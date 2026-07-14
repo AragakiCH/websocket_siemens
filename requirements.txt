@@ -1,0 +1,12 @@
+# ==========================================================================
+# Dependencias del servicio backend OPC UA -> WebSocket
+# Python 3.11 (probado también en 3.10). Instalar con:
+#   pip install -r requirements.txt
+# ==========================================================================
+
+fastapi==0.111.0          # Framework web asíncrono (REST + WebSocket)
+uvicorn[standard]==0.30.1 # Servidor ASGI para correr FastAPI
+asyncua==1.1.5            # Cliente OPC UA asíncrono (async/await)
+pydantic==2.7.4          # Validación de datos / modelos de configuración
+pydantic-settings==2.3.4 # Carga de settings desde variables de entorno
+PyYAML==6.0.1            # Lectura opcional del filtro de DBs (tags_filter.yaml)

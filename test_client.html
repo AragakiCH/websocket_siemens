@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Monitor OPC UA en vivo — Siemens S7-1500</title>
+<style>
+  :root {
+    --bg: #0f172a; --panel: #1e293b; --border: #334155;
+    --txt: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+    --ok: #22c55e; --warn: #f59e0b; --err: #ef4444; --flash: #164e63;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg); color: var(--txt); padding: 24px;
+  }
+  header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  .estado {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 14px; border-radius: 999px; font-size: 14px; font-weight: 600;
+    background: var(--panel); border: 1px solid var(--border);
+  }
+  .punto { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+  .punto.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .punto.warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+  .punto.err { background: var(--err); box-shadow: 0 0 8px var(--err); }
+  .meta { color: var(--muted); font-size: 13px; display: flex; gap: 18px; flex-wrap: wrap; }
+  .controles { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  select {
+    background: var(--panel); color: var(--txt); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; font-size: 14px;
+  }
+  label { color: var(--muted); font-size: 13px; }
+  table {
+    width: 100%; border-collapse: collapse; background: var(--panel);
+    border-radius: 12px; overflow: hidden; border: 1px solid var(--border);
+  }
+  thead th {
+    text-align: left; padding: 12px 14px; font-size: 12px; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--muted); background: #172033;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  tbody tr:last-child td { border-bottom: none; }
+  .tag { font-weight: 600; }
+  .plc {
+    font-size: 12px; font-weight: 700; color: #a5f3fc; background: #0b2b33;
+    padding: 2px 8px; border-radius: 6px; border: 1px solid #155e75;
+  }
+  .valor { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent); }
+  .tipo {
+    font-size: 12px; color: var(--muted); background: #0b1220;
+    padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border);
+  }
+  .ts, .delta { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .delta { color: #fbbf24; font-weight: 600; }
+  .flash { animation: destello .8s ease-out; }
+  @keyframes destello { from { background: var(--flash); } to { background: transparent; } }
+  .bool-true { color: var(--ok); }
+  .bool-false { color: var(--err); }
+  footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
+  code { background: #0b1220; padding: 2px 6px; border-radius: 5px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>⚙️ Monitor OPC UA en vivo</h1>
+    <span class="estado">
+      <span id="punto" class="punto"></span>
+      <span id="estadoTexto">Desconectado</span>
+    </span>
+    <div class="meta">
+      <span>PLCs: <strong id="numPlcs">0</strong></span>
+      <span>Tags: <strong id="numTags">0</strong></span>
+      <span>Mensajes: <strong id="numMsg">0</strong></span>
+      <span>Último cambio: <strong id="ultimoCambio">—</strong></span>
+    </div>
+  </header>
+
+  <div class="controles">
+    <label for="selPlc">Ver PLC:</label>
+    <select id="selPlc">
+      <option value="">Todos</option>
+    </select>
+    <span id="intervalos" class="meta"></span>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>PLC</th><th>Tag</th><th>Valor</th><th>Tipo</th>
+        <th>Δ intervalo</th><th>Cambio (PLC)</th>
+      </tr>
+    </thead>
+    <tbody id="cuerpo">
+      <tr><td colspan="6" style="color:var(--muted)">Esperando datos de los PLCs…</td></tr>
+    </tbody>
+  </table>
+
+  <footer>
+    Conectado a <code id="urlWs"></code> — Δ intervalo = tiempo entre cambios de ese tag.
+    Reconexión automática activada.
+  </footer>
+
+<script>
+// ==========================================================================
+// Cliente WebSocket vanilla. Muestra tags en vivo, permite elegir PLC y ver
+// el intervalo real entre cambios (delta_ms) y la hora de cambio en el PLC.
+// ==========================================================================
+(function () {
+  "use strict";
+
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const cuerpo = document.getElementById("cuerpo");
+  const punto = document.getElementById("punto");
+  const estadoTexto = document.getElementById("estadoTexto");
+  const numPlcs = document.getElementById("numPlcs");
+  const numTags = document.getElementById("numTags");
+  const numMsg = document.getElementById("numMsg");
+  const ultimoCambio = document.getElementById("ultimoCambio");
+  const selPlc = document.getElementById("selPlc");
+  const intervalos = document.getElementById("intervalos");
+  const urlWsSpan = document.getElementById("urlWs");
+
+  const filas = new Map();       // "plc|tag" -> <tr>
+  const plcsVistos = new Set();
+  let contadorMsg = 0;
+  let reintento = 1000;
+  let ws = null;
+  let plcFiltro = "";            // "" = todos
+
+  function setEstado(clase, texto) {
+    punto.className = "punto " + clase;
+    estadoTexto.textContent = texto;
+  }
+
+  function fmtHora(iso) {
+    if (!iso) return "—";
+    try {
+      const d = new Date(iso);
+      return d.toLocaleTimeString("es-ES") + "." +
+             String(d.getMilliseconds()).padStart(3, "0");
+    } catch (e) { return iso; }
+  }
+
+  function fmtDelta(ms) {
+    if (ms === null || ms === undefined) return "—";
+    if (ms < 1000) return Math.round(ms) + " ms";
+    return (ms / 1000).toFixed(2) + " s";
+  }
+
+  function fmtValor(value, type) {
+    if (typeof value === "boolean")
+      return `<span class="${value ? "bool-true" : "bool-false"}">${value ? "TRUE" : "FALSE"}</span>`;
+    if (["Float","Double","Real","LReal"].includes(type)) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toFixed(2) : String(value);
+    }
+    return String(value);
+  }
+
+  function actualizarSelector() {
+    // Añadir al dropdown los PLCs nuevos que vayan apareciendo.
+    plcsVistos.forEach(function (p) {
+      if (![...selPlc.options].some(o => o.value === p)) {
+        const opt = document.createElement("option");
+        opt.value = p; opt.textContent = p;
+        selPlc.appendChild(opt);
+      }
+    });
+  }
+
+  function upsertTag(plc, tag, value, type, sourceTs, deltaMs) {
+    const clave = plc + "|" + tag;
+    let fila = filas.get(clave);
+    if (!fila) {
+      fila = document.createElement("tr");
+      fila.innerHTML =
+        `<td><span class="plc"></span></td><td class="tag"></td><td class="valor"></td>` +
+        `<td><span class="tipo"></span></td><td class="delta"></td><td class="ts"></td>`;
+      cuerpo.appendChild(fila);
+      filas.set(clave, fila);
+      const ph = cuerpo.querySelector("td[colspan]");
+      if (ph) ph.parentElement.remove();
+    }
+    const c = fila.children;
+    c[0].firstElementChild.textContent = plc;
+    c[1].textContent = tag;
+    c[2].innerHTML = fmtValor(value, type);
+    c[3].firstElementChild.textContent = type;
+    c[4].textContent = fmtDelta(deltaMs);
+    c[5].textContent = fmtHora(sourceTs);
+
+    fila.classList.remove("flash");
+    void fila.offsetWidth;
+    fila.classList.add("flash");
+
+    plcsVistos.add(plc);
+    numPlcs.textContent = plcsVistos.size;
+    numTags.textContent = filas.size;
+    actualizarSelector();
+  }
+
+  function limpiarTabla() {
+    filas.clear();
+    cuerpo.innerHTML =
+      `<tr><td colspan="6" style="color:var(--muted)">Esperando datos…</td></tr>`;
+    numTags.textContent = 0;
+  }
+
+  function conectar() {
+    setEstado("warn", "Conectando…");
+    const url = `${proto}://${location.host}/ws` + (plcFiltro ? `?plc=${encodeURIComponent(plcFiltro)}` : "");
+    urlWsSpan.textContent = url;
+    ws = new WebSocket(url);
+
+    ws.onopen = function () { setEstado("ok", "Conectado"); reintento = 1000; };
+
+    ws.onmessage = function (evt) {
+      contadorMsg++; numMsg.textContent = contadorMsg;
+      let msg;
+      try { msg = JSON.parse(evt.data); } catch (e) { return; }
+
+      if (msg.type === "snapshot") {
+        // Resumen de intervalos configurados por PLC.
+        if (msg.plcs) {
+          const partes = Object.entries(msg.plcs).map(([id, p]) =>
+            `${id}: muestreo ${p.sampling_interval_ms}ms / publish ${p.publishing_interval_ms}ms`);
+          intervalos.textContent = partes.join("  |  ");
+        }
+        if (msg.tags) {
+          for (const info of Object.values(msg.tags))
+            upsertTag(info.plc, info.tag, info.value, info.type, info.source_ts, info.delta_ms);
+        }
+        return;
+      }
+
+      if (msg.type === "status") {
+        const etq = msg.plc ? `PLC ${msg.plc}` : "PLC";
+        if (msg.status === "reconectando") setEstado("warn", `${etq} reconectando…`);
+        else if (msg.status === "conectado") setEstado("ok", `${etq} conectado`);
+        return;
+      }
+
+      if (msg.tag !== undefined) {
+        upsertTag(msg.plc || "?", msg.tag, msg.value, msg.type, msg.source_ts, msg.delta_ms);
+        ultimoCambio.textContent = fmtHora(msg.source_ts || msg.timestamp);
+      }
+    };
+
+    ws.onclose = function () {
+      setEstado("err", "Desconectado — reintentando…");
+      setTimeout(conectar, reintento);
+      reintento = Math.min(reintento * 2, 10000);
+    };
+    ws.onerror = function () { ws.close(); };
+  }
+
+  // Cambiar de PLC: reconectar el WS con el nuevo filtro.
+  selPlc.addEventListener("change", function () {
+    plcFiltro = selPlc.value;
+    limpiarTabla();
+    if (ws) { ws.onclose = null; ws.close(); }
+    conectar();
+  });
+
+  conectar();
+})();
+</script>
+</body>
+</html>

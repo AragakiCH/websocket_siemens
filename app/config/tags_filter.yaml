@@ -1,0 +1,13 @@
+# ==========================================================================
+# Filtro OPCIONAL de Data Blocks a descubrir.
+#
+# - Si 'include_dbs' está vacío o comentado -> se descubren TODOS los DBs.
+# - Si se listan nombres -> solo se suscriben esos Data Blocks.
+#
+# Este archivo es opcional; también puede definirse por variable de entorno:
+#   PLC_TAGS_FILTER_DBS=DB_snap7,DB_produccion
+# ==========================================================================
+
+include_dbs:
+  # - DB_snap7
+  # - DB_produccion

@@ -1,0 +1,23 @@
+# --- Python ---
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# --- Node / React ---
+frontend/node_modules/
+frontend/dist/
+
+# --- Builds de escritorio (PyInstaller) ---
+build/
+dist/
+*.spec.bak
+
+# --- Configuracion local (subir solo .env.example) ---
+.env
+
+# --- Otros ---
+nohup.out
+*.log
+.vscode/
+.idea/

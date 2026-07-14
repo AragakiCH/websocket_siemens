@@ -1,0 +1,93 @@
+.app { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+
+.app-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 1.25rem;
+}
+.app-header h1 { margin: 0; font-size: 1.4rem; }
+.subtitle { color: var(--muted); font-size: 0.85rem; }
+
+.ws-badge {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.35rem 0.8rem; border-radius: 999px;
+  border: 1px solid var(--border); font-size: 0.85rem;
+  text-transform: capitalize;
+}
+.ws-badge .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.ws-conectado .dot { background: var(--ok); }
+.ws-conectando .dot { background: var(--warn); }
+.ws-desconectado .dot { background: var(--ko); }
+
+.plc-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.75rem; margin-bottom: 1.5rem;
+}
+.plc-card {
+  text-align: left; background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 0.8rem 1rem; cursor: pointer; font: inherit;
+}
+.plc-card:hover { border-color: var(--accent); }
+.plc-card.activo { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.plc-head { display: flex; justify-content: space-between; gap: 0.5rem; }
+.estado { font-size: 0.75rem; }
+.estado.ok { color: var(--ok); }
+.estado.ko { color: var(--ko); }
+.plc-endpoint { color: var(--muted); font-size: 0.78rem; margin-top: 0.3rem; word-break: break-all; }
+.plc-meta { color: var(--muted); font-size: 0.72rem; margin-top: 0.3rem; }
+
+.tags-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 0.6rem;
+}
+.tags-toolbar h2 { margin: 0; font-size: 1.05rem; }
+.tags-toolbar input {
+  background: var(--panel); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 0.45rem 0.7rem; min-width: 240px; font: inherit;
+}
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+.tags-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.tags-table th, .tags-table td {
+  padding: 0.5rem 0.75rem; text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.tags-table th { background: var(--panel); color: var(--muted); font-weight: 600; }
+.tags-table tbody tr:last-child td { border-bottom: none; }
+.mono { font-family: Consolas, monospace; }
+.valor { font-family: Consolas, monospace; color: var(--accent); font-weight: 600; }
+
+.empty { color: var(--muted); }
+
+/* --- Panel agregar PLC --- */
+.add-plc {
+  display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 10px; padding: 0.7rem 0.9rem; margin-bottom: 1.25rem;
+}
+.add-plc input {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 0.45rem 0.7rem; font: inherit;
+}
+.add-plc input[type="text"] { flex: 1; min-width: 260px; }
+.add-plc input.puerto { width: 90px; }
+.add-plc button {
+  background: var(--accent); color: #08131a; border: none; font: inherit;
+  border-radius: 8px; padding: 0.48rem 0.9rem; cursor: pointer; font-weight: 600;
+}
+.add-plc button:disabled { opacity: 0.45; cursor: default; }
+.add-plc button.secundario {
+  background: transparent; color: var(--accent);
+  border: 1px solid var(--accent);
+}
+.add-plc .aviso { font-size: 0.8rem; }
+.add-plc .aviso.ok { color: var(--ok); }
+.add-plc .aviso.ko { color: var(--ko); }
+
+/* --- Botón quitar PLC en la tarjeta --- */
+.plc-head-der { display: flex; align-items: center; gap: 0.45rem; }
+.plc-card .quitar {
+  background: transparent; border: none; color: var(--muted);
+  cursor: pointer; font-size: 0.85rem; padding: 0 0.15rem; line-height: 1;
+}
+.plc-card .quitar:hover { color: var(--ko); }
