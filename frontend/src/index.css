@@ -1,19 +1,62 @@
-:root {
-  color-scheme: dark;
-  --bg: #0f141a;
-  --panel: #171e26;
-  --border: #26303c;
-  --text: #dfe7ee;
-  --muted: #8fa1b3;
-  --ok: #34d399;
-  --ko: #f87171;
-  --warn: #fbbf24;
-  --accent: #38bdf8;
+/* @import url() FONT IMPORTS MUST ALWAYS BE AT THE VERY TOP OF THIS FILE, ABOVE THE TAILWIND IMPORTS — DO NOT DELETE THIS COMMENT */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+/* CRITICAL: THE FOLLOWING TAILWIND IMPORTS MUST NEVER BE DELETED OR REORDERED — DO NOT DELETE THIS COMMENT */
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* END TAILWIND IMPORTS — ALL OTHER CSS MUST GO BELOW THIS LINE */
+
+html,
+body,
+#root {
+  height: 100%;
 }
-* { box-sizing: border-box; }
 body {
-  margin: 0;
-  font-family: "Segoe UI", system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f8fafc;
+}
+html.dark body {
+  background-color: #0f172a;
+}
+/* Siemens-inspired design tokens */
+:root {
+  --siemens-petrol: #009999;
+  --siemens-petrol-dark: #007a7a;
+  --siemens-navy: #0f172a;
+  --siemens-navy-soft: #1e293b;
+  --siemens-slate: #334155;
+}
+/* HMI canvas grid */
+.hmi-grid {
+  background-color: #f1f5f9;
+  background-image:
+    linear-gradient(to right, rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.hmi-grid-dark {
+  background-color: #0b1220;
+  background-image:
+    linear-gradient(to right, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+/* Thin premium scrollbars */
+.mp-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.mp-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.mp-scroll-dark::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+.mp-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }
