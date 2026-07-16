@@ -11,7 +11,7 @@ export interface PlcVariable {
   selected: boolean;
 }
 
-export type UpdateRate = 250 | 500 | 1000 | 2000 | 5000;
+export type UpdateRate = 100 | 250 | 500 | 1000 | 2000 | 5000;
 
 export type ThemeMode = 'light' | 'dark' | 'auto';
 
@@ -24,6 +24,7 @@ export interface AppConfig {
 }
 
 export const UPDATE_RATE_OPTIONS: {label: string;value: UpdateRate;}[] = [
+{ label: '100 ms', value: 100 },
 { label: '250 ms', value: 250 },
 { label: '500 ms', value: 500 },
 { label: '1 segundo', value: 1000 },

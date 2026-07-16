@@ -170,3 +170,17 @@ async def root():
     return JSONResponse(
         {"mensaje": "Servicio activo. Endpoints: /health, /tags, /browse, /ws"}
     )
+
+
+@app.get("/{ruta_spa:path}", include_in_schema=False)
+async def spa_fallback(ruta_spa: str):
+    """
+    Fallback para React Router (SPA): cualquier ruta no-API (/menu, /designer,
+    /config, /preview...) devuelve el index.html del frontend para que el
+    router del navegador resuelva la vista. Se registra al FINAL, así que
+    /health, /plcs, /ws, /docs, /assets, etc. tienen prioridad.
+    """
+    index_react = os.path.join(_FRONTEND_DIST, "index.html")
+    if os.path.isfile(index_react):
+        return FileResponse(index_react)
+    return JSONResponse({"error": "ruta no encontrada"}, status_code=404)
