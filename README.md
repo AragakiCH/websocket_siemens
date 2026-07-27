@@ -1,12 +1,25 @@
-# Backend OPC UA → WebSocket (Siemens S7-1500)
+# Backend OPC UA → WebSocket (Siemens S7-1500 + Bosch Rexroth ctrlX)
 
-Servicio backend en Python que se conecta a un PLC Siemens S7-1500 vía **OPC UA**,
-**descubre automáticamente** los tags de los Data Blocks (browse recursivo) y
-transmite sus valores en **tiempo real** a clientes vía **WebSocket**, usando
-**subscriptions OPC UA** (MonitoredItems) — sin polling.
+Servicio backend en Python que se conecta a PLCs vía **OPC UA**, **descubre
+automáticamente** sus tags (browse recursivo) y transmite los valores en
+**tiempo real** a clientes vía **WebSocket**, usando **subscriptions OPC UA**
+(MonitoredItems) — sin polling.
+
+Soporta **dos marcas de PLC**, y pueden estar conectadas **a la vez**:
+
+| | **Siemens S7-1500** | **Bosch Rexroth ctrlX CORE** |
+|---|---|---|
+| Driver | `OpcUaDriver` | `RexrothDriver` |
+| Autenticación | Anónima | **Usuario + contraseña** (obligatorio) |
+| Seguridad | *No security* | Cascada `Basic256Sha256` → … → `None` + certificado de cliente |
+| Ruta de los datos | `DeviceSet/PLC_x/DataBlocksGlobal/<DB>` | `Datalayer/plc/app/<app>/sym/<programa>` |
+| Qué se elige en el login | Solo la IP | IP + credenciales + **aplicación** + **programa** |
+| Agrupación de tags | Data Block | Programa (POU) |
+| Lectura | Subscriptions | Subscriptions, con **fallback automático a polling** |
 
 La arquitectura está diseñada para escalar: un driver abstracto (`PlcDriver`)
-permite añadir otros PLCs/protocolos en el futuro sin refactorizar el resto.
+permite añadir otros PLCs/protocolos sin refactorizar el resto. El core
+(`SubscriptionHandler`, WebSocket, frontend) es idéntico para las dos marcas.
 
 ---
 
@@ -34,7 +47,8 @@ permite añadir otros PLCs/protocolos en el futuro sin refactorizar el resto.
 /app
   /drivers
     plc_driver.py         # Interfaz abstracta (ABC) PlcDriver + dataclasses TagInfo/TagValue
-    opcua_driver.py       # Implementación OPC UA con asyncua (browse + subscriptions)
+    opcua_driver.py       # Siemens S7-1500: browse de DataBlocksGlobal + subscriptions
+    rexroth_driver.py     # Rexroth ctrlX: seguridad en cascada, Datalayer/plc/app, fallback a polling
   /core
     connection_manager.py # Gestión de clientes WebSocket + broadcast
     subscription_handler.py # Orquestador por-PLC: conexión, reconexión, snapshot, WS
@@ -45,8 +59,16 @@ permite añadir otros PLCs/protocolos en el futuro sin refactorizar el resto.
     tags_filter.yaml      # Filtro opcional de Data Blocks (default: todos)
   /api
     websocket_routes.py   # Endpoint /ws
-    rest_routes.py        # Endpoints /health, /tags, /browse
+    rest_routes.py        # /health, /tags, /browse, /plcs, /rexroth/apps, /rexroth/programs
   main.py                 # App FastAPI + lifespan (startup/shutdown)
+/frontend/src
+  /pages
+    Login.tsx             # Selector de marca + IP (Siemens) o IP/credenciales/programa (Rexroth)
+  /services
+    RealPLCService.ts     # WebSocket -> PlcVariable (igual para las dos marcas)
+    rexrothApi.ts         # Cliente de /rexroth/apps y /rexroth/programs
+  /models
+    plc.ts                # PlcVendor, PlcConnection, PlcVariable...
 requirements.txt
 test_client.html          # Cliente WebSocket de prueba (tabla en vivo)
 ```
@@ -55,7 +77,7 @@ test_client.html          # Cliente WebSocket de prueba (tabla en vivo)
 
 ## Requisitos
 
-- **Python 3.11** (funciona también en 3.10).
+- **Python 3.10 – 3.13**.
 - PLC / S7-PLCSIM Advanced con servidor OPC UA activo en
   `opc.tcp://192.168.50.1:4840` (No security + acceso anónimo).
 
@@ -82,11 +104,19 @@ venv\Scripts\activate.bat
 pip install -r requirements.txt
 ```
 
+Un venv recién creado solo trae `pip`. Si te saltas este paso, el arranque
+falla con *"El término 'uvicorn' no se reconoce…"*.
+
 ### 3) Arrancar el servidor
 
 ```powershell
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+Usa **`python -m uvicorn`**, no `uvicorn` a secas: el ejecutable
+`venv\Scripts\uvicorn.exe` solo existe si el venv estaba activo al instalar,
+y `python -m` funciona siempre. Y ojo: `python uvicorn ...` (sin `-m`) no
+sirve, Python lo interpreta como el nombre de un archivo.
 
 ### 4) Abrir el cliente de prueba
 
@@ -253,6 +283,139 @@ También soporta usuario/contraseña con `PLC_OPCUA_USERNAME` / `PLC_OPCUA_PASSW
 
 ---
 
+## Trabajar con las dos marcas (Siemens y Rexroth)
+
+### Flujo en la vista web
+
+En la pantalla de login hay un **selector de marca** arriba del todo:
+
+**Siemens** — Igual que siempre. Se escribe la IP y se pulsa *Conectar*. La
+sesión OPC UA es anónima y los tags se descubren solos bajo `DataBlocksGlobal`.
+Usuario y contraseña quedan como campos informativos.
+
+**Rexroth** — Tres pasos, porque el ctrlX exige credenciales y hay que decirle
+qué leer:
+
+1. Se escriben **IP, usuario y contraseña** (de fábrica suele ser
+   `boschrexroth` / `boschrexroth`).
+2. Se pulsa **Buscar**. El backend abre una sesión temporal y devuelve las
+   **aplicaciones** publicadas en `Datalayer/plc/app`. Si solo hay una (lo
+   normal, `Application`), se selecciona sola y ya carga sus programas.
+3. Se elige el **programa** (POU) del desplegable. Recién ahí se habilita
+   *Conectar*.
+
+Como cada tag va prefijado con su `plc_id`, se pueden dar de alta un S7 y un
+ctrlX y ver los dos a la vez en el Diseñador.
+
+### Endpoints REST específicos de Rexroth
+
+Se usan **antes** de dar de alta el PLC; abren una sesión OPC UA temporal y la
+cierran. Documentados también en `/docs`.
+
+```bash
+# 1) Aplicaciones publicadas en el ctrlX
+curl -X POST http://localhost:8000/rexroth/apps \
+  -H "Content-Type: application/json" \
+  -d '{"host":"192.168.1.1","usuario":"boschrexroth","password":"boschrexroth"}'
+# -> {"ok":true,"endpoint":"opc.tcp://192.168.1.1:4840","apps":["Application"]}
+
+# 2) Programas (POUs) de una aplicación
+curl -X POST http://localhost:8000/rexroth/programs \
+  -H "Content-Type: application/json" \
+  -d '{"host":"192.168.1.1","usuario":"boschrexroth","password":"boschrexroth","app":"Application"}'
+# -> {"ok":true,"app":"Application","programas":["PLC_PRG"]}
+
+# 3) Dar de alta el PLC
+curl -X POST http://localhost:8000/plcs \
+  -H "Content-Type: application/json" \
+  -d '{"host":"192.168.1.1","vendor":"rexroth","usuario":"boschrexroth",
+       "password":"boschrexroth","app":"Application","programa":"PLC_PRG"}'
+```
+
+Un PLC Siemens se sigue dando de alta igual que antes; `vendor` es opcional y
+por defecto vale `siemens`:
+
+```bash
+curl -X POST http://localhost:8000/plcs \
+  -H "Content-Type: application/json" -d '{"host":"192.168.50.1"}'
+```
+
+### Certificado de cliente (importante la primera vez)
+
+El ctrlX suele exigir canal seguro con certificado. El backend **genera uno
+solo** (RSA 2048, autofirmado, 10 años, con el `SubjectAltName` que pide la
+especificación OPC UA) y lo reutiliza en cada arranque:
+
+- Windows: `%LOCALAPPDATA%\HMI-Studio\opcua\client_cert.pem`
+- Linux: `~/.local/share/hmi-studio/opcua/client_cert.pem`
+
+**La primera conexión va a fallar** hasta que aceptes ese certificado en la web
+del ctrlX: *Settings → Certificates & Keys → OPC UA Server → Trusted
+certificates*. Después conecta sin intervención.
+
+Si prefieres usar el par que ya tienes (por ejemplo el del proyecto
+WebSocket_RX), apunta `PLC_REXROTH_CERT_PATH` y `PLC_REXROTH_KEY_PATH` a esos
+archivos `.pem` y no se genera nada.
+
+### Subscriptions vs. polling
+
+El `RexrothDriver` intenta primero la **subscription OPC UA nativa**, igual que
+Siemens. Si el ctrlX la rechaza, **o si no entrega ningún cambio en 5 segundos**
+(`PLC_REXROTH_SUBSCRIPTION_GRACE_S`), la cierra sola y arranca un bucle de
+**polling** cada 100 ms (`PLC_REXROTH_POLL_INTERVAL_MS`) que emite por el mismo
+callback. El WebSocket y el frontend no notan la diferencia; el polling solo
+emite los tags que **cambiaron**, para no inundar la vista.
+
+Puedes ver qué modo quedó activo en `GET /health`, campo `modo_lectura`:
+
+```json
+{"plc": "192.168.1.1", "vendor": "rexroth", "modo_lectura": "polling", ...}
+```
+
+Para forzar polling desde el arranque (como hacía el `WebSocket_RX` original):
+`PLC_REXROTH_FORCE_POLLING=true`.
+
+### Variables de entorno de Rexroth
+
+| Variable | Por defecto | Para qué |
+|---|---|---|
+| `PLC_VENDOR` | `siemens` | Marca por defecto del arranque automático y del escaneo de red |
+| `PLC_REXROTH_USERNAME` | — | Usuario del ctrlX |
+| `PLC_REXROTH_PASSWORD` | — | Contraseña del ctrlX |
+| `PLC_REXROTH_APP` | `Application` | Aplicación bajo `Datalayer/plc/app` |
+| `PLC_REXROTH_PROGRAM` | `PLC_PRG` | Programa bajo el nodo `sym` |
+| `PLC_REXROTH_BROWSE_DEPTH` | `4` | Profundidad al recorrer estructuras anidadas |
+| `PLC_REXROTH_CERT_PATH` / `_KEY_PATH` | autogenerado | Certificado de cliente |
+| `PLC_REXROTH_SAMPLING_INTERVAL_MS` | `100` | Muestreo de la subscription |
+| `PLC_REXROTH_SUBSCRIPTION_GRACE_S` | `5.0` | Gracia antes de caer a polling |
+| `PLC_REXROTH_POLL_INTERVAL_MS` | `100` | Intervalo del polling |
+| `PLC_REXROTH_FORCE_POLLING` | `false` | Saltarse la subscription |
+
+Estas variables solo hacen falta si arrancas con PLCs automáticos
+(`PLC_AUTOSTART_PLCS=true`); si los agregas desde la vista, las credenciales
+viajan en la petición.
+
+### Requisitos del lado del ctrlX
+
+- App **PLC** instalada y en marcha.
+- Proyecto **publicado desde la configuración de símbolos** (Symbol
+  Configuration). Sin eso el nodo `sym` no existe y el backend responde
+  *"No hay símbolos publicados"*.
+- Servidor **OPC UA** habilitado en el ctrlX.
+- Certificado del cliente aceptado (ver arriba).
+
+### Errores frecuentes
+
+| Mensaje | Causa | Solución |
+|---|---|---|
+| `No se pudo abrir sesión con opc.tcp://…` (401) | Usuario/contraseña mal, o certificado no aceptado | Revisa credenciales; acepta el certificado en el ctrlX |
+| `no se encontró 'Datalayer/plc/app'` (404) | La app PLC no está corriendo | Arráncala desde la web del ctrlX |
+| `no se encontró el nodo 'sym'` (404) | Proyecto sin publicar | Publica desde la configuración de símbolos |
+| `Un PLC Rexroth necesita usuario y contraseña` | Se mandó `vendor=rexroth` sin credenciales | El ctrlX no admite sesiones anónimas |
+| Conecta pero no llegan datos | Subscription muda | El driver cae solo a polling a los 5 s; revisa `modo_lectura` en `/health` |
+
+---
+
 ## Extender a otros PLCs / protocolos
 
 Para añadir soporte, por ejemplo, a Modbus o S7 nativo:
@@ -282,7 +445,7 @@ Para añadir soporte, por ejemplo, a Modbus o S7 nativo:
 
 | Herramienta | Versión | Para qué |
 |---|---|---|
-| Python | 3.10 – 3.11 | Backend FastAPI + OPC UA |
+| Python | 3.10 – 3.13 | Backend FastAPI + OPC UA |
 | Node.js | 18+ | Compilar el frontend React (solo si vas a tocar la vista) |
 | Git | — | Clonar el repositorio |
 
@@ -316,7 +479,7 @@ cd ..
 
 ```bash
 python desktop\servidor.py
-# o equivalente: uvicorn app.main:app --host 0.0.0.0 --port 8000
+# o equivalente: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 Abrir **http://localhost:8000** → vista web para agregar PLCs por IP o
@@ -326,7 +489,7 @@ escanear la red. Documentación interactiva de la API en **http://localhost:8000
 
 ```bash
 # Terminal 1: backend
-uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 8000
 
 # Terminal 2: frontend con Vite
 cd frontend && npm run dev

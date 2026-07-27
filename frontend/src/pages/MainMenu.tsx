@@ -10,7 +10,10 @@ import {
 import { useAppStore } from '../context/AppStore';
 export function MainMenu() {
   const navigate = useNavigate();
-  const { plcIp, disconnect, t } = useAppStore();
+  const { plcIp, plcVendor, disconnect, t } = useAppStore();
+  // Etiqueta legible de la marca, para saber de un vistazo contra qué PLC se
+  // está trabajando cuando hay Siemens y Rexroth mezclados.
+  const marca = plcVendor === 'rexroth' ? 'Rexroth' : 'Siemens';
   const handleLogout = () => {
     disconnect();
     navigate('/');
@@ -27,7 +30,7 @@ export function MainMenu() {
               HMI Studio
             </p>
             <p className="text-xs text-slate-400">
-              {t('menu.connectedTo')} {plcIp}
+              {t('menu.connectedTo')} {plcIp} · {marca}
             </p>
           </div>
         </div>

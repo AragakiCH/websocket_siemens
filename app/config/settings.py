@@ -30,6 +30,17 @@ class Settings(BaseSettings):
     """Modelo de configuración de la aplicación."""
 
     # ------------------------------------------------------------------ #
+    # Proveedor del PLC (marca)
+    # ------------------------------------------------------------------ #
+    # 'siemens' -> OpcUaDriver  (S7-1500, DataBlocksGlobal, anónimo)
+    # 'rexroth' -> RexrothDriver (ctrlX CORE, Datalayer/plc/app, user+pass)
+    # Es el valor por DEFECTO; cada PLC puede traer el suyo al darse de alta.
+    vendor: str = Field(
+        default="siemens",
+        description="Marca del PLC por defecto: 'siemens' o 'rexroth'.",
+    )
+
+    # ------------------------------------------------------------------ #
     # Conexión OPC UA
     # ------------------------------------------------------------------ #
     opcua_endpoint: str = Field(
@@ -65,6 +76,45 @@ class Settings(BaseSettings):
     server_cert_path: Optional[str] = Field(default=None)
     opcua_username: Optional[str] = Field(default=None)
     opcua_password: Optional[str] = Field(default=None)
+
+    # ------------------------------------------------------------------ #
+    # Bosch Rexroth ctrlX CORE (solo aplica si vendor='rexroth')
+    # ------------------------------------------------------------------ #
+    # El ctrlX SIEMPRE pide usuario y contraseña (no admite anónimo).
+    rexroth_username: Optional[str] = Field(
+        default=None, description="Usuario del ctrlX (ej. 'boschrexroth').")
+    rexroth_password: Optional[str] = Field(
+        default=None, description="Contraseña del ctrlX.")
+
+    # Ruta de los datos: Datalayer/plc/app/<app>/sym/<programa>
+    rexroth_app: str = Field(
+        default="Application",
+        description="Aplicación PLC dentro del Data Layer.")
+    rexroth_program: str = Field(
+        default="PLC_PRG",
+        description="Programa (POU) cuyos símbolos se van a leer.")
+
+    # Profundidad máxima al recorrer estructuras anidadas dentro del programa.
+    rexroth_browse_depth: int = Field(default=4)
+
+    # Certificado de cliente. Si se dejan vacíos se genera uno automáticamente
+    # en el perfil del usuario y se reutiliza en cada arranque.
+    rexroth_cert_path: Optional[str] = Field(default=None)
+    rexroth_key_path: Optional[str] = Field(default=None)
+    rexroth_application_uri: str = Field(default="urn:psi:hmi-studio")
+    rexroth_application_name: str = Field(default="HMI Studio")
+    rexroth_connect_timeout: float = Field(default=8.0)
+
+    # Muestreo de la subscription en el ctrlX (no tiene el mínimo de 1000 ms
+    # del S7-1500, así que puede bajar bastante más).
+    rexroth_sampling_interval_ms: int = Field(default=100)
+
+    # Fallback a polling: si la subscription no entrega ningún dato en estos
+    # segundos, se cierra y se lee por polling al intervalo indicado.
+    rexroth_subscription_grace_s: float = Field(default=5.0)
+    rexroth_poll_interval_ms: int = Field(default=100)
+    # Saltarse el intento de subscription e ir directo a polling.
+    rexroth_force_polling: bool = Field(default=False)
 
     # ------------------------------------------------------------------ #
     # Parámetros de las subscriptions (tiempo real, sin polling)

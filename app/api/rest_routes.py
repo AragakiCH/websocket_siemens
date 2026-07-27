@@ -4,26 +4,37 @@ rest_routes.py
 ==============
 Endpoints REST del servicio. Documentación interactiva en /docs (Swagger UI).
 
-  GET    /health        -> estado de cada PLC, intervalos, nº de tags y clientes WS.
-  GET    /plcs          -> lista de ids de PLC gestionados (para el selector).
-  POST   /plcs          -> añade un PLC por IP/endpoint escrito por el usuario.
-  DELETE /plcs/{id}     -> quita un PLC gestionado.
-  POST   /discover      -> re-escanea la red una vez y añade PLCs nuevos.
-  GET    /tags?plc=X    -> tags descubiertos (de todos los PLCs o solo de X).
-  GET    /browse?plc=X  -> árbol de tags por PLC y Data Block (debug).
+  GET    /health          -> estado de cada PLC, intervalos, nº de tags y clientes WS.
+  GET    /plcs            -> lista de ids de PLC gestionados (para el selector).
+  POST   /plcs            -> añade un PLC por IP/endpoint (Siemens o Rexroth).
+  DELETE /plcs/{id}       -> quita un PLC gestionado.
+  POST   /discover        -> re-escanea la red una vez y añade PLCs nuevos.
+  GET    /tags?plc=X      -> tags descubiertos (de todos los PLCs o solo de X).
+  GET    /browse?plc=X    -> árbol de tags por PLC y Data Block / programa.
+
+Específicos de Bosch Rexroth ctrlX (se usan ANTES de dar de alta el PLC, para
+que el usuario elija qué leer):
+
+  POST   /rexroth/apps     -> apps PLC publicadas en Datalayer/plc/app.
+  POST   /rexroth/programs -> programas (POUs) de una app, bajo su nodo `sym`.
 """
 from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Body, Request
+from fastapi import APIRouter, Body, HTTPException, Request
 from pydantic import BaseModel, Field
 
 router = APIRouter()
 
 
 class NuevoPlc(BaseModel):
-    """Cuerpo de POST /plcs: IP, hostname o endpoint opc.tcp:// completo."""
+    """
+    Cuerpo de POST /plcs.
+
+    Siemens: basta `host` (la sesión OPC UA es anónima).
+    Rexroth: además son obligatorios `usuario`, `password` y `programa`.
+    """
 
     host: str = Field(
         ...,
@@ -34,6 +45,53 @@ class NuevoPlc(BaseModel):
         default=4840, ge=1, le=65535,
         description="Puerto OPC UA (se ignora si `host` ya es un endpoint completo).",
     )
+    vendor: str = Field(
+        default="siemens",
+        description="Marca del PLC: `siemens` (S7-1500) o `rexroth` (ctrlX CORE).",
+        examples=["siemens", "rexroth"],
+    )
+    usuario: str = Field(
+        default="", description="Solo Rexroth: usuario del ctrlX.")
+    password: str = Field(
+        default="", description="Solo Rexroth: contraseña del ctrlX.")
+    app: str = Field(
+        default="Application",
+        description="Solo Rexroth: aplicación bajo `Datalayer/plc/app`.")
+    programa: str = Field(
+        default="",
+        description="Solo Rexroth: programa (POU) bajo el nodo `sym` de la app.")
+
+
+class CredencialesRexroth(BaseModel):
+    """Credenciales para explorar un ctrlX antes de darlo de alta."""
+
+    host: str = Field(
+        ...,
+        description="IP, hostname o endpoint completo del ctrlX.",
+        examples=["192.168.1.1"],
+    )
+    puerto: int = Field(default=4840, ge=1, le=65535)
+    usuario: str = Field(..., examples=["boschrexroth"])
+    password: str = Field(...)
+
+
+class ProgramasRexroth(CredencialesRexroth):
+    """Igual que CredencialesRexroth, más la app cuyos programas se listan."""
+
+    app: str = Field(
+        default="Application",
+        description="Aplicación devuelta por `POST /rexroth/apps`.",
+    )
+
+
+def _endpoint_desde(host: str, puerto: int) -> str:
+    """Normaliza IP/hostname/endpoint a un endpoint `opc.tcp://host:puerto`."""
+    host = (host or "").strip()
+    if not host:
+        raise HTTPException(400, "Indica la IP del PLC.")
+    if host.startswith("opc.tcp://"):
+        return host
+    return f"opc.tcp://{host}:{puerto}"
 
 
 @router.get(
@@ -75,16 +133,24 @@ async def plcs(request: Request) -> dict:
 
 @router.post(
     "/plcs",
-    summary="Agregar un PLC por IP",
+    summary="Agregar un PLC por IP (Siemens o Rexroth)",
     description="Añade un PLC en caliente con la IP (o endpoint `opc.tcp://`) "
                 "indicada. Responde de inmediato; la conexión OPC UA se "
                 "intenta en segundo plano con reintentos automáticos. Todos "
-                "los clientes WebSocket reciben un snapshot actualizado.",
+                "los clientes WebSocket reciben un snapshot actualizado.\n\n"
+                "Con `vendor=rexroth` hay que mandar además `usuario`, "
+                "`password` y `programa` (usa `/rexroth/apps` y "
+                "`/rexroth/programs` para obtener los dos últimos).",
     responses={200: {"content": {"application/json": {"examples": {
-        "ok": {"summary": "PLC añadido", "value": {
+        "siemens": {"summary": "S7-1500 añadido", "value": {
             "ok": True, "plc_id": "192.168.50.1",
-            "endpoint": "opc.tcp://192.168.50.1:4840",
-            "mensaje": "PLC 192.168.50.1 añadido; conectando...",
+            "endpoint": "opc.tcp://192.168.50.1:4840", "vendor": "siemens",
+            "mensaje": "PLC 192.168.50.1 (siemens) añadido; conectando...",
+        }},
+        "rexroth": {"summary": "ctrlX CORE añadido", "value": {
+            "ok": True, "plc_id": "192.168.1.1",
+            "endpoint": "opc.tcp://192.168.1.1:4840", "vendor": "rexroth",
+            "mensaje": "PLC 192.168.1.1 (rexroth) añadido; conectando...",
         }},
         "duplicado": {"summary": "Ya existía", "value": {
             "ok": False, "plc_id": "192.168.50.1",
@@ -95,10 +161,21 @@ async def plcs(request: Request) -> dict:
 )
 async def agregar_plc(
     request: Request,
-    cuerpo: NuevoPlc = Body(..., examples=[{"host": "192.168.50.1", "puerto": 4840}]),
+    cuerpo: NuevoPlc = Body(..., examples=[
+        {"host": "192.168.50.1", "puerto": 4840, "vendor": "siemens"},
+        {"host": "192.168.1.1", "puerto": 4840, "vendor": "rexroth",
+         "usuario": "boschrexroth", "password": "boschrexroth",
+         "app": "Application", "programa": "PLC_PRG"},
+    ]),
 ) -> dict:
     return await request.app.state.plc_manager.add_plc_manual(
-        cuerpo.host, cuerpo.puerto
+        host=cuerpo.host,
+        puerto=cuerpo.puerto,
+        vendor=cuerpo.vendor,
+        usuario=cuerpo.usuario,
+        password=cuerpo.password,
+        app=cuerpo.app,
+        programa=cuerpo.programa,
     )
 
 
@@ -175,3 +252,116 @@ async def tags(request: Request, plc: Optional[str] = None) -> dict:
 )
 async def browse(request: Request, plc: Optional[str] = None) -> dict:
     return request.app.state.plc_manager.get_browse(plc)
+
+
+# ====================================================================== #
+# Bosch Rexroth ctrlX: exploración previa al alta del PLC
+# ====================================================================== #
+async def _explorar_ctrlx(cuerpo: CredencialesRexroth, listar, *args):
+    """
+    Abre una sesión temporal contra el ctrlX, ejecuta `listar` y cierra.
+
+    Se conecta y desconecta en cada llamada a propósito: esto ocurre en la
+    pantalla de login, antes de que el PLC exista como tal, así que no hay
+    ningún driver ni sesión persistente que reutilizar.
+    """
+    # Import local: `cryptography` solo se necesita para PLCs Rexroth.
+    from app.config.settings import get_settings
+    from app.drivers.rexroth_driver import conectar_ctrlx
+
+    endpoint = _endpoint_desde(cuerpo.host, cuerpo.puerto)
+    if not cuerpo.usuario or not cuerpo.password:
+        raise HTTPException(400, "El ctrlX necesita usuario y contraseña.")
+
+    try:
+        cliente = await conectar_ctrlx(
+            endpoint, cuerpo.usuario, cuerpo.password, get_settings()
+        )
+    except Exception as exc:  # noqa: BLE001
+        # 401: credenciales/seguridad. Es el caso más común y conviene
+        # distinguirlo de "conecté pero no encontré nada".
+        raise HTTPException(
+            401,
+            f"No se pudo abrir sesión con {endpoint}. Revisa usuario, "
+            f"contraseña y que el certificado del cliente esté aceptado en el "
+            f"ctrlX. Detalle: {exc}",
+        )
+
+    try:
+        return await listar(cliente, *args)
+    except RuntimeError as exc:
+        # Conectó, pero el árbol esperado no está (proyecto sin publicar).
+        raise HTTPException(404, str(exc))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"{type(exc).__name__}: {exc}")
+    finally:
+        try:
+            await cliente.disconnect()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+@router.post(
+    "/rexroth/apps",
+    summary="Listar aplicaciones PLC de un ctrlX",
+    description="Abre una sesión temporal con el ctrlX y devuelve las "
+                "aplicaciones publicadas bajo `Datalayer/plc/app` que exponen "
+                "símbolos. Normalmente hay una sola: `Application`.",
+    responses={
+        200: {"content": {"application/json": {"example": {
+            "ok": True, "endpoint": "opc.tcp://192.168.1.1:4840",
+            "apps": ["Application"],
+        }}}},
+        401: {"description": "Credenciales inválidas o certificado no aceptado."},
+        404: {"description": "Conectó, pero no hay símbolos publicados."},
+    },
+)
+async def rexroth_apps(
+    cuerpo: CredencialesRexroth = Body(..., examples=[{
+        "host": "192.168.1.1", "puerto": 4840,
+        "usuario": "boschrexroth", "password": "boschrexroth",
+    }]),
+) -> dict:
+    from app.drivers.rexroth_driver import listar_apps
+
+    apps = await _explorar_ctrlx(cuerpo, listar_apps)
+    return {
+        "ok": True,
+        "endpoint": _endpoint_desde(cuerpo.host, cuerpo.puerto),
+        "apps": apps,
+    }
+
+
+@router.post(
+    "/rexroth/programs",
+    summary="Listar programas (POUs) de una aplicación del ctrlX",
+    description="Devuelve los hijos del nodo `sym` de la aplicación indicada, "
+                "es decir los programas cuyos símbolos se pueden leer. Si sale "
+                "vacío, publica el proyecto desde la configuración de símbolos "
+                "del PLC.",
+    responses={
+        200: {"content": {"application/json": {"example": {
+            "ok": True, "endpoint": "opc.tcp://192.168.1.1:4840",
+            "app": "Application", "programas": ["PLC_PRG", "MotionProg"],
+        }}}},
+        401: {"description": "Credenciales inválidas o certificado no aceptado."},
+        404: {"description": "La app no expone programas en `sym`."},
+    },
+)
+async def rexroth_programas(
+    cuerpo: ProgramasRexroth = Body(..., examples=[{
+        "host": "192.168.1.1", "puerto": 4840,
+        "usuario": "boschrexroth", "password": "boschrexroth",
+        "app": "Application",
+    }]),
+) -> dict:
+    from app.drivers.rexroth_driver import listar_programas
+
+    app_sel = (cuerpo.app or "Application").strip()
+    programas = await _explorar_ctrlx(cuerpo, listar_programas, app_sel)
+    return {
+        "ok": True,
+        "endpoint": _endpoint_desde(cuerpo.host, cuerpo.puerto),
+        "app": app_sel,
+        "programas": programas,
+    }

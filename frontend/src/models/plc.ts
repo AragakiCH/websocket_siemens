@@ -1,6 +1,26 @@
-// Domain models for the emulated PLC layer.
+// Domain models for the PLC layer.
 
 export type DataType = 'bool' | 'int' | 'double' | 'string';
+
+/**
+ * Marca del PLC. Determina qué driver usa el backend:
+ *  - 'siemens': S7-1500 por OPC UA anónimo, tags bajo DataBlocksGlobal.
+ *  - 'rexroth': ctrlX CORE, requiere usuario/contraseña y elegir el programa
+ *               dentro de Datalayer/plc/app/<app>/sym/<programa>.
+ */
+export type PlcVendor = 'siemens' | 'rexroth';
+
+/** Datos que la vista de Login envía al backend para dar de alta un PLC. */
+export interface PlcConnection {
+  vendor: PlcVendor;
+  ip: string;
+  puerto?: number;
+  // Solo Rexroth:
+  usuario?: string;
+  password?: string;
+  app?: string;
+  programa?: string;
+}
 
 export interface PlcVariable {
   id: string;
