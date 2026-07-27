@@ -170,3 +170,12 @@ async def root():
     return JSONResponse(
         {"mensaje": "Servicio activo. Endpoints: /health, /tags, /browse, /ws"}
     )
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def spa_fallback(full_path: str):
+    """Devuelve index.html para las rutas del router de React (/config, /designer...)."""
+    index_react = os.path.join(_FRONTEND_DIST, "index.html")
+    if os.path.isfile(index_react):
+        return FileResponse(index_react)
+    return JSONResponse({"mensaje": "Frontend no compilado. Corre npm run build."})

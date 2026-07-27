@@ -1,0 +1,27 @@
+// vite.config.js
+import { defineConfig } from "file:///sessions/lucid-bold-pascal/mnt/websocket_siemens/frontend/node_modules/vite/dist/node/index.js";
+import react from "file:///sessions/lucid-bold-pascal/mnt/websocket_siemens/frontend/node_modules/@vitejs/plugin-react/dist/index.js";
+var BACKEND = "http://localhost:8000";
+var vite_config_default = defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    proxy: {
+      // WebSocket en tiempo real
+      "/ws": { target: BACKEND, ws: true },
+      // Endpoints REST del backend
+      "/health": BACKEND,
+      "/plcs": BACKEND,
+      "/tags": BACKEND,
+      "/browse": BACKEND,
+      "/discover": BACKEND
+    }
+  },
+  build: {
+    outDir: "dist"
+  }
+});
+export {
+  vite_config_default as default
+};
+//# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsidml0ZS5jb25maWcuanMiXSwKICAic291cmNlc0NvbnRlbnQiOiBbImNvbnN0IF9fdml0ZV9pbmplY3RlZF9vcmlnaW5hbF9kaXJuYW1lID0gXCIvc2Vzc2lvbnMvbHVjaWQtYm9sZC1wYXNjYWwvbW50L3dlYnNvY2tldF9zaWVtZW5zL2Zyb250ZW5kXCI7Y29uc3QgX192aXRlX2luamVjdGVkX29yaWdpbmFsX2ZpbGVuYW1lID0gXCIvc2Vzc2lvbnMvbHVjaWQtYm9sZC1wYXNjYWwvbW50L3dlYnNvY2tldF9zaWVtZW5zL2Zyb250ZW5kL3ZpdGUuY29uZmlnLmpzXCI7Y29uc3QgX192aXRlX2luamVjdGVkX29yaWdpbmFsX2ltcG9ydF9tZXRhX3VybCA9IFwiZmlsZTovLy9zZXNzaW9ucy9sdWNpZC1ib2xkLXBhc2NhbC9tbnQvd2Vic29ja2V0X3NpZW1lbnMvZnJvbnRlbmQvdml0ZS5jb25maWcuanNcIjtpbXBvcnQgeyBkZWZpbmVDb25maWcgfSBmcm9tICd2aXRlJ1xyXG5pbXBvcnQgcmVhY3QgZnJvbSAnQHZpdGVqcy9wbHVnaW4tcmVhY3QnXHJcblxyXG4vLyBCYWNrZW5kIEZhc3RBUEkgKHV2aWNvcm4gYXBwLm1haW46YXBwIC0tcG9ydCA4MDAwKVxyXG5jb25zdCBCQUNLRU5EID0gJ2h0dHA6Ly9sb2NhbGhvc3Q6ODAwMCdcclxuXHJcbi8vIGh0dHBzOi8vdml0ZS5kZXYvY29uZmlnL1xyXG5leHBvcnQgZGVmYXVsdCBkZWZpbmVDb25maWcoe1xyXG4gIHBsdWdpbnM6IFtyZWFjdCgpXSxcclxuICBzZXJ2ZXI6IHtcclxuICAgIHBvcnQ6IDUxNzMsXHJcbiAgICBwcm94eToge1xyXG4gICAgICAvLyBXZWJTb2NrZXQgZW4gdGllbXBvIHJlYWxcclxuICAgICAgJy93cyc6IHsgdGFyZ2V0OiBCQUNLRU5ELCB3czogdHJ1ZSB9LFxyXG4gICAgICAvLyBFbmRwb2ludHMgUkVTVCBkZWwgYmFja2VuZFxyXG4gICAgICAnL2hlYWx0aCc6IEJBQ0tFTkQsXHJcbiAgICAgICcvcGxjcyc6IEJBQ0tFTkQsXHJcbiAgICAgICcvdGFncyc6IEJBQ0tFTkQsXHJcbiAgICAgICcvYnJvd3NlJzogQkFDS0VORCxcclxuICAgICAgJy9kaXNjb3Zlcic6IEJBQ0tFTkQsXHJcbiAgICB9LFxyXG4gIH0sXHJcbiAgYnVpbGQ6IHtcclxuICAgIG91dERpcjogJ2Rpc3QnLFxyXG4gIH0sXHJcbn0pXHJcbiJdLAogICJtYXBwaW5ncyI6ICI7QUFBZ1csU0FBUyxvQkFBb0I7QUFDN1gsT0FBTyxXQUFXO0FBR2xCLElBQU0sVUFBVTtBQUdoQixJQUFPLHNCQUFRLGFBQWE7QUFBQSxFQUMxQixTQUFTLENBQUMsTUFBTSxDQUFDO0FBQUEsRUFDakIsUUFBUTtBQUFBLElBQ04sTUFBTTtBQUFBLElBQ04sT0FBTztBQUFBO0FBQUEsTUFFTCxPQUFPLEVBQUUsUUFBUSxTQUFTLElBQUksS0FBSztBQUFBO0FBQUEsTUFFbkMsV0FBVztBQUFBLE1BQ1gsU0FBUztBQUFBLE1BQ1QsU0FBUztBQUFBLE1BQ1QsV0FBVztBQUFBLE1BQ1gsYUFBYTtBQUFBLElBQ2Y7QUFBQSxFQUNGO0FBQUEsRUFDQSxPQUFPO0FBQUEsSUFDTCxRQUFRO0FBQUEsRUFDVjtBQUNGLENBQUM7IiwKICAibmFtZXMiOiBbXQp9Cg==

@@ -10,11 +10,12 @@ import {
 import { useAppStore } from '../context/AppStore';
 export function MainMenu() {
   const navigate = useNavigate();
-  const { plcIp, disconnect, t } = useAppStore();
-  const handleLogout = () => {
-    disconnect();
-    navigate('/');
-  };
+  const { disconnect, t } = useAppStore();
+  // Login deshabilitado — ya no hay logout
+  // const handleLogout = () => {
+  //   disconnect();
+  //   navigate('/');
+  // };
   return (
     <div className="relative flex min-h-full w-full flex-col bg-slate-50 dark:bg-navy">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-4 dark:border-navy-slate dark:bg-navy-soft">
@@ -24,20 +25,20 @@ export function MainMenu() {
           </div>
           <div>
             <p className="text-sm font-bold text-navy dark:text-slate-100">
-              HMI Studio
+              SRX Studio
             </p>
-            <p className="text-xs text-slate-400">
-              {t('menu.connectedTo')} {plcIp}
-            </p>
+            {/* IP movida a /config */}
           </div>
         </div>
+        {/* Login deshabilitado — botón de logout oculto */}
+        {/*
         <button
           onClick={handleLogout}
           className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-navy dark:hover:bg-navy-slate/40 dark:hover:text-slate-100">
-          
           <LogOutIcon className="h-4 w-4" />
           {t('menu.logout')}
         </button>
+        */}
       </header>
 
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-16">

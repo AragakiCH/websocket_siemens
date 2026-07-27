@@ -20,6 +20,8 @@ import {
 'lucide-react';
 import { WidgetKind } from '../../models/widget';
 import { customWidgets } from './custom/registry';
+import { loadZipWidgets, fullKind } from '../../services/zipWidgetLoader';
+import { PuzzleIcon } from 'lucide-react';
 
 export interface CatalogItem {
   kind: WidgetKind;
@@ -177,20 +179,33 @@ const builtInCatalog: CatalogItem[] = [
   category: 'Datos'
 }];
 
-// Catálogo completo = built-in + los custom del registry.
-// Los customs se agregan solitos aquí porque el registry los expone;
-// no toques este archivo cuando agregues un widget nuevo.
-export const widgetCatalog: CatalogItem[] = [
-  ...builtInCatalog,
-  ...customWidgets.map((w) => ({
-    kind: w.kind,
-    label: w.label,
-    icon: w.icon,
-    defaultWidth: w.defaultWidth,
-    defaultHeight: w.defaultHeight,
-    category: w.category
-  }))
-];
+// Catálogo completo = built-in + custom TSX + custom ZIP (HTML).
+// Se regenera cada vez que se llama para capturar ZIPs recién cargados.
+export function getWidgetCatalog(): CatalogItem[] {
+  const zipItems: CatalogItem[] = loadZipWidgets().map((z) => ({
+    kind: fullKind(z.meta.kind) as WidgetKind,
+    label: z.meta.label,
+    icon: PuzzleIcon,
+    defaultWidth: z.meta.defaultWidth,
+    defaultHeight: z.meta.defaultHeight,
+    category: z.meta.category,
+  }));
+  return [
+    ...builtInCatalog,
+    ...customWidgets.map((w) => ({
+      kind: w.kind as WidgetKind,
+      label: w.label,
+      icon: w.icon,
+      defaultWidth: w.defaultWidth,
+      defaultHeight: w.defaultHeight,
+      category: w.category,
+    })),
+    ...zipItems,
+  ];
+}
+
+/** Compat: referencia estática (sin ZIP dinámicos). Usar getWidgetCatalog() para incluir ZIPs. */
+export const widgetCatalog = getWidgetCatalog();
 
 export const catalogByKind = (kind: WidgetKind): CatalogItem | undefined =>
-  widgetCatalog.find((c) => c.kind === kind);
+  getWidgetCatalog().find((c) => c.kind === kind);

@@ -49,7 +49,8 @@ typeof window !== 'undefined' &&
 typeof window.matchMedia === 'function' &&
 window.matchMedia('(prefers-color-scheme: dark)').matches;
 export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
-  const [connected, setConnected] = useState(false);
+  // Login deshabilitado — auto-conectado con IP por defecto
+  const [connected, setConnected] = useState(true);
   const [plcIp, setPlcIp] = useState('192.168.0.1');
   const [variables, setVariables] = useState<PlcVariable[]>(() =>
   MockPLCService.getVariables()

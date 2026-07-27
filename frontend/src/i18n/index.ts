@@ -52,6 +52,10 @@ const es: Dict = {
   'config.mainView': 'Vista Principal',
   'config.saved': 'Configuración guardada correctamente',
   'config.selectVar': 'Seleccionar',
+  'config.plcConnection': 'Conexión PLC',
+  'config.noPlc': 'Sin PLCs conectados — agregue uno desde el backend',
+  'config.plcOnline': 'Conectado',
+  'config.plcOffline': 'Desconectado',
 
   // Rate options
   'rate.1000': '1 segundo',
@@ -70,6 +74,8 @@ const es: Dict = {
   // Sidebar
   'sidebar.title': 'Widgets',
   'sidebar.hint': 'Arrastre al lienzo',
+  'sidebar.uploadZip': 'Cargar widget (.zip)',
+  'sidebar.removeWidget': 'Eliminar widget',
   'cat.Básicos': 'Básicos',
   'cat.Indicadores': 'Indicadores',
   'cat.Equipos': 'Equipos',
@@ -153,6 +159,10 @@ const en: Dict = {
   'config.mainView': 'Main View',
   'config.saved': 'Settings saved successfully',
   'config.selectVar': 'Select',
+  'config.plcConnection': 'PLC Connection',
+  'config.noPlc': 'No PLCs connected — add one from the backend',
+  'config.plcOnline': 'Online',
+  'config.plcOffline': 'Offline',
 
   'rate.1000': '1 second',
   'rate.2000': '2 seconds',
@@ -168,6 +178,8 @@ const en: Dict = {
 
   'sidebar.title': 'Widgets',
   'sidebar.hint': 'Drag onto the canvas',
+  'sidebar.uploadZip': 'Upload widget (.zip)',
+  'sidebar.removeWidget': 'Remove widget',
   'cat.Básicos': 'Basic',
   'cat.Indicadores': 'Indicators',
   'cat.Equipos': 'Equipment',

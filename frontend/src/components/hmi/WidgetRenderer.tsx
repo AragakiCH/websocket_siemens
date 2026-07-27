@@ -4,7 +4,8 @@ import { PowerIcon } from "lucide-react";
 import { HmiWidget } from "../../models/widget";
 import { PlcVariable } from "../../models/plc";
 import { formatValue, valueFraction, isTruthy } from "../../utils/format";
-import { customByKind } from "./custom/registry";
+import { customByKind, zipByKind } from "./custom/registry";
+import { HtmlWidgetRenderer } from "./HtmlWidgetRenderer";
 
 interface Props {
   widget: HmiWidget;
@@ -26,10 +27,16 @@ export function WidgetRenderer({ widget, variable, live = true }: Props) {
   };
 
   const content = () => {
-    // 👇 primero checa si es custom, si sí lo delega al registry
+    // 👇 primero checa si es custom TSX, si sí lo delega al registry
     const custom = customByKind(widget.kind);
     if (custom) {
       return custom.render({ widget, variable, style, on, frac, label });
+    }
+
+    // 👇 luego checa si es un widget HTML cargado por ZIP
+    const zip = zipByKind(widget.kind);
+    if (zip) {
+      return <HtmlWidgetRenderer zipWidget={zip} widget={widget} variable={variable} style={style} />;
     }
 
     // built-in: el switch original queda intacto

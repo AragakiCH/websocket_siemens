@@ -162,7 +162,7 @@ export function Designer() {
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5 dark:border-navy-slate dark:bg-navy-soft">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/menu')}
+            onClick={() => navigate('/')}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 dark:hover:bg-navy-slate/40">
             <ArrowLeftIcon className="h-4 w-4" />
           </button>

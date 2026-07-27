@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -6,7 +6,10 @@ import {
   SaveIcon,
   CheckCircle2Icon,
   DatabaseIcon,
-  SlidersHorizontalIcon } from
+  SlidersHorizontalIcon,
+  NetworkIcon,
+  WifiIcon,
+  WifiOffIcon } from
 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { UPDATE_RATE_OPTIONS, DataType } from '../models/plc';
@@ -32,6 +35,24 @@ export function Configuracion() {
   } = useAppStore();
   const [saved, setSaved] = useState(false);
   const selectedCount = variables.filter((v) => v.selected).length;
+
+  // ---------- IP real del PLC desde GET /health ----------
+  interface PlcInfo { plc_id: string; endpoint: string; conectado: boolean; estado_conexion: string; num_tags: number; }
+  const [plcs, setPlcs] = useState<PlcInfo[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchHealth = async () => {
+      try {
+        const res = await fetch('/health');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data.plcs)) setPlcs(data.plcs);
+      } catch { /* backend no disponible */ }
+    };
+    fetchHealth();
+    const id = setInterval(fetchHealth, 5000); // refrescar cada 5s
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
   // Rate labels: sub-second ones are language-neutral ("250 ms"); translate the rest.
   const rateOptions = UPDATE_RATE_OPTIONS.map((o) =>
   o.value >= 1000 ?
@@ -51,7 +72,7 @@ export function Configuracion() {
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 dark:border-navy-slate dark:bg-navy-soft">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/menu')}
+            onClick={() => navigate('/')}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 dark:hover:bg-navy-slate/40">
             
             <ArrowLeftIcon className="h-5 w-5" />
@@ -73,6 +94,44 @@ export function Configuracion() {
       </header>
 
       <div className="mp-scroll mp-scroll-dark grid flex-1 grid-cols-1 gap-6 overflow-auto p-6 lg:grid-cols-3">
+        {/* PLC connection info */}
+        <section className="lg:col-span-3">
+          <div className="mb-3 flex items-center gap-2">
+            <NetworkIcon className="h-4 w-4 text-siemens" />
+            <h2 className="text-sm font-bold text-navy dark:text-slate-100">
+              {t('config.plcConnection')}
+            </h2>
+          </div>
+          {plcs.length === 0 ? (
+            <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-card dark:border-navy-slate dark:bg-navy-soft">
+              <WifiOffIcon className="h-5 w-5 text-slate-400" />
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {t('config.noPlc')}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {plcs.map((p) => {
+                const ip = p.endpoint.replace('opc.tcp://', '').replace(/:.*$/, '');
+                return (
+                  <div key={p.plc_id} className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-card dark:border-navy-slate dark:bg-navy-soft">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${p.conectado ? 'bg-state-ok/15 text-state-ok' : 'bg-red-100 text-red-500 dark:bg-red-500/15'}`}>
+                      {p.conectado ? <WifiIcon className="h-5 w-5" /> : <WifiOffIcon className="h-5 w-5" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-navy dark:text-slate-100">{p.plc_id}</p>
+                      <p className="text-xs font-mono text-slate-500 dark:text-slate-400">{ip}</p>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${p.conectado ? 'bg-state-ok/15 text-state-ok' : 'bg-red-100 text-red-500 dark:bg-red-500/15'}`}>
+                      {p.conectado ? t('config.plcOnline') : t('config.plcOffline')}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
         {/* Variables table */}
         <section className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
