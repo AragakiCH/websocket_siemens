@@ -16,7 +16,7 @@ import {
 import { HmiWidget, WidgetKind, BuiltInWidgetKind } from '../models/widget';
 import { RealPLCService as MockPLCService } from '../services/RealPLCService';
 import { createTranslator, widgetLabel as widgetLabelFn, TFn } from '../i18n';
-import { customByKind } from '../components/hmi/custom/registry';
+import { customByKind, zipByKind } from '../components/hmi/custom/registry';
 interface AppStore {
   // auth (emulated)
   connected: boolean;
@@ -144,7 +144,7 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   const widgetLabel = useCallback(
     (kind: WidgetKind) => {
       if (kind.startsWith('custom:')) {
-        return customByKind(kind)?.label ?? kind;
+        return customByKind(kind)?.label ?? zipByKind(kind)?.meta.label ?? kind.replace('custom:', '');
       }
       return widgetLabelFn(config.language, kind as BuiltInWidgetKind);
     },

@@ -183,14 +183,33 @@ export function PropertyInspector({
           })
           } />
         
-        <ColorField
-          label={t('insp.bgColor')}
-          value={widget.style.background}
-          onChange={(v) =>
-          onStyleChange({
-            background: v
-          })
-          } />
+        <div className="flex items-center gap-2">
+          <label className="flex flex-1 items-center justify-between gap-2">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              {t('insp.bgColor')}
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[11px] text-slate-400">
+                {widget.style.background === 'transparent' ? 'ninguno' : widget.style.background}
+              </span>
+              <input
+                type="color"
+                value={widget.style.background !== 'transparent' && widget.style.background.length === 7 ? widget.style.background : '#ffffff'}
+                onChange={(e) => onStyleChange({ background: e.target.value })}
+                className="h-7 w-9 cursor-pointer rounded border border-slate-200 bg-white p-0.5 dark:border-navy-slate dark:bg-navy" />
+            </div>
+          </label>
+          <button
+            onClick={() => onStyleChange({ background: 'transparent' })}
+            title="Sin fondo"
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded border text-xs transition ${
+              widget.style.background === 'transparent'
+                ? 'border-siemens bg-siemens/10 text-siemens'
+                : 'border-slate-200 text-slate-400 hover:border-siemens/40 dark:border-navy-slate'
+            }`}>
+            ∅
+          </button>
+        </div>
         
         <ColorField
           label={t('insp.borderColor')}
