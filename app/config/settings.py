@@ -87,12 +87,15 @@ class Settings(BaseSettings):
         default=None, description="Contraseña del ctrlX.")
 
     # Ruta de los datos: Datalayer/plc/app/<app>/sym/<programa>
+    # Vacío = AUTODETECTAR navegando el Data Layer (lo habitual: hay una sola
+    # app 'Application' con un solo programa 'PLC_PRG'). Rellenar solo si el
+    # ctrlX tiene varias y quieres forzar una concreta.
     rexroth_app: str = Field(
-        default="Application",
-        description="Aplicación PLC dentro del Data Layer.")
+        default="",
+        description="Aplicación PLC dentro del Data Layer. Vacío = autodetectar.")
     rexroth_program: str = Field(
-        default="PLC_PRG",
-        description="Programa (POU) cuyos símbolos se van a leer.")
+        default="",
+        description="Programa (POU) cuyos símbolos se leen. Vacío = autodetectar.")
 
     # Profundidad máxima al recorrer estructuras anidadas dentro del programa.
     rexroth_browse_depth: int = Field(default=4)

@@ -334,6 +334,51 @@ async def listar_programas(cliente: Client, app: str) -> List[str]:
     return programas
 
 
+async def resolver_app_programa(
+    cliente: Client,
+    app: Optional[str] = None,
+    programa: Optional[str] = None,
+) -> Tuple[str, str]:
+    """
+    Resuelve automáticamente la app y el programa de un ctrlX.
+
+    Las variables siempre viven en `plc/app/<app>/sym/<programa>`, y lo normal
+    es que haya UNA sola app ('Application') con UN solo programa ('PLC_PRG').
+    Por eso no hace falta que el usuario los indique: si no llegan, se
+    descubren navegando el Data Layer.
+
+    Reglas:
+      * `app` vacío     -> se toma la primera app que exponga símbolos.
+      * `programa` vacío-> se toma el primer programa de esa app.
+      * Si vienen dados, se respetan tal cual (sin descubrimiento).
+
+    Devuelve (app, programa) y lanza RuntimeError con un mensaje claro si no
+    hay nada publicado.
+    """
+    app = (app or "").strip()
+    programa = (programa or "").strip()
+
+    if not app:
+        apps = await listar_apps(cliente)          # ya lanza si no hay ninguna
+        app = apps[0]
+        if len(apps) > 1:
+            logger.info("Hay %d apps (%s); se usa la primera: '%s'.",
+                        len(apps), ", ".join(apps), app)
+        else:
+            logger.info("App detectada automáticamente: '%s'.", app)
+
+    if not programa:
+        programas = await listar_programas(cliente, app)   # lanza si está vacío
+        programa = programas[0]
+        if len(programas) > 1:
+            logger.info("Hay %d programas (%s); se usa el primero: '%s'.",
+                        len(programas), ", ".join(programas), programa)
+        else:
+            logger.info("Programa detectado automáticamente: '%s'.", programa)
+
+    return app, programa
+
+
 # ====================================================================== #
 # Handler de subscription
 # ====================================================================== #
@@ -390,6 +435,9 @@ class RexrothDriver(PlcDriver):
 
         # Modo de lectura activo: 'subscription' | 'polling' | '-'
         self.modo_lectura: str = "-"
+        # App/programa realmente usados (tras autodetección en browse_tags).
+        self.app_resuelta: str = ""
+        self.programa_resuelto: str = ""
         self._tarea_polling: Optional[asyncio.Task] = None
         self._tarea_vigilancia: Optional[asyncio.Task] = None
         self._datos_recibidos: bool = False
@@ -410,11 +458,13 @@ class RexrothDriver(PlcDriver):
 
     @property
     def _app(self) -> str:
-        return self._settings.rexroth_app or "Application"
+        """App configurada. Vacío = se autodetecta en browse_tags()."""
+        return (self._settings.rexroth_app or "").strip()
 
     @property
     def _programa(self) -> str:
-        return self._settings.rexroth_program or "PLC_PRG"
+        """Programa configurado. Vacío = se autodetecta en browse_tags()."""
+        return (self._settings.rexroth_program or "").strip()
 
     # ================================================================== #
     # Conexión
@@ -435,7 +485,7 @@ class RexrothDriver(PlcDriver):
         )
         self._connected = True
         logger.info("Conectado al ctrlX en %s (app=%s, programa=%s)",
-                    self._endpoint, self._app, self._programa)
+                    self._endpoint, self._app or "auto", self._programa or "auto")
 
     async def disconnect(self) -> None:
         await self._detener_lectura()
@@ -475,23 +525,31 @@ class RexrothDriver(PlcDriver):
         if self._client is None:
             raise RuntimeError("browse_tags llamado sin conexión activa.")
 
+        # Si el usuario no indicó app/programa, se descubren aquí (una sola vez,
+        # reusando la sesión ya abierta: no cuesta una conexión extra).
+        app, programa = await resolver_app_programa(
+            self._client, self._app, self._programa
+        )
+        self.app_resuelta = app
+        self.programa_resuelto = programa
+
         root = self._client.get_root_node()
         nodo_prog = await navegar(
-            root, "Objects", "Datalayer", "plc", "app", self._app, "sym", self._programa
+            root, "Objects", "Datalayer", "plc", "app", app, "sym", programa
         )
         if nodo_prog is None:
             raise RuntimeError(
-                f"No se encontró el programa '{self._programa}' en la app "
-                f"'{self._app}'. Publica el proyecto desde la configuración de "
+                f"No se encontró el programa '{programa}' en la app "
+                f"'{app}'. Publica el proyecto desde la configuración de "
                 f"símbolos o elige otro programa."
             )
 
         tags: List[TagInfo] = []
-        await self._browse_recursivo(nodo_prog, self._programa, self._programa, tags, 0)
+        await self._browse_recursivo(nodo_prog, programa, programa, tags, 0)
 
         self.tags_descubiertos = tags
         self.tag_por_nodeid = {t.node_id: t for t in tags}
-        logger.info("Descubiertos %d tags en %s.%s", len(tags), self._app, self._programa)
+        logger.info("Descubiertos %d tags en %s.%s", len(tags), app, programa)
         return tags
 
     async def _browse_recursivo(

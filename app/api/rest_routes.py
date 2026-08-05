@@ -12,8 +12,10 @@ Endpoints REST del servicio. Documentación interactiva en /docs (Swagger UI).
   GET    /tags?plc=X      -> tags descubiertos (de todos los PLCs o solo de X).
   GET    /browse?plc=X    -> árbol de tags por PLC y Data Block / programa.
 
-Específicos de Bosch Rexroth ctrlX (se usan ANTES de dar de alta el PLC, para
-que el usuario elija qué leer):
+Específicos de Bosch Rexroth ctrlX. Son OPCIONALES: solo hacen falta si el
+ctrlX tiene varias apps/programas y quieres elegir cuál leer. En el caso normal
+(una app 'Application' con un programa 'PLC_PRG') basta con `POST /plcs`
+mandando host + usuario + password: el driver los descubre solo.
 
   POST   /rexroth/apps     -> apps PLC publicadas en Datalayer/plc/app.
   POST   /rexroth/programs -> programas (POUs) de una app, bajo su nodo `sym`.
@@ -33,7 +35,8 @@ class NuevoPlc(BaseModel):
     Cuerpo de POST /plcs.
 
     Siemens: basta `host` (la sesión OPC UA es anónima).
-    Rexroth: además son obligatorios `usuario`, `password` y `programa`.
+    Rexroth: además son obligatorios `usuario` y `password`. `app` y `programa`
+    son opcionales: si no llegan, se autodetectan al conectar.
     """
 
     host: str = Field(
@@ -55,11 +58,13 @@ class NuevoPlc(BaseModel):
     password: str = Field(
         default="", description="Solo Rexroth: contraseña del ctrlX.")
     app: str = Field(
-        default="Application",
-        description="Solo Rexroth: aplicación bajo `Datalayer/plc/app`.")
+        default="",
+        description="Solo Rexroth (OPCIONAL): aplicación bajo "
+                    "`Datalayer/plc/app`. Vacío = se autodetecta.")
     programa: str = Field(
         default="",
-        description="Solo Rexroth: programa (POU) bajo el nodo `sym` de la app.")
+        description="Solo Rexroth (OPCIONAL): programa (POU) bajo el nodo "
+                    "`sym`. Vacío = se autodetecta.")
 
 
 class CredencialesRexroth(BaseModel):
@@ -79,8 +84,9 @@ class ProgramasRexroth(CredencialesRexroth):
     """Igual que CredencialesRexroth, más la app cuyos programas se listan."""
 
     app: str = Field(
-        default="Application",
-        description="Aplicación devuelta por `POST /rexroth/apps`.",
+        default="",
+        description="Aplicación devuelta por `POST /rexroth/apps`. "
+                    "Vacío = se autodetecta la primera con símbolos.",
     )
 
 
@@ -138,9 +144,13 @@ async def plcs(request: Request) -> dict:
                 "indicada. Responde de inmediato; la conexión OPC UA se "
                 "intenta en segundo plano con reintentos automáticos. Todos "
                 "los clientes WebSocket reciben un snapshot actualizado.\n\n"
-                "Con `vendor=rexroth` hay que mandar además `usuario`, "
-                "`password` y `programa` (usa `/rexroth/apps` y "
-                "`/rexroth/programs` para obtener los dos últimos).",
+                "Con `vendor=rexroth` hay que mandar además `usuario` y "
+                "`password`. Los campos `app` y `programa` son OPCIONALES: si "
+                "se omiten, el driver navega `plc/app/<app>/sym/<programa>` y "
+                "toma la primera app con símbolos y su primer programa. Solo "
+                "hace falta indicarlos si el ctrlX tiene varios y quieres uno "
+                "concreto (consúltalos con `/rexroth/apps` y "
+                "`/rexroth/programs`).",
     responses={200: {"content": {"application/json": {"examples": {
         "siemens": {"summary": "S7-1500 añadido", "value": {
             "ok": True, "plc_id": "192.168.50.1",
@@ -163,6 +173,8 @@ async def agregar_plc(
     request: Request,
     cuerpo: NuevoPlc = Body(..., examples=[
         {"host": "192.168.50.1", "puerto": 4840, "vendor": "siemens"},
+        {"host": "192.168.1.1", "puerto": 4840, "vendor": "rexroth",
+         "usuario": "boschrexroth", "password": "boschrexroth"},
         {"host": "192.168.1.1", "puerto": 4840, "vendor": "rexroth",
          "usuario": "boschrexroth", "password": "boschrexroth",
          "app": "Application", "programa": "PLC_PRG"},
@@ -352,13 +364,18 @@ async def rexroth_programas(
     cuerpo: ProgramasRexroth = Body(..., examples=[{
         "host": "192.168.1.1", "puerto": 4840,
         "usuario": "boschrexroth", "password": "boschrexroth",
-        "app": "Application",
     }]),
 ) -> dict:
-    from app.drivers.rexroth_driver import listar_programas
+    from app.drivers.rexroth_driver import listar_apps, listar_programas
 
-    app_sel = (cuerpo.app or "Application").strip()
-    programas = await _explorar_ctrlx(cuerpo, listar_programas, app_sel)
+    async def _listar(cliente):
+        # Si no llega `app`, se toma la primera que exponga símbolos.
+        app_sel = (cuerpo.app or "").strip()
+        if not app_sel:
+            app_sel = (await listar_apps(cliente))[0]
+        return app_sel, await listar_programas(cliente, app_sel)
+
+    app_sel, programas = await _explorar_ctrlx(cuerpo, _listar)
     return {
         "ok": True,
         "endpoint": _endpoint_desde(cuerpo.host, cuerpo.puerto),

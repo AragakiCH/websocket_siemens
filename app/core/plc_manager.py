@@ -201,8 +201,8 @@ class PlcManager:
         Añade un PLC escrito por el usuario (IP, host o endpoint completo).
 
         Para `vendor='siemens'` basta la IP (conexión anónima, como siempre).
-        Para `vendor='rexroth'` son obligatorios `usuario`, `password` y
-        `programa`; `app` por defecto es 'Application'.
+        Para `vendor='rexroth'` solo son obligatorios `usuario` y `password`:
+        si no se indican `app` y `programa`, se autodetectan al conectar.
 
         Devuelve {ok, plc_id, endpoint, vendor, mensaje}.
         """
@@ -224,9 +224,8 @@ class PlcManager:
             if not usuario or not password:
                 return {"ok": False,
                         "mensaje": "Un PLC Rexroth necesita usuario y contraseña."}
-            if not programa:
-                return {"ok": False,
-                        "mensaje": "Selecciona el programa del PLC Rexroth."}
+            # `app` y `programa` son OPCIONALES: si no llegan, el driver los
+            # descubre solo navegando plc/app/<app>/sym/<programa>.
 
         if host.startswith("opc.tcp://"):
             endpoint = host
