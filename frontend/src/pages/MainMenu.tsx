@@ -10,12 +10,14 @@ import {
 import { useAppStore } from '../context/AppStore';
 export function MainMenu() {
   const navigate = useNavigate();
-  const { disconnect, t } = useAppStore();
-  // Login deshabilitado — ya no hay logout
-  // const handleLogout = () => {
-  //   disconnect();
-  //   navigate('/');
-  // };
+  const { plcIp, plcVendor, disconnect, t } = useAppStore();
+  // Etiqueta legible de la marca, para saber de un vistazo contra qué PLC se
+  // está trabajando cuando hay Siemens y Rexroth mezclados.
+  const marca = plcVendor === 'rexroth' ? 'Rexroth' : 'Siemens';
+  const handleLogout = () => {
+    disconnect();
+    navigate('/');
+  };
   return (
     <div className="relative flex min-h-full w-full flex-col bg-slate-50 dark:bg-navy">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-4 dark:border-navy-slate dark:bg-navy-soft">
@@ -25,7 +27,10 @@ export function MainMenu() {
           </div>
           <div>
             <p className="text-sm font-bold text-navy dark:text-slate-100">
-              SRX Studio
+              HMI Studio
+            </p>
+            <p className="text-xs text-slate-400">
+              {t('menu.connectedTo')} {plcIp} · {marca}
             </p>
             {/* IP movida a /config */}
           </div>

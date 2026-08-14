@@ -1,12 +1,38 @@
 # ==========================================================================
 # Dependencias del servicio backend OPC UA -> WebSocket
-# Python 3.11 (probado también en 3.10). Instalar con:
+# Python 3.10 - 3.13. Instalar con:
 #   pip install -r requirements.txt
+#
+# NOTA sobre las versiones: los pines anteriores (fastapi 0.111 / pydantic
+# 2.7.4) NO se pueden instalar en Python 3.13, porque `pydantic-core 2.18.4`
+# no publica wheel para cp313 y pip intenta compilarlo con Rust. Estos pines
+# son los primeros que traen wheel para 3.13 manteniendo la misma API.
+# `asyncua` sigue en 1.1.5: es la version con la que se probo el proyecto.
 # ==========================================================================
 
-fastapi==0.111.0          # Framework web asíncrono (REST + WebSocket)
-uvicorn[standard]==0.30.1 # Servidor ASGI para correr FastAPI
+fastapi==0.115.12         # Framework web asíncrono (REST + WebSocket)
+uvicorn[standard]==0.34.0 # Servidor ASGI para correr FastAPI
 asyncua==1.1.5            # Cliente OPC UA asíncrono (async/await)
-pydantic==2.7.4          # Validación de datos / modelos de configuración
-pydantic-settings==2.3.4 # Carga de settings desde variables de entorno
-PyYAML==6.0.1            # Lectura opcional del filtro de DBs (tags_filter.yaml)
+pydantic==2.10.6          # Validación de datos / modelos de configuración
+pydantic-settings==2.8.1  # Carga de settings desde variables de entorno
+PyYAML==6.0.2             # Lectura opcional del filtro de DBs (tags_filter.yaml)
+
+# --------------------------------------------------------------------------
+# Bosch Rexroth ctrlX CORE
+# --------------------------------------------------------------------------
+# El ctrlX exige un canal seguro con certificado de cliente. `cryptography`
+# genera el par cert/key autofirmado la primera vez. asyncua ya la trae como
+# dependencia, pero se fija aquí porque el RexrothDriver la usa directamente.
+cryptography>=42.0.0
+
+# ==========================================================================
+# Bases de datos para los widgets de datos del HMI
+# ==========================================================================
+SQLAlchemy[asyncio]==2.0.51  # ORM/core async: un solo driver para todos los SQL
+aiosqlite==0.20.0            # SQLite (sin servidor; ideal para pruebas)
+# cryptography ya está arriba: se reutiliza para cifrar las contraseñas de BD.
+
+# --- Motores opcionales: instalar SOLO el que se vaya a usar --------------
+# asyncpg==0.29.0            # PostgreSQL / TimescaleDB
+# aiomysql==0.2.0            # MySQL / MariaDB
+# aioodbc==0.5.0             # SQL Server (requiere ODBC Driver 17/18 en Windows)

@@ -21,3 +21,6 @@ nohup.out
 *.log
 .vscode/
 .idea/
+
+# --- Datos locales del backend (conexiones a BD + clave de cifrado) ---
+datos/

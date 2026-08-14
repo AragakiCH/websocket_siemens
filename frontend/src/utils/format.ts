@@ -2,8 +2,12 @@ import { PlcVariable } from '../models/plc';
 
 export const formatValue = (v: PlcVariable | undefined): string => {
   if (!v) return '—';
+  if (v.value === null || v.value === undefined) return '—';
   if (v.type === 'bool') return v.value as boolean ? 'ON' : 'OFF';
+  // Strings (u otros valores no numéricos): mostrarlos tal cual, sin Number()
+  if (v.type === 'string') return String(v.value);
   const num = typeof v.value === 'number' ? v.value : Number(v.value);
+  if (Number.isNaN(num)) return String(v.value);
   const val = v.type === 'double' ? num.toFixed(1) : String(num);
   return v.unit ? `${val} ${v.unit}` : val;
 };

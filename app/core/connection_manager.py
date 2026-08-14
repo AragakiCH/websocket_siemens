@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Dict, List, Optional, Set
+from typing import Callable, Dict, List, Optional, Set
 
 from fastapi import WebSocket
 
@@ -27,6 +27,9 @@ class ConnectionManager:
         # Filtro opcional por conexión: websocket -> plc_id (o None = todos).
         self._filtros: Dict[WebSocket, Optional[str]] = {}
         self._lock = asyncio.Lock()
+        # Observadores internos del backend (historizador, alarmas futuras...).
+        # Reciben TODOS los mensajes, sin filtro de PLC y sin ser clientes WS.
+        self._observadores: List[Callable[[dict], None]] = []
 
     # ------------------------------------------------------------------ #
     # Alta / baja de clientes
@@ -55,6 +58,28 @@ class ConnectionManager:
         return len(self._active)
 
     # ------------------------------------------------------------------ #
+    # Observadores internos (no son clientes WebSocket)
+    # ------------------------------------------------------------------ #
+    def registrar_observador(self, callback: Callable[[dict], None]) -> None:
+        """
+        Registra una función que recibirá una COPIA de cada mensaje difundido.
+
+        Lo usa el historizador para escuchar los cambios de tags sin abrir una
+        conexión WebSocket ni una segunda sesión OPC UA. El callback debe ser
+        SÍNCRONO y muy rápido (encolar y volver): se ejecuta dentro del bucle
+        de broadcast, así que si bloquea, retrasa a todos los clientes.
+        """
+        if callback not in self._observadores:
+            self._observadores.append(callback)
+            logger.info("Observador interno registrado (total: %d).",
+                        len(self._observadores))
+
+    def quitar_observador(self, callback: Callable[[dict], None]) -> None:
+        """Da de baja un observador previamente registrado."""
+        if callback in self._observadores:
+            self._observadores.remove(callback)
+
+    # ------------------------------------------------------------------ #
     # Envío de mensajes
     # ------------------------------------------------------------------ #
     async def send_personal(self, message: dict, websocket: WebSocket) -> None:
@@ -72,6 +97,15 @@ class ConnectionManager:
         campo 'plc', como estados globales, llegan a todos).
         Los clientes que fallen se eliminan de la lista.
         """
+        # Observadores internos primero: deben ver TODOS los mensajes aunque
+        # no haya ningún cliente web conectado (el historizador tiene que
+        # seguir guardando aunque nadie esté mirando la pantalla).
+        for obs in self._observadores:
+            try:
+                obs(message)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Observador interno falló: %s", exc)
+
         plc_msg = message.get("plc")
         # Copia para iterar sin bloquear altas/bajas concurrentes.
         async with self._lock:

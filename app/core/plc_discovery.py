@@ -42,6 +42,14 @@ class EndpointPlc:
     nombre: str = ""       # ApplicationName del servidor (si se pudo leer)
     origen: str = "scan"   # 'scan' | 'manual'
 
+    # ---- Marca del PLC y datos específicos de Rexroth ------------------ #
+    # 'siemens' -> OpcUaDriver | 'rexroth' -> RexrothDriver
+    vendor: str = "siemens"
+    usuario: str = ""      # solo Rexroth (el ctrlX no admite anónimo)
+    password: str = ""     # solo Rexroth
+    app: str = ""          # solo Rexroth: Datalayer/plc/app/<app>
+    programa: str = ""     # solo Rexroth: .../sym/<programa>
+
 
 def _host_puerto(endpoint: str) -> tuple[str, int]:
     """Extrae (host, puerto) de un endpoint opc.tcp://host:puerto."""
@@ -92,6 +100,26 @@ async def _validar_opcua(endpoint: str, timeout: float) -> Optional[str]:
             pass
 
 
+def _datos_vendor(settings: Settings) -> dict:
+    """
+    Campos de marca/credenciales que se aplican a los PLCs descubiertos o
+    estáticos, tomados de la configuración por defecto (.env).
+
+    Ojo: el escaneo de red no puede adivinar la marca (un ctrlX y un S7 abren
+    igual el 4840), así que se asume `PLC_VENDOR`. Los PLCs que se agregan
+    desde la vista sí traen su marca explícita.
+    """
+    if (settings.vendor or "siemens").lower() != "rexroth":
+        return {"vendor": "siemens"}
+    return {
+        "vendor": "rexroth",
+        "usuario": settings.rexroth_username or "",
+        "password": settings.rexroth_password or "",
+        "app": settings.rexroth_app,
+        "programa": settings.rexroth_program,
+    }
+
+
 async def _sondear_host(
     host: str, port: int, settings: Settings, sem: asyncio.Semaphore
 ) -> Optional[EndpointPlc]:
@@ -107,7 +135,7 @@ async def _sondear_host(
             return None
         logger.info("PLC OPC UA detectado: %s (%s)", endpoint, nombre or "sin nombre")
         return EndpointPlc(endpoint=endpoint, host=host, port=port,
-                           nombre=nombre, origen="scan")
+                           nombre=nombre, origen="scan", **_datos_vendor(settings))
 
 
 async def descubrir_plcs(settings: Settings) -> List[EndpointPlc]:
@@ -128,7 +156,8 @@ async def descubrir_plcs(settings: Settings) -> List[EndpointPlc]:
         clave = f"{host}:{port}"
         nombre = await _validar_opcua(ep, settings.discovery_opcua_timeout) or ""
         resultados[clave] = EndpointPlc(endpoint=ep, host=host, port=port,
-                                        nombre=nombre, origen="manual")
+                                        nombre=nombre, origen="manual",
+                                        **_datos_vendor(settings))
 
     # 2) Escaneo de la subred (opcional).
     if settings.discovery_enabled:

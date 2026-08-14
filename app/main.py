@@ -25,19 +25,34 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import rest_routes, websocket_routes
+from app.api import (db_routes, historian_routes, rest_routes,
+                     websocket_routes)
 from app.config.settings import get_settings
 from app.core.connection_manager import ConnectionManager
+from app.core.db_manager import DbManager
+from app.db.historian import Historizador
 from app.core.plc_manager import PlcManager
 
 
 def _configurar_logging(nivel: str) -> None:
-    """Configura el logging estándar en español."""
+    """
+    Configura el logging estándar en español.
+
+    Las librerías OPC UA (`asyncua`) son MUY verbosas en INFO: imprimen cada
+    PublishResult, es decir varias líneas por segundo y por PLC, que tapan por
+    completo los mensajes del servicio. Se suben a WARNING salvo que se pida
+    DEBUG explícitamente (PLC_LOG_LEVEL=DEBUG).
+    """
     logging.basicConfig(
         level=getattr(logging, nivel.upper(), logging.INFO),
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+
+    nivel_libs = logging.DEBUG if nivel.upper() == "DEBUG" else logging.WARNING
+    for nombre in ("asyncua", "asyncua.client", "asyncua.common.subscription",
+                   "asyncua.client.ua_client", "asyncua.uaprotocol"):
+        logging.getLogger(nombre).setLevel(nivel_libs)
 
 
 @asynccontextmanager
@@ -54,11 +69,17 @@ async def lifespan(app: FastAPI):
     # Construcción de componentes (inyección de dependencias sencilla).
     manager = ConnectionManager()
     plc_manager = PlcManager(manager, settings)
+    db_manager = DbManager()
+    # El historizador escucha el MISMO flujo de tags que el WebSocket:
+    # no abre una segunda sesión OPC UA ni añade carga al PLC.
+    historizador = Historizador(db_manager, db_manager.store)
 
     # Guardar en el estado de la app para que los routers accedan a ellos.
     app.state.settings = settings
     app.state.manager = manager
     app.state.plc_manager = plc_manager
+    app.state.db_manager = db_manager
+    app.state.historizador = historizador
 
     logger.info("=== Iniciando servicio OPC UA -> WebSocket (multi-PLC) ===")
     logger.info("Endpoint semilla: %s | discovery=%s | subred=%s",
@@ -67,68 +88,206 @@ async def lifespan(app: FastAPI):
     # El descubrimiento + supervisores corren en segundo plano: la API arranca
     # aunque ningún PLC esté disponible todavía.
     await plc_manager.start()
+    # Conexiones a BD guardadas: se abren en paralelo. Una BD caída no impide
+    # arrancar el servicio (el widget mostrará el error y podrá reintentar).
+    await db_manager.start()
+    await historizador.start(manager)
 
     try:
         yield
     finally:
         logger.info("=== Apagando servicio: cierre limpio ===")
         await plc_manager.stop()
+        # Orden importante: primero el historizador (vuelca su buffer
+        # pendiente), y solo después se cierran los pools de la BD.
+        await historizador.stop()
+        await db_manager.stop()
 
 
 _DESCRIPCION_API = """
-Descubre tags de PLCs Siemens S7-1500 por browse OPC UA y los transmite en
-tiempo real vía WebSocket.
+Descubre tags de PLCs **Siemens S7-1500** y **Bosch Rexroth ctrlX CORE** por
+OPC UA y los transmite en tiempo real vía WebSocket.
 
-## Cómo se usa
+---
 
-1. **Agregar PLCs**: `POST /plcs` con la IP, o `POST /discover` para escanear
-   la subred. (También desde la vista web en `/`.)
-2. **Recibir datos**: conectarse al WebSocket `ws://<host>:8000/ws`
-   (o `/ws?plc=<id>` para un solo PLC).
-3. **Consultar**: `GET /health`, `/plcs`, `/tags`, `/browse`.
+## Flujo de uso
 
-## WebSocket `/ws` — protocolo de mensajes
+| Paso | Qué hacer | Endpoint |
+|:---:|---|---|
+| 1 | Dar de alta el PLC | `POST /plcs` |
+| 2 | Escuchar los datos en vivo | `ws://<host>:8000/ws` |
+| 3 | Consultar estado y tags | `GET /health` · `GET /tags` |
 
-Swagger no puede probar WebSockets; estos son los mensajes que envía el servidor:
+---
 
-**1. Snapshot** (al conectarte, y cuando se agrega un PLC):
+## Alta de un PLC — `POST /plcs`
+
+Un S7-1500 y un ctrlX CORE pueden estar conectados **a la vez**: cada PLC lleva
+su propio driver, credenciales y reconexión. La marca se elige con `vendor`.
+
+#### Siemens S7-1500
+
+Conexión anónima, no necesita más campos:
+
 ```json
-{"type": "snapshot", "timestamp": "2026-07-14T07:30:00+00:00",
- "plcs": {"PLC_2": {"nombre": "PLC_2", "endpoint": "opc.tcp://192.168.50.1:4840",
-                     "estado": "conectado", "conectado": true,
-                     "sampling_interval_ms": 1000, "publishing_interval_ms": 500}},
- "tags": {"PLC_2|DB_Datos.Temperatura": {"plc": "PLC_2", "tag": "DB_Datos.Temperatura",
-           "value": 23.7, "type": "Float", "timestamp": "...", "delta_ms": 512}}}
+{
+  "host": "192.168.50.1",
+  "puerto": 4840,
+  "vendor": "siemens"
+}
 ```
 
-**2. Cambio de valor de un tag** (en tiempo real; aquí `type` es el TIPO DE DATO):
+#### Rexroth ctrlX CORE
+
+Siempre requiere credenciales, aplicación y programa:
+
 ```json
-{"timestamp": "2026-07-14T07:30:01+00:00", "plc": "PLC_2",
- "tag": "DB_Datos.Temperatura", "value": 24.1, "type": "Float",
- "source_ts": "2026-07-14T07:30:00.900+00:00", "server_ts": "...", "delta_ms": 480}
+{
+  "host": "192.168.1.1",
+  "puerto": 4840,
+  "vendor": "rexroth",
+  "usuario": "boschrexroth",
+  "password": "boschrexroth",
+  "app": "Application",
+  "programa": "PLC_PRG"
+}
 ```
 
-**3. Estado de conexión de un PLC**:
-```json
-{"type": "status", "plc": "PLC_2", "status": "conectado",
- "timestamp": "2026-07-14T07:30:00+00:00"}
-```
-(`status` puede ser `conectado` o `reconectando`)
+Para conocer `app` y `programa` antes del alta, llamar en orden a
+`POST /rexroth/apps` y `POST /rexroth/programs`. Abren una sesión temporal y no
+registran nada.
 
-**4. PLC eliminado**:
-```json
-{"type": "plc_removed", "plc_removed": "PLC_2",
- "timestamp": "2026-07-14T07:30:00+00:00"}
-```
+**Nota:** la primera vez hay que confiar el certificado del cliente desde la web
+del ctrlX (*Settings → Certificates & Keys*), o `/rexroth/apps` devolverá `401`.
 
-El cliente no necesita enviar nada por el WebSocket: es un canal de solo
-lectura (las acciones se hacen por REST).
+---
 
-Probar el WebSocket desde la consola del navegador (F12):
+## WebSocket `/ws`
+
+Canal de **solo lectura**: el cliente nunca envía nada, las acciones van por
+REST. Swagger no puede probar WebSockets, así que aquí quedan documentados los
+cuatro mensajes que envía el servidor.
+
+Conectarse desde la consola del navegador (F12):
+
 ```js
 const ws = new WebSocket("ws://localhost:8000/ws");
 ws.onmessage = (e) => console.log(JSON.parse(e.data));
 ```
+
+Para recibir un solo PLC: `ws://localhost:8000/ws?plc=<plc_id>`
+
+### 1 · `snapshot`
+
+Al conectarte, y cada vez que se agrega un PLC:
+
+```json
+{
+  "type": "snapshot",
+  "timestamp": "2026-07-16T04:14:11+00:00",
+  "plcs": {
+    "PLC_2": {
+      "nombre": "PLC_2",
+      "endpoint": "opc.tcp://192.168.50.1:4840",
+      "estado": "conectado",
+      "conectado": true,
+      "sampling_interval_ms": 100,
+      "publishing_interval_ms": 100
+    }
+  },
+  "tags": {
+    "PLC_2|DB_snap7.temperatura": {
+      "plc": "PLC_2",
+      "tag": "DB_snap7.temperatura",
+      "value": 53.09,
+      "type": "Float",
+      "timestamp": "2026-07-16T04:14:11+00:00",
+      "delta_ms": 512
+    }
+  }
+}
+```
+
+La clave de `tags` es `"<plc_id>|<tag>"`, para que no colisionen tags con el
+mismo nombre en PLCs distintos.
+
+### 2 · Cambio de valor
+
+Llega cada vez que un tag cambia en el PLC:
+
+```json
+{
+  "timestamp": "2026-07-16T04:14:12+00:00",
+  "plc": "PLC_2",
+  "tag": "DB_snap7.temperatura",
+  "value": 49.36,
+  "type": "Float",
+  "source_ts": "2026-07-16T04:14:11.900+00:00",
+  "server_ts": "2026-07-16T04:14:11.900+00:00",
+  "delta_ms": 480
+}
+```
+
+**Ojo:** aquí `type` es el **tipo de dato** (`Float`, `Boolean`, `String`...),
+no el tipo de mensaje. Para distinguirlos: si el mensaje trae `tag`, es un
+cambio de valor; si no, es de control.
+
+### 3 · `status`
+
+Cambió el estado de conexión de un PLC (`conectado` o `reconectando`):
+
+```json
+{
+  "type": "status",
+  "plc": "PLC_2",
+  "status": "conectado",
+  "timestamp": "2026-07-16T04:14:11+00:00"
+}
+```
+
+### 4 · `plc_removed`
+
+Alguien quitó un PLC desde cualquier cliente. Hay que limpiar ese PLC y sus
+tags del estado local:
+
+```json
+{
+  "type": "plc_removed",
+  "plc_removed": "PLC_2",
+  "timestamp": "2026-07-16T04:14:11+00:00"
+}
+```
+
+---
+
+## Bases de datos y historizador
+
+Además de los PLCs, el servicio conecta con bases de datos SQL
+(**PostgreSQL**, **MySQL/MariaDB**, **SQL Server**, **SQLite**) para dos cosas:
+
+| Sección en esta página | Para qué |
+|---|---|
+| **Bases de datos** | Los widgets LEEN datos de una BD (tablas, KPIs, gráficos) |
+| **Historizador (PLC → BD)** | GUARDAR los tags de los PLCs para ver su histórico |
+
+**Los widgets nunca mandan SQL**: el diseñador registra la consulta una vez con
+`POST /db/queries` y el widget la ejecuta por su `query_id`. Todo el SQL de los
+widgets pasa por una validación de solo-lectura.
+
+La **escritura** es un camino aparte y controlado: solo el historizador escribe,
+con sentencias que genera el propio backend.
+
+Contrato completo para el frontend: `docs/API_DB.md`.
+
+---
+
+## Notas
+
+- El refresco mínimo real es **~100 ms** (límite del servidor OPC UA del
+  S7-1500, no del backend).
+- El backend mantiene **una sola sesión OPC UA por PLC**, sin importar cuántos
+  clientes web estén conectados.
+- Contrato completo para el frontend: `docs/API.md`.
 """
 
 app = FastAPI(
@@ -141,6 +300,8 @@ app = FastAPI(
 # Routers.
 app.include_router(rest_routes.router, tags=["REST"])
 app.include_router(websocket_routes.router, tags=["WebSocket"])
+app.include_router(db_routes.router)
+app.include_router(historian_routes.router)
 
 # ------------------------------------------------------------------ #
 # Frontend React (frontend/dist generado con `npm run build`).
@@ -172,10 +333,15 @@ async def root():
     )
 
 
-@app.get("/{full_path:path}", include_in_schema=False)
-async def spa_fallback(full_path: str):
-    """Devuelve index.html para las rutas del router de React (/config, /designer...)."""
+@app.get("/{ruta_spa:path}", include_in_schema=False)
+async def spa_fallback(ruta_spa: str):
+    """
+    Fallback para React Router (SPA): cualquier ruta no-API (/menu, /designer,
+    /config, /preview...) devuelve el index.html del frontend para que el
+    router del navegador resuelva la vista. Se registra al FINAL, así que
+    /health, /plcs, /ws, /docs, /assets, etc. tienen prioridad.
+    """
     index_react = os.path.join(_FRONTEND_DIST, "index.html")
     if os.path.isfile(index_react):
         return FileResponse(index_react)
-    return JSONResponse({"mensaje": "Frontend no compilado. Corre npm run build."})
+    return JSONResponse({"error": "ruta no encontrada"}, status_code=404)

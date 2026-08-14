@@ -18,6 +18,8 @@ export default defineConfig({
       '/tags': BACKEND,
       '/browse': BACKEND,
       '/discover': BACKEND,
+      // Exploración del ctrlX de Rexroth (apps y programas) desde el Login
+      '/rexroth': BACKEND,
     },
   },
   build: {

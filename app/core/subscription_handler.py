@@ -49,6 +49,7 @@ class SubscriptionHandler:
         plc_id: str,
         endpoint: str = "",
         plc_nombre: str = "",
+        vendor: str = "siemens",
     ) -> None:
         self._driver = driver
         self._manager = manager
@@ -58,6 +59,9 @@ class SubscriptionHandler:
         self.plc_id = plc_id
         self.endpoint = endpoint
         self.plc_nombre = plc_nombre
+        # Marca del PLC ('siemens' | 'rexroth'). Solo informativa: esta clase
+        # trabaja contra la interfaz PlcDriver, no contra un protocolo concreto.
+        self.vendor = vendor
 
         # Snapshot en memoria: full_name -> TagValue (último valor conocido).
         self._snapshot: Dict[str, TagValue] = {}
@@ -179,7 +183,9 @@ class SubscriptionHandler:
         return {
             "plc": self.plc_id,
             "nombre": self.plc_nombre,
+            "vendor": self.vendor,
             "endpoint": self.endpoint,
+            # Siemens: Data Blocks. Rexroth: programas (POUs).
             "data_blocks": arbol,
         }
 
@@ -188,10 +194,13 @@ class SubscriptionHandler:
         return {
             "plc": self.plc_id,
             "nombre": self.plc_nombre,
+            "vendor": self.vendor,
             "endpoint": self.endpoint,
             "conectado": self._driver.is_connected(),
             "estado_conexion": self.estado_conexion,
             "num_tags": len(self._tags),
+            # Solo Rexroth: 'subscription' o 'polling' (el driver decide solo).
+            "modo_lectura": getattr(self._driver, "modo_lectura", "subscription"),
             # Intervalos configurados: cada cuánto se muestrea y se publica.
             "sampling_interval_ms": self._settings.sampling_interval_ms,
             "publishing_interval_ms": self._settings.publishing_interval_ms,

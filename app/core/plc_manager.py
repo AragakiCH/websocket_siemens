@@ -5,7 +5,10 @@ plc_manager.py
 Gestor MULTI-PLC. Es el nivel superior que:
 
   * Ejecuta el descubrimiento de PLCs (escaneo de subred + endpoints manuales).
-  * Crea un OpcUaDriver y un SubscriptionHandler por cada PLC encontrado.
+  * Crea el DRIVER que corresponda a la marca de cada PLC y un
+    SubscriptionHandler por cada uno:
+        - 'siemens' -> OpcUaDriver  (S7-1500, DataBlocksGlobal, anónimo)
+        - 'rexroth' -> RexrothDriver (ctrlX CORE, Datalayer/plc/app, user+pass)
   * Arranca todos los handlers (cada uno con su propio supervisor/reconexión).
   * Agrega el estado de todos los PLCs para el snapshot inicial y los endpoints
     REST (/health, /tags, /browse).
@@ -13,6 +16,8 @@ Gestor MULTI-PLC. Es el nivel superior que:
     nuevos en caliente, sin reiniciar el servicio.
 
 Un PLC caído o inaccesible NO afecta a los demás: cada handler es independiente.
+Los PLCs Siemens y Rexroth pueden convivir en la misma sesión: como cada tag
+va prefijado con el `plc_id`, la vista los muestra juntos sin colisiones.
 """
 from __future__ import annotations
 
@@ -25,8 +30,13 @@ from app.config.settings import Settings
 from app.core.connection_manager import ConnectionManager
 from app.core.plc_discovery import EndpointPlc, descubrir_plcs
 from app.drivers.opcua_driver import OpcUaDriver
+from app.drivers.plc_driver import PlcDriver
+from app.drivers.rexroth_driver import RexrothDriver
 
 logger = logging.getLogger("plc_manager")
+
+# Marcas soportadas.
+VENDORS = ("siemens", "rexroth")
 
 
 def _ahora_iso() -> str:
@@ -127,18 +137,38 @@ class PlcManager:
         )
         logger.info("PlcManager detenido.")
 
+    def _settings_para(self, ep: EndpointPlc) -> Settings:
+        """
+        Copia de settings personalizada para ESTE PLC: su endpoint y, si es
+        Rexroth, sus credenciales, app y programa. Se usa model_copy para no
+        contaminar la configuración de los demás PLCs.
+        """
+        update: dict = {"opcua_endpoint": ep.endpoint, "vendor": ep.vendor}
+        if ep.vendor == "rexroth":
+            update.update({
+                "rexroth_username": ep.usuario or self._settings.rexroth_username,
+                "rexroth_password": ep.password or self._settings.rexroth_password,
+                "rexroth_app": ep.app or self._settings.rexroth_app,
+                "rexroth_program": ep.programa or self._settings.rexroth_program,
+            })
+        return self._settings.model_copy(update=update)
+
+    @staticmethod
+    def _crear_driver(vendor: str, settings_plc: Settings) -> PlcDriver:
+        """Instancia el driver que corresponde a la marca del PLC."""
+        if vendor == "rexroth":
+            return RexrothDriver(settings_plc)
+        return OpcUaDriver(settings_plc)
+
     async def _añadir_plc(self, ep: EndpointPlc) -> str:
         """Crea driver + handler para un endpoint, lo arranca y devuelve su id."""
         # Import local para evitar dependencias circulares y facilitar tests.
         from app.core.subscription_handler import SubscriptionHandler
 
         plc_id = _plc_id_desde(ep, self._ids_usados)
+        settings_plc = self._settings_para(ep)
 
-        # Construye una copia de settings con el endpoint concreto de este PLC.
-        # (settings es inmutable-ish; usamos model_copy para no afectar a otros.)
-        settings_plc = self._settings.model_copy(update={"opcua_endpoint": ep.endpoint})
-
-        driver = OpcUaDriver(settings_plc)
+        driver = self._crear_driver(ep.vendor, settings_plc)
         handler = SubscriptionHandler(
             driver=driver,
             manager=self._manager,
@@ -146,24 +176,57 @@ class PlcManager:
             plc_id=plc_id,
             endpoint=ep.endpoint,
             plc_nombre=ep.nombre,
+            vendor=ep.vendor,
         )
         self._handlers[plc_id] = handler
         await handler.start()
-        logger.info("PLC añadido: id=%s endpoint=%s nombre=%s",
-                    plc_id, ep.endpoint, ep.nombre or "-")
+        logger.info("PLC añadido: id=%s marca=%s endpoint=%s nombre=%s",
+                    plc_id, ep.vendor, ep.endpoint, ep.nombre or "-")
         return plc_id
 
     # ------------------------------------------------------------------ #
     # Gestión en caliente desde la vista (REST)
     # ------------------------------------------------------------------ #
-    async def add_plc_manual(self, host: str, puerto: int = 4840) -> dict:
+    async def add_plc_manual(
+        self,
+        host: str,
+        puerto: int = 4840,
+        vendor: str = "siemens",
+        usuario: str = "",
+        password: str = "",
+        app: str = "",
+        programa: str = "",
+    ) -> dict:
         """
         Añade un PLC escrito por el usuario (IP, host o endpoint completo).
-        Devuelve {ok, plc_id, endpoint, mensaje}.
+
+        Para `vendor='siemens'` basta la IP (conexión anónima, como siempre).
+        Para `vendor='rexroth'` solo son obligatorios `usuario` y `password`:
+        si no se indican `app` y `programa`, se autodetectan al conectar.
+
+        Devuelve {ok, plc_id, endpoint, vendor, mensaje}.
         """
         host = host.strip()
         if not host:
             return {"ok": False, "mensaje": "Indica una IP o endpoint."}
+
+        vendor = (vendor or "siemens").strip().lower()
+        if vendor not in VENDORS:
+            return {"ok": False,
+                    "mensaje": f"Marca desconocida '{vendor}'. Usa: {', '.join(VENDORS)}."}
+
+        # Validación específica de Rexroth: el ctrlX no acepta sesiones anónimas.
+        if vendor == "rexroth":
+            usuario = (usuario or "").strip()
+            password = password or ""
+            programa = (programa or "").strip()
+            app = (app or "Application").strip()
+            if not usuario or not password:
+                return {"ok": False,
+                        "mensaje": "Un PLC Rexroth necesita usuario y contraseña."}
+            # `app` y `programa` son OPCIONALES: si no llegan, el driver los
+            # descubre solo navegando plc/app/<app>/sym/<programa>.
+
         if host.startswith("opc.tcp://"):
             endpoint = host
             from app.core.plc_discovery import _host_puerto
@@ -179,12 +242,15 @@ class PlcManager:
                         "mensaje": f"Ese PLC ya está gestionado (id={pid})."}
 
         ep = EndpointPlc(endpoint=endpoint, host=host_solo, port=puerto,
-                         nombre="", origen="manual")
+                         nombre="", origen="manual", vendor=vendor,
+                         usuario=usuario, password=password,
+                         app=app, programa=programa)
         plc_id = await self._añadir_plc(ep)
         # Refrescar a todos los clientes conectados con un snapshot nuevo.
         await self._manager.broadcast(self.build_snapshot_message())
         return {"ok": True, "plc_id": plc_id, "endpoint": endpoint,
-                "mensaje": f"PLC {plc_id} añadido; conectando..."}
+                "vendor": vendor,
+                "mensaje": f"PLC {plc_id} ({vendor}) añadido; conectando..."}
 
     async def remove_plc(self, plc_id: str) -> dict:
         """Detiene y elimina un PLC gestionado."""
@@ -265,6 +331,7 @@ class PlcManager:
             tags.update(h.snapshot_entries())
             plcs[plc_id] = {
                 "nombre": h.plc_nombre,
+                "vendor": h.vendor,
                 "endpoint": h.endpoint,
                 "estado": h.estado_conexion,
                 "conectado": h.is_plc_connected(),

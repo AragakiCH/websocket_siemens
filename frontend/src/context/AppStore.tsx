@@ -11,17 +11,26 @@ import {
   PlcVariable,
   UpdateRate,
   ThemeMode,
-  Language } from
+  Language,
+  PlcConnection,
+  PlcVendor } from
 '../models/plc';
 import { HmiWidget, WidgetKind, BuiltInWidgetKind } from '../models/widget';
 import { RealPLCService as MockPLCService } from '../services/RealPLCService';
 import { createTranslator, widgetLabel as widgetLabelFn, TFn } from '../i18n';
 import { customByKind, zipByKind } from '../components/hmi/custom/registry';
 interface AppStore {
-  // auth (emulated)
+  // auth / conexión al PLC
   connected: boolean;
   plcIp: string;
-  connect: (ip: string) => void;
+  /** Marca del PLC al que se conectó ('siemens' | 'rexroth'). */
+  plcVendor: PlcVendor;
+  /**
+   * Da de alta el PLC en el backend (POST /plcs). Para Siemens basta la IP;
+   * para Rexroth se envían además usuario, contraseña, app y programa.
+   * Lanza si el backend responde con error, para que el Login lo muestre.
+   */
+  connect: (conn: PlcConnection) => Promise<void>;
   disconnect: () => void;
   // variables
   variables: PlcVariable[];
@@ -52,6 +61,7 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   // Login deshabilitado — auto-conectado con IP por defecto
   const [connected, setConnected] = useState(true);
   const [plcIp, setPlcIp] = useState('192.168.0.1');
+  const [plcVendor, setPlcVendor] = useState<PlcVendor>('siemens');
   const [variables, setVariables] = useState<PlcVariable[]>(() =>
   MockPLCService.getVariables()
   );
@@ -96,18 +106,39 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     root.style.colorScheme = isDark ? 'dark' : 'light';
     root.setAttribute('lang', config.language);
   }, [isDark, config.language]);
-  const connect = useCallback(async (ip: string) => {
-    setPlcIp(ip);
-    setConnected(true);
-    try {
-      await fetch('/plcs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ host: ip, puerto: 4840 }),
-      });
-    } catch (e) {
-      console.warn('[connect] no se pudo agregar el PLC:', e);
+  const connect = useCallback(async (conn: PlcConnection) => {
+    const vendor: PlcVendor = conn.vendor ?? 'siemens';
+
+    // El backend ignora los campos de Rexroth cuando vendor='siemens', así que
+    // se puede mandar siempre el mismo cuerpo.
+    const body = {
+      host: conn.ip,
+      puerto: conn.puerto ?? 4840,
+      vendor,
+      usuario: conn.usuario ?? '',
+      password: conn.password ?? '',
+      app: conn.app ?? 'Application',
+      programa: conn.programa ?? '',
+    };
+
+    const r = await fetch('/plcs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    const data = await r.json().catch(() => null);
+    if (!r.ok) {
+      throw new Error(data?.detail ?? `HTTP ${r.status}`);
     }
+    // El backend responde ok:false cuando el PLC ya existía o faltan datos.
+    if (data && data.ok === false) {
+      throw new Error(data.mensaje ?? 'No se pudo agregar el PLC.');
+    }
+
+    setPlcIp(conn.ip);
+    setPlcVendor(vendor);
+    setConnected(true);
   }, []);
   const disconnect = useCallback(() => setConnected(false), []);
   const toggleVariable = useCallback((id: string, selected: boolean) => {
@@ -157,6 +188,7 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   const value: AppStore = {
     connected,
     plcIp,
+    plcVendor,
     connect,
     disconnect,
     variables,
