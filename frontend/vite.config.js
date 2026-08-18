@@ -1,8 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// Backend FastAPI (uvicorn app.main:app --port 8000)
-const BACKEND = 'http://localhost:8000'
+// Backend FastAPI (uvicorn app.main:app --port 8000).
+// El puerto se puede sobrescribir con la variable de entorno BACKEND_PORT;
+// `tools/dev.py` la define sola cuando se arranca con --puerto, para que el
+// proxy siga apuntando al backend correcto.
+const BACKEND_PORT = process.env.BACKEND_PORT || '8000'
+const BACKEND = `http://localhost:${BACKEND_PORT}`
 
 // https://vite.dev/config/
 export default defineConfig({

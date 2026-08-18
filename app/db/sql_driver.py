@@ -28,9 +28,9 @@ import asyncio
 import logging
 import re
 import time
-from datetime import date, datetime, time as dtime
+from datetime import date, datetime, time as dtime, timezone
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import text
@@ -146,6 +146,93 @@ def _nombre_seguro(nombre: str) -> str:
             f"guion bajo, empezando por letra (máx. 63 caracteres)."
         )
     return nombre
+
+
+_RE_PREFIJO = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,20}$")
+
+
+def _prefijo_seguro(prefijo: str) -> str:
+    """
+    Valida el prefijo opcional de las tablas del esquema estándar.
+
+    Sirve para que dos instalaciones puedan convivir en la misma base de datos
+    (`planta1_usuarios`, `planta2_usuarios`). Vacío = sin prefijo. Como es un
+    identificador, se valida con lista blanca igual que los nombres de tabla.
+    """
+    prefijo = (prefijo or "").strip()
+    if not prefijo:
+        return ""
+    if not _RE_PREFIJO.match(prefijo):
+        raise ValueError(
+            f"Prefijo inválido: '{prefijo}'. Solo letras, dígitos y guion "
+            f"bajo, empezando por letra (máx. 21 caracteres)."
+        )
+    return prefijo if prefijo.endswith("_") else f"{prefijo}_"
+
+
+# ====================================================================== #
+# Marcas de tiempo: todo se guarda en UTC, de forma determinista
+# ====================================================================== #
+def a_utc(valor: Any) -> Optional[datetime]:
+    """
+    Convierte cualquier marca de tiempo a un `datetime` **aware en UTC**.
+
+    Acepta cadenas ISO 8601 (con o sin offset, con 'Z' o con '+00:00'),
+    `datetime` (aware o naive) y None. Una marca naive se asume UTC, que es lo
+    que emiten los dos drivers de PLC (`SourceTimestamp` de OPC UA es UTC por
+    especificación).
+    """
+    if valor is None:
+        return None
+    if isinstance(valor, datetime):
+        dt = valor
+    else:
+        texto = str(valor).strip()
+        if not texto:
+            return None
+        # `fromisoformat` de Python <3.11 no entiende la 'Z' final.
+        if texto.endswith("Z"):
+            texto = texto[:-1] + "+00:00"
+        try:
+            dt = datetime.fromisoformat(texto)
+        except ValueError:
+            return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def ts_para_motor(valor: Any, motor: str) -> Any:
+    """
+    Adapta una marca de tiempo al tipo que espera cada motor, SIEMPRE en UTC.
+
+    Esto existe por un problema real y silencioso: si se le pasa a MySQL la
+    cadena ISO `'2026-08-17T20:54:08+00:00'`, MySQL 8.0.19+ la convierte a la
+    zona horaria **de sesión del servidor** antes de guardarla en un `DATETIME`
+    (que no almacena zona). Resultado: la misma instalación guarda una hora
+    distinta según el `time_zone` del servidor, y al leer ya no hay forma de
+    saber en qué zona está el dato.
+
+    La solución es no delegar nunca esa conversión en el motor:
+
+      * PostgreSQL (`TIMESTAMPTZ`) -> datetime AWARE en UTC. La columna sí
+        guarda la zona, así que se aprovecha.
+      * MySQL / SQL Server (`DATETIME`, `DATETIME2`) -> datetime NAIVE que ya
+        contiene la hora UTC. Sin offset que el motor pueda reinterpretar.
+      * SQLite (`TEXT`) -> cadena ISO 8601 en UTC con formato fijo, para que
+        las comparaciones `ts >= :desde` (que son lexicográficas) funcionen.
+    """
+    dt = a_utc(valor)
+    if dt is None:
+        return None
+    if motor == "postgresql":
+        return dt
+    if motor == "sqlite":
+        # Formato fijo y ordenable. Se conserva el '+00:00' para que quede
+        # explícito en la tabla que el dato está en UTC.
+        return dt.isoformat(sep=" ", timespec="milliseconds")
+    # MySQL y SQL Server: naive, con la hora UTC ya aplicada.
+    return dt.replace(tzinfo=None)
 
 
 # ====================================================================== #
@@ -438,6 +525,209 @@ class SqlDriver(DbDriver):
         return (
             f"INSERT INTO {tabla} (ts, plc, tag, valor_num, valor_texto, tipo) "
             f"VALUES (:ts, :plc, :tag, :valor_num, :valor_texto, :tipo)"
+        )
+
+    # ------------------------------------------------------------------ #
+    # Esquema estándar del HMI (usuarios / plc_prg / alarmas)
+    # ------------------------------------------------------------------ #
+    def ddl_esquema_hmi(self, prefijo: str = "") -> List[Tuple[str, str]]:
+        """
+        Sentencias DDL del esquema estándar del HMI, adaptadas al motor.
+
+        Devuelve una lista de tuplas `(nombre_objeto, sentencia)` EN ORDEN:
+        `usuarios` y `plc_prg` van antes que `alarmas`, porque esta última
+        las referencia con claves foráneas.
+
+        ┌────────────┬───────────────────────────────────────────────────────┐
+        │ usuarios   │ Quién opera el HMI. La contraseña se guarda HASHEADA. │
+        │ plc_prg    │ Lecturas del PLC. Esquema ESTRECHO: una fila por      │
+        │            │ (ts, tag). Agregar o quitar tags NO cambia la tabla.  │
+        │ alarmas    │ Eventos de alarma, con su ciclo de vida completo:     │
+        │            │ activación -> reconocimiento -> normalización.        │
+        └────────────┴───────────────────────────────────────────────────────┘
+
+        Relaciones:
+            alarmas.plc_prg_id -> plc_prg.id   (la lectura que la disparó)
+            alarmas.usuario_id -> usuarios.id  (quién la reconoció)
+
+        Ambas son NULLables a propósito: una alarma existe desde que salta,
+        aunque todavía nadie la haya reconocido, y puede venir de una
+        condición del sistema que no corresponde a una lectura concreta.
+        `ON DELETE SET NULL` evita que borrar un usuario borre su historial
+        de alarmas: se pierde el "quién", no el evento.
+
+        Todas las sentencias son IDEMPOTENTES: ejecutarlas sobre una BD que
+        ya tiene el esquema no falla ni borra datos.
+        """
+        p = _prefijo_seguro(prefijo)
+        t_usuarios = f"{p}usuarios"
+        t_plc = f"{p}plc_prg"
+        t_alarmas = f"{p}alarmas"
+
+        m = self.motor
+        # --- Tipos que cambian entre motores ---------------------------- #
+        if m == "postgresql":
+            pk = "BIGSERIAL PRIMARY KEY"
+            fk_tipo = "BIGINT"
+            ts = "TIMESTAMPTZ"
+            texto = "TEXT"
+            real = "DOUBLE PRECISION"
+            entero = "INTEGER"
+        elif m == "mysql":
+            pk = "BIGINT AUTO_INCREMENT PRIMARY KEY"
+            fk_tipo = "BIGINT"
+            ts = "DATETIME(3)"
+            texto = "TEXT"
+            real = "DOUBLE PRECISION"
+            entero = "INT"
+        elif m == "mssql":
+            pk = "BIGINT IDENTITY(1,1) PRIMARY KEY"
+            fk_tipo = "BIGINT"
+            ts = "DATETIME2"
+            texto = "NVARCHAR(MAX)"
+            real = "FLOAT"
+            entero = "INT"
+        else:  # sqlite
+            pk = "INTEGER PRIMARY KEY AUTOINCREMENT"
+            fk_tipo = "INTEGER"
+            ts = "TEXT"
+            texto = "TEXT"
+            real = "DOUBLE PRECISION"
+            entero = "INTEGER"
+
+        # ---------------------------------------------------------------- #
+        # usuarios
+        # ---------------------------------------------------------------- #
+        # OJO: `password_hash`, NO la contraseña. El backend guarda el hash
+        # (PBKDF2/bcrypt) y `algoritmo` permite migrar de algoritmo sin
+        # invalidar las contraseñas existentes.
+        usuarios = (
+            f"CREATE TABLE {t_usuarios} ("
+            f"id {pk}, "
+            f"usuario VARCHAR(80) NOT NULL UNIQUE, "
+            f"password_hash VARCHAR(255) NOT NULL, "
+            f"algoritmo VARCHAR(30) NOT NULL DEFAULT 'pbkdf2_sha256', "
+            f"email VARCHAR(160), "
+            # Rol: admin | supervisor | operador | invitado
+            f"categoria VARCHAR(40) NOT NULL DEFAULT 'operador', "
+            # activo | inactivo | bloqueado
+            f"estado VARCHAR(20) NOT NULL DEFAULT 'activo', "
+            f"creado_en {ts}, "
+            f"ultimo_acceso {ts})"
+        )
+
+        # ---------------------------------------------------------------- #
+        # plc_prg  (lecturas del PLC, esquema estrecho)
+        # ---------------------------------------------------------------- #
+        # Es el MISMO formato que escribe el historizador, así que los
+        # widgets de tendencia consultan esta tabla sin adaptaciones.
+        #   - `plc_id`   distingue el mismo tag en dos PLCs distintos.
+        #   - `programa` es el POU en Rexroth o el Data Block en Siemens.
+        #   - los booleanos van en `valor_num` como 0/1, para poder graficarlos.
+        plc = (
+            f"CREATE TABLE {t_plc} ("
+            f"id {pk}, "
+            f"ts {ts} NOT NULL, "
+            f"plc_id VARCHAR(120) NOT NULL, "
+            f"programa VARCHAR(200), "
+            f"tag VARCHAR(400) NOT NULL, "
+            f"valor_num {real}, "
+            f"valor_texto {texto}, "
+            f"tipo VARCHAR(40))"
+        )
+
+        # ---------------------------------------------------------------- #
+        # alarmas
+        # ---------------------------------------------------------------- #
+        # PK simple + FKs simples (no una PK compuesta de los tres campos):
+        # con una PK compuesta no podrías tener dos alarmas distintas del
+        # mismo PLC y el mismo usuario, que es justo lo normal.
+        fk_plc = (
+            f"CONSTRAINT fk_{p}alarmas_plc FOREIGN KEY (plc_prg_id) "
+            f"REFERENCES {t_plc} (id) ON DELETE SET NULL"
+        )
+        fk_usr = (
+            f"CONSTRAINT fk_{p}alarmas_usuario FOREIGN KEY (usuario_id) "
+            f"REFERENCES {t_usuarios} (id) ON DELETE SET NULL"
+        )
+        alarmas = (
+            f"CREATE TABLE {t_alarmas} ("
+            f"id {pk}, "
+            f"plc_prg_id {fk_tipo}, "
+            f"usuario_id {fk_tipo}, "
+            # proceso | equipo | comunicacion | sistema
+            f"tipo VARCHAR(20) NOT NULL DEFAULT 'proceso', "
+            f"area VARCHAR(80), "
+            # 1 = crítica ... 5 = informativa
+            f"severidad {entero} NOT NULL DEFAULT 3, "
+            f"mensaje VARCHAR(500) NOT NULL, "
+            # Qué tag y con qué valor se disparó (para poder auditarla).
+            f"tag VARCHAR(400), "
+            f"valor_disparo {real}, "
+            # activa | reconocida | normalizada
+            f"estado VARCHAR(20) NOT NULL DEFAULT 'activa', "
+            f"ts_activacion {ts} NOT NULL, "
+            f"ts_reconocimiento {ts}, "
+            f"ts_normalizacion {ts}, "
+            f"{fk_plc}, {fk_usr})"
+        )
+
+        tablas = [
+            (t_usuarios, usuarios),
+            (t_plc, plc),
+            (t_alarmas, alarmas),
+        ]
+
+        # --- Idempotencia: "IF NOT EXISTS" no es estándar ---------------- #
+        sentencias: List[Tuple[str, str]] = []
+        for nombre, crear in tablas:
+            if m == "mssql":
+                crear = f"IF OBJECT_ID('{nombre}', 'U') IS NULL {crear}"
+            else:
+                crear = crear.replace("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ", 1)
+            sentencias.append((nombre, crear))
+
+        # --- Índices ----------------------------------------------------- #
+        # Pensados para las consultas reales del HMI:
+        #   plc_prg   -> "este tag entre dos fechas" (gráfico de tendencia)
+        #   alarmas   -> "las alarmas activas, más recientes primero"
+        indices = [
+            (f"idx_{p}plc_prg_tag_ts", t_plc, "(tag, ts)"),
+            (f"idx_{p}plc_prg_plc_ts", t_plc, "(plc_id, ts)"),
+            (f"idx_{p}alarmas_estado", t_alarmas, "(estado, ts_activacion)"),
+            (f"idx_{p}alarmas_tipo", t_alarmas, "(tipo, ts_activacion)"),
+        ]
+        for idx, tabla, cols in indices:
+            if m == "mssql":
+                sent = (
+                    f"IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='{idx}') "
+                    f"CREATE INDEX {idx} ON {tabla} {cols}"
+                )
+            elif m == "mysql":
+                # MySQL no soporta CREATE INDEX IF NOT EXISTS: se crea el
+                # índice dentro de un procedimiento condicional sería
+                # excesivo, así que se marca como opcional y el DbManager
+                # ignora el error de "índice duplicado".
+                sent = f"CREATE INDEX {idx} ON {tabla} {cols}"
+            else:
+                sent = f"CREATE INDEX IF NOT EXISTS {idx} ON {tabla} {cols}"
+            sentencias.append((idx, sent))
+
+        return sentencias
+
+    def tablas_esquema_hmi(self, prefijo: str = "") -> List[str]:
+        """Nombres de las tablas del esquema estándar, en orden de creación."""
+        p = _prefijo_seguro(prefijo)
+        return [f"{p}usuarios", f"{p}plc_prg", f"{p}alarmas"]
+
+    def sql_insert_lectura(self, prefijo: str = "") -> str:
+        """INSERT parametrizado para la tabla `plc_prg` del esquema estándar."""
+        p = _prefijo_seguro(prefijo)
+        return (
+            f"INSERT INTO {p}plc_prg "
+            f"(ts, plc_id, programa, tag, valor_num, valor_texto, tipo) "
+            f"VALUES (:ts, :plc_id, :programa, :tag, :valor_num, "
+            f":valor_texto, :tipo)"
         )
 
     # ------------------------------------------------------------------ #

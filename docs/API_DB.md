@@ -150,6 +150,136 @@ Respuesta:
 
 ---
 
+## 1.b Esquema estándar del HMI
+
+### `POST /db/{db_id}/esquema` — crear las tablas
+
+Crea las tres tablas del HMI con sus claves foráneas e índices, **adaptadas al
+motor** (los tipos cambian: `BIGSERIAL` en PostgreSQL, `IDENTITY(1,1)` en SQL
+Server, `AUTOINCREMENT` en SQLite…).
+
+```json
+POST /db/local/esquema
+{ "prefijo": "" }
+```
+
+```json
+{
+  "ok": true,
+  "db_id": "local",
+  "tablas_creadas": ["usuarios", "plc_prg", "alarmas"],
+  "tablas_existentes": [],
+  "errores": [],
+  "mensaje": "Esquema listo: 3 tabla(s) creada(s)."
+}
+```
+
+También se puede crear en el mismo momento del alta, mandando
+`"crear_esquema": true` (y opcionalmente `"prefijo_esquema"`) en `POST /db`.
+
+**Es idempotente**: llamarlo sobre una BD que ya tiene el esquema no falla ni
+toca los datos. La respuesta distingue `tablas_creadas` de `tablas_existentes`.
+
+Por defecto **no se crea nada** al dar de alta una conexión. Es deliberado: si
+conectas a un MES o un ERP de producción, no quieres que el servicio le escriba
+estructura sin que se lo pidas explícitamente.
+
+### Las tablas
+
+#### `usuarios` — quién opera el HMI
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | PK autoincremental | |
+| `usuario` | VARCHAR(80) NOT NULL **UNIQUE** | login |
+| `password_hash` | VARCHAR(255) NOT NULL | **el hash, nunca la contraseña** |
+| `algoritmo` | VARCHAR(30) | `pbkdf2_sha256` por defecto; permite migrar de algoritmo sin invalidar las contraseñas existentes |
+| `email` | VARCHAR(160) | |
+| `categoria` | VARCHAR(40) | rol: `admin` \| `supervisor` \| `operador` \| `invitado` |
+| `estado` | VARCHAR(20) | `activo` \| `inactivo` \| `bloqueado` |
+| `creado_en` | timestamp | |
+| `ultimo_acceso` | timestamp | para auditoría y para detectar cuentas muertas |
+
+> Nunca guardes la contraseña en claro en esta tabla. Si alguien consigue leerla
+> —un backup, una captura, un `SELECT` mal dado— se lleva las credenciales de
+> todos los operarios de la planta.
+
+#### `plc_prg` — lecturas del PLC
+
+Esquema **estrecho**: una fila por `(ts, tag)`. Es el mismo formato que escribe
+el historizador, así que los widgets de tendencia consultan esta tabla sin
+adaptaciones.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | PK autoincremental | |
+| `ts` | timestamp NOT NULL | **cuándo se leyó** — sin esto no hay tendencias |
+| `plc_id` | VARCHAR(120) NOT NULL | distingue el mismo tag en dos PLCs |
+| `programa` | VARCHAR(200) | POU en Rexroth, Data Block en Siemens |
+| `tag` | VARCHAR(400) NOT NULL | `PLC_PRG.Temperatura` |
+| `valor_num` | double | numéricos y booleanos (0/1, para poder graficarlos) |
+| `valor_texto` | text | strings |
+| `tipo` | VARCHAR(40) | `LREAL`, `BOOL`, `DINT`… |
+
+Índices: `(tag, ts)` y `(plc_id, ts)` — son los dos patrones de consulta reales
+("este tag entre dos fechas", "todo lo de este PLC").
+
+**Por qué estrecho y no una columna por magnitud**: con columnas fijas, tener
+tres temperaturas no cabe, y cada cambio en el programa del PLC obliga a un
+`ALTER TABLE`. Con este esquema, agregar o quitar tags no toca la estructura
+nunca — que es justo lo que necesitas con el ctrlX, donde los programas varían.
+
+#### `alarmas` — eventos con su ciclo de vida
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | PK autoincremental | |
+| `plc_prg_id` | FK → `plc_prg.id` | la lectura que la disparó (NULLable) |
+| `usuario_id` | FK → `usuarios.id` | quién la reconoció (NULLable) |
+| `tipo` | VARCHAR(20) | `proceso` \| `equipo` \| `comunicacion` \| `sistema` |
+| `area` | VARCHAR(80) | zona de planta |
+| `severidad` | int | 1 = crítica … 5 = informativa |
+| `mensaje` | VARCHAR(500) NOT NULL | texto que ve el operario |
+| `tag` | VARCHAR(400) | qué tag la disparó |
+| `valor_disparo` | double | con qué valor saltó (para auditarla) |
+| `estado` | VARCHAR(20) | `activa` \| `reconocida` \| `normalizada` |
+| `ts_activacion` | timestamp NOT NULL | cuándo saltó |
+| `ts_reconocimiento` | timestamp | cuándo la aceptó un operario |
+| `ts_normalizacion` | timestamp | cuándo volvió a la normalidad |
+
+Índices: `(estado, ts_activacion)` y `(tipo, ts_activacion)`.
+
+### Las relaciones, y por qué así
+
+```
+usuarios.id  <──┐
+                ├── alarmas (plc_prg_id, usuario_id)
+plc_prg.id   <──┘
+```
+
+* **PK simple, no compuesta.** Con una PK compuesta de `(id, plc_prg_id,
+  usuario_id)` no podrías tener dos alarmas distintas del mismo PLC y el mismo
+  usuario, que es exactamente el caso normal.
+* **Las dos FK son NULLables.** Una alarma existe desde que salta, aunque
+  todavía nadie la haya reconocido (`usuario_id` NULL), y puede venir de una
+  condición del sistema sin una lectura concreta detrás (`plc_prg_id` NULL).
+* **`ON DELETE SET NULL`.** Borrar un usuario no borra su historial de alarmas:
+  se pierde el "quién", no el evento. En una planta, el histórico de alarmas es
+  justo lo que no puedes perder cuando alguien deja la empresa.
+
+> En SQLite las claves foráneas **no se aplican** salvo que ejecutes
+> `PRAGMA foreign_keys = ON` en cada conexión. PostgreSQL, MySQL (InnoDB) y SQL
+> Server las aplican siempre.
+
+### Prefijo opcional
+
+`prefijo: "planta1"` crea `planta1_usuarios`, `planta1_plc_prg` y
+`planta1_alarmas`. Sirve para que dos instalaciones convivan en la misma base de
+datos. Se valida con lista blanca (letras, dígitos y guion bajo): un prefijo con
+`;` o espacios se rechaza con 400.
+
+---
+
 ## 2. Consultas
 
 ### `POST /db/{db_id}/preview` — probar sin guardar (solo Diseñador)
@@ -409,9 +539,12 @@ GET /historian/proceso/datos?tag=DB_snap7.temperatura&desde=2026-07-30T00:00:00&
 ```json
 {
   "ok": true, "grupo_id": "proceso", "tabla": "historico_tags",
-  "columnas": ["ts", "plc", "tag", "valor_num", "valor_texto", "tipo"],
+  "columnas": ["ts", "plc", "tag", "valor_num", "valor_texto", "tipo", "ts_local"],
+  "timezone": "America/Lima",
   "filas": [
-    { "ts": "2026-07-30T19:00:24+00:00", "plc": "SIM_PLC",
+    { "ts": "2026-07-30T19:00:24Z",
+      "ts_local": "2026-07-30T14:00:24-05:00",
+      "plc": "SIM_PLC",
       "tag": "DB1.temperatura", "valor_num": 66.8,
       "valor_texto": null, "tipo": "Float" }
   ],
@@ -420,6 +553,52 @@ GET /historian/proceso/datos?tag=DB_snap7.temperatura&desde=2026-07-30T00:00:00&
 ```
 
 Ordena por `ts` descendente. Para un gráfico de línea, invierte el array.
+
+### Zonas horarias: leer esto antes de reportar un bug
+
+**Todo se guarda en UTC.** El `SourceTimestamp` de OPC UA es UTC por
+especificación, y los dos drivers (Siemens y Rexroth) lo emiten así.
+
+Consecuencia práctica: **si abres la tabla en phpMyAdmin verás la hora UTC**, no
+la de Lima. Un dato registrado a las 15:54 hora local aparece como `20:54`. No
+es un error — es la hora correcta sin convertir.
+
+La conversión se hace al leer. Cada fila devuelve dos campos:
+
+| Campo | Qué es |
+|---|---|
+| `ts` | UTC, con `Z` explícita. Es el que se usa para filtrar, ordenar y comparar |
+| `ts_local` | ya convertido a `PLC_TIMEZONE`, con su offset. Es el que se pinta |
+
+La zona se configura con `PLC_TIMEZONE` (nombre IANA, por defecto
+`America/Lima`). `UTC` desactiva la conversión.
+
+> En Windows puede faltar la base de datos de zonas horarias. Si en el log ves
+> *"Zona horaria no disponible; se usa UTC"*, instala `pip install tzdata`.
+
+**Por qué UTC y no hora local en la base**: guardar hora local pierde la
+referencia absoluta. Con horario de verano hay una hora que ocurre dos veces al
+año y otra que no existe — dos filas con la misma marca y ningún modo de
+ordenarlas. Y si mañana comparas dos plantas en países distintos, los datos ya
+no son comparables. Perú no tiene horario de verano hoy, pero la tabla dura más
+que esa suposición.
+
+#### Detalle de implementación (por si tocas el historizador)
+
+Las marcas **no** se mandan al motor como cadena ISO. Se normalizan antes del
+`INSERT` con `ts_para_motor()`, en `app/db/sql_driver.py`:
+
+| Motor | Qué se envía | Por qué |
+|---|---|---|
+| PostgreSQL | `datetime` aware UTC | `TIMESTAMPTZ` sí guarda la zona |
+| MySQL / SQL Server | `datetime` **naive** con la hora UTC | `DATETIME` no guarda zona |
+| SQLite | ISO 8601 UTC, formato fijo | la columna es `TEXT`; comparación lexicográfica |
+
+Esto cierra un fallo silencioso: si a MySQL 8.0.19+ se le pasa la cadena
+`'2026-08-17T20:54:08+00:00'`, la convierte a la zona **de sesión del servidor**
+antes de guardarla en un `DATETIME`. La misma instalación guardaría una hora
+distinta según el `time_zone` de cada servidor MySQL, y al leer ya no habría
+forma de saber en qué zona está el dato.
 
 Si aún no hay datos devuelve `ok:true` con `filas: []` y un `mensaje` — no un
 error, para que el widget pinte "sin datos" sin caso especial.

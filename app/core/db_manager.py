@@ -112,12 +112,19 @@ class DbManager:
         nombre: str = "",
         opciones: Optional[Dict[str, str]] = None,
         autoconectar: bool = True,
+        crear_esquema: bool = False,
+        prefijo_esquema: str = "",
     ) -> dict:
         """
         Da de alta (o actualiza) una conexión y abre su pool.
 
         A diferencia de los PLCs, aquí la conexión se verifica ANTES de
         guardar: no tiene sentido persistir credenciales que no funcionan.
+
+        Si `crear_esquema` es True, tras guardar se crean las tablas estándar
+        del HMI (usuarios / plc_prg / alarmas). Es opcional a propósito: si
+        conectas a una BD ajena (un MES de producción, por ejemplo) no quieres
+        que el servicio le escriba estructura sin que se lo pidas.
         """
         db_id = (db_id or "").strip()
         if not db_id:
@@ -153,9 +160,92 @@ class DbManager:
             await self._abrir(conexion)
 
         logger.info("Conexión '%s' dada de alta (%s).", db_id, motor)
-        return {"ok": True, "db_id": db_id, "motor": motor,
-                "latencia_ms": round(latencia, 1),
-                "mensaje": f"Conexión '{db_id}' verificada y guardada."}
+        respuesta = {"ok": True, "db_id": db_id, "motor": motor,
+                     "latencia_ms": round(latencia, 1),
+                     "mensaje": f"Conexión '{db_id}' verificada y guardada."}
+
+        # Creación opcional del esquema estándar, ya con la conexión guardada.
+        # Un fallo aquí NO invalida el alta: la conexión sigue siendo válida y
+        # el esquema se puede crear luego con POST /db/{db_id}/esquema.
+        if crear_esquema:
+            try:
+                respuesta["esquema"] = await self.crear_esquema(
+                    db_id, prefijo=prefijo_esquema
+                )
+            except Exception as exc:  # noqa: BLE001
+                respuesta["esquema"] = {"ok": False, "mensaje": str(exc)}
+
+        return respuesta
+
+    # ================================================================== #
+    # Esquema estándar del HMI
+    # ================================================================== #
+    async def crear_esquema(self, db_id: str, prefijo: str = "") -> dict:
+        """
+        Crea las tablas estándar del HMI en la BD indicada.
+
+            usuarios  -> operarios del HMI (contraseña HASHEADA)
+            plc_prg   -> lecturas del PLC (una fila por ts+tag)
+            alarmas   -> eventos, con FK a plc_prg y a usuarios
+
+        Es IDEMPOTENTE: si las tablas ya existen no falla ni toca los datos,
+        así que se puede llamar tantas veces como haga falta. Devuelve qué se
+        creó y qué ya estaba, comparando el listado de tablas antes y después.
+        """
+        driver = await self._driver_de(db_id)
+
+        # Foto previa para poder informar qué se creó de verdad.
+        try:
+            antes = {t.lower() for t in await driver.listar_tablas()}
+        except Exception:  # noqa: BLE001
+            antes = set()
+
+        creadas: List[str] = []
+        omitidas: List[str] = []
+        errores: List[dict] = []
+
+        for nombre, sentencia in driver.ddl_esquema_hmi(prefijo):
+            try:
+                await driver._ejecutar_interno(sentencia)
+            except Exception as exc:  # noqa: BLE001
+                mensaje = str(exc).lower()
+                # MySQL no soporta CREATE INDEX IF NOT EXISTS: si el índice ya
+                # existe lanza "duplicate key name", que aquí NO es un error.
+                if "duplicate key name" in mensaje or "already exists" in mensaje:
+                    omitidas.append(nombre)
+                    continue
+                errores.append({"objeto": nombre, "error": str(exc)})
+
+        try:
+            despues = {t.lower() for t in await driver.listar_tablas()}
+        except Exception:  # noqa: BLE001
+            despues = antes
+
+        for tabla in driver.tablas_esquema_hmi(prefijo):
+            if tabla.lower() in antes:
+                omitidas.append(tabla)
+            elif tabla.lower() in despues:
+                creadas.append(tabla)
+
+        ok = not errores
+        if ok:
+            logger.info("Esquema HMI en '%s': %d tabla(s) creada(s), %d ya existía(n).",
+                        db_id, len(creadas), len(omitidas))
+        else:
+            logger.error("Esquema HMI en '%s': %d error(es).", db_id, len(errores))
+
+        return {
+            "ok": ok,
+            "db_id": db_id,
+            "tablas_creadas": creadas,
+            "tablas_existentes": sorted(set(omitidas)),
+            "errores": errores,
+            "mensaje": (
+                f"Esquema listo: {len(creadas)} tabla(s) creada(s)."
+                if ok else
+                f"El esquema se creó con {len(errores)} error(es)."
+            ),
+        }
 
     async def baja_conexion(self, db_id: str) -> dict:
         """Cierra el pool y borra la conexión y sus consultas."""

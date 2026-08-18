@@ -39,6 +39,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from app.db.sql_driver import a_utc, ts_para_motor
+
 logger = logging.getLogger("historian")
 
 # Límite duro del buffer en memoria. Si la BD está caída y el buffer se llena,
@@ -246,6 +248,10 @@ class Historizador:
         return {
             # Se prefiere la marca del PLC (source_ts): es cuándo ocurrió de
             # verdad, no cuándo lo recibió el backend.
+            #
+            # Se guarda tal cual (ISO 8601 con offset). La conversión al tipo
+            # concreto de cada motor se hace justo antes del INSERT, en
+            # `_volcar()`, porque solo allí se sabe qué motor hay detrás.
             "ts": mensaje.get("source_ts") or mensaje.get("timestamp") or _ahora_iso(),
             "plc": plc[:120],
             "tag": tag[:400],
@@ -296,6 +302,13 @@ class Historizador:
                     await driver._ejecutar_interno(ddl)
                 grupo._tabla_lista = True
                 logger.info("Tabla '%s' lista en '%s'.", grupo.tabla, grupo.db_id)
+
+            # Normalizar las marcas de tiempo al tipo del motor, SIEMPRE en
+            # UTC. Sin esto, MySQL reinterpretaría el offset de la cadena ISO
+            # según el `time_zone` de su sesión y la hora guardada dependería
+            # de la configuración del servidor.
+            for fila in lote:
+                fila["ts"] = ts_para_motor(fila["ts"], driver.motor)
 
             await driver._ejecutar_interno(
                 driver.sql_insert_historico(grupo.tabla), lote
@@ -480,4 +493,34 @@ class Historizador:
 
         salida = {"ok": True, "grupo_id": grupo_id, "tabla": grupo.tabla}
         salida.update(resultado.to_dict())
+        self._añadir_hora_local(salida)
         return salida
+
+    # ------------------------------------------------------------------ #
+    # Zona horaria de visualización
+    # ------------------------------------------------------------------ #
+    def _añadir_hora_local(self, salida: dict) -> None:
+        """
+        Añade `ts_local` a cada fila, convertido a la zona de `PLC_TIMEZONE`.
+
+        `ts` se deja intacto y normalizado a UTC con 'Z' final, para que quede
+        explícito en qué zona está: el problema clásico es una marca sin zona
+        que cada quien interpreta como quiere.
+
+        Los datos NO se tocan en la base: la conversión es solo de presentación.
+        """
+        from app.config.settings import get_settings
+
+        zona = get_settings().zona_horaria()
+        filas = salida.get("filas") or []
+        for fila in filas:
+            dt = a_utc(fila.get("ts"))
+            if dt is None:
+                fila["ts_local"] = None
+                continue
+            fila["ts"] = dt.isoformat().replace("+00:00", "Z")
+            fila["ts_local"] = dt.astimezone(zona).isoformat()
+
+        if filas and "ts_local" not in (salida.get("columnas") or []):
+            salida.setdefault("columnas", []).append("ts_local")
+        salida["timezone"] = str(zona)

@@ -159,6 +159,22 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO")
 
     # ------------------------------------------------------------------ #
+    # Zona horaria de VISUALIZACIÓN
+    # ------------------------------------------------------------------ #
+    # Los datos SIEMPRE se guardan en UTC (el SourceTimestamp de OPC UA es UTC
+    # por especificación). Esta zona solo se usa para convertir al mostrar:
+    # las lecturas del histórico devuelven `ts` (UTC) y `ts_local` ya
+    # convertido a esta zona.
+    #
+    # Nombre IANA: America/Lima, America/Bogota, Europe/Madrid...
+    # 'UTC' desactiva la conversión (ts_local == ts).
+    timezone: str = Field(
+        default="America/Lima",
+        description="Zona horaria para mostrar las marcas de tiempo "
+                    "(nombre IANA). Los datos se guardan siempre en UTC.",
+    )
+
+    # ------------------------------------------------------------------ #
     # Descubrimiento de PLCs y modo multi-PLC
     # ------------------------------------------------------------------ #
     # Endpoints fijos que SIEMPRE se intentan (si ya conoces las IPs).
@@ -227,6 +243,34 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------ #
     # Helpers de descubrimiento / multi-PLC
     # ------------------------------------------------------------------ #
+    def zona_horaria(self):
+        """
+        Devuelve el objeto de zona horaria configurado (`ZoneInfo`).
+
+        Si el nombre no existe o falta la base de datos de zonas horarias (en
+        Windows hace falta el paquete `tzdata`), se cae a UTC con un aviso en
+        vez de tumbar el servicio: una zona mal escrita no debe impedir
+        historizar.
+        """
+        from datetime import timezone as _tz
+
+        nombre = (self.timezone or "UTC").strip()
+        if not nombre or nombre.upper() == "UTC":
+            return _tz.utc
+        try:
+            from zoneinfo import ZoneInfo
+
+            return ZoneInfo(nombre)
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger("settings").warning(
+                "Zona horaria '%s' no disponible; se usa UTC. En Windows "
+                "puede faltar el paquete 'tzdata' (pip install tzdata).",
+                nombre,
+            )
+            return _tz.utc
+
     def load_static_endpoints(self) -> List[str]:
         """
         Lista de endpoints fijos (manuales). Incluye `static_endpoints` y, por

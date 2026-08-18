@@ -111,6 +111,8 @@ falla con *"El término 'uvicorn' no se reconoce…"*.
 
 ```powershell
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+python tools/dev.py --puerto 8080
 ```
 
 Usa **`python -m uvicorn`**, no `uvicorn` a secas: el ejecutable
@@ -487,6 +489,30 @@ escanear la red. Documentación interactiva de la API en **http://localhost:8000
 
 ### Modo desarrollo (hot-reload de la vista)
 
+**Con una sola terminal** (recomendado) — `tools/dev.py` levanta backend y
+frontend juntos, con la salida de ambos prefijada, y los cierra a los dos con
+un solo Ctrl+C:
+
+```bash
+python tools/dev.py
+```
+
+Abre **http://localhost:5173** (no el 8000): es Vite quien sirve la vista con
+hot-reload, y su proxy reenvía `/ws`, `/plcs`, `/rexroth`, `/health`, `/tags`…
+al backend. El 8000 sigue sirviendo la API y `/docs`.
+
+Opciones:
+
+```bash
+python tools/dev.py --puerto 8080     # backend en otro puerto (el proxy lo sigue solo)
+python tools/dev.py --solo-backend    # sin Vite, si ya hiciste npm run build
+```
+
+Requiere haber corrido `npm install` dentro de `frontend/` una vez; si falta,
+el script lo avisa y arranca solo el backend.
+
+**Con dos terminales**, si lo prefieres:
+
 ```bash
 # Terminal 1: backend
 python -m uvicorn app.main:app --reload --port 8000
@@ -494,6 +520,10 @@ python -m uvicorn app.main:app --reload --port 8000
 # Terminal 2: frontend con Vite
 cd frontend && npm run dev
 ```
+
+> El puerto del backend al que apunta el proxy se puede cambiar con la
+> variable de entorno `BACKEND_PORT` (por defecto `8000`). `tools/dev.py` la
+> define sola cuando usas `--puerto`.
 
 Abrir http://localhost:5173 (el proxy redirige `/ws` y los REST al 8000).
 

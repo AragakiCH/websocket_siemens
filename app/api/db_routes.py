@@ -18,6 +18,8 @@ Modelo de seguridad (importante entenderlo antes de tocar nada):
   POST   /db                    -> alta/actualización de una conexión.
   DELETE /db/{db_id}            -> baja (borra también sus consultas).
   POST   /db/{db_id}/test       -> comprueba que la BD responde.
+  POST   /db/{db_id}/esquema    -> crea las tablas del HMI (usuarios, plc_prg,
+                                   alarmas) con sus FK e índices. Idempotente.
   GET    /db/{db_id}/tablas     -> tablas y vistas disponibles.
   GET    /db/{db_id}/columnas   -> columnas de una tabla.
   POST   /db/{db_id}/preview    -> ejecuta SQL suelto SIN guardarlo (diseñador).
@@ -31,7 +33,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Body, Query, Request
+from fastapi import APIRouter, Body, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 router = APIRouter()
@@ -77,6 +79,19 @@ class NuevaConexion(BaseModel):
     autoconectar: bool = Field(
         default=True,
         description="Abrir el pool automáticamente al arrancar el servidor.",
+    )
+    crear_esquema: bool = Field(
+        default=False,
+        description="Crear las tablas estándar del HMI (`usuarios`, `plc_prg`, "
+                    "`alarmas`) justo después de guardar la conexión. Es "
+                    "idempotente. Por defecto `false` para no escribir "
+                    "estructura en bases de datos ajenas sin pedirlo.",
+    )
+    prefijo_esquema: str = Field(
+        default="",
+        description="Prefijo opcional para las tablas del esquema "
+                    "(`planta1` -> `planta1_usuarios`). Permite que dos "
+                    "instalaciones convivan en la misma base de datos.",
     )
 
 
@@ -251,7 +266,80 @@ async def agregar_conexion(
         usuario=cuerpo.usuario, password=cuerpo.password,
         nombre=cuerpo.nombre, opciones=cuerpo.opciones,
         autoconectar=cuerpo.autoconectar,
+        crear_esquema=cuerpo.crear_esquema,
+        prefijo_esquema=cuerpo.prefijo_esquema,
     )
+
+
+class CrearEsquema(BaseModel):
+    """Cuerpo de POST /db/{db_id}/esquema."""
+
+    prefijo: str = Field(
+        default="",
+        description="Prefijo opcional de las tablas (`planta1` -> "
+                    "`planta1_usuarios`). Vacío = sin prefijo.",
+        examples=[""],
+    )
+
+
+@router.post(
+    "/db/{db_id}/esquema",
+    tags=["Bases de datos"],
+    summary="Crear el esquema estándar del HMI",
+    description="""
+Crea las tres tablas del HMI en la base de datos indicada, con sus claves
+foráneas e índices, adaptadas al motor (PostgreSQL, MySQL, SQL Server o SQLite).
+
+| Tabla | Para qué |
+|---|---|
+| `usuarios` | Operarios del HMI. La contraseña se guarda **hasheada** (`password_hash` + `algoritmo`), nunca en claro. |
+| `plc_prg` | Lecturas del PLC. Esquema **estrecho**: una fila por `(ts, tag)`, así agregar o quitar tags nunca obliga a un `ALTER TABLE`. |
+| `alarmas` | Eventos de alarma con su ciclo de vida: activación → reconocimiento → normalización. |
+
+**Relaciones**
+
+* `alarmas.plc_prg_id` → `plc_prg.id` — la lectura que disparó la alarma.
+* `alarmas.usuario_id` → `usuarios.id` — quién la reconoció.
+
+Ambas son NULLables: una alarma existe desde que salta aunque nadie la haya
+reconocido todavía. Con `ON DELETE SET NULL`, borrar un usuario no borra su
+historial de alarmas — se pierde el "quién", no el evento.
+
+**Es idempotente**: llamarlo sobre una BD que ya tiene el esquema no falla ni
+toca los datos existentes. La respuesta distingue lo que se creó de lo que ya
+estaba.
+""",
+    responses={
+        200: {"content": {"application/json": {"examples": {
+            "creado": {"summary": "Primera vez", "value": {
+                "ok": True, "db_id": "local",
+                "tablas_creadas": ["usuarios", "plc_prg", "alarmas"],
+                "tablas_existentes": [], "errores": [],
+                "mensaje": "Esquema listo: 3 tabla(s) creada(s).",
+            }},
+            "idempotente": {"summary": "Ya existía", "value": {
+                "ok": True, "db_id": "local", "tablas_creadas": [],
+                "tablas_existentes": ["alarmas", "plc_prg", "usuarios"],
+                "errores": [],
+                "mensaje": "Esquema listo: 0 tabla(s) creada(s).",
+            }},
+        }}}},
+        404: {"description": "No existe esa conexión."},
+    },
+)
+async def crear_esquema(
+    request: Request,
+    db_id: str,
+    cuerpo: CrearEsquema = Body(default=CrearEsquema()),
+) -> dict:
+    try:
+        return await _mgr(request).crear_esquema(db_id, prefijo=cuerpo.prefijo)
+    except KeyError:
+        raise HTTPException(404, f"No existe la conexión '{db_id}'.")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"{type(exc).__name__}: {exc}")
 
 
 @router.delete(
