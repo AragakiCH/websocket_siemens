@@ -22,6 +22,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -295,6 +296,15 @@ app = FastAPI(
     description=_DESCRIPCION_API,
     version="1.1.0",
     lifespan=lifespan,
+)
+
+# CORS — necesario para desarrollo con Vite (localhost:5173 → localhost:8000).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Routers.
