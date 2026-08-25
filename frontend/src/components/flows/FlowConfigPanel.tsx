@@ -10,7 +10,7 @@ import {
   AlertCircleIcon,
 } from 'lucide-react';
 import { FlowNodeData } from './types';
-import { API_BASE, extraerMensaje } from './api';
+import { API_BASE, ERROR_SIN_BACKEND, extraerMensaje } from './api';
 import { ConnectionForm } from './bd/ConnectionForm';
 import { HistorianForm } from './historian/HistorianForm';
 import { StartForm } from './historian/StartForm';
@@ -135,10 +135,7 @@ export function FlowConfigPanel({ node, nodes, onUpdateConfig, onUpdateStatus, o
         });
       } catch {
         // fetch solo lanza si NO hubo respuesta: backend apagado, CORS, DNS...
-        throw new Error(
-          `No se pudo contactar al backend en ${API_BASE}. ` +
-          `Revisa que uvicorn esté corriendo.`
-        );
+        throw new Error(ERROR_SIN_BACKEND);
       }
 
       // Se lee como texto primero: si el backend devuelve HTML (por ejemplo el

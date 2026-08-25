@@ -23,8 +23,28 @@
 //   WIDGET.name   — nombre del widget en el canvas
 //   WIDGET.color  — color primario configurado
 //   WIDGET.bg     — color de fondo configurado
+//
+// TIPOS DE DATO QUE ACEPTA EL WIDGET
+// `widget.json` puede declarar `accepts`: qué tipos de variable sabe
+// representar. Con eso el Inspector separa las variables compatibles de las
+// que no lo son, en vez de ofrecerlas todas revueltas.
+//
+//   "accepts": ["double", "int"]   -> magnitudes (gráficas, medidores)
+//   "accepts": ["bool"]            -> encendido/apagado
+//   "accepts": []                  -> decorativo, no lee ninguna variable
+//   (campo ausente)                -> sin declarar: acepta todo
+//
+// Los valores válidos son exactamente: bool, int, double, string. Son los
+// del frontend, no los de tu PLC: `plcAdapter.mapOpcType()` convierte REAL y
+// LREAL en "double", e INT/UINT/DINT en "int".
+//
+// Se declara y no se deduce porque para adivinarlo habría que leer el
+// widget.js y suponer qué hace con WIDGET.value. Quien escribe el widget es
+// el único que lo sabe de verdad.
 // =========================================================================
 import JSZip from 'jszip';
+import { DataType } from '../models/plc';
+import { TIPOS_VALIDOS, esTipoValido } from '../utils/widgetBinding';
 
 const STORAGE_KEY = 'hmi.custom-html-widgets';
 
@@ -40,6 +60,14 @@ export interface ZipWidgetMeta {
   /** Tamaño por defecto en píxeles */
   defaultWidth: number;
   defaultHeight: number;
+  /**
+   * Tipos de variable que el widget sabe representar.
+   *
+   * `undefined` = el widget.json no lo declaró. Se trata como "acepta todo"
+   * para no romper los ZIP subidos antes de que este campo existiera.
+   * `[]` = declarado explícitamente como decorativo.
+   */
+  accepts?: DataType[];
 }
 
 export interface ZipWidget {
@@ -52,6 +80,42 @@ export interface ZipWidget {
 // ---- Validación del widget.json --------------------------------------- //
 
 const VALID_CATEGORIES = ['Básicos', 'Indicadores', 'Equipos', 'Datos'];
+
+/**
+ * Lee y valida `accepts`.
+ *
+ * Falla RUIDOSAMENTE ante un valor mal escrito, en vez de ignorarlo en
+ * silencio: un `"accepts": ["real"]` que se descarte calladamente dejaría al
+ * autor creyendo que declaró algo, y el widget aceptaría cualquier variable
+ * sin que nadie se entere. Mejor rechazar el ZIP y decir qué está mal.
+ *
+ * Ausente sí es válido: significa "sin declarar".
+ */
+function validarAccepts(valor: unknown): DataType[] | undefined {
+  if (valor === undefined || valor === null) return undefined;
+
+  if (!Array.isArray(valor)) {
+    throw new Error(
+      'widget.json: "accepts" debe ser una lista, por ejemplo ' +
+      '["double", "int"]. Usa [] si el widget es decorativo y no lee ' +
+      'ninguna variable.'
+    );
+  }
+
+  const malos = valor.filter((v) => !esTipoValido(v));
+  if (malos.length > 0) {
+    throw new Error(
+      `widget.json: tipo no reconocido en "accepts": ` +
+      `${malos.map((m) => JSON.stringify(m)).join(', ')}. ` +
+      `Los válidos son: ${TIPOS_VALIDOS.join(', ')}. ` +
+      `Ojo: son los tipos del frontend, no los del PLC — REAL y LREAL van ` +
+      `como "double", INT/UINT/DINT como "int".`
+    );
+  }
+
+  // Duplicados fuera: ["int","int"] es lo mismo que ["int"].
+  return Array.from(new Set(valor as DataType[]));
+}
 
 function validateMeta(raw: unknown): ZipWidgetMeta {
   if (!raw || typeof raw !== 'object') {
@@ -79,6 +143,7 @@ function validateMeta(raw: unknown): ZipWidgetMeta {
     category: obj.category as ZipWidgetMeta['category'],
     defaultWidth: Math.max(40, Math.min(800, dw)),
     defaultHeight: Math.max(40, Math.min(800, dh)),
+    accepts: validarAccepts(obj.accepts),
   };
 }
 

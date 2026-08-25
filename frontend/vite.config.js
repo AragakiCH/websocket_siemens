@@ -24,6 +24,11 @@ export default defineConfig({
       '/discover': BACKEND,
       // Exploración del ctrlX de Rexroth (apps y programas) desde el Login
       '/rexroth': BACKEND,
+      // Flow Editor: conexiones a BD y grupos del historizador.
+      // El proxy matchea por PREFIJO, así que '/historian' ya cubre
+      // /historian/{id}/start, /stop, /datos, flush y el DELETE.
+      '/db': BACKEND,
+      '/historian': BACKEND,
     },
   },
   build: {

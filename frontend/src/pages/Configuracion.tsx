@@ -366,7 +366,7 @@ export function Configuracion() {
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 dark:border-navy-slate dark:bg-navy-soft">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/menu')}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 dark:hover:bg-navy-slate/40"
           >
             <ArrowLeftIcon className="h-5 w-5" />

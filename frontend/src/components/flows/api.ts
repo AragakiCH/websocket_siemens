@@ -3,7 +3,35 @@
 // Un solo lugar donde vive la URL del backend y la interpretación de sus
 // respuestas, para no repetir el mismo parseo en cada formulario.
 
-export const API_BASE = 'http://localhost:8000';
+/**
+ * Origen del backend.
+ *
+ * Vacío = rutas RELATIVAS, que es lo que queremos casi siempre:
+ *   * en `npm run dev` las atiende el proxy de Vite (vite.config.js →
+ *     server.proxy), que las reenvía a uvicorn en el 8000;
+ *   * en producción las atiende el mismo FastAPI que sirve el frontend.
+ *
+ * En los dos casos hay UN SOLO origen, así que no hace falta CORS. Antes esto
+ * era 'http://localhost:8000' a pelo: convivían dos orígenes en desarrollo y
+ * por eso el backend necesita todavía `allow_origins=["*"]`.
+ *
+ * `VITE_API_BASE` es la escotilla de escape para apuntar a otra máquina
+ * (backend en un PC distinto al del navegador). Se define en un `.env` dentro
+ * de `frontend/`:  VITE_API_BASE=http://192.168.1.50:8000
+ */
+export const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+
+/**
+ * Mensaje para cuando `fetch` ni siquiera consigue respuesta.
+ *
+ * Con API_BASE vacío la causa más probable NO es que uvicorn esté apagado,
+ * sino que la ruta no esté listada en el proxy de Vite: entonces Vite responde
+ * el index.html de la SPA y el error se ve rarísimo. Por eso el texto lo dice.
+ */
+export const ERROR_SIN_BACKEND = API_BASE
+  ? `No se pudo contactar al backend en ${API_BASE}. Revisa que esté accesible.`
+  : 'No se pudo contactar al backend. Revisa que uvicorn esté corriendo y que ' +
+    'esta ruta esté en el proxy de Vite (vite.config.js → server.proxy).';
 
 /**
  * Extrae un mensaje legible de la respuesta del backend.
@@ -50,10 +78,7 @@ async function pedir<T = any>(ruta: string, init?: RequestInit): Promise<T> {
   try {
     resp = await fetch(`${API_BASE}${ruta}`, init);
   } catch {
-    throw new Error(
-      `No se pudo contactar al backend en ${API_BASE}. ` +
-      `Revisa que uvicorn esté corriendo.`
-    );
+    throw new Error(ERROR_SIN_BACKEND);
   }
 
   // Texto primero: el fallback de la SPA devuelve HTML con status 200 ante una

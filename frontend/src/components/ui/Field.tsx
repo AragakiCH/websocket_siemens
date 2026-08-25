@@ -98,6 +98,52 @@ export function SelectField<T extends string | number>({
     </label>);
 
 }
+
+/**
+ * Igual que SelectField pero con las opciones repartidas en <optgroup>.
+ *
+ * Existe para el enlace de variables del Inspector: hace falta separar las
+ * compatibles de las que no lo son SIN sacar a estas últimas de la lista.
+ * Un grupo vacío no se dibuja, así que cuando todas las variables calzan se
+ * ve exactamente igual que un select normal.
+ */
+export function SelectGroupField({
+  label,
+  value,
+  groups,
+  onChange
+
+
+
+
+}: {label: string;value: string;groups: {label: string;options: {label: string;value: string;}[];}[];onChange: (v: string) => void;}) {
+  return (
+    <label className="block">
+      <span className={labelBase}>{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${inputBase} px-3 py-2 text-sm`}>
+
+        {groups.map((g) => {
+          if (g.options.length === 0) return null;
+          const opciones = g.options.map((o) =>
+          <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          );
+          // Grupo sin título: opciones sueltas arriba de todo (el "Ninguna").
+          if (!g.label) return <React.Fragment key="_sueltas">{opciones}</React.Fragment>;
+          return (
+            <optgroup key={g.label} label={g.label}>
+              {opciones}
+            </optgroup>);
+
+        })}
+      </select>
+    </label>);
+
+}
 export function ColorField({
   label,
   value,

@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AppStoreProvider } from './context/AppStore';
-// import { Login } from './pages/Login';  // Login deshabilitado
+import { Login } from './pages/Login';
 import { MainMenu } from './pages/MainMenu';
 import { Configuracion } from './pages/Configuracion';
 import { Designer } from './pages/Designer';
@@ -37,8 +37,7 @@ export function App() {
         <div className="h-full w-full">
           <AnimatePresence mode="wait">
             <Routes>
-              {/* Login deshabilitado — la raíz ahora es el menú */}
-              {/*
+              {/* La raíz es el acceso; el menú se mudó a /menu. */}
               <Route
                 path="/"
                 element={
@@ -46,18 +45,15 @@ export function App() {
                     <Login />
                   </Page>
                 } />
+
               <Route
                 path="/menu"
-                element={...} />
-              */}
-              <Route
-                path="/"
                 element={
                 <Page>
                     <MainMenu />
                   </Page>
                 } />
-              
+
               <Route
                 path="/config"
                 element={
