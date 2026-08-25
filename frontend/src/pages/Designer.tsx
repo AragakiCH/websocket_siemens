@@ -5,7 +5,10 @@ import {
   MousePointer2Icon,
   ActivityIcon,
   Trash2Icon,
-  EyeIcon } from
+  EyeIcon,
+  LayoutDashboardIcon,
+  WorkflowIcon,
+  BellIcon } from
 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { HmiWidget, WidgetKind, defaultStyle } from '../models/widget';
@@ -15,6 +18,10 @@ import { CanvasWidget } from '../components/hmi/CanvasWidget';
 import { PropertyInspector } from '../components/hmi/PropertyInspector';
 import { UPDATE_RATE_OPTIONS } from '../models/plc';
 import { saveDesign, loadDesign } from '../utils/designStorage';
+import { FlowEditor } from '../components/flows/FlowEditor';
+import { AlarmsEditor } from '../components/alarms/AlarmsEditor';
+
+type DesignerTab = 'designer' | 'flows' | 'alarms';
 
 let counter = 1;
 
@@ -37,6 +44,7 @@ export function Designer() {
   } = useAppStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<DesignerTab>('designer');
 
   
 
@@ -162,7 +170,7 @@ export function Designer() {
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5 dark:border-navy-slate dark:bg-navy-soft">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/menu')}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 dark:hover:bg-navy-slate/40">
             <ArrowLeftIcon className="h-4 w-4" />
           </button>
@@ -174,8 +182,46 @@ export function Designer() {
               {t('designer.mainView')}
             </p>
           </div>
+
+          {/* ── Pestañas ── */}
+          <div className="ml-4 flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-navy-slate dark:bg-navy">
+            <button
+              onClick={() => setActiveTab('designer')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition ${
+                activeTab === 'designer'
+                  ? 'bg-white text-navy shadow-sm dark:bg-navy-slate dark:text-slate-100'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+              }`}
+            >
+              <LayoutDashboardIcon className="h-3.5 w-3.5" />
+              Diseñador
+            </button>
+            <button
+              onClick={() => setActiveTab('flows')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition ${
+                activeTab === 'flows'
+                  ? 'bg-white text-navy shadow-sm dark:bg-navy-slate dark:text-slate-100'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+              }`}
+            >
+              <WorkflowIcon className="h-3.5 w-3.5" />
+              Flujos
+            </button>
+            <button
+              onClick={() => setActiveTab('alarms')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition ${
+                activeTab === 'alarms'
+                  ? 'bg-white text-navy shadow-sm dark:bg-navy-slate dark:text-slate-100'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+              }`}
+            >
+              <BellIcon className="h-3.5 w-3.5" />
+              Alarmas
+            </button>
+          </div>
         </div>
 
+        {activeTab === 'designer' && (
         <div className="flex items-center gap-3">
           {/* --- Medidas del lienzo (px) --- */}
           {/* --- Medidas del lienzo (px) --- */}
@@ -235,8 +281,13 @@ export function Designer() {
             </button>
           }
         </div>
+        )}
       </header>
 
+      {/* ═══ Contenido según pestaña activa ═══ */}
+      {activeTab === 'alarms' ? (
+        <AlarmsEditor />
+      ) : activeTab === 'designer' ? (
       <div className="flex flex-1 overflow-hidden">
         <WidgetSidebar />
 
@@ -284,6 +335,9 @@ export function Designer() {
           onStyleChange={(patch) => selected && patchStyle(selected.id, patch)}
           onDelete={() => selected && deleteWidget(selected.id)} />
       </div>
+      ) : (
+        <FlowEditor />
+      )}
     </div>);
 
 }

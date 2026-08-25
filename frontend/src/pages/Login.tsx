@@ -1,452 +1,907 @@
 // =========================================================================
-// Login.tsx
-// Pantalla de conexión al PLC. Soporta DOS marcas:
+// Login.tsx  —  Pantalla de acceso de Psi Core
 //
-//   * Siemens (S7-1500): exactamente el flujo de siempre. Basta la IP; la
-//     sesión OPC UA es anónima y los tags se descubren solos bajo
-//     DataBlocksGlobal. Usuario/contraseña quedan como campos informativos.
+// ⚠️ SOLO DISEÑO. Todavía NO habla con el backend ni con la tabla `usuarios`.
+//    `enviar()` simula una espera y navega a /menu. Cuando exista el endpoint
+//    de autenticación, lo único que hay que cambiar es el cuerpo de `enviar()`.
 //
-//   * Rexroth (ctrlX CORE): la IP no basta. El ctrlX exige usuario y
-//     contraseña, y hay que decirle QUÉ leer. Por eso, tras escribir las
-//     credenciales, se pulsa "Buscar" y el backend devuelve las aplicaciones
-//     publicadas; al elegir una se cargan sus programas (POUs). El botón
-//     Conectar se habilita recién cuando hay un programa seleccionado.
+// Dos pestañas sobre el mismo panel:
 //
-// El alta real del PLC la hace AppStore.connect() contra POST /plcs.
+//   * ENTRAR       -> usuario + contraseña. Lo mínimo para autenticar.
+//   * CREAR CUENTA -> los campos que el usuario SÍ escribe de la tabla
+//                     `dbo.usuarios`: usuario, contraseña, email, categoría
+//                     y estado.
+//
+// Columnas de `dbo.usuarios` que NO son campos de formulario, y por qué:
+//
+//   id            IDENTITY, lo pone el motor.
+//   password_hash nunca viaja en claro: se escribe la contraseña y el backend
+//                 guarda el hash. Por eso el campo se llama "Contraseña".
+//   algoritmo     lo decide el servidor (bcrypt/argon2), no el usuario. Se
+//                 muestra como dato informativo, deshabilitado.
+//   creado_en     DEFAULT del motor.
+//   ultimo_acceso lo escribe el backend en cada login correcto.
+//
+// El layout es split: panel de marca a la izquierda (donde va el logo) y
+// formulario a la derecha. Por debajo de `lg` el panel colapsa a una cabecera
+// compacta para no comerse la pantalla en móvil.
 // =========================================================================
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
-  NetworkIcon,
   UserIcon,
   LockIcon,
-  PlugZapIcon,
+  MailIcon,
+  EyeIcon,
+  EyeOffIcon,
+  ShieldCheckIcon,
+  LogInIcon,
+  UserPlusIcon,
+  Loader2Icon,
+  AlertCircleIcon,
+  InfoIcon,
+  ActivityIcon,
+  DatabaseIcon,
   CpuIcon,
-  SearchIcon,
-  LayersIcon,
-  FileCodeIcon,
-  AlertCircleIcon } from
-'lucide-react';
+  KeyRoundIcon,
+  ChevronDownIcon,
+  ArrowRightIcon,
+} from 'lucide-react';
 import { useAppStore } from '../context/AppStore';
-import { PlcVendor } from '../models/plc';
-import { fetchRexrothApps, fetchRexrothPrograms } from '../services/rexrothApi';
+
+// ─── Marca ───────────────────────────────────────────────────────
+//
+// Para poner el logo: deja el archivo en `frontend/public/logo.png`. Si
+// prefieres otra extensión, cámbiala acá y ya.
+//
+// El logo es un WORDMARK horizontal (~3.3:1), no un icono cuadrado. Por eso
+// se escala por ALTURA (`h-… w-auto`) y no dentro de una caja cuadrada: si se
+// mete en un cuadrado, `object-contain` lo encoge al ancho de la caja y queda
+// una estampilla diminuta con aire arriba y abajo.
+//
+// Como la imagen trae fondo blanco y letras azul marino, sobre el panel
+// oscuro se apoya en una "placa" blanca. No es un parche: es lo que hay que
+// hacer con un logo de fondo sólido sobre una superficie oscura.
+//
+// `public/logo.png` (900×170) es el `logo.jpeg` original recortado: el JPEG
+// traía el blanco METIDO DENTRO — la tinta ocupaba apenas el 52% del alto, y
+// el margen inferior (183px) era casi cuatro veces el superior (50px). Eso
+// hacía dos cosas: la placa salía altísima con las letras chiquitas, y el
+// logo quedaba visualmente descentrado hacia arriba.
+//
+// Ahora el archivo va justo a la tinta y el aire lo pone el padding de la
+// placa, que sí se puede ajustar desde acá.
+const LOGO_SRC = '/logo.png';
+const APP_NAME = 'Psi Core';
+
+// ─── ⚠️ ATAJO DE DESARROLLO ──────────────────────────────────────
+//
+// En `true`, el botón entra DIRECTO a /menu: sin validar campos, sin esperar
+// y sin mirar lo que haya escrito. Sirve para no rellenar el formulario cada
+// vez que se recarga mientras se trabaja en las otras pantallas.
+//
+// Ponlo en `false` para probar el formulario de verdad (campos obligatorios,
+// mínimos, correo, contraseñas que coinciden). Y déjalo en `false` el día que
+// esto se conecte al backend — con `true` cualquiera entra escribiendo nada.
+//
+// El aviso del pie de la pantalla cambia solo según este valor, así que
+// siempre se ve desde la interfaz en qué modo está.
+const ATAJO_DEV = true;
+
+// Categorías de `usuarios.categoria`. El orden es de más a menos permisos.
+// Estos strings se guardan tal cual en la columna (varchar(40)): si cambian
+// acá, hay que migrar las filas existentes.
+const CATEGORIAS = ['Supervisor', 'Administradores', 'Usuarios', 'Invitado'];
+
+// Valores de `usuarios.estado`.
+const ESTADOS = ['Activo', 'Inactivo'];
+
+type Pestana = 'entrar' | 'registro';
+type Errores = Record<string, string>;
 
 export function Login() {
   const navigate = useNavigate();
-  const { connect, t } = useAppStore();
+  const { t } = useAppStore();
+  const sinMovimiento = useReducedMotion();
 
-  // ---- Marca seleccionada -------------------------------------------- //
-  const [vendor, setVendor] = useState<PlcVendor>('siemens');
+  const [pestana, setPestana] = useState<Pestana>('entrar');
+  const [enviando, setEnviando] = useState(false);
+  const [errores, setErrores] = useState<Errores>({});
 
-  // ---- Campos comunes ------------------------------------------------- //
-  const [ip, setIp] = useState('192.168.0.1');
-  const [user, setUser] = useState('admin');
-  const [password, setPassword] = useState('');
+  // Un solo objeto para los dos formularios: los campos compartidos (usuario,
+  // contraseña) no se pierden al cambiar de pestaña.
+  const [form, setForm] = useState({
+    usuario: '',
+    password: '',
+    confirmar: '',
+    email: '',
+    categoria: 'Usuarios',
+    estado: 'Activo',
+    recordarme: true,
+  });
 
-  // ---- Solo Rexroth: apps y programas descubiertos -------------------- //
-  const [apps, setApps] = useState<string[]>([]);
-  const [app, setApp] = useState('');
-  const [programs, setPrograms] = useState<string[]>([]);
-  const [program, setProgram] = useState('');
-  const [searching, setSearching] = useState(false);
-  const [hint, setHint] = useState('');
+  const formRef = useRef<HTMLFormElement>(null);
 
-  const [connecting, setConnecting] = useState(false);
-  const [error, setError] = useState('');
-
-  const isRexroth = vendor === 'rexroth';
-
-  // Al cambiar de marca se limpia todo lo específico de la anterior, para no
-  // arrastrar el programa de un PLC al otro.
-  useEffect(() => {
-    setApps([]);
-    setApp('');
-    setPrograms([]);
-    setProgram('');
-    setHint('');
-    setError('');
-    // Usuario de fábrica del ctrlX, como comodidad.
-    setUser((u) => vendor === 'rexroth' && u === 'admin' ? 'boschrexroth' : u);
-  }, [vendor]);
-
-  const credsListas = ip.trim() !== '' && user.trim() !== '' && password !== '';
-
-  // ------------------------------------------------------------------- //
-  // Paso 2 (Rexroth): programas de la app elegida
-  // Se define antes que buscarApps porque esta última lo invoca cuando el
-  // ctrlX expone una sola aplicación.
-  // ------------------------------------------------------------------- //
-  const buscarProgramas = useCallback(
-    async (appSel: string) => {
-      if (!appSel) return;
-      setSearching(true);
-      setPrograms([]);
-      setProgram('');
-      try {
-        const result = await fetchRexrothPrograms(
-          { ip, usuario: user, password },
-          appSel
-        );
-        setPrograms(result.programas);
-        setHint(`${result.programas.length} ${t('login.programsFound')}`);
-        if (result.programas.length === 1) setProgram(result.programas[0]);
-      } catch (e: any) {
-        setError(e?.message ?? String(e));
-        setHint('');
-      } finally {
-        setSearching(false);
-      }
-    },
-    [ip, user, password, t]
-  );
-
-  // ------------------------------------------------------------------- //
-  // Paso 1 (Rexroth): aplicaciones publicadas en el ctrlX
-  // ------------------------------------------------------------------- //
-  const buscarApps = useCallback(async () => {
-    if (!credsListas) {
-      setError(t('login.needCreds'));
-      return;
-    }
-    setError('');
-    setSearching(true);
-    setHint(t('login.searching'));
-    setApps([]);
-    setApp('');
-    setPrograms([]);
-    setProgram('');
-
-    try {
-      const encontradas = await fetchRexrothApps({ ip, usuario: user, password });
-      setApps(encontradas);
-      setHint(`${encontradas.length} ${t('login.appsFound')}`);
-      // Si solo hay una app (el caso normal) se elige sola y se cargan sus
-      // programas de inmediato: un clic menos.
-      if (encontradas.length === 1) {
-        setApp(encontradas[0]);
-        await buscarProgramas(encontradas[0]);
-      }
-    } catch (e: any) {
-      setError(e?.message ?? String(e));
-      setHint('');
-    } finally {
-      setSearching(false);
-    }
-  }, [credsListas, ip, user, password, t, buscarProgramas]);
-
-  const onCambiarApp = (valor: string) => {
-    setApp(valor);
-    setError('');
-    void buscarProgramas(valor);
-  };
-
-  // ------------------------------------------------------------------- //
-  // Conectar
-  // ------------------------------------------------------------------- //
-  const handleConnect = async () => {
-    if (isRexroth && !program) {
-      setError(t('login.needProgram'));
-      return;
-    }
-    setError('');
-    setConnecting(true);
-    try {
-      await connect({
-        vendor,
-        ip: ip.trim(),
-        puerto: 4840,
-        usuario: isRexroth ? user.trim() : '',
-        password: isRexroth ? password : '',
-        app: isRexroth ? app || 'Application' : '',
-        programa: isRexroth ? program : ''
+  const set = (campo: string, valor: any) => {
+    setForm((f) => ({ ...f, [campo]: valor }));
+    // Si el campo ya estaba marcado en rojo, se revalida al escribir para que
+    // el error desaparezca en cuanto se corrige (y no al pulsar Enviar).
+    if (errores[campo]) {
+      setErrores((e) => {
+        const { [campo]: _, ...resto } = e;
+        return resto;
       });
-      navigate('/menu');
-    } catch (e: any) {
-      setError(e?.message ?? t('login.connectError'));
-    } finally {
-      setConnecting(false);
     }
   };
 
-  const puedeConectar =
-  !connecting && ip.trim() !== '' && (!isRexroth || !!program);
+  // ── Validación ────────────────────────────────────────────────
+  //
+  // Los límites salen de la tabla: usuario varchar(80), email varchar(160).
+  // `email` acepta NULL en la BD, así que acá es opcional de verdad.
+  const validar = (p: Pestana): Errores => {
+    const e: Errores = {};
+    const u = form.usuario.trim();
+
+    if (!u) e.usuario = t('auth.errUserRequired');
+    else if (u.length < 3) e.usuario = t('auth.errUserShort');
+    else if (u.length > 80) e.usuario = t('auth.errUserLong');
+
+    if (!form.password) e.password = t('auth.errPassRequired');
+    else if (p === 'registro' && form.password.length < 8) {
+      e.password = t('auth.errPassShort');
+    }
+
+    if (p === 'registro') {
+      if (!form.confirmar) e.confirmar = t('auth.errConfirmRequired');
+      else if (form.confirmar !== form.password) {
+        e.confirmar = t('auth.errConfirmMismatch');
+      }
+      const mail = form.email.trim();
+      if (mail) {
+        if (mail.length > 160) e.email = t('auth.errMailLong');
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(mail)) {
+          e.email = t('auth.errMailInvalid');
+        }
+      }
+    }
+    return e;
+  };
+
+  // Validación al salir del campo (no en cada tecla: molesta mientras se
+  // escribe y es la recomendación estándar de formularios).
+  const alSalir = (campo: string) => {
+    const e = validar(pestana);
+    if (e[campo]) setErrores((prev) => ({ ...prev, [campo]: e[campo] }));
+  };
+
+  const cambiarPestana = (p: Pestana) => {
+    setPestana(p);
+    // Los errores del formulario anterior no aplican al nuevo: en "Entrar" la
+    // contraseña no tiene mínimo de 8, por ejemplo.
+    setErrores({});
+  };
+
+  const enviar = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+
+    // Atajo: pasa de largo la validación y el retardo simulado.
+    if (ATAJO_DEV) {
+      navigate('/menu');
+      return;
+    }
+
+    const e = validar(pestana);
+    setErrores(e);
+
+    if (Object.keys(e).length > 0) {
+      // Foco al primer campo con error: sin esto, en móvil el error puede
+      // quedar fuera de pantalla y parece que el botón no hizo nada.
+      const primero = formRef.current?.querySelector<HTMLElement>(
+        '[aria-invalid="true"]'
+      );
+      primero?.focus();
+      primero?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
+
+    setEnviando(true);
+    // TODO: reemplazar por POST /auth/login  |  POST /auth/registro
+    await new Promise((r) => setTimeout(r, 900));
+    setEnviando(false);
+    navigate('/menu');
+  };
+
+  const fuerza = useMemo(() => calcularFuerza(form.password), [form.password]);
+  const esRegistro = pestana === 'registro';
+
+  // Animación de entrada; se anula si el sistema pide menos movimiento.
+  const aparecer = sinMovimiento
+    ? {}
+    : { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
 
   return (
-    <div className="relative flex min-h-full w-full items-center justify-center overflow-hidden bg-navy p-6">
-      {/* subtle industrial backdrop */}
-      <div className="hmi-grid-dark absolute inset-0 opacity-40" />
-      <div className="absolute -left-32 top-1/2 h-96 w-96 -translate-y-1/2 rounded-full bg-siemens/10 blur-3xl" />
+    <div className="mp-scroll mp-scroll-dark h-full w-full overflow-y-auto bg-slate-50 dark:bg-navy">
+      <div className="grid min-h-full lg:grid-cols-[0.9fr_1.1fr]">
 
-      <motion.div
-        initial={{
-          opacity: 0,
-          y: 24
-        }}
-        animate={{
-          opacity: 1,
-          y: 0
-        }}
-        transition={{
-          duration: 0.5,
-          ease: 'easeOut'
-        }}
-        className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-navy-soft/90 p-8 shadow-2xl backdrop-blur">
+        {/* ══ Panel de marca (izquierda en escritorio) ══════════ */}
+        <aside className="relative hidden overflow-hidden bg-gradient-to-br from-siemens-600 via-siemens-700 to-siemens-800 dark:from-siemens-800 dark:via-navy-soft dark:to-navy lg:flex lg:flex-col lg:justify-between lg:p-12">
+          {/* Trama de puntos, la misma del editor de flujos */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 opacity-60"
+            style={{
+              backgroundImage:
+                'radial-gradient(circle, rgba(255,255,255,0.13) 1px, transparent 1px)',
+              backgroundSize: '22px 22px',
+            }}
+          />
+          {/* Halo suave para que el bloque no se vea plano */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-white/10 blur-3xl"
+          />
 
-        <div className="mb-7 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-siemens shadow-lg shadow-siemens/40">
-            <CpuIcon className="h-7 w-7 text-white" />
+          <div className="relative">
+            {/* El logo ES el título: repetir "Psi Core" debajo en texto sería
+                decir el nombre dos veces. El <h1> envuelve la imagen y el alt
+                le da su nombre accesible. */}
+            <h1>
+              <Logo variante="marca" />
+            </h1>
+            <p className="mt-8 max-w-md text-base leading-relaxed text-white/75">
+              {t('auth.brandTagline')}
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-white">SRX Studio</h1>
-          <p className="mt-1 text-sm text-slate-400">{t('login.subtitle')}</p>
-        </div>
 
-        {/* ---- Selector de marca ---- */}
-        <div className="mb-5">
-          <span className="mb-1.5 block text-xs font-medium text-slate-400">
-            {t('login.vendor')}
-          </span>
-          <div className="grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-navy/60 p-1">
-            <VendorTab
-              active={vendor === 'siemens'}
-              label={t('login.vendorSiemens')}
-              onClick={() => setVendor('siemens')} />
+          <ul className="relative space-y-5">
+            <Ventaja
+              icon={<ActivityIcon className="h-5 w-5" />}
+              titulo={t('auth.feat1Title')}
+              texto={t('auth.feat1Desc')}
+            />
+            <Ventaja
+              icon={<DatabaseIcon className="h-5 w-5" />}
+              titulo={t('auth.feat2Title')}
+              texto={t('auth.feat2Desc')}
+            />
+            <Ventaja
+              icon={<CpuIcon className="h-5 w-5" />}
+              titulo={t('auth.feat3Title')}
+              texto={t('auth.feat3Desc')}
+            />
+          </ul>
 
-            <VendorTab
-              active={vendor === 'rexroth'}
-              label={t('login.vendorRexroth')}
-              onClick={() => setVendor('rexroth')} />
-
-          </div>
-          <p className="mt-1.5 text-[11px] text-slate-500">
-            {isRexroth ?
-            t('login.vendorRexrothHint') :
-            t('login.vendorSiemensHint')}
+          <p className="relative text-xs text-white/45">
+            Siemens S7-1500 · Bosch Rexroth ctrlX CORE
           </p>
-        </div>
+        </aside>
 
-        <div className="space-y-4">
-          <LoginInput
-            label={t('login.ip')}
-            value={ip}
-            onChange={setIp}
-            icon={<NetworkIcon className="h-4 w-4" />}
-            placeholder="192.168.0.1" />
+        {/* ══ Formulario (derecha) ═════════════════════════════ */}
+        <main className="flex flex-col items-center justify-center px-5 py-10 sm:px-8 sm:py-12">
+          <motion.div {...aparecer} className="w-full max-w-md">
 
-          <LoginInput
-            label={t('login.user')}
-            value={user}
-            onChange={setUser}
-            icon={<UserIcon className="h-4 w-4" />}
-            placeholder={isRexroth ? 'boschrexroth' : 'admin'} />
-
-          <LoginInput
-            label={t('login.password')}
-            value={password}
-            onChange={setPassword}
-            icon={<LockIcon className="h-4 w-4" />}
-            placeholder="••••••••"
-            type="password" />
-
-          {/* ---- Solo Rexroth: aplicación + programa ---- */}
-          {isRexroth &&
-          <>
-              <div>
-                <span className="mb-1.5 block text-xs font-medium text-slate-400">
-                  {t('login.app')}
-                </span>
-                <div className="flex gap-2">
-                  <LoginSelect
-                  value={app}
-                  onChange={onCambiarApp}
-                  disabled={searching || apps.length === 0}
-                  placeholder={t('login.selectApp')}
-                  options={apps}
-                  icon={<LayersIcon className="h-4 w-4" />} />
-
-                  <button
-                  type="button"
-                  onClick={buscarApps}
-                  disabled={searching || !credsListas}
-                  title={t('login.search')}
-                  className="flex shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-siemens/20 px-3 text-xs font-medium text-white transition hover:bg-siemens/30 disabled:opacity-40">
-
-                    <SearchIcon className="h-4 w-4" />
-                    {t('login.search')}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <span className="mb-1.5 block text-xs font-medium text-slate-400">
-                  {t('login.program')}
-                </span>
-                <LoginSelect
-                value={program}
-                onChange={setProgram}
-                disabled={searching || programs.length === 0}
-                placeholder={t('login.selectProgram')}
-                options={programs}
-                icon={<FileCodeIcon className="h-4 w-4" />} />
-
-              </div>
-
-              <p className="text-[11px] text-slate-500">
-                {hint || t('login.searchHint')}
+            {/* Cabecera compacta: solo cuando el panel de marca no cabe */}
+            <div className="mb-9 flex flex-col items-center text-center lg:hidden">
+              <h1>
+                <Logo variante="compacto" />
+              </h1>
+              <p className="mt-4 max-w-xs text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                {t('auth.brandTagline')}
               </p>
-            </>
-          }
-        </div>
+            </div>
 
-        {/* ---- Mensaje de error ---- */}
-        {error &&
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3">
-            <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-            <p className="whitespace-pre-wrap text-xs text-red-300">{error}</p>
-          </div>
-        }
+            {/* ── Pestañas ────────────────────────────────────── */}
+            <div
+              role="tablist"
+              aria-label={t('auth.tabsLabel')}
+              className="mb-7 grid grid-cols-2 gap-1 rounded-xl bg-slate-200/60 p-1 dark:bg-navy-soft"
+            >
+              <Pestaña
+                activa={!esRegistro}
+                onClick={() => cambiarPestana('entrar')}
+                icon={<LogInIcon className="h-4 w-4" />}
+                label={t('auth.tabLogin')}
+                animar={!sinMovimiento}
+              />
+              <Pestaña
+                activa={esRegistro}
+                onClick={() => cambiarPestana('registro')}
+                icon={<UserPlusIcon className="h-4 w-4" />}
+                label={t('auth.tabSignup')}
+                animar={!sinMovimiento}
+              />
+            </div>
 
-        <motion.button
-          onClick={handleConnect}
-          whileHover={{
-            scale: 1.015
-          }}
-          whileTap={{
-            scale: 0.98
-          }}
-          disabled={!puedeConectar}
-          className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-siemens py-3 text-sm font-semibold text-white shadow-lg shadow-siemens/30 transition-colors hover:bg-siemens-600 disabled:opacity-70">
+            <h2 className="text-2xl font-bold text-navy dark:text-slate-100">
+              {esRegistro ? t('auth.signupTitle') : t('auth.loginTitle')}
+            </h2>
+            <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
+              {esRegistro ? t('auth.signupSubtitle') : t('auth.loginSubtitle')}
+            </p>
 
-          {connecting ?
-          <>
-              <motion.span
-              className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white"
-              animate={{
-                rotate: 360
-              }}
-              transition={{
-                repeat: Infinity,
-                duration: 0.7,
-                ease: 'linear'
-              }} />
+            <form ref={formRef} onSubmit={enviar} noValidate className="mt-7 space-y-5">
 
-              {t('login.connecting')}
-            </> :
+              {/* Usuario — siempre */}
+              <Campo
+                id="usuario"
+                label={t('auth.user')}
+                icon={<UserIcon className="h-4 w-4" />}
+                error={errores.usuario}
+                requerido
+              >
+                <input
+                  id="usuario"
+                  name="usuario"
+                  type="text"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  maxLength={80}
+                  value={form.usuario}
+                  onChange={(e) => set('usuario', e.target.value)}
+                  onBlur={() => alSalir('usuario')}
+                  placeholder={t('auth.userPlaceholder')}
+                  aria-invalid={!!errores.usuario}
+                  aria-describedby={errores.usuario ? 'usuario-error' : undefined}
+                  className={claseInput(!!errores.usuario)}
+                />
+              </Campo>
 
-          <>
-              <PlugZapIcon className="h-4 w-4" />
-              {t('login.connect')}
-            </>
-          }
-        </motion.button>
+              {/* Email — solo registro. En la BD acepta NULL, así que opcional */}
+              {esRegistro && (
+                <Campo
+                  id="email"
+                  label={t('auth.email')}
+                  icon={<MailIcon className="h-4 w-4" />}
+                  error={errores.email}
+                  pista={t('auth.emailHint')}
+                >
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    maxLength={160}
+                    value={form.email}
+                    onChange={(e) => set('email', e.target.value)}
+                    onBlur={() => alSalir('email')}
+                    placeholder="operador@planta.com"
+                    aria-invalid={!!errores.email}
+                    aria-describedby={errores.email ? 'email-error' : 'email-pista'}
+                    className={claseInput(!!errores.email)}
+                  />
+                </Campo>
+              )}
 
-        <p className="mt-5 text-center text-[11px] text-slate-500">
-          {t('login.emulated')}
-        </p>
-      </motion.div>
-    </div>);
+              {/* Contraseña — siempre */}
+              <Campo
+                id="password"
+                label={t('auth.password')}
+                icon={<LockIcon className="h-4 w-4" />}
+                error={errores.password}
+                requerido
+                accion={
+                  !esRegistro ? (
+                    <button
+                      type="button"
+                      className="rounded text-xs font-semibold text-siemens outline-none transition hover:text-siemens-600 focus-visible:ring-2 focus-visible:ring-siemens/40 dark:hover:text-siemens-300"
+                    >
+                      {t('auth.forgot')}
+                    </button>
+                  ) : undefined
+                }
+              >
+                <EntradaPassword
+                  id="password"
+                  name="password"
+                  autoComplete={esRegistro ? 'new-password' : 'current-password'}
+                  value={form.password}
+                  onChange={(v) => set('password', v)}
+                  onBlur={() => alSalir('password')}
+                  error={!!errores.password}
+                  placeholder="••••••••"
+                  etiquetaVer={t('auth.showPass')}
+                  etiquetaOcultar={t('auth.hidePass')}
+                />
+                {esRegistro && form.password.length > 0 && (
+                  <MedidorFuerza nivel={fuerza} t={t} />
+                )}
+              </Campo>
 
+              {/* Confirmar — solo registro */}
+              {esRegistro && (
+                <Campo
+                  id="confirmar"
+                  label={t('auth.confirm')}
+                  icon={<ShieldCheckIcon className="h-4 w-4" />}
+                  error={errores.confirmar}
+                  requerido
+                >
+                  <EntradaPassword
+                    id="confirmar"
+                    name="confirmar"
+                    autoComplete="new-password"
+                    value={form.confirmar}
+                    onChange={(v) => set('confirmar', v)}
+                    onBlur={() => alSalir('confirmar')}
+                    error={!!errores.confirmar}
+                    placeholder="••••••••"
+                    etiquetaVer={t('auth.showPass')}
+                    etiquetaOcultar={t('auth.hidePass')}
+                  />
+                </Campo>
+              )}
+
+              {/* Categoría + Estado — solo registro, en dos columnas */}
+              {esRegistro && (
+                <fieldset className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <legend className="sr-only">{t('auth.accessLegend')}</legend>
+
+                  <Campo
+                    id="categoria"
+                    label={t('auth.category')}
+                    icon={<ShieldCheckIcon className="h-4 w-4" />}
+                    requerido
+                  >
+                    <Desplegable
+                      id="categoria"
+                      name="categoria"
+                      value={form.categoria}
+                      onChange={(v) => set('categoria', v)}
+                      opciones={CATEGORIAS}
+                    />
+                  </Campo>
+
+                  <Campo
+                    id="estado"
+                    label={t('auth.status')}
+                    icon={
+                      <span
+                        aria-hidden="true"
+                        className={`block h-2 w-2 rounded-full ${
+                          form.estado === 'Activo' ? 'bg-state-ok' : 'bg-slate-400'
+                        }`}
+                      />
+                    }
+                    requerido
+                  >
+                    <Desplegable
+                      id="estado"
+                      name="estado"
+                      value={form.estado}
+                      onChange={(v) => set('estado', v)}
+                      opciones={ESTADOS}
+                    />
+                  </Campo>
+                </fieldset>
+              )}
+
+              {/* Algoritmo: dato del servidor, no un campo editable */}
+              {esRegistro && (
+                <div className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-100/70 px-3 py-2.5 dark:border-navy-slate dark:bg-navy-soft/60">
+                  <KeyRoundIcon className="h-4 w-4 shrink-0 text-slate-400" />
+                  <p className="min-w-0 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                    {t('auth.algoNote')}
+                  </p>
+                </div>
+              )}
+
+              {/* Recordarme — solo login */}
+              {!esRegistro && (
+                <label className="flex w-fit cursor-pointer items-center gap-2.5 py-1 text-sm text-slate-600 dark:text-slate-400">
+                  <input
+                    type="checkbox"
+                    checked={form.recordarme}
+                    onChange={(e) => set('recordarme', e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-siemens focus:ring-2 focus:ring-siemens/40 dark:border-navy-slate dark:bg-navy"
+                  />
+                  {t('auth.remember')}
+                </label>
+              )}
+
+              {/* Botón principal */}
+              <button
+                type="submit"
+                disabled={enviando}
+                className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-siemens px-4 text-sm font-semibold text-white shadow-card outline-none transition hover:bg-siemens-600 focus-visible:ring-2 focus-visible:ring-siemens/50 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:focus-visible:ring-offset-navy"
+              >
+                {enviando ? (
+                  <>
+                    <Loader2Icon className="h-4 w-4 animate-spin" />
+                    {esRegistro ? t('auth.creating') : t('auth.entering')}
+                  </>
+                ) : (
+                  <>
+                    {esRegistro ? t('auth.createBtn') : t('auth.enterBtn')}
+                    <ArrowRightIcon className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+
+              {/* Cambio de pestaña desde abajo */}
+              <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+                {esRegistro ? t('auth.haveAccount') : t('auth.noAccount')}{' '}
+                <button
+                  type="button"
+                  onClick={() => cambiarPestana(esRegistro ? 'entrar' : 'registro')}
+                  className="rounded font-semibold text-siemens outline-none transition hover:text-siemens-600 focus-visible:ring-2 focus-visible:ring-siemens/40 dark:hover:text-siemens-300"
+                >
+                  {esRegistro ? t('auth.tabLogin') : t('auth.tabSignup')}
+                </button>
+              </p>
+            </form>
+
+            {/* Aviso honesto del estado real de la pantalla. Cambia solo según
+                ATAJO_DEV para que nunca haya que adivinar en qué modo está. */}
+            <div className="mt-8 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-500/20 dark:bg-amber-500/5">
+              <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0 text-amber-500" />
+              <p className="min-w-0 text-[11px] leading-relaxed text-amber-700 dark:text-amber-400">
+                {ATAJO_DEV ? t('auth.devShortcut') : t('auth.designOnly')}
+              </p>
+            </div>
+          </motion.div>
+        </main>
+      </div>
+    </div>
+  );
 }
 
-/** Pestaña del selector de marca. */
-function VendorTab({
-  active,
+// ═══════════════════════════════════════════════════════════════
+// Piezas
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Wordmark de la aplicación, sobre una placa blanca.
+ *
+ * Se escala por ALTURA y el ancho sale solo (`w-auto`), que es como se trata
+ * un logo horizontal: fijar el ancho lo deformaría o lo encogería.
+ *
+ * Si `LOGO_SRC` no existe, `onError` cambia a un wordmark dibujado con las
+ * mismas proporciones, así la pantalla nunca se ve rota ni da un salto de
+ * layout. En `npm run dev` un 404 devuelve el index.html de la SPA, que el
+ * navegador tampoco puede decodificar como imagen: también dispara onError.
+ */
+function Logo({ variante }: { variante: 'marca' | 'compacto' }) {
+  const [falló, setFalló] = useState(false);
+  const esMarca = variante === 'marca';
+
+  // Alturas. El logo recortado es 5.29:1, así que la altura decide el ancho:
+  //   h-14 (56px) -> 296px   h-16 (64px) -> 338px   h-10 (40px) -> 212px
+  // A `lg` el panel deja ~365px útiles, por eso h-16 se reserva para `xl`.
+  const alto = esMarca ? 'h-14 xl:h-16' : 'h-9 sm:h-10';
+
+  // Padding proporcional al logo (~0.3× su altura). Con el archivo ya
+  // recortado, este es el único aire que se ve: si se sube, la placa vuelve a
+  // parecer inflada como cuando el margen venía dentro del JPEG.
+  const placa = [
+    'inline-flex items-center justify-center rounded-2xl bg-white',
+    esMarca ? 'px-6 py-4 shadow-2xl ring-1 ring-white/25' : 'px-4 py-2.5 shadow-card',
+    // En claro la placa blanca se confundiría con el fondo slate-50: el borde
+    // le devuelve el contorno. En oscuro no hace falta, contrasta sola.
+    esMarca ? '' : 'ring-1 ring-slate-200 dark:ring-0',
+  ].join(' ');
+
+  if (falló) {
+    return (
+      <span className={placa} role="img" aria-label={APP_NAME}>
+        <span
+          className={`flex items-baseline gap-2 font-extrabold leading-none tracking-tight text-navy ${
+            esMarca ? 'text-4xl xl:text-[2.75rem]' : 'text-xl'
+          }`}
+        >
+          PsiCore
+          <span className="text-siemens">Ψ</span>
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <span className={placa}>
+      <img
+        src={LOGO_SRC}
+        alt={APP_NAME}
+        onError={() => setFalló(true)}
+        // w-auto: la altura manda, el ancho lo calcula el navegador con la
+        // proporción real del archivo. Sin esto el logo se aplasta.
+        className={`${alto} w-auto`}
+      />
+    </span>
+  );
+}
+
+/** Fila del panel de marca: icono + título + una línea de texto. */
+function Ventaja({
+  icon,
+  titulo,
+  texto,
+}: {
+  icon: React.ReactNode;
+  titulo: string;
+  texto: string;
+}) {
+  return (
+    <li className="flex gap-3.5">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white ring-1 ring-white/15">
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-white">{titulo}</p>
+        <p className="mt-0.5 text-[13px] leading-relaxed text-white/60">{texto}</p>
+      </div>
+    </li>
+  );
+}
+
+/** Botón de pestaña con indicador deslizante. */
+function Pestaña({
+  activa,
+  onClick,
+  icon,
   label,
-  onClick
-
-
-
-
-}: {active: boolean;label: string;onClick: () => void;}) {
+  animar,
+}: {
+  activa: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  animar: boolean;
+}) {
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={activa}
       onClick={onClick}
-      className={`rounded-lg py-2 text-sm font-medium transition ${
-      active ?
-      'bg-siemens text-white shadow shadow-siemens/30' :
-      'text-slate-400 hover:text-slate-200'}`}>
-
-      {label}
-    </button>);
-
-}
-
-function LoginInput({
-  label,
-  value,
-  onChange,
-  icon,
-  placeholder,
-  type
-
-
-
-
-
-
-
-}: {label: string;value: string;onChange: (v: string) => void;icon: React.ReactNode;placeholder?: string;type?: string;}) {
-  return (
-    <div>
-      <span className="mb-1.5 block text-xs font-medium text-slate-400">
+      className={`relative flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-siemens/50 ${
+        activa
+          ? 'text-navy dark:text-slate-100'
+          : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+      }`}
+    >
+      {activa && animar && (
+        <motion.span
+          layoutId="pestana-activa"
+          transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+          className="absolute inset-0 rounded-lg bg-white shadow-sm dark:bg-navy-slate"
+        />
+      )}
+      {activa && !animar && (
+        <span className="absolute inset-0 rounded-lg bg-white shadow-sm dark:bg-navy-slate" />
+      )}
+      <span className="relative flex items-center gap-2">
+        {icon}
         {label}
       </span>
+    </button>
+  );
+}
+
+/** Etiqueta + icono + control + error. La estructura de todos los campos. */
+function Campo({
+  id,
+  label,
+  icon,
+  error,
+  pista,
+  requerido,
+  accion,
+  children,
+}: {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  error?: string;
+  pista?: string;
+  requerido?: boolean;
+  accion?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-baseline justify-between gap-3">
+        <label
+          htmlFor={id}
+          className="block text-[13px] font-semibold text-slate-600 dark:text-slate-300"
+        >
+          {label}
+          {requerido && (
+            <span className="ml-0.5 text-state-error" aria-hidden="true">
+              *
+            </span>
+          )}
+        </label>
+        {accion}
+      </div>
+
       <div className="relative">
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+        <span className="pointer-events-none absolute left-3.5 top-1/2 z-10 flex -translate-y-1/2 items-center text-slate-400">
           {icon}
         </span>
-        <input
-          type={type ?? 'text'}
-          value={value}
-          placeholder={placeholder}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded-xl border border-white/10 bg-navy/60 py-3 pl-10 pr-3 text-sm text-white placeholder-slate-500 outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/30" />
-
+        {children}
       </div>
-    </div>);
 
+      {error ? (
+        <p
+          id={`${id}-error`}
+          role="alert"
+          className="mt-1.5 flex items-start gap-1.5 text-xs text-state-error"
+        >
+          <AlertCircleIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0">{error}</span>
+        </p>
+      ) : pista ? (
+        <p id={`${id}-pista`} className="mt-1.5 text-xs text-slate-400">
+          {pista}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 /**
- * Desplegable con el mismo estilo visual que LoginInput. Se usa para las
- * aplicaciones y los programas que devuelve el ctrlX.
+ * Clases del input.
+ *
+ * `text-base sm:text-sm`: 16px en móvil a propósito. Con menos de 16px, iOS
+ * hace zoom automático al enfocar y descuadra toda la pantalla.
+ * `min-h-[48px]`: por encima del mínimo táctil de 44px.
  */
-function LoginSelect({
+function claseInput(hayError: boolean, conBotonDerecha = false): string {
+  return [
+    'block w-full min-h-[48px] rounded-xl border bg-white pl-11 text-base outline-none transition',
+    conBotonDerecha ? 'pr-12' : 'pr-3.5',
+    'text-navy placeholder-slate-400 sm:text-sm',
+    'dark:bg-navy-soft dark:text-slate-100 dark:placeholder-slate-500',
+    hayError
+      ? 'border-state-error focus:border-state-error focus:ring-2 focus:ring-state-error/25'
+      : 'border-slate-300 hover:border-slate-400 focus:border-siemens focus:ring-2 focus:ring-siemens/25 dark:border-navy-slate dark:hover:border-slate-600',
+  ].join(' ');
+}
+
+/** Input de contraseña con el ojo de mostrar/ocultar. */
+function EntradaPassword({
+  id,
+  name,
   value,
   onChange,
-  options,
+  onBlur,
+  error,
   placeholder,
-  icon,
-  disabled
-
-
-
-
-
-
-
-}: {value: string;onChange: (v: string) => void;options: string[];placeholder: string;icon: React.ReactNode;disabled?: boolean;}) {
+  autoComplete,
+  etiquetaVer,
+  etiquetaOcultar,
+}: {
+  id: string;
+  name: string;
+  value: string;
+  onChange: (v: string) => void;
+  onBlur: () => void;
+  error: boolean;
+  placeholder: string;
+  autoComplete: string;
+  etiquetaVer: string;
+  etiquetaOcultar: string;
+}) {
+  const [visible, setVisible] = useState(false);
   return (
-    <div className="relative flex-1">
-      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
-        {icon}
-      </span>
-      <select
+    <>
+      <input
+        id={id}
+        name={name}
+        type={visible ? 'text' : 'password'}
+        autoComplete={autoComplete}
+        autoCapitalize="none"
+        spellCheck={false}
         value={value}
-        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full appearance-none rounded-xl border border-white/10 bg-navy/60 py-3 pl-10 pr-3 text-sm text-white outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/30 disabled:opacity-50">
+        onBlur={onBlur}
+        placeholder={placeholder}
+        aria-invalid={error}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className={claseInput(error, true)}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible((v) => !v)}
+        aria-label={visible ? etiquetaOcultar : etiquetaVer}
+        aria-pressed={visible}
+        // -mr-1 + p-2.5 dan 44px de área táctil sin agrandar el input.
+        className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 outline-none transition hover:bg-slate-100 hover:text-slate-600 focus-visible:ring-2 focus-visible:ring-siemens/40 dark:hover:bg-navy-slate/50 dark:hover:text-slate-200"
+      >
+        {visible ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+      </button>
+    </>
+  );
+}
 
-        <option value="" disabled>
-          {placeholder}
-        </option>
-        {options.map((o) =>
-        <option key={o} value={o}>
+/** Desplegable con el mismo alto y estilo que los inputs. */
+function Desplegable({
+  id,
+  name,
+  value,
+  onChange,
+  opciones,
+}: {
+  id: string;
+  name: string;
+  value: string;
+  onChange: (v: string) => void;
+  opciones: string[];
+}) {
+  return (
+    <>
+      <select
+        id={id}
+        name={name}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${claseInput(false, true)} cursor-pointer appearance-none`}
+      >
+        {opciones.map((o) => (
+          <option key={o} value={o}>
             {o}
           </option>
-        )}
+        ))}
       </select>
-    </div>);
+      <ChevronDownIcon
+        aria-hidden="true"
+        className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+      />
+    </>
+  );
+}
 
+/**
+ * Barra de fuerza de la contraseña.
+ *
+ * El nivel se comunica con color Y con texto: quien no distingue rojo de
+ * verde tiene que poder leerlo igual.
+ */
+function MedidorFuerza({ nivel, t }: { nivel: number; t: (k: string) => string }) {
+  const etiquetas = [
+    t('auth.strength0'),
+    t('auth.strength1'),
+    t('auth.strength2'),
+    t('auth.strength3'),
+  ];
+  const colores = ['bg-state-error', 'bg-state-warn', 'bg-siemens-400', 'bg-state-ok'];
+  const idx = Math.max(0, Math.min(3, nivel - 1));
+
+  return (
+    <div className="mt-2.5">
+      <div className="flex gap-1.5" aria-hidden="true">
+        {[0, 1, 2, 3].map((i) => (
+          <span
+            key={i}
+            className={`h-1 flex-1 rounded-full transition-colors duration-200 ${
+              i < nivel ? colores[idx] : 'bg-slate-200 dark:bg-navy-slate'
+            }`}
+          />
+        ))}
+      </div>
+      <p className="mt-1.5 text-xs text-slate-400" aria-live="polite">
+        {etiquetas[idx]}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Puntaje 1-4 de la contraseña.
+ *
+ * Heurística simple y suficiente para una pista visual: longitud + variedad
+ * de tipos de carácter. La validación de verdad la hará el backend.
+ */
+function calcularFuerza(pass: string): number {
+  if (!pass) return 0;
+  let p = 0;
+  if (pass.length >= 8) p++;
+  if (pass.length >= 12) p++;
+  if (/[a-z]/.test(pass) && /[A-Z]/.test(pass)) p++;
+  if (/\d/.test(pass) && /[^A-Za-z0-9]/.test(pass)) p++;
+  return Math.max(1, Math.min(4, p));
 }

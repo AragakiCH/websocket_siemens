@@ -35,6 +35,67 @@ const es: Dict = {
   'login.searchHint': 'Pulse Buscar para listar lo publicado en el PLC.',
   'login.connectError': 'No se pudo agregar el PLC.',
 
+  // ── Acceso a Psi Core (pantalla Login / Registro) ────────────
+  'auth.brandTagline':
+  'Supervisión, historización y diseño de pantallas para tus PLC, en un solo lugar.',
+  'auth.feat1Title': 'Datos en vivo',
+  'auth.feat1Desc': 'Lectura por OPC UA y difusión por WebSocket, sin recargar.',
+  'auth.feat2Title': 'Historización',
+  'auth.feat2Desc': 'Guarda cada cambio en MySQL, PostgreSQL o SQL Server.',
+  'auth.feat3Title': 'Multimarca',
+  'auth.feat3Desc': 'Siemens S7-1500 y Bosch Rexroth ctrlX CORE a la vez.',
+
+  'auth.tabsLabel': 'Acceder o crear cuenta',
+  'auth.tabLogin': 'Entrar',
+  'auth.tabSignup': 'Crear cuenta',
+  'auth.loginTitle': 'Bienvenido de vuelta',
+  'auth.loginSubtitle': 'Ingresa tus credenciales para continuar.',
+  'auth.signupTitle': 'Crear una cuenta',
+  'auth.signupSubtitle': 'Completa los datos del nuevo usuario.',
+
+  'auth.user': 'Usuario',
+  'auth.userPlaceholder': 'operador01',
+  'auth.email': 'Correo electrónico',
+  'auth.emailHint': 'Opcional. Se usa para recuperar la contraseña.',
+  'auth.password': 'Contraseña',
+  'auth.confirm': 'Confirmar contraseña',
+  'auth.category': 'Categoría',
+  'auth.status': 'Estado',
+  'auth.accessLegend': 'Permisos de la cuenta',
+  'auth.algoNote':
+  'El algoritmo de hash lo elige el servidor al guardar. La contraseña nunca se almacena en claro.',
+
+  'auth.showPass': 'Mostrar contraseña',
+  'auth.hidePass': 'Ocultar contraseña',
+  'auth.remember': 'Mantener la sesión iniciada',
+  'auth.forgot': '¿Olvidaste tu contraseña?',
+  'auth.enterBtn': 'Entrar',
+  'auth.entering': 'Entrando…',
+  'auth.createBtn': 'Crear cuenta',
+  'auth.creating': 'Creando…',
+  'auth.noAccount': '¿No tienes cuenta?',
+  'auth.haveAccount': '¿Ya tienes cuenta?',
+
+  'auth.strength0': 'Contraseña débil',
+  'auth.strength1': 'Contraseña aceptable',
+  'auth.strength2': 'Contraseña buena',
+  'auth.strength3': 'Contraseña fuerte',
+
+  'auth.errUserRequired': 'Escribe tu usuario.',
+  'auth.errUserShort': 'El usuario necesita al menos 3 caracteres.',
+  'auth.errUserLong': 'El usuario no puede pasar de 80 caracteres.',
+  'auth.errPassRequired': 'Escribe tu contraseña.',
+  'auth.errPassShort': 'La contraseña necesita al menos 8 caracteres.',
+  'auth.errConfirmRequired': 'Repite la contraseña.',
+  'auth.errConfirmMismatch': 'Las contraseñas no coinciden.',
+  'auth.errMailInvalid': 'Ese correo no tiene un formato válido.',
+  'auth.errMailLong': 'El correo no puede pasar de 160 caracteres.',
+
+  'auth.designOnly':
+  'Vista de diseño: todavía no valida contra la base de datos. Cualquier dato te deja entrar.',
+  'auth.devShortcut':
+  'Atajo de desarrollo activo: el botón entra directo sin validar nada. Ponlo en false en ATAJO_DEV (Login.tsx) para probar el formulario.',
+
   // Main menu
   'menu.connectedTo': 'Conectado a',
   'menu.logout': 'Salir',
@@ -114,6 +175,10 @@ const es: Dict = {
   'insp.associatedVar': 'Variable asociada',
   'insp.none': '— Ninguna —',
   'insp.varsAvailable': 'variables disponibles',
+  'insp.varsCompatible': 'Compatibles',
+  'insp.varsOther': 'No recomendadas para este widget',
+  'insp.varsCompatibleCount': 'variables compatibles',
+  'insp.widgetAccepts': 'Este widget espera',
   'insp.geometry': 'Geometría',
   'insp.posX': 'Posición X',
   'insp.posY': 'Posición Y',
@@ -169,6 +234,67 @@ const en: Dict = {
   'login.needProgram': 'Select a program before connecting.',
   'login.searchHint': 'Press Search to list what is published on the PLC.',
   'login.connectError': 'Could not add the PLC.',
+
+  // ── Psi Core access (Login / Sign-up screen) ─────────────────
+  'auth.brandTagline':
+  'Monitoring, historization and screen design for your PLCs, all in one place.',
+  'auth.feat1Title': 'Live data',
+  'auth.feat1Desc': 'OPC UA polling broadcast over WebSocket, no page reloads.',
+  'auth.feat2Title': 'Historization',
+  'auth.feat2Desc': 'Store every change in MySQL, PostgreSQL or SQL Server.',
+  'auth.feat3Title': 'Multi-vendor',
+  'auth.feat3Desc': 'Siemens S7-1500 and Bosch Rexroth ctrlX CORE side by side.',
+
+  'auth.tabsLabel': 'Sign in or create an account',
+  'auth.tabLogin': 'Sign in',
+  'auth.tabSignup': 'Create account',
+  'auth.loginTitle': 'Welcome back',
+  'auth.loginSubtitle': 'Enter your credentials to continue.',
+  'auth.signupTitle': 'Create an account',
+  'auth.signupSubtitle': 'Fill in the details for the new user.',
+
+  'auth.user': 'Username',
+  'auth.userPlaceholder': 'operator01',
+  'auth.email': 'Email',
+  'auth.emailHint': 'Optional. Used for password recovery.',
+  'auth.password': 'Password',
+  'auth.confirm': 'Confirm password',
+  'auth.category': 'Category',
+  'auth.status': 'Status',
+  'auth.accessLegend': 'Account permissions',
+  'auth.algoNote':
+  'The hashing algorithm is chosen by the server on save. Passwords are never stored in plain text.',
+
+  'auth.showPass': 'Show password',
+  'auth.hidePass': 'Hide password',
+  'auth.remember': 'Keep me signed in',
+  'auth.forgot': 'Forgot your password?',
+  'auth.enterBtn': 'Sign in',
+  'auth.entering': 'Signing in…',
+  'auth.createBtn': 'Create account',
+  'auth.creating': 'Creating…',
+  'auth.noAccount': "Don't have an account?",
+  'auth.haveAccount': 'Already have an account?',
+
+  'auth.strength0': 'Weak password',
+  'auth.strength1': 'Fair password',
+  'auth.strength2': 'Good password',
+  'auth.strength3': 'Strong password',
+
+  'auth.errUserRequired': 'Enter your username.',
+  'auth.errUserShort': 'Username needs at least 3 characters.',
+  'auth.errUserLong': 'Username cannot exceed 80 characters.',
+  'auth.errPassRequired': 'Enter your password.',
+  'auth.errPassShort': 'Password needs at least 8 characters.',
+  'auth.errConfirmRequired': 'Repeat the password.',
+  'auth.errConfirmMismatch': 'Passwords do not match.',
+  'auth.errMailInvalid': 'That email address is not valid.',
+  'auth.errMailLong': 'Email cannot exceed 160 characters.',
+
+  'auth.designOnly':
+  'Design preview: this does not check the database yet. Any input will let you through.',
+  'auth.devShortcut':
+  'Dev shortcut enabled: the button goes straight through without validating anything. Set ATAJO_DEV to false in Login.tsx to test the form.',
 
   'menu.connectedTo': 'Connected to',
   'menu.logout': 'Log out',
@@ -241,6 +367,10 @@ const en: Dict = {
   'insp.associatedVar': 'Associated variable',
   'insp.none': '— None —',
   'insp.varsAvailable': 'variables available',
+  'insp.varsCompatible': 'Compatible',
+  'insp.varsOther': 'Not recommended for this widget',
+  'insp.varsCompatibleCount': 'compatible variables',
+  'insp.widgetAccepts': 'This widget expects',
   'insp.geometry': 'Geometry',
   'insp.posX': 'Position X',
   'insp.posY': 'Position Y',

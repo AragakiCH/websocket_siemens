@@ -65,17 +65,19 @@ function PlcTable({
           {title}
         </h3>
       </div>
+      {/* Scroll con cabecera fija: con muchos PLCs la tarjeta ya no crece sin fin. */}
+      <div className="mp-scroll mp-scroll-dark max-h-64 overflow-y-auto">
       <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400 dark:border-navy-slate">
-            <th className="px-4 py-2.5 font-semibold">ID</th>
-            <th className="px-4 py-2.5 font-semibold">IP</th>
-            <th className="px-4 py-2.5 font-semibold">{t('config.status')}</th>
-            <th className="px-4 py-2.5 font-semibold">Tags</th>
+        <thead className="sticky top-0 z-10">
+          <tr className="text-xs uppercase tracking-wide text-slate-400">
+            <th className="px-4 py-2.5 font-semibold bg-slate-50 dark:bg-navy shadow-[inset_0_-1px_0_rgba(148,163,184,0.3)]">ID</th>
+            <th className="bg-slate-50 dark:bg-navy shadow-[inset_0_-1px_0_rgba(148,163,184,0.3)] px-4 py-2.5 font-semibold">IP</th>
+            <th className="bg-slate-50 dark:bg-navy shadow-[inset_0_-1px_0_rgba(148,163,184,0.3)] px-4 py-2.5 font-semibold">{t('config.status')}</th>
+            <th className="bg-slate-50 dark:bg-navy shadow-[inset_0_-1px_0_rgba(148,163,184,0.3)] px-4 py-2.5 font-semibold">Tags</th>
             {showModo && (
-              <th className="px-4 py-2.5 font-semibold">{t('config.readMode')}</th>
+              <th className="bg-slate-50 dark:bg-navy shadow-[inset_0_-1px_0_rgba(148,163,184,0.3)] px-4 py-2.5 font-semibold">{t('config.readMode')}</th>
             )}
-            <th className="w-12 px-4 py-2.5" />
+            <th className="bg-slate-50 dark:bg-navy shadow-[inset_0_-1px_0_rgba(148,163,184,0.3)] w-12 px-4 py-2.5" />
           </tr>
         </thead>
         <tbody>
@@ -134,6 +136,7 @@ function PlcTable({
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -363,7 +366,7 @@ export function Configuracion() {
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 dark:border-navy-slate dark:bg-navy-soft">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/menu')}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 dark:hover:bg-navy-slate/40"
           >
             <ArrowLeftIcon className="h-5 w-5" />
@@ -467,17 +470,20 @@ export function Configuracion() {
                   </span>
                 </div>
 
+                {/* Scroll con cabecera fija: un PLC con cientos de tags ya no
+                    estira la tarjeta hasta el infinito. */}
+                <div className="mp-scroll mp-scroll-dark max-h-[22rem] overflow-y-auto">
                 <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400 dark:border-navy-slate">
-                      <th className="w-12 px-4 py-2.5" />
-                      <th className="px-4 py-2.5 font-semibold">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="text-xs uppercase tracking-wide text-slate-400">
+                      <th className="w-12 px-4 py-2.5 bg-slate-50 dark:bg-navy shadow-[inset_0_-1px_0_rgba(148,163,184,0.3)]" />
+                      <th className="px-4 py-2.5 font-semibold bg-slate-50 dark:bg-navy shadow-[inset_0_-1px_0_rgba(148,163,184,0.3)]">
                         {t('config.colName')}
                       </th>
-                      <th className="px-4 py-2.5 font-semibold">
+                      <th className="px-4 py-2.5 font-semibold bg-slate-50 dark:bg-navy shadow-[inset_0_-1px_0_rgba(148,163,184,0.3)]">
                         {t('config.colType')}
                       </th>
-                      <th className="px-4 py-2.5 text-right font-semibold">
+                      <th className="px-4 py-2.5 text-right font-semibold bg-slate-50 dark:bg-navy shadow-[inset_0_-1px_0_rgba(148,163,184,0.3)]">
                         {t('config.colValue')}
                       </th>
                     </tr>
@@ -516,6 +522,7 @@ export function Configuracion() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             ))}
           </div>

@@ -27,7 +27,7 @@ export function MainMenu() {
           </div>
           <div>
             <p className="text-sm font-bold text-navy dark:text-slate-100">
-              HMI Studio
+              Psi Core
             </p>
             <p className="text-xs text-slate-400">
               {t('menu.connectedTo')} {plcIp} · {marca}
@@ -35,15 +35,14 @@ export function MainMenu() {
             {/* IP movida a /config */}
           </div>
         </div>
-        {/* Login deshabilitado — botón de logout oculto */}
-        {/*
+        {/* Salir vuelve al acceso (/). La sesion todavia no se valida
+            contra la BD, asi que por ahora solo limpia el estado local. */}
         <button
           onClick={handleLogout}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-navy dark:hover:bg-navy-slate/40 dark:hover:text-slate-100">
+          className="flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-500 outline-none transition hover:bg-slate-100 hover:text-navy focus-visible:ring-2 focus-visible:ring-siemens/40 dark:hover:bg-navy-slate/40 dark:hover:text-slate-100">
           <LogOutIcon className="h-4 w-4" />
           {t('menu.logout')}
         </button>
-        */}
       </header>
 
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-16">

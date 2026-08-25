@@ -60,3 +60,28 @@ html.dark body {
 .mp-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Flow editor form inputs */
+.input-field {
+  display: block;
+  width: 100%;
+  border-radius: 0.375rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.75rem;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.input-field:focus {
+  border-color: #009999;
+}
+html.dark .input-field {
+  border-color: #334155;
+  background: #0f172a;
+  color: #f1f5f9;
+}
+html.dark .input-field:focus {
+  border-color: #009999;
+}

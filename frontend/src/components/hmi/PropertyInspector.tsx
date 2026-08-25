@@ -1,15 +1,23 @@
 import React from 'react';
-import { MousePointerSquareDashedIcon, Link2Icon } from 'lucide-react';
+import { MousePointerSquareDashedIcon, Link2Icon, AlertTriangleIcon, ShapesIcon } from 'lucide-react';
 import { HmiWidget } from '../../models/widget';
 import { PlcVariable } from '../../models/plc';
 import { useAppStore } from '../../context/AppStore';
+import { catalogByKind } from './widgetCatalog';
+import {
+  usaVariable,
+  avisoIncompatible,
+  describirAceptados,
+  repartirPorCompatibilidad } from
+'../../utils/widgetBinding';
 import {
   TextField,
   NumberField,
   ColorField,
   ToggleField,
   SliderField,
-  SelectField } from
+  SelectField,
+  SelectGroupField } from
 '../ui/Field';
 interface Props {
   widget: HmiWidget | null;
@@ -55,15 +63,34 @@ export function PropertyInspector({
       </aside>);
 
   }
-  const varOptions = [
-  {
-    label: t('insp.none'),
-    value: ''
-  },
-  ...selectedVariables.map((v) => ({
+  // ── Compatibilidad de tipos ───────────────────────────────────
+  //
+  // El widget declara qué tipos sabe representar (widgetCatalog.ts para los
+  // que vienen con la app, widget.json para los subidos por ZIP). Con eso las
+  // variables se reparten en dos grupos del desplegable.
+  //
+  // Las incompatibles NO se ocultan: `mapOpcType()` deduce el tipo del nombre
+  // que reporta el OPC UA y ante un nombre raro cae en 'string' por descarte.
+  // Si eso escondiera la variable, el usuario se quedaría sin poder usar la
+  // suya y sin saber por qué. Se separan, se avisa, y decide él.
+  const acepta = catalogByKind(widget.kind)?.accepts;
+  const leeVariables = usaVariable(acepta);
+  const { compatibles, otras } = repartirPorCompatibilidad(selectedVariables, acepta);
+
+  const opcion = (v: PlcVariable) => ({
     label: `${v.name} (${v.type})`,
     value: v.id
-  }))];
+  });
+
+  const varGroups = [
+  { label: '', options: [{ label: t('insp.none'), value: '' }] },
+  { label: t('insp.varsCompatible'), options: compatibles.map(opcion) },
+  { label: t('insp.varsOther'), options: otras.map(opcion) }];
+
+  // Variable enlazada ahora mismo, para avisar si no calza. Puede venir de un
+  // diseño guardado antes de que existiera esta validación.
+  const variableActual = selectedVariables.find((v) => v.id === widget.variableId);
+  const aviso = avisoIncompatible(acepta, variableActual);
 
   return (
     <aside className="mp-scroll mp-scroll-dark flex w-72 shrink-0 flex-col overflow-auto border-l border-slate-200 bg-white dark:border-navy-slate dark:bg-navy-soft">
@@ -104,20 +131,39 @@ export function PropertyInspector({
       </Section>
 
       <Section title={t('insp.binding')}>
-        <SelectField
+        <SelectGroupField
           label={t('insp.associatedVar')}
           value={widget.variableId ?? ''}
-          options={varOptions}
+          groups={varGroups}
           onChange={(v) =>
           onChange({
             variableId: v === '' ? null : v
           })
           } />
         
-        <div className="flex items-center gap-1.5 rounded-lg bg-siemens-50 px-2.5 py-2 text-[11px] text-siemens-700 dark:bg-siemens/10 dark:text-siemens-200">
-          <Link2Icon className="h-3.5 w-3.5" />
-          {selectedVariables.length} {t('insp.varsAvailable')}
+        {/* Qué espera este widget. Se muestra siempre: es la respuesta a
+            "¿por qué mi variable salió en el grupo de abajo?". */}
+        <div className="flex items-start gap-1.5 rounded-lg bg-slate-100 px-2.5 py-2 text-[11px] text-slate-500 dark:bg-navy-slate/40 dark:text-slate-400">
+          <ShapesIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0">
+            {t('insp.widgetAccepts')} <b>{describirAceptados(acepta)}</b>
+          </span>
         </div>
+
+        {/* Aviso, no bloqueo. */}
+        {aviso &&
+        <div className="flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-400">
+            <AlertTriangleIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0">{aviso}</span>
+          </div>
+        }
+
+        {leeVariables &&
+        <div className="flex items-center gap-1.5 rounded-lg bg-siemens-50 px-2.5 py-2 text-[11px] text-siemens-700 dark:bg-siemens/10 dark:text-siemens-200">
+            <Link2Icon className="h-3.5 w-3.5" />
+            {compatibles.length}/{selectedVariables.length} {t('insp.varsCompatibleCount')}
+          </div>
+        }
       </Section>
 
       <Section title={t('insp.geometry')}>

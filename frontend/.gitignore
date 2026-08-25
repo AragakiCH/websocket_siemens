@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Config temporal de Vite. Vite transpila vite.config.js a un .mjs con
+# marca de tiempo y lo borra al salir; si el proceso se mata a media
+# ejecucion, el archivo se queda huerfano. Es basura, nunca se commitea.
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
