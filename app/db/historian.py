@@ -455,17 +455,39 @@ class Historizador:
         if grupo is None:
             return {"ok": False, "mensaje": f"No existe el grupo '{grupo_id}'."}
 
+        try:
+            driver = await self._db._driver_de(grupo.db_id)
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "mensaje": f"Error leyendo el histórico: {exc}"}
+
         condiciones = []
         parametros: Dict[str, Any] = {}
         if tag:
             condiciones.append("tag = :tag")
             parametros["tag"] = tag
+
+        # Los filtros de fecha se normalizan con la MISMA función que se usa al
+        # escribir. Sin esto, en SQLite (donde `ts` es TEXT y la comparación es
+        # lexicográfica) un filtro '2026-07-30T10:00' nunca casaría con un valor
+        # guardado como '2026-07-30 10:00:00.000+00:00': el separador 'T' es
+        # mayor que el espacio y el WHERE descartaría TODAS las filas.
         if desde:
+            convertido = ts_para_motor(desde, driver.motor)
+            if convertido is None:
+                return {"ok": False,
+                        "mensaje": f"Fecha 'desde' no válida: '{desde}'. "
+                                   f"Usa ISO 8601, ej. 2026-07-30T10:00:00."}
             condiciones.append("ts >= :desde")
-            parametros["desde"] = desde
+            parametros["desde"] = convertido
         if hasta:
+            convertido = ts_para_motor(hasta, driver.motor)
+            if convertido is None:
+                return {"ok": False,
+                        "mensaje": f"Fecha 'hasta' no válida: '{hasta}'. "
+                                   f"Usa ISO 8601, ej. 2026-07-30T23:59:59."}
             condiciones.append("ts <= :hasta")
-            parametros["hasta"] = hasta
+            parametros["hasta"] = convertido
+
         where = (" WHERE " + " AND ".join(condiciones)) if condiciones else ""
 
         sql = (
@@ -473,7 +495,6 @@ class Historizador:
             f"FROM {grupo.tabla}{where} ORDER BY ts DESC"
         )
         try:
-            driver = await self._db._driver_de(grupo.db_id)
             resultado = await driver.query(sql, parametros, limite)
         except Exception as exc:  # noqa: BLE001
             # Caso normal al empezar: la tabla aún no existe porque todavía no
