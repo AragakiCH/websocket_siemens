@@ -5,12 +5,22 @@ import {
   SettingsIcon,
   LayoutDashboardIcon,
   ArrowRightIcon,
+  UsersIcon,
   LogOutIcon } from
 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 export function MainMenu() {
   const navigate = useNavigate();
-  const { plcIp, plcVendor, disconnect, t } = useAppStore();
+  const { plcIp, plcVendor, disconnect, t, permisos, presentes } = useAppStore();
+  // La tarjeta de Actividad solo se ofrece a quien puede usarla. El
+  // permiso REAL lo aplica el backend en cada endpoint; esto es comodidad,
+  // no seguridad.
+  const verActividad = !permisos || permisos.gestionar_bd ||
+  permisos.gestionar_usuarios;
+  // Cuántas personas más están conectadas ahora mismo.
+  const otros = presentes.filter(
+    (p) => !p.usuario.includes('anónimo')
+  ).length;
   // Etiqueta legible de la marca, para saber de un vistazo contra qué PLC se
   // está trabajando cuando hay Siemens y Rexroth mezclados.
   const marca = plcVendor === 'rexroth' ? 'Rexroth' : 'Siemens';
@@ -81,7 +91,21 @@ export function MainMenu() {
             onClick={() => navigate('/designer')}
             delay={0.12}
             open={t('menu.open')} />
-          
+
+          {verActividad &&
+          <MenuCard
+            title="Actividad"
+            description={
+            otros > 1 ?
+            `${otros} personas conectadas ahora. Vea quién está trabajando, ` +
+            `quién edita cada pantalla y el histórico de cambios.` :
+            'Vea quién está trabajando, quién edita cada pantalla y el ' +
+            'histórico de quién hizo qué y cuándo.'}
+            icon={<UsersIcon className="h-8 w-8" />}
+            onClick={() => navigate('/actividad')}
+            delay={0.19}
+            open={t('menu.open')} />
+          }
         </div>
       </div>
     </div>);

@@ -49,6 +49,7 @@ import {
   ArrowRightIcon,
 } from 'lucide-react';
 import { useAppStore } from '../context/AppStore';
+import { login, registro } from '../services/authApi';
 
 // ─── Marca ───────────────────────────────────────────────────────
 //
@@ -87,7 +88,7 @@ const APP_NAME = 'Psi Core';
 //
 // El aviso del pie de la pantalla cambia solo según este valor, así que
 // siempre se ve desde la interfaz en qué modo está.
-const ATAJO_DEV = true;
+const ATAJO_DEV = false;
 
 // Categorías de `usuarios.categoria`. El orden es de más a menos permisos.
 // Estos strings se guardan tal cual en la columna (varchar(40)): si cambian
@@ -102,7 +103,7 @@ type Errores = Record<string, string>;
 
 export function Login() {
   const navigate = useNavigate();
-  const { t } = useAppStore();
+  const { t, refrescarSesion } = useAppStore();
   const sinMovimiento = useReducedMotion();
 
   const [pestana, setPestana] = useState<Pestana>('entrar');
@@ -206,10 +207,37 @@ export function Login() {
     }
 
     setEnviando(true);
-    // TODO: reemplazar por POST /auth/login  |  POST /auth/registro
-    await new Promise((r) => setTimeout(r, 900));
-    setEnviando(false);
-    navigate('/menu');
+    setErrores({});
+    try {
+      if (esRegistro) {
+        // El PRIMER usuario del sistema se crea como Supervisor lo pida o no:
+        // si no, no habría forma de tener un administrador inicial sin tocar
+        // la base de datos a mano. Eso lo decide el backend.
+        await registro({
+          usuario: form.usuario.trim(),
+          password: form.password,
+          email: form.email.trim(),
+          categoria: form.categoria,
+          estado: form.estado,
+        });
+        // Recién creada la cuenta, se entra con ella: el usuario no tiene por
+        // qué escribir dos veces lo mismo.
+        await login(form.usuario.trim(), form.password);
+      } else {
+        await login(form.usuario.trim(), form.password);
+      }
+      await refrescarSesion();
+      navigate('/menu');
+    } catch (err: any) {
+      // El backend ya manda mensajes redactados y en español (credenciales
+      // incorrectas, cuenta inactiva, usuario repetido...). Se muestran tal
+      // cual sobre el campo que corresponde.
+      const msg = err?.message ?? 'No se pudo completar la operación.';
+      const esDeUsuario = /usuario|cuenta|existe/i.test(msg);
+      setErrores({ [esDeUsuario ? 'usuario' : 'password']: msg, _general: msg });
+    } finally {
+      setEnviando(false);
+    }
   };
 
   const fuerza = useMemo(() => calcularFuerza(form.password), [form.password]);

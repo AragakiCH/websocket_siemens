@@ -6,6 +6,120 @@
 
 ---
 
+## ✅ ESTADO: Fases 0 a 4 IMPLEMENTADAS · 25 ago 2026
+
+Lo que sigue en este documento es el análisis original. **Todo el plan está
+hecho** salvo lo que se marca como pendiente al final. Para probarlo, ver
+[PROBAR_MULTIUSUARIO.md](PROBAR_MULTIUSUARIO.md) o ejecutar:
+
+```powershell
+python tools/probar_multiusuario.py
+```
+
+Resumen de lo que existe hoy:
+
+| Fase | Estado | Qué se hizo |
+|---|---|---|
+| 0 · Cerrar fugas | ✅ | Lock + escritura fuera del bucle async en `DbStore`; broadcast en `_bucle_reescaneo()`; PLCs persistidos en `datos/plcs.json` (contraseñas cifradas) |
+| 1 · Diseño al servidor | ✅ | `app/db/project_store.py` + `app/api/project_routes.py`. **Varios proyectos** en `datos/proyectos/<id>.json`, versionados, con 409 ante conflicto |
+| 2 · Avisar cambios | ✅ | `config.updated` tras cada mutación de BD, consultas e historizador |
+| 3 · Identidad | ✅ | Cuentas en la tabla SQL `usuarios`, PBKDF2-SHA256, sesiones, 4 roles aplicados **en el backend**, y presencia en vivo |
+| 4 · Bloqueo del diseñador | ✅ | **Opción A**: un usuario tiene "el lápiz", el resto ve en vivo en modo lectura. Heartbeat cada 10 s, caduca a los 30 s, toma de control por Supervisor. Escribir sin él da **423** |
+| 5 · Escalar >10 | 🟡 | Broadcast ya es concurrente (`asyncio.gather`). Redis sigue sin hacer falta: **un solo worker** |
+
+### Archivos nuevos
+
+```
+app/core/auth_manager.py      Cuentas, hash, sesiones, roles
+app/core/lock_manager.py      El "lápiz" de edición (Fase 4)
+app/core/auditoria.py         Quién hizo qué (datos/auditoria.jsonl)
+app/core/plc_store.py         Persistencia de PLCs (cifrada)
+app/api/auth_routes.py        /auth/* y las dependencias de rol
+app/api/project_routes.py     /proyectos/*
+app/api/lock_routes.py        /locks/* y /auditoria
+app/db/project_store.py       Proyectos versionados
+frontend/src/services/authApi.ts     Cliente de sesión (token, fetchAuth)
+frontend/src/services/lockApi.ts     Cliente del lápiz
+frontend/src/hooks/useLock.ts        Ciclo completo del lápiz en la vista
+tools/probar_multiusuario.py         Prueba automática de todo lo anterior
+```
+
+### El lápiz de edición (Fase 4)
+
+```
+Al ENTRAR al Diseñador   ->  POST /locks/designer:<id>/adquirir
+Mientras se edita        ->  POST /locks/designer:<id>/renovar   (cada 10 s)
+Al SALIR                 ->  POST /locks/designer:<id>/liberar
+Si el navegador muere    ->  caduca solo a los 30 s
+Un Supervisor puede      ->  POST /locks/designer:<id>/forzar
+```
+
+Quien no lo tiene ve **`Solo lectura · edita <nombre>`** en la barra superior y
+el lienzo no responde. Sigue recibiendo los cambios en vivo. Escribir sin el
+lápiz devuelve **423 Locked** con quién lo tiene y qué hacer.
+
+El lock es **por proyecto** (`designer:principal`, `designer:horno_2`), así que
+dos personas pueden editar dos pantallas distintas a la vez.
+
+### Cómo se pone en marcha
+
+```bash
+# 1) En .env
+PLC_AUTH_REQUERIDA=true
+
+# 2) Arrancar. Mientras NO haya cuentas, los endpoints de administración
+#    quedan abiertos (modo arranque): sin eso sería imposible configurar la
+#    BD donde viven los usuarios. Da de alta la BD y crea el esquema:
+POST /db  { "db_id": "local", "motor": "sqlite",
+            "base_datos": "C:/datos/planta.db", "crear_esquema": true }
+
+# 3) Crear la primera cuenta. Será SUPERVISOR pida lo que pida, y a partir
+#    de ahí la puerta se cierra sola.
+POST /auth/registro  { "usuario": "hugo", "password": "Planta2026!" }
+```
+
+### Roles (de más a menos permisos)
+
+Son exactamente los strings del desplegable de `Login.tsx`, y se guardan tal
+cual en `usuarios.categoria`:
+
+| Rol | Puede |
+|---|---|
+| `Supervisor` | Todo, incluida la gestión de usuarios |
+| `Administradores` | Editar el diseño, dar de alta PLCs y conexiones a BD |
+| `Usuarios` | Ver la configuración, no modificarla |
+| `Invitado` | Solo la vista de operación |
+
+Los permisos se aplican **en el backend**, en cada endpoint. Esconder un botón
+en la vista no es seguridad: cualquiera puede llamar al endpoint con `curl`.
+
+### Lo que sigue pendiente
+
+- **Preferencias personales en el servidor.** Tema e idioma siguen perdiéndose
+  al recargar (`saveConfig()` sigue siendo no-op). Es deliberado: son
+  preferencias del navegador, no configuración compartida. Si se quiere que
+  sigan a la persona entre equipos, el sitio es una tabla `preferencias`
+  con FK a `usuarios`.
+- **Selector de proyectos en la vista.** El backend ya soporta varios
+  (`datos/proyectos/<id>.json`, `GET /proyectos`), pero el frontend abre
+  siempre `principal`. Añadir el desplegable es media hora.
+- **Edición colaborativa real** (CRDT, opción C de la Fase 4). Solo se
+  justifica si varias personas construyen pantallas a la vez como trabajo
+  habitual. Con el lápiz, el caso real está cubierto.
+- **Varios workers / varias máquinas.** Sesiones, bloqueos y clientes WS viven
+  en la memoria de un proceso. Hasta que haga falta escalar, **un solo
+  worker**.
+
+### Nueva variable de entorno
+
+`PLC_DATOS_DIR` — carpeta donde se persiste el estado (conexiones, proyectos,
+PLCs, auditoría). Por defecto `<raíz>/datos`. Se añadió porque el script de
+pruebas levanta un backend real y, sin esto, escribiría en la carpeta de datos
+de la instalación de verdad. También sirve para el ejecutable de escritorio,
+que corre desde una ruta de solo lectura.
+
+---
+
 ## Resumen
 
 **Sí es viable, y ya estás a mitad de camino.**

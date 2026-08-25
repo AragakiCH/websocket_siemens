@@ -27,10 +27,12 @@ la contraseña maestra al arrancar.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
 import stat
+import threading
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -40,6 +42,64 @@ from cryptography.fernet import Fernet, InvalidToken
 logger = logging.getLogger("db_store")
 
 PREFIJO_CIFRADO = "enc:"   # marca los valores cifrados dentro del JSON
+
+
+# ====================================================================== #
+# Clave de cifrado compartida
+# ====================================================================== #
+def cargar_o_crear_clave(ruta_clave: Path) -> bytes:
+    """
+    Lee la clave Fernet de disco; si no existe, la genera y la protege.
+
+    Está a nivel de módulo (y no dentro de `DbStore`) porque la comparten
+    varios stores: las contraseñas de las conexiones a BD y las de los PLCs
+    Rexroth se cifran con la MISMA clave, en `datos/.clave`. Una sola clave
+    significa un solo fichero que respaldar y que proteger.
+    """
+    if ruta_clave.is_file():
+        return ruta_clave.read_bytes().strip()
+
+    ruta_clave.parent.mkdir(parents=True, exist_ok=True)
+    clave = Fernet.generate_key()
+    ruta_clave.write_bytes(clave)
+    try:
+        # Solo el propietario puede leerla (efectivo en Linux; en Windows es
+        # orientativo, ahí manda la ACL de la carpeta).
+        os.chmod(ruta_clave, stat.S_IRUSR | stat.S_IWUSR)
+    except OSError:
+        pass
+    logger.info("Clave de cifrado creada en %s", ruta_clave)
+    return clave
+
+
+def carpeta_datos(carpeta: Optional[str] = None) -> Path:
+    """
+    Carpeta donde se persiste el estado de la aplicación, creada si no existe.
+
+    Ahí viven conexiones, consultas, grupos de historización, PLCs, proyectos y
+    la auditoría. Se resuelve en este orden:
+
+      1. El argumento `carpeta`, si se pasa.
+      2. La variable de entorno **`PLC_DATOS_DIR`**.
+      3. `<raíz del proyecto>/datos` (el comportamiento de siempre).
+
+    El paso 2 existe por dos motivos reales:
+
+      * **Pruebas aisladas.** `tools/probar_multiusuario.py` levanta un backend
+        de verdad; sin esto escribiría en la carpeta `datos/` de la instalación
+        real y pisaría conexiones y proyectos del usuario.
+      * **Ejecutable de escritorio.** Un `.exe` empaquetado corre desde una
+        carpeta de solo lectura (o desde `Program Files`), donde no se puede
+        escribir al lado del binario. Poder apuntar los datos a `%APPDATA%` es
+        lo que hace que funcione.
+    """
+    raiz = carpeta or os.getenv("PLC_DATOS_DIR") or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "datos",
+    )
+    ruta = Path(raiz)
+    ruta.mkdir(parents=True, exist_ok=True)
+    return ruta
 
 
 # ====================================================================== #
@@ -96,18 +156,17 @@ class DbStore:
     """Lee y escribe conexiones y consultas, cifrando las contraseñas."""
 
     def __init__(self, carpeta: Optional[str] = None) -> None:
-        raiz = carpeta or os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(
-                os.path.abspath(__file__)))),
-            "datos",
-        )
-        self.carpeta = Path(raiz)
-        self.carpeta.mkdir(parents=True, exist_ok=True)
+        self.carpeta = carpeta_datos(carpeta)
 
         self.ruta_conexiones = self.carpeta / "conexiones.json"
         self.ruta_consultas = self.carpeta / "consultas.json"
         self.ruta_historicos = self.carpeta / "historicos.json"
         self.ruta_clave = self.carpeta / ".clave"
+
+        # Serialización de escrituras (ver `guardar` / `guardar_async`).
+        # Son dos locks porque hay dos mundos: llamadores síncronos y async.
+        self._lock_hilos = threading.Lock()
+        self._lock_async = asyncio.Lock()
 
         self._fernet = Fernet(self._cargar_o_crear_clave())
         self.conexiones: Dict[str, ConexionGuardada] = {}
@@ -122,19 +181,7 @@ class DbStore:
     # ------------------------------------------------------------------ #
     def _cargar_o_crear_clave(self) -> bytes:
         """Lee la clave de disco; si no existe, la genera y la protege."""
-        if self.ruta_clave.is_file():
-            return self.ruta_clave.read_bytes().strip()
-
-        clave = Fernet.generate_key()
-        self.ruta_clave.write_bytes(clave)
-        try:
-            # Solo el propietario puede leerla (efectivo en Linux; en Windows
-            # es orientativo, ahí manda la ACL de la carpeta).
-            os.chmod(self.ruta_clave, stat.S_IRUSR | stat.S_IWUSR)
-        except OSError:
-            pass
-        logger.info("Clave de cifrado creada en %s", self.ruta_clave)
-        return clave
+        return cargar_o_crear_clave(self.ruta_clave)
 
     def cifrar(self, texto: str) -> str:
         """Cifra una contraseña. Cadena vacía se deja tal cual."""
@@ -203,7 +250,39 @@ class DbStore:
             len(self.conexiones), len(self.consultas), len(self.historicos))
 
     def guardar(self) -> None:
-        """Vuelca ambos ficheros a disco (escritura atómica)."""
+        """
+        Vuelca los tres ficheros a disco (escritura atómica).
+
+        MULTIUSUARIO: esta versión es SÍNCRONA y se sigue usando desde código
+        que no es async. El acceso concurrente se serializa con un lock de
+        hilos (`_lock_hilos`), porque el volcado es un leer-modificar-escribir
+        sobre diccionarios compartidos: sin él, dos peticiones simultáneas
+        pueden entrelazarse y la última escritura gana, perdiendo la otra.
+
+        Desde código async, usar `guardar_async()`: además de tomar el lock,
+        saca la I/O del bucle de eventos.
+        """
+        with self._lock_hilos:
+            self._volcar()
+
+    async def guardar_async(self) -> None:
+        """
+        Igual que `guardar()`, pero apta para llamarse desde código async.
+
+        Escribir tres JSON completos es I/O bloqueante: hacerlo dentro del
+        bucle de eventos congela TODOS los WebSockets mientras dura. Con diez
+        clientes recibiendo tags en vivo eso se nota. Por eso el volcado se
+        delega a un hilo con `run_in_executor`.
+
+        El `asyncio.Lock` serializa a los llamadores async entre sí; el lock de
+        hilos de dentro protege frente a los llamadores síncronos.
+        """
+        async with self._lock_async:
+            bucle = asyncio.get_running_loop()
+            await bucle.run_in_executor(None, self.guardar)
+
+    def _volcar(self) -> None:
+        """Serializa el estado actual a los tres ficheros. Asume lock tomado."""
         self._escribir(
             self.ruta_conexiones,
             [asdict(c) for c in self.conexiones.values()],

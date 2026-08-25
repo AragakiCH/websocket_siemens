@@ -17,6 +17,7 @@ Arrancar con:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -26,15 +27,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import (ai_routes, db_routes, export_routes,
-                     historian_routes, rest_routes, websocket_routes)
+from app.api import (ai_routes, auth_routes, db_routes, export_routes,
+                     historian_routes, lock_routes, project_routes,
+                     rest_routes, websocket_routes)
 from app.config.settings import get_settings
 from app.core.connection_manager import ConnectionManager
 from app.core.db_manager import DbManager
 from app.db.historian import Historizador
 from app.export.grabador import Grabador
 from app.ai.agent import Agente
+from app.core.auditoria import Auditoria
+from app.core.auth_manager import AuthManager
+from app.core.lock_manager import LockManager
 from app.core.plc_manager import PlcManager
+from app.db.project_store import ProjectStore
 
 
 def _configurar_logging(nivel: str) -> None:
@@ -79,6 +85,21 @@ async def lifespan(app: FastAPI):
     # El grabador comparte el mismo flujo de tags: mantiene en memoria el
     # último valor de cada uno y lo muestrea a intervalo fijo.
     grabador = Grabador(plc_manager)
+    # MULTIUSUARIO -------------------------------------------------- #
+    # El diseño del HMI vive AQUÍ, no en el localStorage de cada
+    # navegador: es lo único que permite que dos personas vean la misma
+    # pantalla. Va versionado para detectar escrituras simultáneas.
+    project_store = ProjectStore()
+    # Identidad: las cuentas están en la tabla SQL `usuarios`, así que
+    # este gestor necesita el DbManager para llegar a ellas.
+    auth_manager = AuthManager(db_manager, settings)
+    # Fase 4: 'el lápiz'. Un solo usuario edita; el resto ve en vivo en
+    # modo lectura. Caduca solo a los 30 s sin heartbeat, así que un
+    # navegador cerrado no deja la pantalla bloqueada para siempre.
+    lock_manager = LockManager(manager)
+    # Quién hizo qué. Escribe en un hilo aparte: auditar nunca debe
+    # retrasar la operación auditada.
+    auditoria = Auditoria()
 
     # Guardar en el estado de la app para que los routers accedan a ellos.
     app.state.settings = settings
@@ -87,6 +108,10 @@ async def lifespan(app: FastAPI):
     app.state.db_manager = db_manager
     app.state.historizador = historizador
     app.state.grabador = grabador
+    app.state.project_store = project_store
+    app.state.auth_manager = auth_manager
+    app.state.lock_manager = lock_manager
+    app.state.auditoria = auditoria
 
     logger.info("=== Iniciando servicio OPC UA -> WebSocket (multi-PLC) ===")
     logger.info("Endpoint semilla: %s | discovery=%s | subred=%s",
@@ -94,6 +119,25 @@ async def lifespan(app: FastAPI):
                 settings.resolve_subnet())
     # El descubrimiento + supervisores corren en segundo plano: la API arranca
     # aunque ningún PLC esté disponible todavía.
+    auditoria.start()
+    auditoria.registrar("servicio.arranque", "", "",
+                        {"auth_requerida": settings.auth_requerida})
+
+    # Barrido de bloqueos abandonados. Hace falta un barrido ACTIVO: si
+    # nadie consulta el lock, los demás clientes no se enterarían de que
+    # quedó libre y seguirían en modo lectura sin motivo.
+    async def _barrer_locks():
+        while True:
+            await asyncio.sleep(5)
+            try:
+                await lock_manager.barrer_caducados()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Error barriendo bloqueos: %s", exc)
+
+    tarea_locks = asyncio.create_task(_barrer_locks())
+
     await plc_manager.start()
     # Conexiones a BD guardadas: se abren en paralelo. Una BD caída no impide
     # arrancar el servicio (el widget mostrará el error y podrá reintentar).
@@ -115,6 +159,9 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         logger.info("=== Apagando servicio: cierre limpio ===")
+        tarea_locks.cancel()
+        auditoria.registrar("servicio.parada")
+        auditoria.stop()
         await plc_manager.stop()
         # Orden importante: primero el historizador (vuelca su buffer
         # pendiente), y solo después se cierran los pools de la BD.
@@ -373,6 +420,9 @@ app.add_middleware(
 )
 
 # Routers.
+app.include_router(auth_routes.router)
+app.include_router(project_routes.router)
+app.include_router(lock_routes.router)
 app.include_router(rest_routes.router, tags=["REST"])
 app.include_router(websocket_routes.router, tags=["WebSocket"])
 app.include_router(db_routes.router)

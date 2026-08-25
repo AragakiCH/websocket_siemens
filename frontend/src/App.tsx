@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AppStoreProvider } from './context/AppStore';
 import { Login } from './pages/Login';
+import { Actividad } from './pages/Actividad';
 import { MainMenu } from './pages/MainMenu';
 import { Configuracion } from './pages/Configuracion';
 import { Designer } from './pages/Designer';
@@ -67,6 +68,18 @@ export function App() {
                 element={
                 <Page>
                     <Designer />
+                  </Page>
+                } />
+
+              {/* Actividad: quién está trabajando y qué se ha hecho. El
+                  permiso real lo aplica el backend en cada endpoint; esta
+                  ruta solo evita mostrar una pantalla vacía a quien no debe
+                  verla. */}
+              <Route
+                path="/actividad"
+                element={
+                <Page>
+                    <Actividad />
                   </Page>
                 } />
 

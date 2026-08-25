@@ -24,10 +24,22 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Body, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app.api.auth_routes import exigir_rol, usuario_de
+from app.core.auth_manager import Sesion
+
 router = APIRouter()
+
+
+def _auditar(request: Request, accion: str, sesion, recurso: str,
+             detalle: dict | None = None) -> None:
+    """Registra la acción. Un PLC de produccion borrado sin saber por quien
+    es exactamente lo que la auditoria existe para evitar."""
+    aud = getattr(request.app.state, "auditoria", None)
+    if aud is not None:
+        aud.registrar(accion, usuario_de(sesion), recurso, detalle)
 
 
 class NuevoPlc(BaseModel):
@@ -171,6 +183,7 @@ async def plcs(request: Request) -> dict:
 )
 async def agregar_plc(
     request: Request,
+    sesion: Sesion = Depends(exigir_rol("Administradores")),
     cuerpo: NuevoPlc = Body(..., examples=[
         {"host": "192.168.50.1", "puerto": 4840, "vendor": "siemens"},
         {"host": "192.168.1.1", "puerto": 4840, "vendor": "rexroth",
@@ -180,6 +193,8 @@ async def agregar_plc(
          "app": "Application", "programa": "PLC_PRG"},
     ]),
 ) -> dict:
+    _auditar(request, "plc.alta", sesion, cuerpo.host,
+             {"vendor": cuerpo.vendor})
     return await request.app.state.plc_manager.add_plc_manual(
         host=cuerpo.host,
         puerto=cuerpo.puerto,
@@ -206,7 +221,11 @@ async def agregar_plc(
         }},
     }}}}},
 )
-async def quitar_plc(request: Request, plc_id: str) -> dict:
+async def quitar_plc(
+    request: Request, plc_id: str,
+    sesion: Sesion = Depends(exigir_rol("Administradores")),
+) -> dict:
+    _auditar(request, "plc.baja", sesion, plc_id)
     return await request.app.state.plc_manager.remove_plc(plc_id)
 
 
@@ -222,7 +241,10 @@ async def quitar_plc(request: Request, plc_id: str) -> dict:
         "mensaje": "1 PLC(s) nuevo(s) añadido(s).",
     }}}}},
 )
-async def redescubrir(request: Request) -> dict:
+async def redescubrir(
+    request: Request,
+    sesion: Sesion = Depends(exigir_rol("Administradores")),
+) -> dict:
     return await request.app.state.plc_manager.rescan()
 
 

@@ -608,10 +608,12 @@ class SqlDriver(DbDriver):
             f"password_hash VARCHAR(255) NOT NULL, "
             f"algoritmo VARCHAR(30) NOT NULL DEFAULT 'pbkdf2_sha256', "
             f"email VARCHAR(160), "
-            # Rol: admin | supervisor | operador | invitado
-            f"categoria VARCHAR(40) NOT NULL DEFAULT 'operador', "
-            # activo | inactivo | bloqueado
-            f"estado VARCHAR(20) NOT NULL DEFAULT 'activo', "
+            # Rol, de MÁS a MENOS permisos. Los valores son exactamente los
+            # que ofrece el desplegable de Login.tsx y se guardan tal cual:
+            #   Supervisor > Administradores > Usuarios > Invitado
+            f"categoria VARCHAR(40) NOT NULL DEFAULT 'Usuarios', "
+            # Activo | Inactivo. Un usuario Inactivo no puede iniciar sesión.
+            f"estado VARCHAR(20) NOT NULL DEFAULT 'Activo', "
             f"creado_en {ts}, "
             f"ultimo_acceso {ts})"
         )

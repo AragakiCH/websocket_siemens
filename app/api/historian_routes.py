@@ -24,10 +24,22 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Body, Query, Request
+from fastapi import APIRouter, Body, Depends, Query, Request
 from pydantic import BaseModel, Field
 
+from app.api.auth_routes import exigir_rol, usuario_de
+from app.core.auth_manager import Sesion
+
 router = APIRouter()
+
+
+async def _avisar(request: Request, sesion=None, accion: str = "") -> None:
+    """Difunde `config.updated` del recurso 'historicos' a todas las pantallas."""
+    try:
+        await request.app.state.manager.difundir_config(
+            "historicos", usuario_de(sesion), accion)
+    except Exception:  # noqa: BLE001
+        pass
 
 TAG = ["Historizador (PLC → BD)"]
 
@@ -148,6 +160,7 @@ async def estado_historizador(request: Request) -> dict:
 )
 async def crear_grupo(
     request: Request,
+    sesion: Sesion = Depends(exigir_rol("Administradores")),
     cuerpo: NuevoGrupo = Body(..., openapi_examples={
         "seleccion": {
             "summary": "Tags seleccionados (lo habitual)",
@@ -196,12 +209,15 @@ async def crear_grupo(
         },
     }),
 ) -> dict:
-    return _hist(request).alta_grupo(
+    resultado = _hist(request).alta_grupo(
         grupo_id=cuerpo.grupo_id, db_id=cuerpo.db_id, tags=cuerpo.tags,
         tabla=cuerpo.tabla, nombre=cuerpo.nombre, activo=cuerpo.activo,
         banda_muerta=cuerpo.banda_muerta,
         intervalo_min_ms=cuerpo.intervalo_min_ms,
     )
+    if resultado.get("ok"):
+        await _avisar(request, sesion, "alta")
+    return resultado
 
 
 @router.delete(
@@ -216,8 +232,14 @@ async def crear_grupo(
         "mensaje": "Grupo 'proceso' eliminado. Los datos ya guardados NO se borran.",
     }}}}},
 )
-async def borrar_grupo(request: Request, grupo_id: str) -> dict:
-    return await _hist(request).baja_grupo(grupo_id)
+async def borrar_grupo(
+    request: Request, grupo_id: str,
+    sesion: Sesion = Depends(exigir_rol("Administradores")),
+) -> dict:
+    resultado = await _hist(request).baja_grupo(grupo_id)
+    if resultado.get("ok"):
+        await _avisar(request, sesion, "baja")
+    return resultado
 
 
 @router.post(
@@ -231,8 +253,14 @@ async def borrar_grupo(request: Request, grupo_id: str) -> dict:
         "mensaje": "Grupo 'proceso' activado.",
     }}}}},
 )
-async def arrancar_grupo(request: Request, grupo_id: str) -> dict:
-    return _hist(request).activar(grupo_id, True)
+async def arrancar_grupo(
+    request: Request, grupo_id: str,
+    sesion: Sesion = Depends(exigir_rol("Administradores")),
+) -> dict:
+    resultado = _hist(request).activar(grupo_id, True)
+    if resultado.get("ok"):
+        await _avisar(request, sesion, "activado")
+    return resultado
 
 
 @router.post(
@@ -246,8 +274,14 @@ async def arrancar_grupo(request: Request, grupo_id: str) -> dict:
         "mensaje": "Grupo 'proceso' detenido.",
     }}}}},
 )
-async def parar_grupo(request: Request, grupo_id: str) -> dict:
-    return _hist(request).activar(grupo_id, False)
+async def parar_grupo(
+    request: Request, grupo_id: str,
+    sesion: Sesion = Depends(exigir_rol("Administradores")),
+) -> dict:
+    resultado = _hist(request).activar(grupo_id, False)
+    if resultado.get("ok"):
+        await _avisar(request, sesion, "pausado")
+    return resultado
 
 
 @router.post(

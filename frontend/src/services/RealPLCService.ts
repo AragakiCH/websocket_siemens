@@ -20,6 +20,7 @@
 // =========================================================================
 import { PlcVariable } from '../models/plc';
 import { toPlcVariables } from './plcAdapter';
+import { tokenParaWs } from './authApi';
 
 const RETRY_MS = 3000;
 const SELECTION_KEY = 'hmi.plc.selection'; // localStorage
@@ -116,7 +117,9 @@ class RealPLCServiceImpl {
     this.manualClose = false;
 
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const url = `${proto}://${window.location.host}/ws`;
+    // El token va en el query string porque la API de WebSocket del
+    // navegador no permite cabeceras personalizadas al conectar.
+    const url = tokenParaWs(`${proto}://${window.location.host}/ws`);
     const ws = new WebSocket(url);
     this.ws = ws;
 
@@ -138,6 +141,18 @@ class RealPLCServiceImpl {
           Object.entries(this.tags).filter(([, t]) => t.plc !== id)
         );
         this.emitNow();
+      } else if (
+        msg.type === 'project.updated' ||
+        msg.type === 'project.removed' ||
+        msg.type === 'config.updated' ||
+        msg.type === 'presence'
+      ) {
+        // Canal de PROYECTO: baja frecuencia. Este servicio no los
+        // interpreta, pero es el único que tiene el socket abierto, así
+        // que los reemite como eventos del navegador y quien quiera los
+        // escucha (AppStore, barra de presencia...). Evita abrir un
+        // segundo WebSocket solo para esto.
+        window.dispatchEvent(new CustomEvent('hmi:ws', { detail: msg }));
       } else if (msg.type === 'status') {
         // Estado de conexión de un PLC (no afecta a las variables). Se ignora.
       } else if (msg.tag) {

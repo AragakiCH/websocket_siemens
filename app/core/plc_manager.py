@@ -82,6 +82,19 @@ class PlcManager:
         self._running = False
         self._rescan_task = None
 
+        # MULTIUSUARIO: la lista de PLCs se persiste para que un reinicio del
+        # servicio no borre el trabajo de todos los usuarios a la vez.
+        # `_endpoints` guarda el endpoint original de cada PLC gestionado
+        # (incluidas las credenciales de Rexroth), indexado por plc_id.
+        from app.core.plc_store import PlcStore
+
+        self._store = PlcStore()
+        self._endpoints: Dict[str, EndpointPlc] = {}
+
+    def _persistir(self) -> None:
+        """Vuelca a disco los PLCs gestionados actualmente."""
+        self._store.guardar(list(self._endpoints.values()))
+
     # ------------------------------------------------------------------ #
     # Arranque / parada
     # ------------------------------------------------------------------ #
@@ -89,13 +102,32 @@ class PlcManager:
         """Descubre PLCs, crea un handler por cada uno y los arranca."""
         self._running = True
 
-        # Modo manual: arrancar sin PLCs; el usuario los agrega desde la vista.
+        # 1) PLCs guardados en disco. Van SIEMPRE, incluso con
+        #    autostart_plcs=False: no son un descubrimiento automático, son los
+        #    que alguien dio de alta explícitamente antes del reinicio.
+        for ep in self._store.cargar():
+            try:
+                await self._añadir_plc(ep)
+            except Exception as exc:  # noqa: BLE001
+                logger.error("No se pudo restaurar el PLC %s: %s",
+                             ep.endpoint, exc)
+
+        if self._handlers:
+            logger.info("Restaurados %d PLC(s) de la sesión anterior.",
+                        len(self._handlers))
+
+        # Modo manual: no descubrir nada más; el usuario los agrega desde la vista.
         if not self._settings.autostart_plcs:
-            logger.info("autostart_plcs=False: arranque sin PLCs. "
+            logger.info("autostart_plcs=False: sin descubrimiento automático. "
                         "Agrega PLCs desde la vista (POST /plcs o /discover).")
+            if self._settings.discovery_interval and self._settings.discovery_interval > 0:
+                self._rescan_task = asyncio.create_task(self._bucle_reescaneo())
             return
 
         endpoints = await descubrir_plcs(self._settings)
+        # No duplicar los que ya se restauraron del disco.
+        ya_estan = {h.endpoint for h in self._handlers.values()}
+        endpoints = [ep for ep in endpoints if ep.endpoint not in ya_estan]
 
         # Lista blanca opcional: conectarse solo a los PLCs elegidos.
         incluir = self._settings.include_plcs
@@ -114,6 +146,8 @@ class PlcManager:
 
         for ep in endpoints:
             await self._añadir_plc(ep)
+
+        self._persistir()
 
         # Re-escaneo periódico opcional para detectar PLCs nuevos en caliente.
         if self._settings.discovery_interval and self._settings.discovery_interval > 0:
@@ -179,6 +213,7 @@ class PlcManager:
             vendor=ep.vendor,
         )
         self._handlers[plc_id] = handler
+        self._endpoints[plc_id] = ep
         await handler.start()
         logger.info("PLC añadido: id=%s marca=%s endpoint=%s nombre=%s",
                     plc_id, ep.vendor, ep.endpoint, ep.nombre or "-")
@@ -246,6 +281,7 @@ class PlcManager:
                          usuario=usuario, password=password,
                          app=app, programa=programa)
         plc_id = await self._añadir_plc(ep)
+        self._persistir()
         # Refrescar a todos los clientes conectados con un snapshot nuevo.
         await self._manager.broadcast(self.build_snapshot_message())
         return {"ok": True, "plc_id": plc_id, "endpoint": endpoint,
@@ -262,6 +298,8 @@ class PlcManager:
         except Exception as exc:  # noqa: BLE001
             logger.warning("Error deteniendo handler %s: %s", plc_id, exc)
         self._ids_usados.discard(plc_id)
+        self._endpoints.pop(plc_id, None)
+        self._persistir()
         # Aviso a los clientes (sin clave 'plc' para que llegue a todos).
         await self._manager.broadcast(
             {"timestamp": _ahora_iso(), "type": "plc_removed",
@@ -279,6 +317,7 @@ class PlcManager:
             if ep.endpoint not in existentes:
                 nuevos.append(await self._añadir_plc(ep))
         if nuevos:
+            self._persistir()
             await self._manager.broadcast(self.build_snapshot_message())
         return {"ok": True, "encontrados": len(endpoints), "nuevos": nuevos,
                 "mensaje": (f"{len(nuevos)} PLC(s) nuevo(s) añadido(s)."
@@ -293,10 +332,19 @@ class PlcManager:
                     break
                 endpoints = await descubrir_plcs(self._settings)
                 existentes = {h.endpoint for h in self._handlers.values()}
+                nuevos = 0
                 for ep in endpoints:
                     if ep.endpoint not in existentes:
                         logger.info("Re-escaneo: PLC nuevo detectado %s", ep.endpoint)
                         await self._añadir_plc(ep)
+                        nuevos += 1
+                # MULTIUSUARIO: igual que `rescan()`, hay que avisar a los
+                # clientes conectados. Sin esto, un PLC detectado por el
+                # re-escaneo automático solo aparecía en las vistas que se
+                # recargaran a mano.
+                if nuevos:
+                    self._persistir()
+                    await self._manager.broadcast(self.build_snapshot_message())
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001

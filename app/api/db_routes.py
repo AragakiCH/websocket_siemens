@@ -33,8 +33,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+
+from app.api.auth_routes import exigir_rol, sesion_actual, usuario_de
+from app.core.auth_manager import Sesion
 
 router = APIRouter()
 
@@ -144,6 +147,26 @@ def _mgr(request: Request):
     return request.app.state.db_manager
 
 
+async def _avisar(request: Request, recurso: str, sesion=None,
+                  accion: str = "") -> None:
+    """
+    Difunde `config.updated` para que las demás pantallas se refresquen.
+
+    Antes, estos endpoints escribían en disco y devolvían 200 sin avisar a
+    nadie: el usuario 2 no veía la conexión nueva hasta recargar a mano.
+    """
+    try:
+        await request.app.state.manager.difundir_config(
+            recurso, usuario_de(sesion), accion)
+    except Exception:  # noqa: BLE001
+        # Un fallo al avisar no debe invalidar una operación ya hecha.
+        pass
+    aud = getattr(request.app.state, "auditoria", None)
+    if aud is not None:
+        aud.registrar(f"bd.{recurso}.{accion or 'cambio'}",
+                      usuario_de(sesion), recurso)
+
+
 # ====================================================================== #
 # Conexiones
 # ====================================================================== #
@@ -198,6 +221,7 @@ async def listar_conexiones(request: Request) -> dict:
 )
 async def agregar_conexion(
     request: Request,
+    sesion: Sesion = Depends(exigir_rol("Administradores")),
     cuerpo: NuevaConexion = Body(..., openapi_examples={
         "postgresql": {
             "summary": "PostgreSQL",
@@ -260,7 +284,7 @@ async def agregar_conexion(
         },
     }),
 ) -> dict:
-    return await _mgr(request).alta_conexion(
+    resultado = await _mgr(request).alta_conexion(
         db_id=cuerpo.db_id, motor=cuerpo.motor, host=cuerpo.host,
         puerto=cuerpo.puerto, base_datos=cuerpo.base_datos,
         usuario=cuerpo.usuario, password=cuerpo.password,
@@ -269,6 +293,9 @@ async def agregar_conexion(
         crear_esquema=cuerpo.crear_esquema,
         prefijo_esquema=cuerpo.prefijo_esquema,
     )
+    if resultado.get("ok"):
+        await _avisar(request, "conexiones", sesion, "alta")
+    return resultado
 
 
 class CrearEsquema(BaseModel):
@@ -331,9 +358,13 @@ async def crear_esquema(
     request: Request,
     db_id: str,
     cuerpo: CrearEsquema = Body(default=CrearEsquema()),
+    sesion: Sesion = Depends(exigir_rol("Administradores")),
 ) -> dict:
     try:
-        return await _mgr(request).crear_esquema(db_id, prefijo=cuerpo.prefijo)
+        resultado = await _mgr(request).crear_esquema(db_id, prefijo=cuerpo.prefijo)
+        if resultado.get("ok"):
+            await _avisar(request, "esquema", sesion, "creado")
+        return resultado
     except KeyError:
         raise HTTPException(404, f"No existe la conexión '{db_id}'.")
     except ValueError as exc:
@@ -353,8 +384,14 @@ async def crear_esquema(
         "mensaje": "Conexión 'mes_produccion' eliminada (3 consulta(s) asociada(s)).",
     }}}}},
 )
-async def quitar_conexion(request: Request, db_id: str) -> dict:
-    return await _mgr(request).baja_conexion(db_id)
+async def quitar_conexion(
+    request: Request, db_id: str,
+    sesion: Sesion = Depends(exigir_rol("Administradores")),
+) -> dict:
+    resultado = await _mgr(request).baja_conexion(db_id)
+    if resultado.get("ok"):
+        await _avisar(request, "conexiones", sesion, "baja")
+    return resultado
 
 
 @router.post(
@@ -483,6 +520,7 @@ async def listar_consultas(
 )
 async def agregar_consulta(
     request: Request,
+    sesion: Sesion = Depends(exigir_rol("Administradores")),
     cuerpo: NuevaConsulta = Body(..., openapi_examples={
         "agregado": {
             "summary": "Agregado por grupo (estándar, vale en todos)",
@@ -566,11 +604,14 @@ async def agregar_consulta(
         },
     }),
 ) -> dict:
-    return _mgr(request).alta_consulta(
+    resultado = _mgr(request).alta_consulta(
         query_id=cuerpo.query_id, db_id=cuerpo.db_id, sql=cuerpo.sql,
         nombre=cuerpo.nombre, parametros=cuerpo.parametros,
         limite=cuerpo.limite, descripcion=cuerpo.descripcion,
     )
+    if resultado.get("ok"):
+        await _avisar(request, "consultas", sesion, "alta")
+    return resultado
 
 
 @router.delete(
@@ -582,8 +623,14 @@ async def agregar_consulta(
         "mensaje": "Consulta 'piezas_por_maquina' eliminada.",
     }}}}},
 )
-async def quitar_consulta(request: Request, query_id: str) -> dict:
-    return _mgr(request).baja_consulta(query_id)
+async def quitar_consulta(
+    request: Request, query_id: str,
+    sesion: Sesion = Depends(exigir_rol("Administradores")),
+) -> dict:
+    resultado = _mgr(request).baja_consulta(query_id)
+    if resultado.get("ok"):
+        await _avisar(request, "consultas", sesion, "baja")
+    return resultado
 
 
 @router.post(

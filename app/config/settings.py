@@ -159,6 +159,23 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO")
 
     # ------------------------------------------------------------------ #
+    # Identidad de usuario (multiusuario)
+    # ------------------------------------------------------------------ #
+    # Si False, los endpoints no exigen sesión: cualquiera que abra la URL
+    # puede hacer todo. Es el comportamiento histórico y sirve para trabajar en
+    # local, pero NO debe quedarse así en planta: con diez personas, cualquiera
+    # podría borrar un PLC de producción.
+    auth_requerida: bool = Field(
+        default=False,
+        description="Exigir inicio de sesión en los endpoints que modifican "
+                    "algo. Ponlo en true en producción.",
+    )
+    # Conexión donde vive la tabla `usuarios`. Vacío = la primera dada de alta.
+    auth_db_id: Optional[str] = Field(default=None)
+    # Prefijo de la tabla, si se creó el esquema con uno.
+    auth_tabla_prefijo: str = Field(default="")
+
+    # ------------------------------------------------------------------ #
     # Zona horaria de VISUALIZACIÓN
     # ------------------------------------------------------------------ #
     # Los datos SIEMPRE se guardan en UTC (el SourceTimestamp de OPC UA es UTC
