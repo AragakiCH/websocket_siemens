@@ -19,7 +19,7 @@
 //   Alarm class  categoría (desplegable)
 //   Trigger tag  variable que la dispara
 // =========================================================================
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   BellIcon,
@@ -34,7 +34,9 @@ import {
   WrenchIcon,
   InfoIcon,
   BellOffIcon,
+  ChevronDownIcon,
 } from 'lucide-react';
+import { Th, Celda, IconoBoton, AccionesFila } from '../ui/TableBits';
 
 const STORAGE_KEY = 'hmi.alarms';
 
@@ -269,9 +271,12 @@ export function AlarmsEditor() {
                 type="search"
                 value={filtro}
                 onChange={(e) => setFiltro(e.target.value)}
-                placeholder="Filtrar…"
-                aria-label="Filtrar alarmas"
-                className="w-36 rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2.5 text-xs text-navy outline-none transition placeholder:text-slate-400 focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100 sm:w-48"
+                // El placeholder enumera las columnas a propósito: la búsqueda
+                // barre las cinco a la vez y no hay forma de adivinarlo mirando
+                // una caja que solo diga "Buscar…".
+                placeholder="Buscar por ID, nombre, texto, clase o tag…"
+                aria-label="Buscar alarmas por ID, nombre, texto, clase o tag"
+                className="w-44 rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2.5 text-xs text-navy outline-none transition placeholder:text-slate-400 focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100 sm:w-72"
               />
             </div>
           )}
@@ -352,7 +357,13 @@ export function AlarmsEditor() {
                           />
                         </td>
 
-                        {/* Alarm class — el desplegable */}
+                        {/* Alarm class — el desplegable.
+                            Sin fondo de color a propósito: el <select> pinta
+                            la lista desplegable NATIVA con su mismo fondo, y
+                            un fondo claro con el texto claro del modo oscuro
+                            dejaba las opciones ilegibles. El color de la clase
+                            vive en el punto de la izquierda, que no arrastra
+                            ese problema. */}
                         <td className="px-1 py-1">
                           <div className="relative">
                             <select
@@ -363,7 +374,7 @@ export function AlarmsEditor() {
                                 })
                               }
                               aria-label={`Clase de la alarma ${a.id}`}
-                              className={`w-full cursor-pointer appearance-none rounded-md py-1.5 pl-7 pr-7 text-xs font-semibold outline-none ring-1 transition focus:ring-2 focus:ring-siemens/50 ${clase.insignia}`}
+                              className="w-full cursor-pointer appearance-none rounded-md border border-transparent bg-transparent py-1.5 pl-7 pr-7 text-xs font-medium text-navy outline-none transition hover:border-slate-200 hover:bg-white focus:border-siemens focus:bg-white focus:ring-2 focus:ring-siemens/20 dark:text-slate-100 dark:hover:border-navy-slate dark:hover:bg-navy dark:focus:bg-navy"
                             >
                               {ALARM_CLASSES.map((c) => (
                                 <option key={c.id} value={c.id}>
@@ -375,12 +386,10 @@ export function AlarmsEditor() {
                               aria-hidden="true"
                               className={`pointer-events-none absolute left-2.5 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full ${clase.punto}`}
                             />
-                            <span
+                            <ChevronDownIcon
                               aria-hidden="true"
-                              className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] opacity-50"
-                            >
-                              ▼
-                            </span>
+                              className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+                            />
                           </div>
                         </td>
 
@@ -401,7 +410,7 @@ export function AlarmsEditor() {
 
                         {/* Acciones — aparecen al pasar por encima */}
                         <td className="px-1 py-1">
-                          <div className="flex items-center justify-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                          <AccionesFila>
                             <IconoBoton
                               onClick={() => duplicar(a.id)}
                               titulo="Duplicar"
@@ -416,7 +425,7 @@ export function AlarmsEditor() {
                             >
                               <Trash2Icon className="h-3.5 w-3.5" />
                             </IconoBoton>
-                          </div>
+                          </AccionesFila>
                         </td>
                       </motion.tr>
                     );
@@ -456,7 +465,7 @@ export function AlarmsEditor() {
                   onClick={() => setFiltro('')}
                   className="mt-2 text-xs font-semibold text-siemens hover:underline"
                 >
-                  Limpiar filtro
+                  Limpiar búsqueda
                 </button>
               </div>
             )}
@@ -480,84 +489,6 @@ export function AlarmsEditor() {
 // ═════════════════════════════════════════════════════════════════
 // Piezas
 // ═════════════════════════════════════════════════════════════════
-
-function Th({
-  children,
-  className = '',
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <th
-      scope="col"
-      className={`border-b border-slate-200 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-navy-slate ${className}`}
-    >
-      {children}
-    </th>
-  );
-}
-
-/**
- * Celda editable.
- *
- * Sin borde en reposo para que la tabla se lea como una tabla y no como un
- * muro de inputs; el borde aparece al pasar por encima o al enfocar, que es
- * cuando hace falta saber dónde estás escribiendo.
- */
-function Celda({
-  value,
-  onChange,
-  placeholder,
-  className = '',
-  autoFocus,
-  onFocus,
-  ...resto
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  className?: string;
-  autoFocus?: boolean;
-  onFocus?: () => void;
-} & React.AriaAttributes) {
-  return (
-    <input
-      type="text"
-      value={value}
-      autoFocus={autoFocus}
-      onFocus={onFocus}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className={`w-full rounded-md border border-transparent bg-transparent px-2.5 py-1.5 text-xs text-navy outline-none transition placeholder:text-slate-300 hover:border-slate-200 hover:bg-white focus:border-siemens focus:bg-white focus:ring-2 focus:ring-siemens/20 dark:text-slate-100 dark:placeholder:text-slate-600 dark:hover:border-navy-slate dark:hover:bg-navy dark:focus:bg-navy ${className}`}
-      {...resto}
-    />
-  );
-}
-
-function IconoBoton({
-  onClick,
-  titulo,
-  className = '',
-  children,
-}: {
-  onClick: () => void;
-  titulo: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={titulo}
-      aria-label={titulo}
-      className={`flex h-7 w-7 items-center justify-center rounded-md text-slate-400 outline-none transition focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-siemens/40 ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
 
 /** Color de texto del icono de la fila, derivado de la insignia de la clase. */
 function textoDe(c: AlarmClassDef): string {

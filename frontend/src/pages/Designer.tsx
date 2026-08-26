@@ -8,7 +8,8 @@ import {
   EyeIcon,
   LayoutDashboardIcon,
   WorkflowIcon,
-  BellIcon } from
+  BellIcon,
+  BookOpenIcon } from
 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { HmiWidget, WidgetKind, defaultStyle } from '../models/widget';
@@ -20,8 +21,9 @@ import { UPDATE_RATE_OPTIONS } from '../models/plc';
 import { saveDesign, loadDesign } from '../utils/designStorage';
 import { FlowEditor } from '../components/flows/FlowEditor';
 import { AlarmsEditor } from '../components/alarms/AlarmsEditor';
+import { RecipesEditor } from '../components/recipes/RecipesEditor';
 
-type DesignerTab = 'designer' | 'flows' | 'alarms';
+type DesignerTab = 'designer' | 'flows' | 'alarms' | 'recipes';
 
 let counter = 1;
 
@@ -218,6 +220,17 @@ export function Designer() {
               <BellIcon className="h-3.5 w-3.5" />
               Alarmas
             </button>
+            <button
+              onClick={() => setActiveTab('recipes')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition ${
+                activeTab === 'recipes'
+                  ? 'bg-white text-navy shadow-sm dark:bg-navy-slate dark:text-slate-100'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+              }`}
+            >
+              <BookOpenIcon className="h-3.5 w-3.5" />
+              Recetas
+            </button>
           </div>
         </div>
 
@@ -287,6 +300,8 @@ export function Designer() {
       {/* ═══ Contenido según pestaña activa ═══ */}
       {activeTab === 'alarms' ? (
         <AlarmsEditor />
+      ) : activeTab === 'recipes' ? (
+        <RecipesEditor />
       ) : activeTab === 'designer' ? (
       <div className="flex flex-1 overflow-hidden">
         <WidgetSidebar />
