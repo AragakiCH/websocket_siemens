@@ -42,6 +42,10 @@ export const NODE_CATALOG: NodeCatalogEntry[] = [
     icon: 'Database',
     color: 'siemens',
     defaultConfig: {
+      // Arranca en modo "usar una existente": lo habitual al dibujar un flujo
+      // es apuntar a una conexión que ya está dada de alta, no declararla otra
+      // vez. Si no hay ninguna, el formulario cae solo en el modo de crear.
+      usar_existente: true,
       db_id: '',
       motor: 'mysql',
       nombre: '',

@@ -21,6 +21,7 @@ import { UPDATE_RATE_OPTIONS, DataType, PlcVendor } from '../models/plc';
 import { formatValue } from '../utils/format';
 import { SelectField } from '../components/ui/Field';
 import { fetchRexrothPrograms } from '../services/rexrothApi';
+import { PanelBasesDatos } from '../components/bd/PanelBasesDatos';
 
 const typeColor: Record<DataType, string> = {
   bool: 'bg-purple-100 text-purple-700',
@@ -526,6 +527,22 @@ export function Configuracion() {
               </div>
             ))}
           </div>
+        </section>
+
+        {/* ============================================================= */}
+        {/* Bases de datos                                                */}
+        {/* ============================================================= */}
+        {/* Aquí se dan de alta la segunda base y las siguientes. El
+            asistente del login solo aparece cuando no hay NINGUNA y se cierra
+            para siempre en cuanto existe la primera cuenta. */}
+        <section className="lg:col-span-3">
+          <div className="mb-3 flex items-center gap-2">
+            <DatabaseIcon className="h-4 w-4 text-siemens" />
+            <h2 className="text-sm font-bold text-navy dark:text-slate-100">
+              Bases de datos
+            </h2>
+          </div>
+          <PanelBasesDatos />
         </section>
 
         {/* ============================================================= */}

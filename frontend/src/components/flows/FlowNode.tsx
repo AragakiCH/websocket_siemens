@@ -204,7 +204,13 @@ export function FlowNode({
       <div className="px-3 py-1.5">
         {node.type === 'connection' && (
           <p className="truncate text-[10px] text-slate-500 dark:text-slate-400">
-            {node.config.motor ? `${node.config.motor}://${node.config.host || '…'}` : 'Sin configurar'}
+            {/* Con una conexión ya existente lo que identifica al nodo es su
+                db_id, no el motor y el host: es a lo que APUNTA. */}
+            {node.config.usar_existente
+              ? node.config.db_id || 'Elige una conexión'
+              : node.config.motor
+                ? `${node.config.motor}://${node.config.host || '…'}`
+                : 'Sin configurar'}
           </p>
         )}
         {node.type === 'historian' && (

@@ -171,12 +171,21 @@ class Usuario:
 
 @dataclass
 class Sesion:
-    """Sesión activa. Vive solo en memoria del proceso."""
+    """
+    Sesión activa. Vive solo en memoria del proceso.
+
+    **`db_id` no es decorativo.** Con varias bases dadas de alta, cada tabla
+    `usuarios` es independiente: el `id` 3 de la local y el `id` 3 de la nube
+    son personas distintas. Guardar aquí contra cuál se autenticó esta sesión
+    es lo que impide que un `PATCH /auth/usuarios/x` hecho por alguien que
+    entró en local acabe modificando la cuenta homónima del servidor.
+    """
 
     token: str
     usuario: str
     categoria: str
     usuario_id: int
+    db_id: str = ""
     creada: datetime = field(default_factory=_ahora)
     ultima_actividad: datetime = field(default_factory=_ahora)
 
@@ -186,7 +195,7 @@ class Sesion:
     def publico(self) -> dict:
         return {
             "usuario": self.usuario, "categoria": self.categoria,
-            "usuario_id": self.usuario_id,
+            "usuario_id": self.usuario_id, "db_id": self.db_id,
             "creada": _iso(self.creada),
             "ultima_actividad": _iso(self.ultima_actividad),
         }
@@ -223,17 +232,37 @@ class AuthManager:
             prefijo += "_"
         return f"{prefijo}usuarios"
 
-    def _db_id(self) -> str:
+    def _db_id(self, explicito: Optional[str] = None) -> str:
         """
         Conexión donde vive la tabla `usuarios`.
 
-        `PLC_AUTH_DB_ID` manda. Si está vacío se usa la primera conexión dada
-        de alta, que es lo razonable cuando solo hay una.
+        Orden de precedencia, de más a menos fuerte:
+
+          1. `explicito` — la base que eligió quien está entrando. Solo se
+             acepta si está REALMENTE dada de alta: si no se validara, un
+             `db_id` inventado desde el navegador acabaría en un mensaje de
+             error interno en vez de en uno claro.
+          2. `PLC_AUTH_DB_ID` del `.env`.
+          3. La primera conexión de la lista. Es una casualidad, no una
+             decisión, y por eso `info_bd()` lo marca con `fijada: False`.
         """
-        elegido = (self._settings.auth_db_id or "").strip()
-        if elegido:
-            return elegido
         conexiones = self._db.listar_conexiones()
+
+        elegido = (explicito or "").strip()
+        if elegido:
+            if not any(c["db_id"] == elegido for c in conexiones):
+                disponibles = ", ".join(c["db_id"] for c in conexiones) or "ninguna"
+                raise ErrorAuth(
+                    f"La base de datos '{elegido}' no está dada de alta. "
+                    f"Disponibles: {disponibles}.",
+                    codigo=404,
+                )
+            return elegido
+
+        fijado = (self._settings.auth_db_id or "").strip()
+        if fijado:
+            return fijado
+
         if not conexiones:
             raise ErrorAuth(
                 "No hay ninguna base de datos configurada. Da de alta una "
@@ -242,14 +271,95 @@ class AuthManager:
             )
         return conexiones[0]["db_id"]
 
-    async def _driver(self):
+    def bases_disponibles(self) -> List[Dict[str, Any]]:
+        """
+        Bases entre las que se puede elegir al entrar. Alimenta el desplegable
+        del login, así que es información **pública**: identificador, nombre,
+        motor y si responde ahora mismo. Nunca host ni credenciales.
+
+        `por_defecto` marca cuál sale preseleccionada — la de `PLC_AUTH_DB_ID`
+        si está fijada, o la primera si no.
+        """
         try:
-            return await self._db._driver_de(self._db_id())
+            defecto = self._db_id()
+        except ErrorAuth:
+            defecto = ""
+        salida = []
+        for c in self._db.listar_conexiones():
+            salida.append({
+                "db_id": c["db_id"],
+                "nombre": c.get("nombre") or c["db_id"],
+                "motor": c.get("motor", ""),
+                "etiqueta_motor": c.get("etiqueta_motor", ""),
+                "base_datos": c.get("base_datos", ""),
+                "conectado": bool(c.get("conectado")),
+                "por_defecto": c["db_id"] == defecto,
+            })
+        return salida
+
+    def info_bd(self, db_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Qué base de datos respalda las cuentas. Para el badge del login.
+
+        Es información **pública** a propósito (la sirve `/auth/estado`, que no
+        exige sesión): quien está a punto de crear una cuenta tiene derecho a
+        saber DÓNDE se va a crear. Sin esto, con una conexión local y otra en
+        el servidor dadas de alta, no hay forma de distinguir desde la vista en
+        cuál acabas de registrarte — y la cuenta que creaste "no existe" la
+        próxima vez.
+
+        Devuelve el identificador, el nombre y el motor. **Nunca** el host, el
+        usuario ni la contraseña: eso solo lo ve un Administrador autenticado,
+        en `GET /db`.
+
+        `fijada` distingue los dos modos:
+          * True  -> `PLC_AUTH_DB_ID` la eligió explícitamente.
+          * False -> se tomó la primera conexión de la lista, que es una
+                     casualidad, no una decisión. La vista lo advierte.
+        """
+        # Si la base la eligió quien está entrando, "fijada" deja de tener
+        # sentido como advertencia: la elección fue explícita, aunque no venga
+        # del .env.
+        fijada = bool((db_id or "").strip()) or bool(
+            (self._settings.auth_db_id or "").strip())
+        try:
+            db_id = self._db_id(db_id)
+        except ErrorAuth as exc:
+            return {"configurada": False, "fijada": fijada, "tabla": self.tabla,
+                    "mensaje": exc.mensaje}
+
+        conexiones = {c["db_id"]: c for c in self._db.listar_conexiones()}
+        c = conexiones.get(db_id)
+        if c is None:
+            return {
+                "configurada": False, "fijada": fijada, "db_id": db_id,
+                "tabla": self.tabla,
+                "mensaje": (f"PLC_AUTH_DB_ID apunta a '{db_id}', que no está "
+                            f"dada de alta. Revísalo o crea esa conexión."),
+            }
+
+        return {
+            "configurada": True,
+            "fijada": fijada,
+            "db_id": db_id,
+            "nombre": c.get("nombre") or db_id,
+            "motor": c.get("motor", ""),
+            "etiqueta_motor": c.get("etiqueta_motor", ""),
+            "base_datos": c.get("base_datos", ""),
+            "conectado": bool(c.get("conectado")),
+            "tabla": self.tabla,
+            "mensaje": c.get("ultimo_error", ""),
+        }
+
+    async def _driver(self, db_id: Optional[str] = None):
+        elegida = self._db_id(db_id)
+        try:
+            return await self._db._driver_de(elegida)
         except ErrorAuth:
             raise
         except KeyError as exc:
             raise ErrorAuth(
-                f"La conexión '{self._db_id()}' no existe. Revisa PLC_AUTH_DB_ID.",
+                f"La conexión '{elegida}' no existe. Revisa PLC_AUTH_DB_ID.",
                 codigo=503,
             ) from exc
         except Exception as exc:  # noqa: BLE001
@@ -258,9 +368,11 @@ class AuthManager:
                 codigo=503,
             ) from exc
 
-    async def _fila_usuario(self, usuario: str) -> Optional[dict]:
+    async def _fila_usuario(
+        self, usuario: str, db_id: Optional[str] = None
+    ) -> Optional[dict]:
         """Lee un usuario por nombre. Devuelve la fila cruda (CON el hash)."""
-        driver = await self._driver()
+        driver = await self._driver(db_id)
         # `query()` valida que sea solo lectura; el nombre de usuario va
         # bindeado, nunca concatenado.
         resultado = await driver.query(
@@ -293,6 +405,7 @@ class AuthManager:
         email: str = "",
         categoria: str = ROL_POR_DEFECTO,
         estado: str = ESTADO_ACTIVO,
+        db_id: Optional[str] = None,
     ) -> Usuario:
         """
         Crea una cuenta. Falla si el nombre ya existe.
@@ -315,12 +428,14 @@ class AuthManager:
             raise ErrorAuth(
                 f"Estado inválido. Opciones: {', '.join(ESTADOS)}.", 400)
 
-        driver = await self._driver()
+        driver = await self._driver(db_id)
 
-        if await self._fila_usuario(usuario) is not None:
+        if await self._fila_usuario(usuario, db_id) is not None:
             raise ErrorAuth(f"El usuario '{usuario}' ya existe.", 409)
 
-        if await self.contar() == 0:
+        # "Primer usuario" es POR BASE: cada tabla `usuarios` necesita su
+        # propio Supervisor inicial, porque son sistemas de cuentas separados.
+        if await self.contar(db_id) == 0:
             categoria = "Supervisor"
             logger.info(
                 "Primer usuario del sistema: '%s' se crea como Supervisor.",
@@ -339,7 +454,7 @@ class AuthManager:
         )
         logger.info("Usuario '%s' creado con categoría '%s'.", usuario, categoria)
 
-        fila = await self._fila_usuario(usuario)
+        fila = await self._fila_usuario(usuario, db_id)
         return self._a_usuario(fila or {"usuario": usuario, "categoria": categoria})
 
     def _ts_para_motor(self, driver):
@@ -348,10 +463,10 @@ class AuthManager:
 
         return ts_para_motor(_ahora(), driver.motor)
 
-    async def contar(self) -> int:
-        """Cuántas cuentas hay. 0 significa 'sistema sin configurar'."""
+    async def contar(self, db_id: Optional[str] = None) -> int:
+        """Cuántas cuentas hay EN ESA BASE. 0 = 'sistema sin configurar'."""
         try:
-            driver = await self._driver()
+            driver = await self._driver(db_id)
             r = await driver.query(f"SELECT COUNT(*) AS n FROM {self.tabla}",
                                    limite=1)
             return int(r.filas[0]["n"]) if r.filas else 0
@@ -361,22 +476,59 @@ class AuthManager:
             # La tabla puede no existir todavía: eso es 'sin usuarios'.
             return 0
 
-    async def listar(self) -> List[dict]:
-        """Todos los usuarios, sin hashes."""
-        driver = await self._driver()
+    async def contar_en_todas(self) -> int:
+        """
+        Cuentas sumadas de TODAS las bases dadas de alta.
+
+        Existe por un agujero que abre poder elegir base al entrar. El alta de
+        la primera cuenta es anónima a propósito (sin eso el sistema no se
+        puede poner en marcha), y esa primera cuenta se crea como Supervisor.
+        Si "la primera" se midiera por base, con dos bases registradas y una
+        vacía, cualquiera podría darse de alta como Supervisor en la vacía,
+        entrar con ella... y ser Supervisor de TODO el backend: los permisos
+        que concede la sesión no son por base, son del proceso entero.
+
+        Midiendo el total, la puerta de arranque se cierra en cuanto existe la
+        primera cuenta en cualquier sitio. Del segundo usuario en adelante hace
+        falta un Supervisor, también para estrenar una base nueva.
+        """
+        total = 0
+        for c in self._db.listar_conexiones():
+            try:
+                total += await self.contar(c["db_id"])
+            except Exception as exc:  # noqa: BLE001
+                # Una conexión rota NO puede tumbar este conteo. `contar()`
+                # re-lanza `ErrorAuth` a propósito (a `/auth/estado` le sirve
+                # para decir "esa base no responde"), pero aquí la pregunta es
+                # otra: "¿el sistema ya tiene dueño?". Sin este try, una sola
+                # conexión vieja e inservible bloquea el alta de la PRIMERA
+                # cuenta en una base que funciona perfectamente — que es
+                # justo el momento en que nadie puede entrar a arreglarlo.
+                logger.warning(
+                    "No se pudo contar cuentas en '%s' (%s); se ignora para "
+                    "decidir si el sistema ya está inicializado.",
+                    c["db_id"], exc,
+                )
+        return total
+
+    async def listar(self, db_id: Optional[str] = None) -> List[dict]:
+        """Todos los usuarios de esa base, sin hashes."""
+        driver = await self._driver(db_id)
         r = await driver.query(
             f"SELECT id, usuario, email, categoria, estado, creado_en, "
             f"ultimo_acceso FROM {self.tabla} ORDER BY usuario", limite=500,
         )
         return [self._a_usuario(f).publico() for f in r.filas]
 
-    async def cambiar_estado(self, usuario: str, estado: str) -> dict:
+    async def cambiar_estado(
+        self, usuario: str, estado: str, db_id: Optional[str] = None
+    ) -> dict:
         """Activa o desactiva una cuenta, y cierra sus sesiones si se desactiva."""
         if estado not in ESTADOS:
             raise ErrorAuth(
                 f"Estado inválido. Opciones: {', '.join(ESTADOS)}.", 400)
-        driver = await self._driver()
-        if await self._fila_usuario(usuario) is None:
+        driver = await self._driver(db_id)
+        if await self._fila_usuario(usuario, db_id) is None:
             raise ErrorAuth(f"No existe el usuario '{usuario}'.", 404)
 
         await driver._ejecutar_interno(
@@ -389,13 +541,15 @@ class AuthManager:
             await self.cerrar_sesiones_de(usuario)
         return {"ok": True, "usuario": usuario, "estado": estado}
 
-    async def cambiar_categoria(self, usuario: str, categoria: str) -> dict:
+    async def cambiar_categoria(
+        self, usuario: str, categoria: str, db_id: Optional[str] = None
+    ) -> dict:
         """Cambia el rol y refresca las sesiones abiertas de esa persona."""
         if categoria not in ROLES:
             raise ErrorAuth(
                 f"Categoría inválida. Opciones: {', '.join(ROLES)}.", 400)
-        driver = await self._driver()
-        if await self._fila_usuario(usuario) is None:
+        driver = await self._driver(db_id)
+        if await self._fila_usuario(usuario, db_id) is None:
             raise ErrorAuth(f"No existe el usuario '{usuario}'.", 404)
 
         await driver._ejecutar_interno(
@@ -409,12 +563,14 @@ class AuthManager:
                     s.categoria = categoria
         return {"ok": True, "usuario": usuario, "categoria": categoria}
 
-    async def cambiar_password(self, usuario: str, password_nueva: str) -> dict:
+    async def cambiar_password(
+        self, usuario: str, password_nueva: str, db_id: Optional[str] = None
+    ) -> dict:
         """Fija una contraseña nueva (ya hasheada) para un usuario."""
         if len(password_nueva or "") < 8:
             raise ErrorAuth("La contraseña debe tener al menos 8 caracteres.", 400)
-        driver = await self._driver()
-        if await self._fila_usuario(usuario) is None:
+        driver = await self._driver(db_id)
+        if await self._fila_usuario(usuario, db_id) is None:
             raise ErrorAuth(f"No existe el usuario '{usuario}'.", 404)
         await driver._ejecutar_interno(
             f"UPDATE {self.tabla} SET password_hash = :p, algoritmo = :a "
@@ -426,7 +582,9 @@ class AuthManager:
     # ------------------------------------------------------------------ #
     # Login / sesiones
     # ------------------------------------------------------------------ #
-    async def login(self, usuario: str, password: str) -> dict:
+    async def login(
+        self, usuario: str, password: str, db_id: Optional[str] = None
+    ) -> dict:
         """
         Verifica credenciales y abre una sesión.
 
@@ -435,7 +593,10 @@ class AuthManager:
         cuentas existen probando nombres.
         """
         usuario = (usuario or "").strip()
-        fila = await self._fila_usuario(usuario)
+        # Resolver la base ANTES de tocarla: si el db_id no existe, el error
+        # dice cuál se pidió y cuáles hay, en vez de un fallo de conexión.
+        elegida = self._db_id(db_id)
+        fila = await self._fila_usuario(usuario, elegida)
 
         if fila is None or not verificar_password(
             password, str(fila.get("password_hash") or "")
@@ -450,7 +611,7 @@ class AuthManager:
                 f"Contacta con un supervisor.", 403,
             )
 
-        driver = await self._driver()
+        driver = await self._driver(elegida)
 
         # Subir el coste del hash si la cuenta es antigua. Se hace aquí porque
         # es el único momento en que la contraseña en claro está disponible.
@@ -476,14 +637,16 @@ class AuthManager:
 
         token = secrets.token_urlsafe(32)
         sesion = Sesion(token=token, usuario=datos.usuario,
-                        categoria=datos.categoria, usuario_id=datos.id)
+                        categoria=datos.categoria, usuario_id=datos.id,
+                        db_id=elegida)
         async with self._lock:
             self._limpiar_caducadas()
             self._sesiones[token] = sesion
 
-        logger.info("'%s' inició sesión (%s).", datos.usuario, datos.categoria)
+        logger.info("'%s' inició sesión (%s) contra la base '%s'.",
+                    datos.usuario, datos.categoria, elegida)
         return {"ok": True, "token": token, "usuario": datos.publico(),
-                "expira_horas": HORAS_SESION}
+                "db_id": elegida, "expira_horas": HORAS_SESION}
 
     def sesion_de(self, token: Optional[str]) -> Optional[Sesion]:
         """Devuelve la sesión de un token, renovando su actividad."""

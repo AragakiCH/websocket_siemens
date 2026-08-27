@@ -94,7 +94,10 @@ async def _sistema_sin_cuentas(request: Request) -> bool:
     if auth is None:
         return True
     try:
-        return await auth.contar() == 0
+        # TODAS las bases, no solo la activa: ver `contar_en_todas()`. Medirlo
+        # por base dejaría la puerta de arranque abierta en cualquier base
+        # vacía, y quien entrara por ahí sería Supervisor del backend entero.
+        return await auth.contar_en_todas() == 0
     except Exception:  # noqa: BLE001
         # Si ni siquiera se puede consultar (sin BD configurada), estamos
         # necesariamente en el arranque.
@@ -174,6 +177,14 @@ def usuario_de(sesion: Optional[Sesion]) -> str:
 class Credenciales(BaseModel):
     usuario: str = Field(..., examples=["jmendoza"])
     password: str = Field(..., examples=["Planta2026!"])
+    db_id: Optional[str] = Field(
+        default=None,
+        description="Base de datos contra la que autenticar. Vacío = la de "
+                    "`PLC_AUTH_DB_ID`, o la primera dada de alta. Cada base "
+                    "tiene su propia tabla `usuarios`: una cuenta creada en "
+                    "una NO existe en las demás.",
+        examples=["local"],
+    )
 
 
 class NuevoUsuario(Credenciales):
@@ -207,17 +218,45 @@ class CambioUsuario(BaseModel):
                 "'crear la primera cuenta' en vez del formulario de acceso.",
     responses={200: {"content": {"application/json": {"example": {
         "ok": True, "hay_usuarios": False, "auth_requerida": True,
+        "bd": {"configurada": True, "fijada": True, "db_id": "psi",
+               "nombre": "HMI PSI (servidor)", "etiqueta_motor": "SQL Server",
+               "base_datos": "HMI_PSI", "conectado": True, "tabla": "usuarios"},
         "roles": ROLES, "mensaje": "No hay cuentas: la primera será Supervisor.",
     }}}}},
 )
-async def estado_auth(request: Request) -> dict:
+async def estado_auth(
+    request: Request,
+    db_id: Optional[str] = Query(
+        default=None,
+        description="Consultar el estado de ESTA base. El desplegable del "
+                    "login lo usa al cambiar de opción: si hay cuentas o no "
+                    "depende de la base, no del sistema.",
+    ),
+) -> dict:
     auth = _auth(request)
     try:
-        total = await auth.contar()
+        total = await auth.contar(db_id)
         disponible = True
         detalle = ""
     except ErrorAuth as exc:
         total, disponible, detalle = 0, False, exc.mensaje
+
+    # Qué base respalda las cuentas. Va aquí, en el endpoint público, porque
+    # el login tiene que poder decir "vas a crear la cuenta en HMI PSI
+    # (servidor)" ANTES de que nadie escriba nada. No incluye host ni
+    # credenciales: eso es GET /db, y exige ser Administrador.
+    try:
+        bd = auth.info_bd(db_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudo describir la BD de cuentas: %s", exc)
+        bd = {"configurada": False, "fijada": False, "mensaje": str(exc)}
+
+    # Catálogo para el desplegable. Sin host ni credenciales.
+    try:
+        bases = auth.bases_disponibles()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudieron listar las bases: %s", exc)
+        bases = []
 
     return {
         "ok": True,
@@ -225,6 +264,8 @@ async def estado_auth(request: Request) -> dict:
         "num_usuarios": total,
         "auth_requerida": request.app.state.settings.auth_requerida,
         "bd_disponible": disponible,
+        "bd": bd,
+        "bases": bases,
         "roles": ROLES,
         "estados": ESTADOS,
         "mensaje": detalle or (
@@ -259,7 +300,11 @@ async def registro(
     try:
         # El primero es libre (hay que poder arrancar). Del segundo en
         # adelante, si se exige auth, solo un Supervisor da de alta cuentas.
-        if await auth.contar() > 0 and request.app.state.settings.auth_requerida:
+        # El conteo es GLOBAL (todas las bases), no de la base destino: ver
+        # `contar_en_todas()`. Si fuera por base, con dos registradas y una
+        # vacía cualquiera se daría de alta como Supervisor en la vacía.
+        if (await auth.contar_en_todas() > 0
+                and request.app.state.settings.auth_requerida):
             if sesion is None:
                 raise HTTPException(401, "Necesitas iniciar sesión.")
             if not tiene_permiso(sesion.categoria, "Supervisor"):
@@ -269,14 +314,19 @@ async def registro(
         usuario = await auth.registrar(
             usuario=cuerpo.usuario, password=cuerpo.password,
             email=cuerpo.email, categoria=cuerpo.categoria,
-            estado=cuerpo.estado,
+            estado=cuerpo.estado, db_id=cuerpo.db_id,
         )
         aud = getattr(request.app.state, "auditoria", None)
         if aud is not None:
+            # La base queda en la auditoría: con varias, "se creó la cuenta"
+            # sin decir dónde no responde la pregunta que uno se hace cuando
+            # esa cuenta luego "no existe".
             aud.registrar("usuario.creado", usuario_de(sesion), usuario.usuario,
-                          {"categoria": usuario.categoria})
-        return {"ok": True, "usuario": usuario.publico(),
-                "mensaje": f"Cuenta '{usuario.usuario}' creada."}
+                          {"categoria": usuario.categoria,
+                           "db_id": auth._db_id(cuerpo.db_id)})
+        destino = auth._db_id(cuerpo.db_id)
+        return {"ok": True, "usuario": usuario.publico(), "db_id": destino,
+                "mensaje": f"Cuenta '{usuario.usuario}' creada en '{destino}'."}
     except ErrorAuth as exc:
         raise HTTPException(exc.codigo, exc.mensaje)
 
@@ -302,7 +352,8 @@ async def registro(
 )
 async def login(request: Request, cuerpo: Credenciales) -> dict:
     try:
-        return await _auth(request).login(cuerpo.usuario, cuerpo.password)
+        return await _auth(request).login(
+            cuerpo.usuario, cuerpo.password, cuerpo.db_id)
     except ErrorAuth as exc:
         raise HTTPException(exc.codigo, exc.mensaje)
 
@@ -359,9 +410,16 @@ async def yo(
     dependencies=[Depends(exigir_rol("Administradores"))],
     description="Nunca devuelve hashes de contraseña.",
 )
-async def listar_usuarios(request: Request) -> dict:
+async def listar_usuarios(
+    request: Request, sesion: Optional[Sesion] = Depends(sesion_actual)
+) -> dict:
+    # La base de la SESIÓN, no la activa por defecto: quien entró en local
+    # administra las cuentas de local. Mezclarlas dejaría a un Supervisor
+    # editando homónimos de otra base sin saberlo.
+    db_id = sesion.db_id if sesion else None
     try:
-        return {"ok": True, "usuarios": await _auth(request).listar()}
+        return {"ok": True, "db_id": _auth(request)._db_id(db_id),
+                "usuarios": await _auth(request).listar(db_id)}
     except ErrorAuth as exc:
         raise HTTPException(exc.codigo, exc.mensaje)
 
@@ -379,18 +437,20 @@ async def modificar_usuario(
     request: Request,
     usuario: str,
     cuerpo: CambioUsuario = Body(...),
+    sesion: Optional[Sesion] = Depends(sesion_actual),
 ) -> dict:
     auth = _auth(request)
+    db_id = sesion.db_id if sesion else None
     hechos = []
     try:
         if cuerpo.categoria is not None:
-            await auth.cambiar_categoria(usuario, cuerpo.categoria)
+            await auth.cambiar_categoria(usuario, cuerpo.categoria, db_id)
             hechos.append(f"categoría → {cuerpo.categoria}")
         if cuerpo.estado is not None:
-            await auth.cambiar_estado(usuario, cuerpo.estado)
+            await auth.cambiar_estado(usuario, cuerpo.estado, db_id)
             hechos.append(f"estado → {cuerpo.estado}")
         if cuerpo.password is not None:
-            await auth.cambiar_password(usuario, cuerpo.password)
+            await auth.cambiar_password(usuario, cuerpo.password, db_id)
             await auth.cerrar_sesiones_de(usuario)
             hechos.append("contraseña cambiada (sesiones cerradas)")
     except ErrorAuth as exc:

@@ -25,7 +25,9 @@ UA** ni añade carga al PLC. Y sigue guardando aunque no haya nadie mirando la
 pantalla.
 
 Seguridad: el SQL de inserción lo genera el backend (`sql_insert_historico`),
-nunca el usuario. Los widgets no tienen forma de llegar a este camino: sus
+nunca el usuario. Y el historizador NO crea tablas: la tabla destino debe
+existir ya (se crea con `sql/esquema_hmi_*.sql`). Este servicio escribe
+datos, no altera la estructura de la base de datos. Los widgets no tienen forma de llegar a este camino: sus
 consultas siguen pasando por `validar_sql_lectura()`.
 
 Rendimiento: los cambios NO se escriben uno a uno. Se acumulan en un buffer en
@@ -95,6 +97,8 @@ class GrupoHistorizacion:
         self.ultimo_error: str = ""
         self.ultima_escritura: str = ""
         self._tabla_lista = False
+        # Mapa campo->columna real, resuelto al preparar la tabla.
+        self._mapa: Dict[str, str] = {}
 
     # ------------------------------------------------------------------ #
     def interesa(self, clave: str) -> bool:
@@ -258,6 +262,9 @@ class Historizador:
             "valor_num": valor_num,
             "valor_texto": valor_texto,
             "tipo": (mensaje.get("type") or "")[:40],
+            # Solo se escribe si la tabla destino tiene la columna (ver _mapa).
+            # En Siemens es el Data Block; en Rexroth, el POU.
+            "programa": (tag.split(".")[0] if "." in tag else "")[:200],
         }
 
     # ================================================================== #
@@ -296,12 +303,45 @@ class Historizador:
         try:
             driver = await self._db._driver_de(grupo.db_id)
 
-            # La tabla se crea sola la primera vez (y tras un fallo).
+            # La tabla NO se crea aquí: debe existir ya, creada con
+            # `sql/esquema_hmi_*.sql`. Este servicio escribe datos, no altera
+            # la estructura de la base de datos.
             if not grupo._tabla_lista:
-                for ddl in driver.ddl_tabla_historico(grupo.tabla):
-                    await driver._ejecutar_interno(ddl)
+                # Se leen las columnas REALES de la tabla destino, porque hay
+                # dos válidas con nombres distintos: `historico_tags` (la que
+                # crea el propio historizador, columna `plc`) y `plc_prg` (la
+                # del esquema del HMI, columna `plc_id` y con `programa`).
+                # Sin esto, apuntar el historizador a `plc_prg` fallaría en
+                # cada volcado con "Invalid column name 'plc'".
+                try:
+                    columnas = [c["nombre"]
+                                for c in await driver.listar_columnas(grupo.tabla)]
+                except Exception as exc:  # noqa: BLE001
+                    raise RuntimeError(
+                        f"La tabla '{grupo.tabla}' no existe o no es "
+                        f"accesible en la conexión '{grupo.db_id}'. Créala "
+                        f"ejecutando sql/esquema_hmi_<motor>.sql en tu base "
+                        f"de datos. Detalle: {exc}"
+                    ) from exc
+
+                if not columnas:
+                    raise RuntimeError(
+                        f"La tabla '{grupo.tabla}' no tiene columnas legibles. "
+                        f"Comprueba que existe y que el usuario tiene permiso "
+                        f"de lectura sobre ella.")
+
+                grupo._mapa = driver.mapa_insert_historico(columnas)
+                # Sin la columna del tag no hay nada que escribir.
+                faltan = [c for c in ("ts", "tag") if c not in grupo._mapa]
+                if faltan:
+                    raise RuntimeError(
+                        f"La tabla '{grupo.tabla}' no sirve como destino de "
+                        f"histórico: le faltan las columnas {', '.join(faltan)}. "
+                        f"Usa la tabla `plc_prg` del esquema del HMI.")
                 grupo._tabla_lista = True
-                logger.info("Tabla '%s' lista en '%s'.", grupo.tabla, grupo.db_id)
+                logger.info("Tabla '%s' lista en '%s' (columnas: %s).",
+                            grupo.tabla, grupo.db_id,
+                            ", ".join(grupo._mapa.values()))
 
             # Normalizar las marcas de tiempo al tipo del motor, SIEMPRE en
             # UTC. Sin esto, MySQL reinterpretaría el offset de la cadena ISO
@@ -310,8 +350,15 @@ class Historizador:
             for fila in lote:
                 fila["ts"] = ts_para_motor(fila["ts"], driver.motor)
 
+            # Ajustar cada fila al mapa: se descartan los campos que la tabla
+            # no tenga y se añaden los que espere y no vengan.
+            lote_ajustado = [
+                {campo: fila.get(campo) for campo in grupo._mapa}
+                for fila in lote
+            ]
             await driver._ejecutar_interno(
-                driver.sql_insert_historico(grupo.tabla), lote
+                driver.sql_insert_historico(grupo.tabla, grupo._mapa),
+                lote_ajustado,
             )
             grupo.filas_escritas += len(lote)
             grupo.ultima_escritura = _ahora_iso()
@@ -490,8 +537,29 @@ class Historizador:
 
         where = (" WHERE " + " AND ".join(condiciones)) if condiciones else ""
 
+        # Las columnas se resuelven contra la tabla REAL, por el mismo motivo
+        # que en la escritura: `historico_tags` usa `plc` y `plc_prg` usa
+        # `plc_id`. Se emite siempre un alias `plc` para que el consumidor
+        # (widget de tendencia, exportación a Excel) reciba el mismo formato
+        # venga de la tabla que venga.
+        if not grupo._mapa:
+            try:
+                columnas_reales = [
+                    c["nombre"] for c in await driver.listar_columnas(grupo.tabla)]
+                grupo._mapa = driver.mapa_insert_historico(columnas_reales)
+            except Exception:  # noqa: BLE001
+                grupo._mapa = driver.mapa_insert_historico()
+
+        seleccion = []
+        for campo in ("ts", "plc", "tag", "valor_num", "valor_texto", "tipo"):
+            columna = grupo._mapa.get(campo)
+            if columna is None:
+                continue
+            seleccion.append(columna if columna == campo
+                             else f"{columna} AS {campo}")
+
         sql = (
-            f"SELECT ts, plc, tag, valor_num, valor_texto, tipo "
+            f"SELECT {', '.join(seleccion)} "
             f"FROM {grupo.tabla}{where} ORDER BY ts DESC"
         )
         try:

@@ -27,11 +27,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import (ai_routes, auth_routes, db_routes, export_routes,
-                     historian_routes, lock_routes, project_routes,
-                     rest_routes, websocket_routes)
+from app.api import (ai_routes, auth_routes, crud_routes, db_routes,
+                     export_routes, historian_routes, lock_routes,
+                     project_routes, rest_routes, websocket_routes)
 from app.config.settings import get_settings
 from app.core.connection_manager import ConnectionManager
+from app.core.crud_manager import CrudManager
 from app.core.db_manager import DbManager
 from app.db.historian import Historizador
 from app.export.grabador import Grabador
@@ -79,6 +80,7 @@ async def lifespan(app: FastAPI):
     manager = ConnectionManager()
     plc_manager = PlcManager(manager, settings)
     db_manager = DbManager()
+    crud_manager = CrudManager(db_manager, settings)
     # El historizador escucha el MISMO flujo de tags que el WebSocket:
     # no abre una segunda sesión OPC UA ni añade carga al PLC.
     historizador = Historizador(db_manager, db_manager.store)
@@ -106,6 +108,7 @@ async def lifespan(app: FastAPI):
     app.state.manager = manager
     app.state.plc_manager = plc_manager
     app.state.db_manager = db_manager
+    app.state.crud_manager = crud_manager
     app.state.historizador = historizador
     app.state.grabador = grabador
     app.state.project_store = project_store
@@ -426,6 +429,7 @@ app.include_router(lock_routes.router)
 app.include_router(rest_routes.router, tags=["REST"])
 app.include_router(websocket_routes.router, tags=["WebSocket"])
 app.include_router(db_routes.router)
+app.include_router(crud_routes.router)
 app.include_router(historian_routes.router)
 app.include_router(export_routes.router)
 app.include_router(ai_routes.router)
