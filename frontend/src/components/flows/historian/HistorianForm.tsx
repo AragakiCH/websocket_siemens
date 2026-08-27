@@ -422,7 +422,7 @@ export function HistorianForm({ config, connectionNodes, onChange }: Props) {
 
               {/* Lista agrupada por PLC */}
               {!cargando && grupos.length > 0 && (
-                <div className="mp-scroll max-h-64 space-y-2 overflow-y-auto rounded-lg border border-slate-200 p-2 dark:border-navy-slate">
+                <div className="mp-scroll mp-scroll-dark max-h-64 space-y-2 overflow-y-auto overscroll-contain rounded-lg border border-slate-200 p-2 dark:border-navy-slate">
                   {grupos.map(([plc, tags]) => {
                     const marcados = tags.filter((t) => seleccionSet.has(claveTag(t))).length;
                     const todos = marcados === tags.length;
