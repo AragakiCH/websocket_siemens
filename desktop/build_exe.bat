@@ -36,6 +36,18 @@ echo    dist\MonitorS7_Servidor.exe  -^> maquina servidor (+ .env)
 echo    dist\VisorS7.exe             -^> cada escritorio
 echo         (junto al visor se crea visor_config.ini: poner ahi
 echo          la IP del servidor)
+echo.
+echo  DONDE QUEDAN LOS DATOS
+echo    C:\ProgramData\PsiCore\datos
+echo.
+echo    Ahi van PLCs, pantallas, conexiones y usuarios. Esa carpeta
+echo    NO se borra al desinstalar ni al instalar una version nueva,
+echo    y la comparten todos los usuarios de Windows del equipo.
+echo    Junto al .exe solo va la CONFIGURACION de la instalacion
+echo    (.env), que si se reemplaza al actualizar.
+echo.
+echo    Para cambiarla: PLC_DATOS_DIR en el .env
+echo    Para respaldarla: Configuracion -^> Carpeta de datos -^> Descargar
 echo ============================================================
 goto :eof
 

@@ -6,6 +6,7 @@ import {
   SaveIcon,
   CheckCircle2Icon,
   DatabaseIcon,
+  HardDriveIcon,
   SlidersHorizontalIcon,
   NetworkIcon,
   WifiOffIcon,
@@ -22,6 +23,7 @@ import { formatValue } from '../utils/format';
 import { SelectField } from '../components/ui/Field';
 import { fetchRexrothPrograms } from '../services/rexrothApi';
 import { PanelBasesDatos } from '../components/bd/PanelBasesDatos';
+import { PanelCarpetaDatos } from '../components/sistema/PanelCarpetaDatos';
 
 const typeColor: Record<DataType, string> = {
   bool: 'bg-purple-100 text-purple-700',
@@ -543,6 +545,22 @@ export function Configuracion() {
             </h2>
           </div>
           <PanelBasesDatos />
+        </section>
+
+        {/* ============================================================= */}
+        {/* Carpeta de datos                                              */}
+        {/* ============================================================= */}
+        {/* Dónde queda todo lo que se configura, y cómo llevárselo. Va
+            después de las bases de datos porque es la pregunta que aparece
+            justo cuando ya hay algo que perder. */}
+        <section className="lg:col-span-3">
+          <div className="mb-3 flex items-center gap-2">
+            <HardDriveIcon className="h-4 w-4 text-siemens" />
+            <h2 className="text-sm font-bold text-navy dark:text-slate-100">
+              Carpeta de datos
+            </h2>
+          </div>
+          <PanelCarpetaDatos />
         </section>
 
         {/* ============================================================= */}

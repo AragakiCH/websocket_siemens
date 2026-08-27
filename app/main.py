@@ -28,6 +28,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import (ai_routes, auth_routes, crud_routes, db_routes,
+                     sistema_routes,
                      export_routes, historian_routes, lock_routes,
                      project_routes, rest_routes, websocket_routes)
 from app.config.settings import get_settings
@@ -433,6 +434,7 @@ app.include_router(crud_routes.router)
 app.include_router(historian_routes.router)
 app.include_router(export_routes.router)
 app.include_router(ai_routes.router)
+app.include_router(sistema_routes.router)
 
 # ------------------------------------------------------------------ #
 # Frontend React (frontend/dist generado con `npm run build`).

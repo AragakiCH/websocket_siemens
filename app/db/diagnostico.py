@@ -55,6 +55,7 @@ SIN_SERVIDOR = "sin_servidor"
 HOST_DESCONOCIDO = "host_desconocido"
 CREDENCIALES = "credenciales"
 BASE_NO_EXISTE = "base_no_existe"
+BASE_NO_ACCESIBLE = "base_no_accesible"
 SIN_PERMISOS = "sin_permisos"
 RUTA_NO_EXISTE = "ruta_no_existe"
 TLS = "tls"
@@ -154,6 +155,7 @@ def diagnosticar(
     opciones: Optional[Dict[str, str]] = None,
     forzar: str = "",
     nota: str = "",
+    estado_bd: str = "",
 ) -> Dict[str, Any]:
     """
     Clasifica el fallo de una conexión.
@@ -232,8 +234,61 @@ def diagnosticar(
             "que la cuenta esté activa." + extra,
         )
 
+    def dx_base_no_accesible() -> Dict[str, Any]:
+        """
+        La base EXISTE pero no se puede abrir. Es un caso distinto de "no
+        existe", y confundirlos lleva a ofrecer crear algo que ya está ahí.
+
+        El error del motor es el mismo (`4060`), así que esto solo se alcanza
+        cuando alguien ha mirado de verdad el estado — ver
+        `provision.afinar_diagnostico()`.
+        """
+        arreglo = {
+            "OFFLINE":
+                f"Está desconectada a propósito. Se vuelve a poner en línea "
+                f"con: ALTER DATABASE [{base_datos}] SET ONLINE;",
+            "RESTORING":
+                f"Se quedó a medio restaurar (alguien restauró WITH "
+                f"NORECOVERY y no terminó). Se cierra con: RESTORE DATABASE "
+                f"[{base_datos}] WITH RECOVERY;",
+            "RECOVERY_PENDING":
+                "SQL Server no pudo abrir sus ficheros al arrancar: suele "
+                "faltar el .mdf o el .ldf, o no tener permiso sobre ellos. "
+                "Mira el ERRORLOG del servidor antes de tocar nada.",
+            "SUSPECT":
+                "Está marcada como sospechosa: el motor detectó corrupción o "
+                "un log ilegible. NO la fuerces a ONLINE sin antes mirar el "
+                "ERRORLOG y tener una copia de seguridad.",
+            "EMERGENCY":
+                "Alguien la puso en modo emergencia para recuperarla. Es un "
+                "estado de rescate, no de trabajo.",
+            "RESTRICTED_USER":
+                f"Solo admite miembros de db_owner, dbcreator o sysadmin. Se "
+                f"devuelve a la normalidad con: ALTER DATABASE [{base_datos}] "
+                f"SET MULTI_USER;",
+            "SINGLE_USER":
+                f"Está en modo un-solo-usuario y esa única conexión la tiene "
+                f"otra sesión. Se libera con: ALTER DATABASE [{base_datos}] "
+                f"SET MULTI_USER WITH ROLLBACK IMMEDIATE;",
+        }.get(estado_bd.upper(), "")
+
+        return r(
+            BASE_NO_ACCESIBLE,
+            f"La base '{base_datos}' existe, pero no se puede abrir",
+            f"El servidor la conoce y las credenciales son correctas, pero su "
+            f"estado es {estado_bd or 'no operativo'}. No es que falte: es que "
+            f"no está disponible para trabajar.",
+            arreglo or (
+                "Comprueba su estado con: SELECT name, state_desc, "
+                "user_access_desc FROM sys.databases WHERE name = "
+                f"'{base_datos}';"
+            ),
+        )
+
     if forzar == BASE_NO_EXISTE:
         return dx_base_no_existe()
+    if forzar == BASE_NO_ACCESIBLE:
+        return dx_base_no_accesible()
     if forzar == CREDENCIALES:
         return dx_credenciales()
 

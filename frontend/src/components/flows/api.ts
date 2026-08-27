@@ -157,6 +157,9 @@ export interface Diagnostico {
     | 'host_desconocido'
     | 'credenciales'
     | 'base_no_existe'
+    // Existe pero no se puede abrir (OFFLINE, RESTORING, SINGLE_USER...).
+    // A propósito NO ofrece crearla: está ahí, solo que no operativa.
+    | 'base_no_accesible'
     | 'sin_permisos'
     | 'ruta_no_existe'
     | 'tls'

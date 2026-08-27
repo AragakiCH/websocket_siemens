@@ -81,25 +81,25 @@ def carpeta_datos(carpeta: Optional[str] = None) -> Path:
 
       1. El argumento `carpeta`, si se pasa.
       2. La variable de entorno **`PLC_DATOS_DIR`**.
-      3. `<raíz del proyecto>/datos` (el comportamiento de siempre).
+      3. La carpeta por defecto, que depende de cómo se esté ejecutando:
+         en desarrollo `<raíz>/datos`; empaquetado, la carpeta de datos del
+         SISTEMA (`C:\ProgramData\PsiCore\datos`), para que desinstalar o
+         actualizar la aplicación no se lleve por delante la configuración.
 
     El paso 2 existe por dos motivos reales:
 
       * **Pruebas aisladas.** `tools/probar_multiusuario.py` levanta un backend
         de verdad; sin esto escribiría en la carpeta `datos/` de la instalación
         real y pisaría conexiones y proyectos del usuario.
-      * **Ejecutable de escritorio.** Un `.exe` empaquetado corre desde una
-        carpeta de solo lectura (o desde `Program Files`), donde no se puede
-        escribir al lado del binario. Poder apuntar los datos a `%APPDATA%` es
-        lo que hace que funcione.
+      * **Despliegues a medida**, donde la carpeta la decide quien instala.
+
+    La lógica vive en `app/config/rutas.py`, que además MIGRA los datos de una
+    instalación anterior si la carpeta nueva está vacía. Ver ese módulo para el
+    razonamiento completo (incluido por qué no es `Documentos`).
     """
-    raiz = carpeta or os.getenv("PLC_DATOS_DIR") or os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "datos",
-    )
-    ruta = Path(raiz)
-    ruta.mkdir(parents=True, exist_ok=True)
-    return ruta
+    from app.config.rutas import resolver_carpeta_datos
+
+    return resolver_carpeta_datos(carpeta)
 
 
 # ====================================================================== #

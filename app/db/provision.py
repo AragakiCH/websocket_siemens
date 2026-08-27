@@ -203,11 +203,29 @@ async def afinar_diagnostico(
             pass
 
     etiqueta = mantenimiento or "el servidor"
+    estado_bd = ""
     if credenciales_ok:
-        nota = (f"Comprobado: con este usuario sí se puede entrar a "
-                f"'{etiqueta}', así que las credenciales son correctas y lo "
-                f"que falta es la base de datos.")
-        forzar = "base_no_existe"
+        # Las credenciales valen. Queda una tercera posibilidad que el `4060`
+        # tampoco distingue: que la base EXISTA pero no se pueda abrir
+        # —OFFLINE, RESTORING, SUSPECT, SINGLE_USER...—. Ofrecer "¿la creo?"
+        # ahí sería absurdo: está delante, solo que no operativa.
+        estado_bd = await _estado_base(
+            motor, host, puerto, usuario, password, opciones or {}, base_datos)
+
+        if estado_bd and estado_bd.upper() != "ONLINE":
+            nota = (f"Comprobado: la base existe pero su estado es "
+                    f"{estado_bd}.")
+            forzar = "base_no_accesible"
+        elif estado_bd == "ONLINE":
+            # Existe, está sana y las credenciales valen: entonces lo que
+            # falta es un USER mapeado dentro de ella o sus permisos.
+            nota = (f"Comprobado: la base existe y está en línea, y este "
+                    f"usuario entra en '{etiqueta}'.")
+            forzar = "sin_permisos"
+        else:
+            nota = (f"Comprobado: con este usuario sí se puede entrar a "
+                    f"'{etiqueta}', y esa base no aparece en el servidor.")
+            forzar = "base_no_existe"
     else:
         nota = (f"Comprobado: con este usuario tampoco se puede entrar a "
                 f"'{etiqueta}', así que el problema son las credenciales y no "
@@ -223,7 +241,49 @@ async def afinar_diagnostico(
         motor=motor, host=host, puerto=puerto,
         base_datos=base_datos,
         opciones=opciones or {}, forzar=forzar, nota=nota,
+        estado_bd=estado_bd,
     )
+
+
+async def _estado_base(
+    motor: str, host: str, puerto: Optional[int], usuario: str,
+    password: str, opciones: Dict[str, str], base_datos: str,
+) -> str:
+    """
+    Estado de una base vista desde fuera, sin abrirla.
+
+    Devuelve `"ONLINE"`, el estado real (`OFFLINE`, `RESTORING`, `SUSPECT`,
+    `SINGLE_USER`…) o `""` si no existe. Cadena vacía también si no se pudo
+    averiguar: es mejor no afirmar nada que afirmar de más.
+
+    Solo SQL Server distingue estos estados; en MySQL y PostgreSQL una base o
+    está o no está, así que ahí basta con comprobar la existencia.
+    """
+    mantenimiento = BASE_MANTENIMIENTO.get(motor, "")
+    try:
+        eng = _motor_autocommit(
+            _url(motor, host, puerto, mantenimiento, usuario, password, opciones))
+        try:
+            async with eng.connect() as conn:
+                if motor == "mssql":
+                    q = text(
+                        "SELECT state_desc, user_access_desc FROM sys.databases "
+                        "WHERE name = :n")
+                    fila = (await conn.execute(q, {"n": base_datos})).first()
+                    if fila is None:
+                        return ""
+                    estado, acceso = str(fila[0] or ""), str(fila[1] or "")
+                    # Una base ONLINE pero en SINGLE_USER/RESTRICTED_USER
+                    # tampoco se puede abrir: para quien lo sufre es el mismo
+                    # problema, así que el acceso manda sobre el estado.
+                    if acceso.upper() not in ("MULTI_USER", ""):
+                        return acceso
+                    return estado
+                return "ONLINE" if await _existe_base(conn, motor, base_datos) else ""
+        finally:
+            await eng.dispose()
+    except Exception:  # noqa: BLE001
+        return ""
 
 
 # ====================================================================== #

@@ -1135,7 +1135,117 @@ una nueva por definición, así que ahí va apagado.
 
 ---
 
-## 11 · Resumen en cuatro líneas
+## 11 · Dónde viven los datos en la aplicación instalada
+
+Al empaquetar como `.exe`, la carpeta `datos/` no puede seguir estando donde
+estaba. Dos motivos, y el segundo es el grave:
+
+* `Program Files` es de solo lectura para un usuario normal;
+* y si se escribiera junto al `.exe`, **desinstalar o actualizar la versión se
+  llevaría por delante los PLCs, las pantallas y las conexiones**.
+
+### 11.1 · Por qué NO es «Documentos»
+
+Es lo primero que uno pide, porque se encuentra fácil. Pero **esto es un
+servidor, no una aplicación personal**: los PLCs dados de alta, las pantallas
+del diseñador y las conexiones pertenecen a la INSTALACIÓN, no a quien tenga la
+sesión de Windows abierta.
+
+Con los datos en `Documentos` o en `%APPDATA%`, el turno de noche que entra con
+otra cuenta se encuentra el HMI **vacío**. Y el día que el servidor corra como
+servicio de Windows —lo razonable en planta— correría con una cuenta de sistema
+que tampoco vería nada.
+
+Motivo secundario pero real: ahí dentro está `.clave`, que descifra todas las
+contraseñas de base de datos. `Documentos` suele estar sincronizado con
+OneDrive, y esa clave no debería acabar en la nube sin que nadie lo decida.
+
+```
+C:\ProgramData\PsiCore\datos      <- la elegida
+```
+
+En Linux, `/var/lib/psicore/datos` si se puede escribir; si no,
+`~/.local/share/psicore/datos`.
+
+**En desarrollo no cambia nada**: sigue siendo `<raíz>/datos`. La carpeta del
+sistema solo se usa cuando corre empaquetado (`sys.frozen`).
+
+### 11.2 · Migración: nadie pierde su configuración al actualizar
+
+Al arrancar, si la carpeta nueva está vacía y hay datos en una antigua (junto
+al `.exe`, o en la carpeta del proyecto), se **copian**.
+
+Se copia y no se mueve a propósito: si algo fallara a mitad, el original sigue
+intacto. Y en el origen queda un `_MIGRADO_A.txt` diciendo a dónde se fueron,
+para que nadie edite la copia equivocada dentro de seis meses.
+
+**Nunca sobrescribe.** Si el destino ya tiene datos, no se toca nada: una
+migración que pisa lo actual con lo viejo es peor que no migrar.
+
+Un detalle que importa: `.clave` sola no cuenta como "tiene datos". Se crea
+vacía en cuanto alguien arranca el servicio, así que si contara, la carpeta
+nueva parecería ocupada y la migración no llegaría a ocurrir.
+
+Verificado en cuatro escenarios: migración limpia, segunda pasada sin pisar lo
+nuevo, origen con solo `.clave`, y la marca en el origen.
+
+### 11.3 · La pantalla: Configuración → Carpeta de datos
+
+| Acción | Para qué |
+|---|---|
+| Ver la ruta | Quita la duda de "¿dónde están mis datos?" |
+| **Abrir carpeta** | La abre en el explorador **del servidor** — en la app de escritorio es la misma máquina; con backend remoto lo dice en vez de fingir |
+| **Descargar copia** | Todo en un `.zip`: llevarlo a otro equipo, o guardarlo antes de actualizar |
+| **Restaurar** | Sube ese `.zip` y recupera la configuración |
+
+Un aviso en rojo si la carpeta **no es escribible**. No es un detalle menor:
+el servicio arranca igual y pierde todo lo que se haga en él. Mejor verlo antes
+de trabajar dos horas.
+
+La copia en `.zip` es la respuesta honesta a "quiero verlo en Documentos": la
+carpeta de trabajo vive donde debe, y el respaldo se guarda donde uno quiera.
+
+**El `.zip` incluye `.clave`** — es imprescindible, sin ella el respaldo
+restaurado no podría leer sus propias contraseñas. Pero eso lo convierte en un
+fichero sensible, y el `_LEEME.txt` de dentro lo dice.
+
+### 11.4 · Restaurar exige reiniciar, y lo dice
+
+No se recarga en caliente. Los pools de base de datos, las sesiones abiertas y
+los PLCs conectados viven en memoria; cambiarles el disco por debajo dejaría el
+proceso a medio camino entre dos configuraciones. Es más honesto pedir un
+reinicio que fingir que no hace falta.
+
+Dos protecciones antes de escribir nada:
+
+- **Respaldo automático** de lo que hay ahora en `datos_antes_de_restaurar_<fecha>`.
+  Si el `.zip` resulta ser el equivocado, no se ha perdido nada.
+- **Validación de rutas**: un `.zip` puede contener `../../windows/system32/...`.
+  Se comprueban TODAS las entradas antes de extraer una sola — comprobar a
+  mitad de la extracción ya sería tarde. Verificado con un zip malicioso.
+
+### 11.5 · Lo que cambió en el empaquetado
+
+`desktop/servidor.py` seguía haciendo `chdir` al directorio del `.exe` y
+dejando ahí los datos. Ahora se distingue:
+
+```
+junto al .exe   ->  CONFIGURACIÓN de la instalación (.env, YAML).
+                    Solo lectura, se reemplaza al actualizar.
+ProgramData     ->  DATOS del usuario. Sobreviven a todo.
+```
+
+Además imprime la ruta al arrancar y avisa en pantalla si no puede escribir en
+ella. `build_exe.bat` lo documenta en su mensaje final.
+
+**Nueva dependencia:** `python-multipart`, que hace falta para recibir el `.zip`
+de la restauración. FastAPI no lo trae de serie, y sin él ese endpoint falla al
+definirse — o sea, **no arranca la aplicación entera**. Está en
+`requirements.txt`.
+
+---
+
+## 12 · Resumen en cuatro líneas
 
 1. `sqlcmd` interactivo + pegar SQL = errores fantasma. Usa siempre `-Q`.
 2. Un error de sintaxis descarta **el lote entero**, incluidas las sentencias correctas que iban antes.

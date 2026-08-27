@@ -17,6 +17,11 @@ pydantic==2.10.6          # Validación de datos / modelos de configuración
 pydantic-settings==2.8.1  # Carga de settings desde variables de entorno
 PyYAML==6.0.2             # Lectura opcional del filtro de DBs (tags_filter.yaml)
 
+# Subida de ficheros (UploadFile). Lo necesita POST /sistema/datos/restaurar
+# para recibir el .zip de la copia de seguridad. FastAPI NO lo trae de serie:
+# sin el, ese endpoint falla al definirse y no arranca la aplicacion entera.
+python-multipart==0.0.20
+
 # --------------------------------------------------------------------------
 # Bosch Rexroth ctrlX CORE
 # --------------------------------------------------------------------------
