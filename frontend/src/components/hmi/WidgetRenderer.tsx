@@ -14,7 +14,7 @@ interface Props {
 }
 
 // Pure visual renderer for a single HMI widget. Reused by canvas + preview.
-export function WidgetRenderer({ widget, variable, live = true }: Props) {
+export function WidgetRenderer({ widget, variable }: Props) {
   const { style } = widget;
   const frac = valueFraction(variable);
   const on = isTruthy(variable);

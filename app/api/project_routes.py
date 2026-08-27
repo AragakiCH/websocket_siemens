@@ -7,6 +7,7 @@ El diseño del HMI, compartido entre todos los usuarios.
   GET    /proyectos                       -> lista de proyectos
   POST   /proyectos                       -> crear uno nuevo    [Administradores]
   GET    /proyectos/{id}                  -> documento completo
+  PATCH  /proyectos/{id}                  -> renombrar          [Administradores]
   PUT    /proyectos/{id}                  -> reemplazar todo    [Administradores]
   PATCH  /proyectos/{id}/widgets/{wid}    -> un widget          [Administradores]
   DELETE /proyectos/{id}/widgets/{wid}    -> quitar un widget   [Administradores]
@@ -148,6 +149,18 @@ class NuevoProyecto(BaseModel):
     nombre: str = Field(default="", examples=["Horno 2 · Línea A"])
 
 
+class RenombrarProyecto(BaseModel):
+    """Cuerpo de PATCH /proyectos/{id}."""
+
+    nombre: str = Field(
+        ..., max_length=80, examples=["Horno 2 - Linea A"],
+        description="Etiqueta visible de la pantalla. El `project_id` no "
+                    "cambia nunca: es el nombre del fichero y la clave del "
+                    "bloqueo de edicion.",
+    )
+    version: Optional[int] = Field(default=None)
+
+
 class ProyectoCompleto(BaseModel):
     """Cuerpo de PUT /proyectos/{id}."""
 
@@ -277,6 +290,45 @@ async def guardar_proyecto(
                      "num_widgets": len(doc["widgets"])})
     return {"ok": True, "version": doc["version"],
             "actualizado_en": doc["actualizado_en"]}
+
+
+@router.patch(
+    "/proyectos/{project_id}",
+    tags=["Proyecto HMI"],
+    summary="Renombrar una pantalla",
+    dependencies=[Depends(exigir_rol("Administradores"))],
+    description="Cambia solo la etiqueta visible.\n\n"
+                "Exige tener el control de edicion de ESA pantalla, igual que "
+                "cualquier otra escritura: renombrar sube la version, y si lo "
+                "hiciera alguien de fuera, quien esta editando recibiria un "
+                "409 al guardar sin haber tocado nada.",
+    responses={
+        404: {"description": "No existe esa pantalla."},
+        423: {"description": "Otra persona tiene el control de edicion."},
+    },
+)
+async def renombrar_proyecto(
+    request: Request,
+    project_id: str,
+    cuerpo: RenombrarProyecto,
+    sesion: Optional[Sesion] = Depends(sesion_actual),
+) -> dict:
+    _exigir_lapiz(request, project_id, sesion)
+    try:
+        doc = await _store(request).renombrar(
+            project_id, cuerpo.nombre, usuario_de(sesion)
+        )
+    except KeyError:
+        raise HTTPException(404, f"No existe la pantalla '{project_id}'.")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+    _auditar(request, "proyecto.renombrado", sesion, project_id,
+             {"nombre": doc["nombre"]})
+    await _difundir(request, project_id, doc, usuario_de(sesion),
+                    {"accion": "proyecto_renombrado", "nombre": doc["nombre"]})
+    return {"ok": True, "project_id": project_id, "nombre": doc["nombre"],
+            "version": doc["version"]}
 
 
 @router.patch(
