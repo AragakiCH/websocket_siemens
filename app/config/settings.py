@@ -159,6 +159,23 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO")
 
     # ------------------------------------------------------------------ #
+    # Identidad de usuario (multiusuario)
+    # ------------------------------------------------------------------ #
+    # Si False, los endpoints no exigen sesión: cualquiera que abra la URL
+    # puede hacer todo. Es el comportamiento histórico y sirve para trabajar en
+    # local, pero NO debe quedarse así en planta: con diez personas, cualquiera
+    # podría borrar un PLC de producción.
+    auth_requerida: bool = Field(
+        default=False,
+        description="Exigir inicio de sesión en los endpoints que modifican "
+                    "algo. Ponlo en true en producción.",
+    )
+    # Conexión donde vive la tabla `usuarios`. Vacío = la primera dada de alta.
+    auth_db_id: Optional[str] = Field(default=None)
+    # Prefijo de la tabla, si se creó el esquema con uno.
+    auth_tabla_prefijo: str = Field(default="")
+
+    # ------------------------------------------------------------------ #
     # Zona horaria de VISUALIZACIÓN
     # ------------------------------------------------------------------ #
     # Los datos SIEMPRE se guardan en UTC (el SourceTimestamp de OPC UA es UTC
@@ -203,6 +220,56 @@ class Settings(BaseSettings):
     # escanea la red al inicio. Los PLCs se agregan desde la vista web
     # (POST /plcs o boton "Escanear red"). Env: PLC_AUTOSTART_PLCS=false
     autostart_plcs: bool = Field(default=True)
+
+    # ------------------------------------------------------------------ #
+    # Asistente de IA (Ollama Cloud o cualquier API compatible con OpenAI)
+    # ------------------------------------------------------------------ #
+    ai_enabled: bool = Field(
+        default=True,
+        description="Activa los endpoints /ai. Ponlo a false para desplegar "
+                    "sin asistente.")
+    ai_base_url: str = Field(
+        default="https://ollama.com",
+        description="Proveedor. Para un Ollama local: http://localhost:11434")
+    ai_api_key: str = Field(
+        default="",
+        description="API key. NUNCA en el código: va en el .env "
+                    "(PLC_AI_API_KEY). Un Ollama local no la necesita.")
+    ai_model: str = Field(
+        default="gpt-oss:120b-cloud",
+        description="Modelo por defecto. Los modelos cloud rotan: si da 410, "
+                    "consulta https://ollama.com/search?c=cloud")
+    ai_models: List[str] = Field(
+        default_factory=lambda: [
+            "gpt-oss:120b-cloud", "gpt-oss:20b-cloud", "qwen3.5:122b-cloud",
+            "deepseek-v4-pro:cloud", "deepseek-v4-flash:cloud",
+            "glm-5.2:cloud", "kimi-k2.7-code:cloud", "minimax-m3:cloud",
+        ],
+        description="Modelos que ofrece el desplegable de la vista.")
+    ai_max_tokens: int = Field(default=8192)
+    ai_temperature: float = Field(
+        default=0.2,
+        description="Baja a propósito: en un HMI industrial se quiere "
+                    "precisión, no creatividad.")
+    ai_timeout_s: float = Field(default=180.0)
+
+    # --- Comportamiento del agente ------------------------------------- #
+    ai_max_pasos: int = Field(
+        default=8,
+        description="Máximo de ciclos herramienta→observación por pregunta. "
+                    "Evita bucles infinitos y facturas sorpresa.")
+    ai_permitir_escritura: bool = Field(
+        default=False,
+        description="Si False, el agente NUNCA ejecuta acciones que modifican "
+                    "(dar de alta un PLC, borrar, historizar): las propone y "
+                    "pide confirmación. Recomendado dejarlo en False.")
+    ai_rag_fragmentos: int = Field(
+        default=6,
+        description="Cuántos fragmentos de documentación se inyectan como "
+                    "contexto en cada pregunta.")
+    ai_historial_max: int = Field(
+        default=20,
+        description="Mensajes de conversación que se conservan por sesión.")
 
     # Configuración de pydantic-settings: prefijo PLC_ y archivo .env
     model_config = SettingsConfigDict(

@@ -22,6 +22,8 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from app.db.db_driver import DbDriver, ResultadoConsulta
+from app.db.diagnostico import diagnosticar
+from app.db.provision import afinar_diagnostico
 from app.db.sql_driver import MOTORES, SqlDriver, validar_sql_lectura
 from app.db.store import ConexionGuardada, ConsultaGuardada, DbStore
 
@@ -112,8 +114,6 @@ class DbManager:
         nombre: str = "",
         opciones: Optional[Dict[str, str]] = None,
         autoconectar: bool = True,
-        crear_esquema: bool = False,
-        prefijo_esquema: str = "",
     ) -> dict:
         """
         Da de alta (o actualiza) una conexión y abre su pool.
@@ -121,10 +121,11 @@ class DbManager:
         A diferencia de los PLCs, aquí la conexión se verifica ANTES de
         guardar: no tiene sentido persistir credenciales que no funcionan.
 
-        Si `crear_esquema` es True, tras guardar se crean las tablas estándar
-        del HMI (usuarios / plc_prg / alarmas). Es opcional a propósito: si
-        conectas a una BD ajena (un MES de producción, por ejemplo) no quieres
-        que el servicio le escriba estructura sin que se lo pidas.
+        Este servicio NO crea tablas: se conecta a una base de datos cuyo
+        esquema ya existe. Las tablas se crean con `sql/esquema_hmi_*.sql`,
+        ejecutado por un DBA. Es deliberado: una aplicación que puede alterar
+        la estructura de la base de datos de producción es una aplicación que
+        puede romperla.
         """
         db_id = (db_id or "").strip()
         if not db_id:
@@ -150,8 +151,26 @@ class DbManager:
             await prueba.connect()
             latencia = await prueba.test()
         except Exception as exc:  # noqa: BLE001
-            return {"ok": False, "db_id": db_id,
-                    "mensaje": f"No se pudo conectar: {exc}"}
+            # El error crudo del driver no dice qué hacer: `IM002`, `10061` y
+            # `18456` son tres problemas completamente distintos y ninguno se
+            # explica. Se traduce a algo accionable, SIN perder el original
+            # (va en `diagnostico.detalle`).
+            diag = diagnosticar(
+                exc, motor=motor, host=host, puerto=puerto,
+                base_datos=base_datos, opciones=opciones or {},
+            )
+            # SQL Server manda 18456 y 4060 juntos y no se distinguen leyendo.
+            # Una sonda contra `master` con las mismas credenciales lo resuelve.
+            diag = await afinar_diagnostico(
+                diag, motor=motor, host=host, puerto=puerto,
+                base_datos=base_datos, usuario=usuario, password=password,
+                opciones=opciones or {},
+            )
+            return {
+                "ok": False, "db_id": db_id,
+                "mensaje": f"{diag['titulo']}. {diag['sugerencia']}",
+                "diagnostico": diag,
+            }
         finally:
             await prueba.disconnect()
 
@@ -167,86 +186,11 @@ class DbManager:
         # Creación opcional del esquema estándar, ya con la conexión guardada.
         # Un fallo aquí NO invalida el alta: la conexión sigue siendo válida y
         # el esquema se puede crear luego con POST /db/{db_id}/esquema.
-        if crear_esquema:
-            try:
-                respuesta["esquema"] = await self.crear_esquema(
-                    db_id, prefijo=prefijo_esquema
-                )
-            except Exception as exc:  # noqa: BLE001
-                respuesta["esquema"] = {"ok": False, "mensaje": str(exc)}
-
         return respuesta
 
     # ================================================================== #
     # Esquema estándar del HMI
     # ================================================================== #
-    async def crear_esquema(self, db_id: str, prefijo: str = "") -> dict:
-        """
-        Crea las tablas estándar del HMI en la BD indicada.
-
-            usuarios  -> operarios del HMI (contraseña HASHEADA)
-            plc_prg   -> lecturas del PLC (una fila por ts+tag)
-            alarmas   -> eventos, con FK a plc_prg y a usuarios
-
-        Es IDEMPOTENTE: si las tablas ya existen no falla ni toca los datos,
-        así que se puede llamar tantas veces como haga falta. Devuelve qué se
-        creó y qué ya estaba, comparando el listado de tablas antes y después.
-        """
-        driver = await self._driver_de(db_id)
-
-        # Foto previa para poder informar qué se creó de verdad.
-        try:
-            antes = {t.lower() for t in await driver.listar_tablas()}
-        except Exception:  # noqa: BLE001
-            antes = set()
-
-        creadas: List[str] = []
-        omitidas: List[str] = []
-        errores: List[dict] = []
-
-        for nombre, sentencia in driver.ddl_esquema_hmi(prefijo):
-            try:
-                await driver._ejecutar_interno(sentencia)
-            except Exception as exc:  # noqa: BLE001
-                mensaje = str(exc).lower()
-                # MySQL no soporta CREATE INDEX IF NOT EXISTS: si el índice ya
-                # existe lanza "duplicate key name", que aquí NO es un error.
-                if "duplicate key name" in mensaje or "already exists" in mensaje:
-                    omitidas.append(nombre)
-                    continue
-                errores.append({"objeto": nombre, "error": str(exc)})
-
-        try:
-            despues = {t.lower() for t in await driver.listar_tablas()}
-        except Exception:  # noqa: BLE001
-            despues = antes
-
-        for tabla in driver.tablas_esquema_hmi(prefijo):
-            if tabla.lower() in antes:
-                omitidas.append(tabla)
-            elif tabla.lower() in despues:
-                creadas.append(tabla)
-
-        ok = not errores
-        if ok:
-            logger.info("Esquema HMI en '%s': %d tabla(s) creada(s), %d ya existía(n).",
-                        db_id, len(creadas), len(omitidas))
-        else:
-            logger.error("Esquema HMI en '%s': %d error(es).", db_id, len(errores))
-
-        return {
-            "ok": ok,
-            "db_id": db_id,
-            "tablas_creadas": creadas,
-            "tablas_existentes": sorted(set(omitidas)),
-            "errores": errores,
-            "mensaje": (
-                f"Esquema listo: {len(creadas)} tabla(s) creada(s)."
-                if ok else
-                f"El esquema se creó con {len(errores)} error(es)."
-            ),
-        }
-
     async def baja_conexion(self, db_id: str) -> dict:
         """Cierra el pool y borra la conexión y sus consultas."""
         async with self._lock:
@@ -276,8 +220,25 @@ class DbManager:
             return {"ok": True, "db_id": db_id,
                     "latencia_ms": round(latencia, 1), "mensaje": "Conexión OK."}
         except Exception as exc:  # noqa: BLE001
-            self._errores[db_id] = str(exc)
-            return {"ok": False, "db_id": db_id, "mensaje": f"Falló: {exc}"}
+            # Mismo tratamiento que en el alta: el botón "Probar" es justo
+            # donde alguien está intentando entender por qué no funciona, así
+            # que es donde más falta hace un mensaje que diga qué mirar.
+            diag = diagnosticar(
+                exc, motor=conexion.motor, host=conexion.host,
+                puerto=conexion.puerto, base_datos=conexion.base_datos,
+                opciones=conexion.opciones or {},
+            )
+            diag = await afinar_diagnostico(
+                diag, motor=conexion.motor, host=conexion.host,
+                puerto=conexion.puerto, base_datos=conexion.base_datos,
+                usuario=conexion.usuario,
+                password=self._store.password_de(db_id),
+                opciones=conexion.opciones or {},
+            )
+            self._errores[db_id] = f"{diag['titulo']}. {diag['sugerencia']}"
+            return {"ok": False, "db_id": db_id,
+                    "mensaje": f"{diag['titulo']}. {diag['sugerencia']}",
+                    "diagnostico": diag}
 
     async def _driver_de(self, db_id: str) -> DbDriver:
         """

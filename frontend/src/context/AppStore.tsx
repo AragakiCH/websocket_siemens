@@ -19,6 +19,17 @@ import { HmiWidget, WidgetKind, BuiltInWidgetKind } from '../models/widget';
 import { RealPLCService as MockPLCService } from '../services/RealPLCService';
 import { createTranslator, widgetLabel as widgetLabelFn, TFn } from '../i18n';
 import { customByKind, zipByKind } from '../components/hmi/custom/registry';
+import {
+  me as fetchMe,
+  logout as apiLogout,
+  UsuarioSesion,
+  Permisos } from
+'../services/authApi';
+import {
+  cargarProyecto,
+  loadDesign,
+  PROYECTO_POR_DEFECTO } from
+'../utils/designStorage';
 interface AppStore {
   // auth / conexión al PLC
   connected: boolean;
@@ -48,6 +59,21 @@ interface AppStore {
   language: Language;
   t: TFn;
   widgetLabel: (kind: WidgetKind) => string;
+  // ---- MULTIUSUARIO ----
+  /** Sesión activa, o null si nadie ha entrado. */
+  sesion: UsuarioSesion | null;
+  /** Qué puede hacer esta persona. El backend lo aplica de verdad. */
+  permisos: Permisos | null;
+  /** Vuelve a preguntar al servidor quién soy (tras entrar o salir). */
+  refrescarSesion: () => Promise<void>;
+  cerrarSesion: () => Promise<void>;
+  /** Quién más está mirando ahora mismo. */
+  presentes: {usuario: string;categoria: string;}[];
+  /** Proyecto abierto y su versión (para el control de conflictos). */
+  projectId: string;
+  projectVersion: number;
+  setProjectVersion: (v: number) => void;
+
   // canvas widgets
   widgets: HmiWidget[];
   setWidgets: React.Dispatch<React.SetStateAction<HmiWidget[]>>;
@@ -70,7 +96,16 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     theme: 'dark',
     language: 'es'
   });
-  const [widgets, setWidgets] = useState<HmiWidget[]>([]);
+  // El diseño arranca desde la CACHÉ local para pintar al instante, y se
+  // reconcilia con el servidor en cuanto responde (ver el efecto de abajo).
+  const [widgets, setWidgets] = useState<HmiWidget[]>(
+    () => loadDesign()?.widgets ?? []
+  );
+  const [sesion, setSesion] = useState<UsuarioSesion | null>(null);
+  const [permisos, setPermisos] = useState<Permisos | null>(null);
+  const [presentes, setPresentes] = useState<{usuario: string;categoria: string;}[]>([]);
+  const [projectId] = useState<string>(PROYECTO_POR_DEFECTO);
+  const [projectVersion, setProjectVersion] = useState<number>(0);
   const [osDark, setOsDark] = useState<boolean>(systemPrefersDark);
   // Subscribe to the emulated PLC value stream.
   useEffect(() => {
@@ -140,6 +175,105 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     setPlcVendor(vendor);
     setConnected(true);
   }, []);
+  // ================================================================ //
+  // MULTIUSUARIO: sesión
+  // ================================================================ //
+  const refrescarSesion = useCallback(async () => {
+    try {
+      const d = await fetchMe();
+      setSesion(d.autenticado ? d.sesion ?? null : null);
+      setPermisos(d.permisos ?? null);
+    } catch {
+      setSesion(null);
+      setPermisos(null);
+    }
+  }, []);
+
+  const cerrarSesion = useCallback(async () => {
+    await apiLogout();
+    setSesion(null);
+    setPermisos(null);
+  }, []);
+
+  // Al arrancar: ¿hay una sesión guardada de antes que siga siendo válida?
+  useEffect(() => {
+    void refrescarSesion();
+  }, [refrescarSesion]);
+
+  // El token puede caducar o ser revocado (un supervisor desactiva la cuenta).
+  // `authApi` avisa con este evento y aquí se limpia la sesión sin recargar.
+  useEffect(() => {
+    const alCaducar = () => {
+      setSesion(null);
+      setPermisos(null);
+    };
+    window.addEventListener('hmi:sesion-caducada', alCaducar);
+    return () => window.removeEventListener('hmi:sesion-caducada', alCaducar);
+  }, []);
+
+  // ================================================================ //
+  // MULTIUSUARIO: proyecto compartido
+  // ================================================================ //
+  // Hidratación inicial desde el servidor. Los widgets ya se pintaron desde
+  // la caché local, así que esto solo reconcilia.
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      const p = await cargarProyecto(projectId);
+      if (!vivo || !p) return;
+      setWidgets(p.widgets);
+      setProjectVersion(p.version);
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [projectId]);
+
+  // Cambios hechos por OTRA persona. Llegan por el WebSocket, reenviados por
+  // RealPLCService como evento del navegador.
+  useEffect(() => {
+    const alEvento = async (ev: Event) => {
+      const msg = (ev as CustomEvent).detail;
+      if (!msg) return;
+
+      if (msg.type === 'presence') {
+        setPresentes(msg.usuarios ?? []);
+        return;
+      }
+
+      if (msg.type === 'project.updated' && msg.project_id === projectId) {
+        // El eco de mi propio cambio se ignora: ya lo tengo pintado, y
+        // reaplicarlo provocaría un parpadeo mientras arrastro.
+        const miNombre = sesion?.usuario ?? '';
+        if (miNombre && msg.por === miNombre) {
+          setProjectVersion(msg.version);
+          return;
+        }
+
+        const cambio = msg.cambio ?? {};
+        if (cambio.accion === 'widget_guardado' && cambio.datos) {
+          // Aplicación quirúrgica: solo el widget que cambió.
+          setWidgets((prev) => {
+            const i = prev.findIndex((w) => w.id === cambio.datos.id);
+            if (i < 0) return [...prev, cambio.datos];
+            const copia = [...prev];
+            copia[i] = cambio.datos;
+            return copia;
+          });
+        } else if (cambio.accion === 'widget_borrado') {
+          setWidgets((prev) => prev.filter((w) => w.id !== cambio.widget));
+        } else {
+          // Cambio grande (PUT, proyecto nuevo): se recarga entero.
+          const p = await cargarProyecto(projectId);
+          if (p) setWidgets(p.widgets);
+        }
+        setProjectVersion(msg.version);
+      }
+    };
+    window.addEventListener('hmi:ws', alEvento as EventListener);
+    return () => window.removeEventListener('hmi:ws', alEvento as EventListener);
+  }, [projectId, sesion]);
+
   const disconnect = useCallback(() => setConnected(false), []);
   const toggleVariable = useCallback((id: string, selected: boolean) => {
     MockPLCService.toggleSelected(id, selected);
@@ -203,6 +337,14 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     language: config.language,
     t,
     widgetLabel,
+    sesion,
+    permisos,
+    refrescarSesion,
+    cerrarSesion,
+    presentes,
+    projectId,
+    projectVersion,
+    setProjectVersion,
     widgets,
     setWidgets
   };

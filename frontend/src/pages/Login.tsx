@@ -1,9 +1,21 @@
 // =========================================================================
 // Login.tsx  —  Pantalla de acceso de Psi Core
 //
-// ⚠️ SOLO DISEÑO. Todavía NO habla con el backend ni con la tabla `usuarios`.
-//    `enviar()` simula una espera y navega a /menu. Cuando exista el endpoint
-//    de autenticación, lo único que hay que cambiar es el cuerpo de `enviar()`.
+// CONECTADA al backend: `enviar()` llama a `/auth/registro` y `/auth/login`
+// (vía `services/authApi.ts`), guarda el token de sesión y navega a /menu.
+//
+// Antes de pintar el formulario se consulta `GET /auth/estado` (público) para
+// no pedirle datos a nadie que no vayan a servir de nada. Ese endpoint decide
+// cuál de estos cuatro estados se muestra:
+//
+//   * backend caído       -> no se puede saber nada: se dice y no se pide nada
+//   * sin base de datos    -> las cuentas no tienen dónde vivir: se explica
+//   * sin ninguna cuenta   -> modo arranque: se abre en CREAR CUENTA y la
+//                             categoría queda fija en Supervisor (la fuerza el
+//                             backend de todas formas; ocultarlo sería dejar
+//                             que el usuario elija algo que no se respetará)
+//   * ya hay cuentas       -> solo ENTRAR: del segundo usuario en adelante,
+//                             `/auth/registro` exige rol Supervisor
 //
 // Dos pestañas sobre el mismo panel:
 //
@@ -26,7 +38,7 @@
 // formulario a la derecha. Por debajo de `lg` el panel colapsa a una cabecera
 // compacta para no comerse la pantalla en móvil.
 // =========================================================================
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
@@ -49,6 +61,17 @@ import {
   ArrowRightIcon,
 } from 'lucide-react';
 import { useAppStore } from '../context/AppStore';
+import { AsistenteArranque } from '../components/auth/AsistenteArranque';
+import {
+  fetchEstadoAuth,
+  getBasePreferida,
+  setBasePreferida,
+  login,
+  registro,
+  type BaseDatos,
+  type EstadoAuth,
+  type InfoBd,
+} from '../services/authApi';
 
 // ─── Marca ───────────────────────────────────────────────────────
 //
@@ -87,7 +110,7 @@ const APP_NAME = 'Psi Core';
 //
 // El aviso del pie de la pantalla cambia solo según este valor, así que
 // siempre se ve desde la interfaz en qué modo está.
-const ATAJO_DEV = true;
+const ATAJO_DEV = false;
 
 // Categorías de `usuarios.categoria`. El orden es de más a menos permisos.
 // Estos strings se guardan tal cual en la columna (varchar(40)): si cambian
@@ -102,12 +125,79 @@ type Errores = Record<string, string>;
 
 export function Login() {
   const navigate = useNavigate();
-  const { t } = useAppStore();
+  const { t, refrescarSesion } = useAppStore();
   const sinMovimiento = useReducedMotion();
 
   const [pestana, setPestana] = useState<Pestana>('entrar');
   const [enviando, setEnviando] = useState(false);
   const [errores, setErrores] = useState<Errores>({});
+
+  // ── Estado del sistema de cuentas ─────────────────────────────
+  //
+  // `null` mientras se consulta. La pantalla NO pinta el formulario hasta
+  // saberlo: rellenar usuario y contraseña para descubrir al pulsar el botón
+  // que no hay base de datos es exactamente el tipo de trabajo tirado que
+  // este endpoint existe para evitar.
+  const [estado, setEstado] = useState<EstadoAuth | null>(null);
+  const [errorEstado, setErrorEstado] = useState('');
+  const [mostrarOlvido, setMostrarOlvido] = useState(false);
+
+  // ── Base de datos elegida ─────────────────────────────────────
+  //
+  // Cada base tiene su PROPIA tabla `usuarios`: una cuenta creada en la local
+  // no existe en la del servidor. Por eso la elección va aquí, antes de pedir
+  // credenciales, y no escondida en la configuración.
+  const [bases, setBases] = useState<BaseDatos[]>([]);
+  const [dbId, setDbId] = useState('');
+  // Se incrementa para volver a consultar el estado sin recargar la página:
+  // lo usa el asistente cuando acaba de dar de alta la conexión.
+  const [recarga, setRecarga] = useState(0);
+  const [selectorAbierto, setSelectorAbierto] = useState(false);
+
+  // Se vuelve a preguntar en CADA cambio de base: `hay_usuarios` y
+  // `bd_disponible` son propiedades de la base, no del sistema. Sin esto, al
+  // cambiar de opción el login seguiría diciendo "crea la primera cuenta"
+  // sobre una base que ya tiene diez.
+  useEffect(() => {
+    let vivo = true;
+    setEstado(null);
+    setErrorEstado('');
+    setErrores({});
+
+    fetchEstadoAuth(dbId || undefined)
+      .then((e) => {
+        if (!vivo) return;
+        setEstado(e);
+        setBases(e.bases ?? []);
+
+        // Primera carga: decidir con qué base se arranca. Gana la última que
+        // funcionó en este navegador; si ya no está dada de alta, la que el
+        // servidor marca por defecto.
+        if (!dbId) {
+          const lista = e.bases ?? [];
+          const guardada = getBasePreferida();
+          const elegida =
+            lista.find((b) => b.db_id === guardada) ??
+            lista.find((b) => b.por_defecto) ??
+            lista[0];
+          if (elegida) {
+            setDbId(elegida.db_id);
+            return; // el cambio de dbId vuelve a disparar este efecto
+          }
+        }
+
+        // Sin cuentas en ESTA base, la única acción posible es crear la
+        // primera. Con cuentas, se vuelve a "Entrar": mantener abierta la
+        // pestaña de registro tras cambiar de base ofrecería algo que el
+        // backend va a rechazar.
+        setPestana(!e.hay_usuarios && e.bd_disponible ? 'registro' : 'entrar');
+      })
+      .catch((err) => vivo && setErrorEstado(err?.message ?? ''));
+
+    return () => {
+      vivo = false;
+    };
+  }, [dbId, recarga]);
 
   // Un solo objeto para los dos formularios: los campos compartidos (usuario,
   // contraseña) no se pierden al cambiar de pestaña.
@@ -177,6 +267,7 @@ export function Login() {
 
   const cambiarPestana = (p: Pestana) => {
     setPestana(p);
+    setMostrarOlvido(false);
     // Los errores del formulario anterior no aplican al nuevo: en "Entrar" la
     // contraseña no tiene mínimo de 8, por ejemplo.
     setErrores({});
@@ -206,14 +297,85 @@ export function Login() {
     }
 
     setEnviando(true);
-    // TODO: reemplazar por POST /auth/login  |  POST /auth/registro
-    await new Promise((r) => setTimeout(r, 900));
-    setEnviando(false);
-    navigate('/menu');
+    setErrores({});
+    try {
+      if (esRegistro) {
+        // El PRIMER usuario del sistema se crea como Supervisor lo pida o no:
+        // si no, no habría forma de tener un administrador inicial sin tocar
+        // la base de datos a mano. Eso lo decide el backend.
+        await registro({
+          usuario: form.usuario.trim(),
+          password: form.password,
+          email: form.email.trim(),
+          // La primera cuenta la fuerza el backend a Supervisor pase lo que
+          // pase. Se manda ya así para que lo pedido y lo creado coincidan:
+          // mandar 'Usuarios' y recibir un Supervisor es una sorpresa, aunque
+          // sea la correcta.
+          categoria: primeraCuenta ? 'Supervisor' : form.categoria,
+          estado: form.estado,
+          db_id: dbId || undefined,
+        });
+        // Recién creada la cuenta, se entra con ella: el usuario no tiene por
+        // qué escribir dos veces lo mismo.
+        await login(form.usuario.trim(), form.password, form.recordarme, dbId);
+      } else {
+        await login(form.usuario.trim(), form.password, form.recordarme, dbId);
+      }
+      await refrescarSesion();
+      navigate('/menu');
+    } catch (err: any) {
+      // El backend ya manda mensajes redactados y en español (credenciales
+      // incorrectas, cuenta inactiva, usuario repetido...). Se muestran tal
+      // cual sobre el campo que corresponde.
+      const msg = err?.message ?? 'No se pudo completar la operación.';
+      const esDeUsuario = /usuario|cuenta|existe/i.test(msg);
+      setErrores({ [esDeUsuario ? 'usuario' : 'password']: msg, _general: msg });
+      // Con varias bases, "usuario o contraseña incorrectos" tiene DOS causas
+      // igual de probables, y la segunda es invisible: haberse equivocado de
+      // base. Se despliega el selector para que esa opción esté a la vista en
+      // vez de dejar a alguien reescribiendo una contraseña que era correcta.
+      if (bases.length > 1) setSelectorAbierto(true);
+    } finally {
+      setEnviando(false);
+    }
   };
 
   const fuerza = useMemo(() => calcularFuerza(form.password), [form.password]);
-  const esRegistro = pestana === 'registro';
+
+  // ── Qué se puede hacer, según el estado del sistema ───────────
+  const comprobando = estado === null && !errorEstado;
+  const sinBackend = !!errorEstado;
+  const sinBd = !!estado && !estado.bd_disponible;
+  // Modo arranque: no hay cuentas todavía. El backend deja crear la primera
+  // sin sesión y la fuerza a Supervisor.
+  const primeraCuenta = !!estado && estado.bd_disponible && !estado.hay_usuarios;
+  // Ya hay cuentas: `/auth/registro` exige Supervisor, así que un anónimo no
+  // puede registrarse. Se oculta la pestaña en vez de dejarle chocar con un 403.
+  const registroCerrado = !!estado && estado.hay_usuarios;
+
+  const baseActual = bases.find((b) => b.db_id === dbId);
+
+  // El desplegable se abre SOLO cuando la elección importa de verdad:
+  //
+  //   * la base elegida no responde -> insistir con las credenciales no va a
+  //     servir de nada, el problema está una capa más arriba;
+  //   * el último intento de entrar falló -> "usuario o contraseña
+  //     incorrectos" es exactamente lo que se ve al equivocarse de base, y
+  //     esa posibilidad tiene que estar delante de los ojos, no escondida.
+  //
+  // Fuera de esos dos casos se queda plegado: quien entra todos los días a la
+  // misma base no debería tener que mirar un control que no va a tocar.
+  useEffect(() => {
+    if (bases.length <= 1) {
+      setSelectorAbierto(false);
+      return;
+    }
+    if (baseActual && !baseActual.conectado) setSelectorAbierto(true);
+  }, [bases.length, baseActual?.db_id, baseActual?.conectado]);
+
+  const esRegistro = pestana === 'registro' && !registroCerrado;
+  // El formulario solo tiene sentido si hay dónde guardar o comprobar cuentas.
+  const formularioUtil = !comprobando && !sinBackend && !sinBd;
 
   // Animación de entrada; se anula si el sistema pide menos movimiento.
   const aparecer = sinMovimiento
@@ -291,28 +453,136 @@ export function Login() {
               </p>
             </div>
 
-            {/* ── Pestañas ────────────────────────────────────── */}
-            <div
-              role="tablist"
-              aria-label={t('auth.tabsLabel')}
-              className="mb-7 grid grid-cols-2 gap-1 rounded-xl bg-slate-200/60 p-1 dark:bg-navy-soft"
-            >
-              <Pestaña
-                activa={!esRegistro}
-                onClick={() => cambiarPestana('entrar')}
-                icon={<LogInIcon className="h-4 w-4" />}
-                label={t('auth.tabLogin')}
-                animar={!sinMovimiento}
-              />
-              <Pestaña
-                activa={esRegistro}
-                onClick={() => cambiarPestana('registro')}
-                icon={<UserPlusIcon className="h-4 w-4" />}
-                label={t('auth.tabSignup')}
-                animar={!sinMovimiento}
-              />
-            </div>
+            {/* ── En qué base estás ────────────────────────────
+                Va lo PRIMERO, antes incluso de los avisos: si la base elegida
+                es la equivocada, todo lo que venga debajo (incluido "no hay
+                base de datos") habla de la base equivocada.
 
+                Plegado por defecto: quien siempre usa la misma no debería ver
+                un desplegable que no va a tocar. Se abre solo cuando importa
+                — ver `selectorAbierto`. */}
+            {bases.length > 1 ? (
+              <div className="mb-7">
+                {!selectorAbierto ? (
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 dark:border-navy-slate dark:bg-navy-soft">
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <DatabaseIcon className="h-4 w-4 shrink-0 text-slate-400" />
+                      <span className="truncate text-[13px] text-slate-500 dark:text-slate-400">
+                        {t('auth.dbLabel')}{' '}
+                        <span className="font-semibold text-navy dark:text-slate-100">
+                          {baseActual?.nombre ?? t('auth.dbUnknown')}
+                        </span>
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectorAbierto(true)}
+                      className="shrink-0 rounded text-xs font-semibold text-siemens outline-none transition hover:text-siemens-600 focus-visible:ring-2 focus-visible:ring-siemens/40 dark:hover:text-siemens-300"
+                    >
+                      {t('auth.dbChange')}
+                    </button>
+                  </div>
+                ) : (
+                  <SelectorBase
+                    bases={bases}
+                    valor={dbId}
+                    onChange={setDbId}
+                    deshabilitado={comprobando || enviando}
+                    t={t}
+                  />
+                )}
+              </div>
+            ) : (
+              // Con una sola base no hay nada que decidir: basta el badge.
+              estado?.bd?.configurada && <BadgeBd bd={estado.bd} t={t} />
+            )}
+
+            {/* ── Estado del sistema, ANTES de pedir nada ─────── */}
+            {comprobando && (
+              <PanelEstado
+                tono="neutro"
+                icon={<Loader2Icon className="h-4 w-4 animate-spin" />}
+                texto={t('auth.checking')}
+              />
+            )}
+
+            {sinBackend && (
+              <PanelEstado
+                tono="error"
+                icon={<AlertCircleIcon className="h-4 w-4" />}
+                titulo={t('auth.noBackend')}
+                texto={errorEstado}
+              />
+            )}
+
+            {/* Sin base configurada no se muestra un cartel y se deja al
+                usuario encerrado fuera: se le da el formulario para
+                configurarla. El backend permite esto solo mientras no exista
+                ninguna cuenta; si ya las hay, responde 401 y el propio
+                asistente enseña ese mensaje. */}
+            {sinBd && (
+              <div className="mb-7">
+                <AsistenteArranque
+                  motivo={estado?.bd?.mensaje || estado?.mensaje || t('auth.noDbBody')}
+                  onListo={(creada) => {
+                    setSelectorAbierto(false);
+                    // Cambiarse a la conexión recién creada. Recargar la que
+                    // estuviera seleccionada sería volver a mirar la base rota
+                    // que motivó este asistente: guardar parecería no hacer
+                    // nada. Si por lo que sea ya era la activa, basta con
+                    // volver a preguntar.
+                    if (creada) {
+                      // Recordarla YA, no solo al entrar: sin esto, al
+                      // recargar la página el login volvería a elegir la
+                      // primera conexión de la lista —que puede ser una vieja
+                      // y rota— y el asistente reaparecería sobre una base
+                      // que acabas de configurar bien.
+                      setBasePreferida(creada);
+                    }
+                    if (creada && creada !== dbId) setDbId(creada);
+                    else setRecarga((n) => n + 1);
+                  }}
+                />
+              </div>
+            )}
+
+            {primeraCuenta && (
+              <PanelEstado
+                tono="info"
+                icon={<ShieldCheckIcon className="h-4 w-4" />}
+                titulo={t('auth.firstAccountTitle')}
+                texto={t('auth.firstAccountBody')}
+              />
+            )}
+
+            {/* ── Pestañas ────────────────────────────────────── */}
+            {/* Con cuentas ya creadas, `/auth/registro` exige Supervisor: se
+                oculta la pestaña en vez de dejar chocar contra un 403. */}
+            {formularioUtil && !registroCerrado && (
+              <div
+                role="tablist"
+                aria-label={t('auth.tabsLabel')}
+                className="mb-7 grid grid-cols-2 gap-1 rounded-xl bg-slate-200/60 p-1 dark:bg-navy-soft"
+              >
+                <Pestaña
+                  activa={!esRegistro}
+                  onClick={() => cambiarPestana('entrar')}
+                  icon={<LogInIcon className="h-4 w-4" />}
+                  label={t('auth.tabLogin')}
+                  animar={!sinMovimiento}
+                />
+                <Pestaña
+                  activa={esRegistro}
+                  onClick={() => cambiarPestana('registro')}
+                  icon={<UserPlusIcon className="h-4 w-4" />}
+                  label={t('auth.tabSignup')}
+                  animar={!sinMovimiento}
+                />
+              </div>
+            )}
+
+            {formularioUtil && (
+              <>
             <h2 className="text-2xl font-bold text-navy dark:text-slate-100">
               {esRegistro ? t('auth.signupTitle') : t('auth.loginTitle')}
             </h2>
@@ -388,6 +658,9 @@ export function Login() {
                   !esRegistro ? (
                     <button
                       type="button"
+                      onClick={() => setMostrarOlvido((v) => !v)}
+                      aria-expanded={mostrarOlvido}
+                      aria-controls="panel-olvido"
                       className="rounded text-xs font-semibold text-siemens outline-none transition hover:text-siemens-600 focus-visible:ring-2 focus-visible:ring-siemens/40 dark:hover:text-siemens-300"
                     >
                       {t('auth.forgot')}
@@ -411,6 +684,22 @@ export function Login() {
                   <MedidorFuerza nivel={fuerza} t={t} />
                 )}
               </Campo>
+
+              {/* No hay restablecimiento por correo, y decirlo es mejor que un
+                  boton que no hace nada. La via real es que un Supervisor use
+                  PATCH /auth/usuarios/<u>, que ademas cierra las sesiones. */}
+              {!esRegistro && mostrarOlvido && (
+                <div id="panel-olvido">
+                  <PanelEstado
+                    tono="info"
+                    icon={<InfoIcon className="h-4 w-4" />}
+                    titulo={t('auth.forgotTitle')}
+                    texto={t('auth.forgotBody')}
+                    onCerrar={() => setMostrarOlvido(false)}
+                    etiquetaCerrar={t('auth.forgotClose')}
+                  />
+                </div>
+              )}
 
               {/* Confirmar — solo registro */}
               {esRegistro && (
@@ -446,13 +735,18 @@ export function Login() {
                     label={t('auth.category')}
                     icon={<ShieldCheckIcon className="h-4 w-4" />}
                     requerido
+                    pista={primeraCuenta ? t('auth.categoryLocked') : undefined}
                   >
                     <Desplegable
                       id="categoria"
                       name="categoria"
-                      value={form.categoria}
+                      // En modo arranque el backend fuerza Supervisor. Un
+                      // desplegable activo ofrecería una elección que no se
+                      // va a respetar.
+                      value={primeraCuenta ? 'Supervisor' : form.categoria}
                       onChange={(v) => set('categoria', v)}
                       opciones={CATEGORIAS}
+                      deshabilitado={primeraCuenta}
                     />
                   </Campo>
 
@@ -492,15 +786,22 @@ export function Login() {
 
               {/* Recordarme — solo login */}
               {!esRegistro && (
-                <label className="flex w-fit cursor-pointer items-center gap-2.5 py-1 text-sm text-slate-600 dark:text-slate-400">
-                  <input
-                    type="checkbox"
-                    checked={form.recordarme}
-                    onChange={(e) => set('recordarme', e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-siemens focus:ring-2 focus:ring-siemens/40 dark:border-navy-slate dark:bg-navy"
-                  />
-                  {t('auth.remember')}
-                </label>
+                <div>
+                  <label className="flex w-fit cursor-pointer items-center gap-2.5 py-1 text-sm text-slate-600 dark:text-slate-400">
+                    <input
+                      type="checkbox"
+                      checked={form.recordarme}
+                      onChange={(e) => set('recordarme', e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-siemens focus:ring-2 focus:ring-siemens/40 dark:border-navy-slate dark:bg-navy"
+                    />
+                    {t('auth.remember')}
+                  </label>
+                  {/* Ahora decide de verdad el almacen del token
+                      (localStorage vs sessionStorage). Antes no hacia nada. */}
+                  <p className="mt-1 text-xs text-slate-400">
+                    {t('auth.rememberHint')}
+                  </p>
+                </div>
               )}
 
               {/* Botón principal */}
@@ -522,27 +823,48 @@ export function Login() {
                 )}
               </button>
 
-              {/* Cambio de pestaña desde abajo */}
-              <p className="text-center text-sm text-slate-500 dark:text-slate-400">
-                {esRegistro ? t('auth.haveAccount') : t('auth.noAccount')}{' '}
-                <button
-                  type="button"
-                  onClick={() => cambiarPestana(esRegistro ? 'entrar' : 'registro')}
-                  className="rounded font-semibold text-siemens outline-none transition hover:text-siemens-600 focus-visible:ring-2 focus-visible:ring-siemens/40 dark:hover:text-siemens-300"
-                >
-                  {esRegistro ? t('auth.tabLogin') : t('auth.tabSignup')}
-                </button>
-              </p>
+              {/* Cambio de pestaña desde abajo. Se oculta junto con la
+                  pestaña cuando el registro está cerrado: ofrecer el enlace
+                  llevaría a un formulario que el backend va a rechazar. */}
+              {!registroCerrado && (
+                <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+                  {esRegistro ? t('auth.haveAccount') : t('auth.noAccount')}{' '}
+                  <button
+                    type="button"
+                    onClick={() => cambiarPestana(esRegistro ? 'entrar' : 'registro')}
+                    className="rounded font-semibold text-siemens outline-none transition hover:text-siemens-600 focus-visible:ring-2 focus-visible:ring-siemens/40 dark:hover:text-siemens-300"
+                  >
+                    {esRegistro ? t('auth.tabLogin') : t('auth.tabSignup')}
+                  </button>
+                </p>
+              )}
             </form>
 
-            {/* Aviso honesto del estado real de la pantalla. Cambia solo según
-                ATAJO_DEV para que nunca haya que adivinar en qué modo está. */}
-            <div className="mt-8 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-500/20 dark:bg-amber-500/5">
-              <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0 text-amber-500" />
-              <p className="min-w-0 text-[11px] leading-relaxed text-amber-700 dark:text-amber-400">
-                {ATAJO_DEV ? t('auth.devShortcut') : t('auth.designOnly')}
-              </p>
-            </div>
+            {registroCerrado && (
+              <div className="mt-6">
+                <PanelEstado
+                  tono="neutro"
+                  icon={<UserPlusIcon className="h-4 w-4" />}
+                  titulo={t('auth.signupClosedTitle')}
+                  texto={t('auth.signupClosedBody')}
+                />
+              </div>
+            )}
+              </>
+            )}
+
+            {/* El aviso de "vista de diseño" desapareció: la pantalla YA
+                valida contra la base de datos, y dejarlo puesto haría dudar de
+                una sesión que sí es real. Solo queda la advertencia del atajo
+                de desarrollo, que sí es peligrosa mientras esté activa. */}
+            {ATAJO_DEV && (
+              <div className="mt-8 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-500/20 dark:bg-amber-500/5">
+                <AlertCircleIcon className="mt-px h-3.5 w-3.5 shrink-0 text-amber-500" />
+                <p className="min-w-0 text-[11px] leading-relaxed text-amber-700 dark:text-amber-400">
+                  {t('auth.devShortcut')}
+                </p>
+              </div>
+            )}
           </motion.div>
         </main>
       </div>
@@ -825,12 +1147,14 @@ function Desplegable({
   value,
   onChange,
   opciones,
+  deshabilitado = false,
 }: {
   id: string;
   name: string;
   value: string;
   onChange: (v: string) => void;
   opciones: string[];
+  deshabilitado?: boolean;
 }) {
   return (
     <>
@@ -838,8 +1162,13 @@ function Desplegable({
         id={id}
         name={name}
         value={value}
+        disabled={deshabilitado}
         onChange={(e) => onChange(e.target.value)}
-        className={`${claseInput(false, true)} cursor-pointer appearance-none`}
+        className={`${claseInput(false, true)} appearance-none ${
+          deshabilitado
+            ? 'cursor-not-allowed opacity-60'
+            : 'cursor-pointer'
+        }`}
       >
         {opciones.map((o) => (
           <option key={o} value={o}>
@@ -852,6 +1181,200 @@ function Desplegable({
         className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
       />
     </>
+  );
+}
+
+/**
+ * Panel de aviso: el mismo hueco para los cuatro estados del sistema.
+ *
+ * Los tres tonos NO se distinguen solo por color: cada uno lleva su propio
+ * icono, que llega desde fuera. Quien no separa rojo de azul tiene que poder
+ * leer igual de qué se le está avisando.
+ */
+function PanelEstado({
+  tono,
+  icon,
+  titulo,
+  texto,
+  onCerrar,
+  etiquetaCerrar,
+}: {
+  tono: 'neutro' | 'info' | 'error';
+  icon: React.ReactNode;
+  titulo?: string;
+  texto: string;
+  onCerrar?: () => void;
+  etiquetaCerrar?: string;
+}) {
+  const estilos = {
+    neutro:
+      'border-slate-200 bg-slate-100/70 text-slate-600 dark:border-navy-slate dark:bg-navy-soft/60 dark:text-slate-300',
+    info: 'border-siemens/25 bg-siemens/5 text-siemens-700 dark:border-siemens/25 dark:bg-siemens/10 dark:text-siemens-200',
+    error:
+      'border-state-error/30 bg-state-error/5 text-state-error dark:border-state-error/25 dark:bg-state-error/10',
+  }[tono];
+
+  return (
+    <div
+      role={tono === 'error' ? 'alert' : 'status'}
+      className={`mb-6 flex items-start gap-2.5 rounded-xl border px-3.5 py-3 ${estilos}`}
+    >
+      <span className="mt-px shrink-0">{icon}</span>
+      <div className="min-w-0 flex-1">
+        {titulo && <p className="text-[13px] font-semibold">{titulo}</p>}
+        <p className={`text-xs leading-relaxed ${titulo ? 'mt-1 opacity-90' : ''}`}>
+          {texto}
+        </p>
+        {onCerrar && (
+          <button
+            type="button"
+            onClick={onCerrar}
+            className="mt-2 rounded text-xs font-semibold underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-siemens/40"
+          >
+            {etiquetaCerrar}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Selector de base de datos.
+ *
+ * No es un ajuste de conveniencia: **elige contra qué tabla `usuarios` se
+ * autentica**, y cada base tiene la suya. Entrar con la opción equivocada
+ * devuelve "usuario o contraseña incorrectos" aunque la contraseña sea
+ * correcta, así que la pantalla hace tres cosas para que eso no sorprenda:
+ *
+ *   1. Lo pone ARRIBA del todo, antes de usuario y contraseña.
+ *   2. Marca las bases que no responden, para no dejar intentar a ciegas.
+ *   3. Recuerda la última que funcionó (`hmi.auth.db`, por navegador).
+ */
+function SelectorBase({
+  bases,
+  valor,
+  onChange,
+  deshabilitado,
+  t,
+}: {
+  bases: BaseDatos[];
+  valor: string;
+  onChange: (v: string) => void;
+  deshabilitado: boolean;
+  t: (k: string) => string;
+}) {
+  const actual = bases.find((b) => b.db_id === valor);
+  return (
+    <div className="mb-7">
+      <label
+        htmlFor="db-origen"
+        className="mb-1.5 block text-[13px] font-semibold text-slate-600 dark:text-slate-300"
+      >
+        {t('auth.dbPicker')}
+      </label>
+
+      <div className="relative">
+        <span className="pointer-events-none absolute left-3.5 top-1/2 z-10 flex -translate-y-1/2 items-center text-slate-400">
+          <DatabaseIcon className="h-4 w-4" />
+        </span>
+        <select
+          id="db-origen"
+          value={valor}
+          disabled={deshabilitado}
+          onChange={(e) => onChange(e.target.value)}
+          className={`${claseInput(false, true)} appearance-none ${
+            deshabilitado ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+          }`}
+        >
+          {bases.map((b) => (
+            <option key={b.db_id} value={b.db_id}>
+              {/* El estado va en el texto, no solo en un color: dentro de un
+                  <select> nativo no se puede pintar un punto por opción. */}
+              {b.nombre}
+              {b.base_datos ? ` — ${b.base_datos}` : ''}
+              {b.conectado ? '' : `  (${t('auth.dbOffline')})`}
+            </option>
+          ))}
+        </select>
+        <ChevronDownIcon
+          aria-hidden="true"
+          className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+        />
+      </div>
+
+      <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-relaxed text-slate-400">
+        <InfoIcon className="mt-px h-3 w-3 shrink-0" />
+        <span className="min-w-0">{t('auth.dbPickerHint')}</span>
+      </p>
+
+      {actual && !actual.conectado && (
+        <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-relaxed text-state-error">
+          <AlertCircleIcon className="mt-px h-3 w-3 shrink-0" />
+          <span className="min-w-0">{t('auth.dbPickerOffline')}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * En qué base de datos vive tu cuenta.
+ *
+ * Existe porque el proyecto admite varias conexiones a la vez —una local y
+ * otra en el servidor, por ejemplo— y la tabla `usuarios` solo vive en UNA de
+ * ellas. Sin este dato a la vista, crear una cuenta y luego "perderla" al
+ * cambiar de entorno parece un fallo del sistema, cuando en realidad la cuenta
+ * sigue exactamente donde se creó.
+ *
+ * El punto de color dice si esa conexión responde AHORA. Y si `fijada` es
+ * false, se advierte: significa que nadie puso `PLC_AUTH_DB_ID` y se está
+ * usando la primera conexión de la lista, que puede cambiar sola el día que se
+ * dé de alta otra base.
+ */
+function BadgeBd({ bd, t }: { bd: InfoBd; t: (k: string) => string }) {
+  const viva = !!bd.conectado;
+  return (
+    <div className="mb-7 space-y-2">
+      <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 dark:border-navy-slate dark:bg-navy-soft">
+        <DatabaseIcon className="h-4 w-4 shrink-0 text-slate-400" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-semibold text-navy dark:text-slate-100">
+            <span className="font-normal text-slate-500 dark:text-slate-400">
+              {t('auth.dbLabel')}{' '}
+            </span>
+            {bd.nombre || bd.db_id || t('auth.dbUnknown')}
+          </p>
+          <p className="truncate text-[11px] text-slate-400">
+            {[bd.etiqueta_motor, bd.base_datos, bd.tabla]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        </div>
+        <span className="flex shrink-0 items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            className={`h-2 w-2 rounded-full ${
+              viva ? 'bg-state-ok' : 'bg-state-error'
+            }`}
+          />
+          <span
+            className={`text-[11px] font-medium ${
+              viva ? 'text-state-ok' : 'text-state-error'
+            }`}
+          >
+            {viva ? t('auth.dbOnline') : t('auth.dbOffline')}
+          </span>
+        </span>
+      </div>
+
+      {!bd.fijada && (
+        <p className="flex items-start gap-1.5 px-1 text-[11px] leading-relaxed text-amber-600 dark:text-amber-400">
+          <AlertCircleIcon className="mt-px h-3 w-3 shrink-0" />
+          <span className="min-w-0">{t('auth.dbNotFixed')}</span>
+        </p>
+      )}
+    </div>
   );
 }
 

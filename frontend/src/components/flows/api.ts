@@ -1,3 +1,5 @@
+import { getToken } from '../../services/authApi';
+
 // ─── Acceso al backend desde el Flow Editor ────────────────────
 //
 // Un solo lugar donde vive la URL del backend y la interpretación de sus
@@ -74,9 +76,18 @@ export function extraerMensaje(data: any): string {
  * el backend reporta casi todos sus errores de negocio).
  */
 async function pedir<T = any>(ruta: string, init?: RequestInit): Promise<T> {
+  // El token va en TODAS las peticiones. Sin esto, en cuanto se active
+  // `PLC_AUTH_REQUERIDA=true` cada formulario del editor empezaría a recibir
+  // 401 aunque el usuario tenga una sesión abierta y perfectamente válida.
+  const token = getToken();
+  const cabeceras: Record<string, string> = {
+    ...((init?.headers as Record<string, string>) ?? {}),
+  };
+  if (token) cabeceras.Authorization = `Bearer ${token}`;
+
   let resp: Response;
   try {
-    resp = await fetch(`${API_BASE}${ruta}`, init);
+    resp = await fetch(`${API_BASE}${ruta}`, { ...init, headers: cabeceras });
   } catch {
     throw new Error(ERROR_SIN_BACKEND);
   }
@@ -97,7 +108,17 @@ async function pedir<T = any>(ruta: string, init?: RequestInit): Promise<T> {
     );
   }
   if (data && data.ok === false) {
-    throw new Error(extraerMensaje(data) || 'El servidor rechazó la petición.');
+    // El diagnóstico estructurado viaja PEGADO al error. Sin esto se perdería
+    // al convertir la respuesta en `Error`, y la vista solo podría enseñar una
+    // línea de texto en lugar de qué pasó, qué hacer y el detalle técnico.
+    const err = new Error(
+      extraerMensaje(data) || 'El servidor rechazó la petición.'
+    ) as Error & { diagnostico?: Diagnostico; data?: any };
+    if (data.diagnostico) err.diagnostico = data.diagnostico as Diagnostico;
+    // El cuerpo entero también: un aprovisionamiento que falla a mitad trae
+    // los `pasos` que SÍ se completaron, y esos hay que enseñarlos.
+    err.data = data;
+    throw err;
   }
 
   return data as T;
@@ -115,7 +136,39 @@ export function apiPost<T = any>(ruta: string, cuerpo?: any): Promise<T> {
   });
 }
 
+export function apiDelete<T = any>(ruta: string): Promise<T> {
+  return pedir<T>(ruta, { method: 'DELETE' });
+}
+
 // ─── GET /db ───────────────────────────────────────────────────
+
+/**
+ * Diagnóstico de un fallo de conexión, ya traducido por el backend.
+ *
+ * `codigo` es estable y sirve para decidir qué ofrecer: por ejemplo, un
+ * `base_no_existe` es el único caso en el que tiene sentido proponer crear la
+ * base de datos.
+ */
+export interface Diagnostico {
+  codigo:
+    | 'falta_paquete'
+    | 'falta_driver'
+    | 'sin_servidor'
+    | 'host_desconocido'
+    | 'credenciales'
+    | 'base_no_existe'
+    | 'sin_permisos'
+    | 'ruta_no_existe'
+    | 'tls'
+    | 'timeout'
+    | 'desconocido';
+  titulo: string;
+  mensaje: string;
+  sugerencia: string;
+  /** El texto literal del driver. Nunca se oculta: es lo que se puede buscar. */
+  detalle: string;
+  motor?: string;
+}
 
 /** Una conexión de `GET /db`. Nunca incluye la contraseña. */
 export interface ConexionRemota {
@@ -137,6 +190,82 @@ export interface ConexionRemota {
 export async function cargarConexiones(): Promise<ConexionRemota[]> {
   const data = await apiGet<{ conexiones: ConexionRemota[] }>('/db');
   return Array.isArray(data?.conexiones) ? data.conexiones : [];
+}
+
+/**
+ * Da de alta o actualiza una conexión.
+ *
+ * El backend la **verifica antes de guardar**: si responde ok, la conexión
+ * funciona de verdad, no solo está bien escrita. Por eso este mismo endpoint
+ * hace de "probar" en un formulario nuevo — no hay que inventar otro.
+ */
+export function guardarConexion(cfg: Record<string, any>): Promise<any> {
+  return apiPost('/db', cfg);
+}
+
+/**
+ * `SELECT 1` contra una conexión ya guardada, con su latencia.
+ *
+ * Reabre el pool si se había caído, así que sirve de "reconectar" para una
+ * base que estaba apagada cuando arrancó el servicio.
+ */
+export function probarConexion(dbId: string): Promise<any> {
+  return apiPost(`/db/${encodeURIComponent(dbId)}/test`);
+}
+
+/**
+ * Drivers ODBC instalados en la máquina del BACKEND (no en la del navegador).
+ *
+ * Nunca lanza: si no se puede averiguar, devuelve la lista vacía y el motivo.
+ * Un formulario que no puede consultar los drivers tiene que seguir siendo
+ * usable con los nombres de siempre, no quedarse en blanco.
+ */
+export async function cargarDriversOdbc(): Promise<{
+  drivers: string[];
+  mensaje: string;
+}> {
+  try {
+    const d = await apiGet<{ drivers?: string[]; mensaje?: string }>(
+      '/db/drivers'
+    );
+    return {
+      drivers: Array.isArray(d?.drivers) ? d.drivers : [],
+      mensaje: d?.mensaje ?? '',
+    };
+  } catch (e: any) {
+    return { drivers: [], mensaje: e?.message ?? '' };
+  }
+}
+
+/** Un paso del aprovisionamiento, tal y como lo cuenta el backend. */
+export interface PasoProvision {
+  paso: string;
+  ok: boolean;
+  mensaje: string;
+  /** true = ya estaba hecho. No es un fallo. */
+  omitido?: boolean;
+}
+
+/**
+ * Crea la base de datos, su esquema y su usuario.
+ *
+ * Las credenciales de administrador que van en `cfg` **no se guardan**: el
+ * backend las usa para esta operación y las descarta. Lo que se persiste
+ * después, si el usuario acepta, es la conexión normal con el usuario
+ * limitado, por la vía de `guardarConexion()`.
+ */
+export function provisionarBase(cfg: Record<string, any>): Promise<{
+  ok: boolean;
+  mensaje: string;
+  pasos?: PasoProvision[];
+  base_datos?: string;
+}> {
+  return apiPost('/db/provision', cfg);
+}
+
+/** Borra la conexión Y todas sus consultas guardadas. */
+export function borrarConexion(dbId: string): Promise<any> {
+  return apiDelete(`/db/${encodeURIComponent(dbId)}`);
 }
 
 // ─── GET /historian ────────────────────────────────────────────

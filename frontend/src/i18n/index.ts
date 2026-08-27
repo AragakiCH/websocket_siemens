@@ -91,8 +91,44 @@ const es: Dict = {
   'auth.errMailInvalid': 'Ese correo no tiene un formato válido.',
   'auth.errMailLong': 'El correo no puede pasar de 160 caracteres.',
 
-  'auth.designOnly':
-  'Vista de diseño: todavía no valida contra la base de datos. Cualquier dato te deja entrar.',
+  // ── Estado real del sistema de cuentas ──────────────────────
+  'auth.checking': 'Comprobando el estado del sistema…',
+  'auth.noBackend':
+  'No se puede contactar con el servidor. Comprueba que el backend esté en marcha.',
+  'auth.noDbTitle': 'No hay base de datos de cuentas',
+  'auth.noDbBody':
+  'Las cuentas viven en la tabla «usuarios» de una base de datos, y todavía no hay ninguna conectada. Da de alta la conexión y ejecuta el script del esquema antes de crear el primer acceso.',
+  'auth.firstAccountTitle': 'Primera cuenta del sistema',
+  'auth.firstAccountBody':
+  'Todavía no existe ninguna cuenta. Esta se creará como Supervisor —hace falta un administrador inicial— y a partir de ahí solo un Supervisor podrá dar de alta a los demás.',
+  'auth.categoryLocked': 'La primera cuenta es siempre Supervisor.',
+  'auth.signupClosedTitle': 'El registro está cerrado',
+  'auth.signupClosedBody':
+  'Ya existe al menos una cuenta. Las nuevas las crea un Supervisor desde la gestión de usuarios; así nadie se da de alta solo con permisos que no le corresponden.',
+
+  // ── Selector y badge de base de datos ───────────────────────
+  'auth.dbPicker': 'Base de datos',
+  'auth.dbPickerHint':
+  'Cada base tiene sus propias cuentas: una creada aquí no existe en las demás. Se recuerda la última con la que entraste.',
+  'auth.dbPickerOffline':
+  'Esa base no responde ahora mismo. Entrar fallará hasta que vuelva.',
+  'auth.dbLabel': 'Cuentas en',
+  'auth.dbChange': 'Cambiar',
+  'auth.dbOnline': 'conectada',
+  'auth.dbOffline': 'sin conexión',
+  'auth.dbNotFixed':
+  'No hay PLC_AUTH_DB_ID en el .env: se está usando la primera conexión de la lista. Fíjala para que no cambie sola al agregar otra base.',
+  'auth.dbUnknown': 'sin determinar',
+
+  // ── Contraseña olvidada ─────────────────────────────────────
+  'auth.forgotTitle': 'Recuperar el acceso',
+  'auth.forgotBody':
+  'No hay restablecimiento por correo: en un HMI de planta esa vía es un camino de entrada más. Pídele a un Supervisor que te asigne una contraseña nueva; al hacerlo se cierran todas tus sesiones abiertas.',
+  'auth.forgotClose': 'Entendido',
+
+  'auth.rememberHint':
+  'Sin marcar, la sesión se cierra al cerrar la pestaña. Déjalo sin marcar en equipos compartidos.',
+
   'auth.devShortcut':
   'Atajo de desarrollo activo: el botón entra directo sin validar nada. Ponlo en false en ATAJO_DEV (Login.tsx) para probar el formulario.',
 
@@ -291,8 +327,41 @@ const en: Dict = {
   'auth.errMailInvalid': 'That email address is not valid.',
   'auth.errMailLong': 'Email cannot exceed 160 characters.',
 
-  'auth.designOnly':
-  'Design preview: this does not check the database yet. Any input will let you through.',
+  'auth.checking': 'Checking system status…',
+  'auth.noBackend':
+  'Cannot reach the server. Check that the backend is running.',
+  'auth.noDbTitle': 'No accounts database',
+  'auth.noDbBody':
+  'Accounts live in the "usuarios" table of a database, and none is connected yet. Register the connection and run the schema script before creating the first account.',
+  'auth.firstAccountTitle': 'First account on the system',
+  'auth.firstAccountBody':
+  'No account exists yet. This one is created as Supervisor — an initial administrator is required — and from then on only a Supervisor can create the rest.',
+  'auth.categoryLocked': 'The first account is always Supervisor.',
+  'auth.signupClosedTitle': 'Sign-up is closed',
+  'auth.signupClosedBody':
+  'At least one account already exists. New ones are created by a Supervisor from user management, so nobody signs themselves up with permissions they should not have.',
+
+  'auth.dbPicker': 'Database',
+  'auth.dbPickerHint':
+  'Each database has its own accounts: one created here does not exist in the others. The last one you signed in with is remembered.',
+  'auth.dbPickerOffline':
+  'That database is not responding right now. Signing in will fail until it is back.',
+  'auth.dbLabel': 'Accounts in',
+  'auth.dbChange': 'Change',
+  'auth.dbOnline': 'connected',
+  'auth.dbOffline': 'offline',
+  'auth.dbNotFixed':
+  'PLC_AUTH_DB_ID is not set in .env: the first connection in the list is being used. Pin it so it cannot change when another database is added.',
+  'auth.dbUnknown': 'undetermined',
+
+  'auth.forgotTitle': 'Recover access',
+  'auth.forgotBody':
+  'There is no email reset: on a plant HMI that path is one more way in. Ask a Supervisor to set a new password for you; doing so closes all your open sessions.',
+  'auth.forgotClose': 'Got it',
+
+  'auth.rememberHint':
+  'Unchecked, the session ends when you close the tab. Leave it unchecked on shared machines.',
+
   'auth.devShortcut':
   'Dev shortcut enabled: the button goes straight through without validating anything. Set ATAJO_DEV to false in Login.tsx to test the form.',
 

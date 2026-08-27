@@ -18,7 +18,14 @@ import { WidgetSidebar } from '../components/hmi/WidgetSidebar';
 import { CanvasWidget } from '../components/hmi/CanvasWidget';
 import { PropertyInspector } from '../components/hmi/PropertyInspector';
 import { UPDATE_RATE_OPTIONS } from '../models/plc';
-import { saveDesign, loadDesign } from '../utils/designStorage';
+import {
+  saveDesign,
+  loadDesign,
+  guardarProyecto,
+  borrarWidget as apiBorrarWidget } from
+'../utils/designStorage';
+import { useLock } from '../hooks/useLock';
+import { recursoDisenador } from '../services/lockApi';
 import { FlowEditor } from '../components/flows/FlowEditor';
 import { AlarmsEditor } from '../components/alarms/AlarmsEditor';
 import { RecipesEditor } from '../components/recipes/RecipesEditor';
@@ -37,6 +44,11 @@ export function Designer() {
   const navigate = useNavigate();
   const {
     widgets,
+    projectId,
+    projectVersion,
+    setProjectVersion,
+    permisos,
+    presentes,
     setWidgets,
     variables,
     selectedVariables,
@@ -47,6 +59,17 @@ export function Designer() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<DesignerTab>('designer');
+
+  // Fase 4: el "lápiz". Solo una persona edita a la vez; el resto ve los
+  // cambios en vivo en modo lectura. Se pide al entrar y se suelta al salir.
+  // Solo se toma en la pestaña del Diseñador: estar mirando Flujos o Alarmas
+  // no debe bloquear el lienzo a los demás.
+  const lock = useLock(recursoDisenador(projectId), activeTab === 'designer');
+
+  // Se puede editar si el rol lo permite Y se tiene el lápiz. Son dos cosas
+  // distintas: el rol dice si PUEDES, el lápiz si te toca AHORA.
+  const puedeEditar =
+  (!permisos || permisos.editar_diseño) && lock.puedeEditar;
 
   
 
@@ -79,10 +102,62 @@ export function Designer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Guarda el diseño cada vez que cambian los widgets o las medidas.
+  // Guardado en DOS niveles.
+  //
+  // 1) CACHÉ LOCAL, inmediata: si se recarga la página no se pierde nada.
+  // 2) SERVIDOR, con debounce de 400 ms: es lo que ven los demás usuarios.
+  //
+  // El debounce importa. Arrastrar un widget dos segundos genera decenas de
+  // renders; sin él serían decenas de escrituras a disco y decenas de
+  // broadcasts a todos los clientes conectados. Con él, se manda una vez al
+  // soltar (o cada 400 ms si el arrastre es largo).
   useEffect(() => {
-    saveDesign({ widgets, canvas: { width: canvasW, height: canvasH } });
-  }, [widgets, canvasW, canvasH]);
+    saveDesign({ widgets, canvas: { width: canvasW, height: canvasH } }, projectId);
+  }, [widgets, canvasW, canvasH, projectId]);
+
+  // Marca de "todavía no he cargado del servidor": evita que el primer render
+  // (con el store vacío) borre el proyecto de todo el mundo.
+  const yaHidratado = useRef(false);
+  useEffect(() => {
+    if (projectVersion > 0) yaHidratado.current = true;
+  }, [projectVersion]);
+
+  const [errorGuardado, setErrorGuardado] = useState<string>('');
+
+  useEffect(() => {
+    if (!yaHidratado.current) return;
+    // Sin permiso de edición no se intenta escribir: el backend respondería
+    // 403 y saldría un error por cada movimiento del ratón.
+    if (permisos && !permisos.editar_diseño) return;
+    // Sin el lápiz no se escribe: el backend responderia 423 en cada
+    // movimiento del raton.
+    if (!lock.puedeEditar) return;
+
+    const id = setTimeout(async () => {
+      try {
+        const v = await guardarProyecto(
+          { widgets, canvas: { width: canvasW, height: canvasH } },
+          projectVersion,
+          projectId
+        );
+        setProjectVersion(v);
+        setErrorGuardado('');
+      } catch (e: any) {
+        if (e?.status === 409) {
+          // Otro usuario guardó mientras editabas. No se pisa su trabajo: se
+          // avisa y se deja que decida.
+          setErrorGuardado(
+            'Otro usuario guardó cambios. Recarga la pantalla para verlos ' +
+            'antes de seguir editando.'
+          );
+        } else {
+          setErrorGuardado(e?.message ?? 'No se pudo guardar en el servidor.');
+        }
+      }
+    }, 400);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widgets, canvasW, canvasH, projectId]);
 
   const selected = widgets.find((w) => w.id === selectedId) ?? null;
 
@@ -119,6 +194,7 @@ export function Designer() {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    if (!puedeEditar) return;
     const kind = e.dataTransfer.getData('widget-kind') as WidgetKind;
     if (!kind) return;
     const bounds = canvasRef.current?.getBoundingClientRect();
@@ -139,24 +215,35 @@ export function Designer() {
     setSelectedId(w.id);
   };
 
-  const patchWidget = (id: string, patch: Partial<HmiWidget>) =>
-  setWidgets((prev) => prev.map((w) => w.id === id ? { ...w, ...patch } : w));
+  const patchWidget = (id: string, patch: Partial<HmiWidget>) => {
+    if (!puedeEditar) return;
+    setWidgets((prev) => prev.map((w) => w.id === id ? { ...w, ...patch } : w));
+  };
 
-  const patchStyle = (id: string, patch: Partial<HmiWidget['style']>) =>
-  setWidgets((prev) =>
-  prev.map((w) =>
-  w.id === id ? { ...w, style: { ...w.style, ...patch } } : w
-  )
-  );
+  const patchStyle = (id: string, patch: Partial<HmiWidget['style']>) => {
+    if (!puedeEditar) return;
+    setWidgets((prev) =>
+    prev.map((w) =>
+    w.id === id ? { ...w, style: { ...w.style, ...patch } } : w
+    )
+    );
+  };
 
   const deleteWidget = (id: string) => {
+    if (!puedeEditar) return;
     setWidgets((prev) => prev.filter((w) => w.id !== id));
     setSelectedId(null);
+    // El PUT con debounce ya lo reflejaría, pero un borrado conviene
+    // propagarlo de inmediato: es la operación que más molesta ver con
+    // retraso en la pantalla de otro.
+    void apiBorrarWidget(id, null, projectId)
+      .then(setProjectVersion)
+      .catch(() => {/* el guardado con debounce lo reintentará */});
   };
 
   // Abre la vista previa en una pestaña nueva (guarda antes por si acaso).
   const openPreview = () => {
-    saveDesign({ widgets, canvas: { width: canvasW, height: canvasH } });
+    saveDesign({ widgets, canvas: { width: canvasW, height: canvasH } }, projectId);
     window.open('/preview', '_blank', 'noopener');
   };
 
@@ -273,6 +360,68 @@ export function Designer() {
           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 dark:bg-navy dark:text-slate-400">
             {widgets.length} {t('designer.widgets')}
           </span>
+
+          {/* MULTIUSUARIO: quién más está mirando esta pantalla ahora mismo.
+              Saber que hay alguien más editando evita el "¿por qué se me
+              movió esto solo?". */}
+          {presentes.length > 1 &&
+          <span
+            title={presentes.map((p) => `${p.usuario} (${p.categoria})`).join('\n')}
+            className="rounded-full bg-siemens/10 px-2.5 py-1 text-xs font-medium text-siemens-700 dark:text-siemens-100">
+            {presentes.length} conectados
+          </span>
+          }
+
+          {/* ---- FASE 4: estado del "lápiz" ----
+              Es la información más importante de esta barra. Si alguien no
+              puede editar tiene que saber POR QUÉ y QUÉ HACER, no descubrirlo
+              porque el lienzo no responde. */}
+          {activeTab === 'designer' && !lock.cargando &&
+          <>
+              {lock.puedeEditar ?
+            <span
+              title="Tienes el control de edición. Se libera al salir de esta pantalla."
+              className="flex items-center gap-1.5 rounded-full bg-state-ok/10 px-2.5 py-1 text-xs font-semibold text-state-ok">
+                  <MousePointer2Icon className="h-3.5 w-3.5" />
+                  Editando
+                </span> :
+
+            <span className="flex items-center gap-2 rounded-full bg-state-warn/15 px-2.5 py-1 text-xs font-semibold text-state-warn">
+                  <EyeIcon className="h-3.5 w-3.5" />
+                  {lock.titular ?
+              `Solo lectura · edita ${lock.titular.usuario}` :
+              'Solo lectura'}
+                  {/* La toma de control solo tiene sentido ofrecerla a quien
+                      puede usarla. El backend lo verifica igualmente. */}
+                  {permisos?.gestionar_usuarios &&
+              <button
+                onClick={() => void lock.tomarControl()}
+                title="Quitarle el control de edición (queda registrado en la auditoría)"
+                className="rounded bg-state-warn/20 px-1.5 py-0.5 text-[11px] font-bold hover:bg-state-warn/30">
+                      Tomar control
+                    </button>
+              }
+                  {!lock.titular &&
+              <button
+                onClick={() => void lock.reintentar()}
+                className="rounded bg-state-warn/20 px-1.5 py-0.5 text-[11px] font-bold hover:bg-state-warn/30">
+                      Reintentar
+                    </button>
+              }
+                </span>
+            }
+            </>
+          }
+
+          {/* Conflicto de versión: otro usuario guardó mientras editabas. No se
+              pisa su trabajo; se avisa y se deja decidir. */}
+          {errorGuardado &&
+          <span
+            title={errorGuardado}
+            className="max-w-xs truncate rounded-full bg-state-warn/15 px-2.5 py-1 text-xs font-semibold text-state-warn">
+            {errorGuardado}
+          </span>
+          }
 
           {/* --- Vista previa (pestaña nueva) --- */}
           <button

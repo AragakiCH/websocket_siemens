@@ -26,6 +26,10 @@ class ConnectionManager:
         self._active: Set[WebSocket] = set()
         # Filtro opcional por conexión: websocket -> plc_id (o None = todos).
         self._filtros: Dict[WebSocket, Optional[str]] = {}
+        # MULTIUSUARIO: quién está detrás de cada socket. Va al lado del filtro,
+        # con la misma vida: se pone al conectar y se quita al desconectar.
+        # De aquí sale la presencia ("3 conectados: Ana, José, Marta").
+        self._usuarios: Dict[WebSocket, dict] = {}
         self._lock = asyncio.Lock()
         # Observadores internos del backend (historizador, alarmas futuras...).
         # Reciben TODOS los mensajes, sin filtro de PLC y sin ser clientes WS.
@@ -34,16 +38,27 @@ class ConnectionManager:
     # ------------------------------------------------------------------ #
     # Alta / baja de clientes
     # ------------------------------------------------------------------ #
-    async def connect(self, websocket: WebSocket, plc_filter: Optional[str] = None) -> None:
+    async def connect(
+        self,
+        websocket: WebSocket,
+        plc_filter: Optional[str] = None,
+        usuario: Optional[dict] = None,
+    ) -> None:
         """
         Acepta una nueva conexión WebSocket y la registra.
+
         `plc_filter`: si se indica, ese cliente solo recibirá cambios de ese PLC.
+        `usuario`: {"usuario": ..., "categoria": ...} si la conexión venía
+                   autenticada. None para conexiones anónimas.
         """
         await websocket.accept()
         async with self._lock:
             self._active.add(websocket)
             self._filtros[websocket] = plc_filter
-        logger.info("Cliente WS conectado (filtro=%s). Total: %d",
+            if usuario:
+                self._usuarios[websocket] = usuario
+        logger.info("Cliente WS conectado (usuario=%s, filtro=%s). Total: %d",
+                    (usuario or {}).get("usuario", "anónimo"),
                     plc_filter or "todos", len(self._active))
 
     async def disconnect(self, websocket: WebSocket) -> None:
@@ -51,11 +66,75 @@ class ConnectionManager:
         async with self._lock:
             self._active.discard(websocket)
             self._filtros.pop(websocket, None)
+            self._usuarios.pop(websocket, None)
         logger.info("Cliente WS desconectado. Total: %d", len(self._active))
 
     def count(self) -> int:
         """Número de clientes conectados."""
         return len(self._active)
+
+    # ------------------------------------------------------------------ #
+    # Presencia
+    # ------------------------------------------------------------------ #
+    def presentes(self) -> List[dict]:
+        """
+        Quién está mirando ahora mismo, deduplicado por persona.
+
+        Alguien con el Diseñador y la Vista previa en dos pestañas son DOS
+        sockets pero UNA persona; la barra de presencia debe decir "1
+        conectado", no "2".
+        """
+        vistos: Dict[str, dict] = {}
+        anonimos = 0
+        for u in self._usuarios.values():
+            nombre = u.get("usuario")
+            if not nombre:
+                anonimos += 1
+                continue
+            if nombre not in vistos:
+                vistos[nombre] = {"usuario": nombre,
+                                  "categoria": u.get("categoria", "")}
+        # Sockets sin identificar (auth desactivada o conexión anónima).
+        anonimos += len(self._active) - len(self._usuarios)
+
+        salida = sorted(vistos.values(), key=lambda x: x["usuario"])
+        if anonimos > 0:
+            salida.append({"usuario": f"{anonimos} anónimo(s)", "categoria": ""})
+        return salida
+
+    async def difundir_config(self, recurso: str, por: str = "",
+                              accion: str = "") -> None:
+        """
+        Avisa de que cambió algo de la CONFIGURACIÓN compartida.
+
+        Es deliberadamente tonto: dice QUÉ cambió, no CÓMO. El cliente que lo
+        recibe vuelve a pedir la lista correspondiente. Difundir el contenido
+        obligaría a mantener sincronizados dos formatos (el del GET y el del
+        evento) y a filtrar permisos en el broadcast, que es justo donde no
+        se quiere lógica.
+
+        `recurso`: "conexiones" | "consultas" | "historicos" | "esquema"
+        """
+        from datetime import datetime, timezone
+
+        await self.broadcast({
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "type": "config.updated",
+            "recurso": recurso,
+            "accion": accion,
+            "por": por,
+        })
+
+    async def difundir_presencia(self) -> None:
+        """Manda a todos la lista de quién está conectado."""
+        from datetime import datetime, timezone
+
+        await self.broadcast({
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "type": "presence",
+            "usuarios": self.presentes(),
+            "num_clientes": len(self._active),
+        })
 
     # ------------------------------------------------------------------ #
     # Observadores internos (no son clientes WebSocket)
@@ -112,21 +191,34 @@ class ConnectionManager:
             destinatarios = list(self._active)
             filtros = dict(self._filtros)
 
-        caidos: List[WebSocket] = []
-        for ws in destinatarios:
-            # Respetar el filtro por conexión.
-            f = filtros.get(ws)
-            if f and plc_msg and f != plc_msg:
-                continue
-            try:
-                await ws.send_json(message)
-            except Exception:  # noqa: BLE001
-                caidos.append(ws)
+        # Destinatarios que pasan el filtro.
+        objetivo = [
+            ws for ws in destinatarios
+            if not (filtros.get(ws) and plc_msg and filtros.get(ws) != plc_msg)
+        ]
+        if not objetivo:
+            return
+
+        # MULTIUSUARIO: envío CONCURRENTE.
+        #
+        # Antes era un `for` secuencial con `await` dentro: un cliente lento
+        # (por VPN, o con la pestaña en segundo plano) retrasaba a todos los
+        # que iban detrás en la lista. Con `gather` todos los envíos se lanzan
+        # a la vez y el lento solo se retrasa a sí mismo.
+        resultados = await asyncio.gather(
+            *(ws.send_json(message) for ws in objetivo),
+            return_exceptions=True,
+        )
 
         # Limpiar los clientes que fallaron.
+        caidos: List[WebSocket] = [
+            ws for ws, r in zip(objetivo, resultados) if isinstance(r, Exception)
+        ]
         if caidos:
             async with self._lock:
                 for ws in caidos:
                     self._active.discard(ws)
+                    self._filtros.pop(ws, None)
+                    self._usuarios.pop(ws, None)
             logger.info("Depurados %d clientes WS caídos. Total: %d",
                         len(caidos), len(self._active))

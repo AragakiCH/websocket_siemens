@@ -317,10 +317,33 @@ class SqlDriver(DbDriver):
         credenciales = f"{usuario}:{pwd}@" if usuario else ""
         url = f"{prefijo}://{credenciales}{self.host}:{self.puerto}/{self.base_datos}"
 
-        # SQL Server necesita que se indique el driver ODBC instalado.
+        # SQL Server necesita que se indique el driver ODBC instalado, y
+        # ADEMAS cualquier otra opcion de la cadena ODBC.
+        #
+        # Antes aqui solo se leia `opciones["driver"]` y se descartaba el
+        # resto. Eso rompia el caso mas comun de todos: con el **ODBC Driver
+        # 18** el cifrado viene activado de fabrica, asi que un SQL Server con
+        # certificado autofirmado (el de un contenedor, o el de una instancia
+        # local recien instalada) rechaza la conexion con
+        #
+        #     SSL Provider: certificate chain was issued by an authority
+        #     that is not trusted
+        #
+        # ...y `"TrustServerCertificate": "yes"` no servia de nada porque no
+        # llegaba a la URL. El sintoma enganaba: la opcion estaba puesta, se
+        # guardaba en conexiones.json, se devolvia por GET /db, y aun asi la
+        # conexion fallaba como si no existiera.
+        #
+        # Se pasa TODO lo que haya en `opciones`: TrustServerCertificate,
+        # Encrypt, Trusted_Connection, TrustedConnection, MARS_Connection,
+        # ApplicationIntent... son parametros de la cadena ODBC y el driver
+        # ignora los que no conoce.
         if self.motor == "mssql":
-            driver = self.opciones.get("driver", "ODBC Driver 17 for SQL Server")
-            url += f"?driver={quote_plus(driver)}"
+            extras = dict(self.opciones or {})
+            extras.setdefault("driver", "ODBC Driver 17 for SQL Server")
+            url += "?" + "&".join(
+                f"{k}={quote_plus(str(v))}" for k, v in extras.items()
+            )
 
         return url
 
@@ -519,13 +542,62 @@ class SqlDriver(DbDriver):
 
         return [crear, indice]
 
-    def sql_insert_historico(self, tabla: str) -> str:
-        """INSERT parametrizado del histórico (se usa con executemany)."""
+    # Columnas que produce el historizador -> posibles nombres en destino.
+    # Existe porque hay DOS tablas válidas de destino con nombres distintos:
+    #   * `historico_tags` (la que crea el propio historizador) usa `plc`.
+    #   * `plc_prg` (la del esquema del HMI, del diagrama E-R) usa `plc_id`
+    #     y añade `programa`.
+    # Sin esta traducción, apuntar el historizador a `plc_prg` fallaría con
+    # "Invalid column name 'plc'" en cada volcado.
+    ALIAS_HISTORICO = {
+        "ts": ("ts",),
+        "plc": ("plc", "plc_id"),
+        "tag": ("tag",),
+        "valor_num": ("valor_num",),
+        "valor_texto": ("valor_texto",),
+        "tipo": ("tipo",),
+        "programa": ("programa",),
+    }
+
+    def mapa_insert_historico(
+        self, columnas_reales: Optional[List[str]] = None
+    ) -> Dict[str, str]:
+        """
+        Traduce los campos del historizador a las columnas REALES de la tabla.
+
+        Devuelve {campo_del_historizador: columna_en_la_tabla}. Los campos que
+        la tabla no tenga se omiten: así `programa` se rellena solo si la tabla
+        destino lo soporta.
+        """
+        if not columnas_reales:
+            # Sin introspección: se asume la tabla propia del historizador.
+            return {c: c for c in
+                    ("ts", "plc", "tag", "valor_num", "valor_texto", "tipo")}
+
+        disponibles = {c.lower(): c for c in columnas_reales}
+        mapa: Dict[str, str] = {}
+        for campo, candidatos in self.ALIAS_HISTORICO.items():
+            for candidato in candidatos:
+                if candidato.lower() in disponibles:
+                    mapa[campo] = disponibles[candidato.lower()]
+                    break
+        return mapa
+
+    def sql_insert_historico(
+        self, tabla: str, mapa: Optional[Dict[str, str]] = None
+    ) -> str:
+        """
+        INSERT parametrizado del histórico (se usa con executemany).
+
+        `mapa` viene de `mapa_insert_historico()`: permite escribir en tablas
+        cuyas columnas se llamen distinto (ver ALIAS_HISTORICO).
+        """
         tabla = _nombre_seguro(tabla)
-        return (
-            f"INSERT INTO {tabla} (ts, plc, tag, valor_num, valor_texto, tipo) "
-            f"VALUES (:ts, :plc, :tag, :valor_num, :valor_texto, :tipo)"
-        )
+        mapa = mapa or self.mapa_insert_historico()
+        campos = list(mapa)
+        columnas = ", ".join(mapa[c] for c in campos)
+        binds = ", ".join(f":{c}" for c in campos)
+        return f"INSERT INTO {tabla} ({columnas}) VALUES ({binds})"
 
     # ------------------------------------------------------------------ #
     # Esquema estándar del HMI (usuarios / plc_prg / alarmas)
@@ -563,6 +635,7 @@ class SqlDriver(DbDriver):
         t_usuarios = f"{p}usuarios"
         t_plc = f"{p}plc_prg"
         t_alarmas = f"{p}alarmas"
+        t_recetas = f"{p}recetas"
 
         m = self.motor
         # --- Tipos que cambian entre motores ---------------------------- #
@@ -608,10 +681,12 @@ class SqlDriver(DbDriver):
             f"password_hash VARCHAR(255) NOT NULL, "
             f"algoritmo VARCHAR(30) NOT NULL DEFAULT 'pbkdf2_sha256', "
             f"email VARCHAR(160), "
-            # Rol: admin | supervisor | operador | invitado
-            f"categoria VARCHAR(40) NOT NULL DEFAULT 'operador', "
-            # activo | inactivo | bloqueado
-            f"estado VARCHAR(20) NOT NULL DEFAULT 'activo', "
+            # Rol, de MÁS a MENOS permisos. Los valores son exactamente los
+            # que ofrece el desplegable de Login.tsx y se guardan tal cual:
+            #   Supervisor > Administradores > Usuarios > Invitado
+            f"categoria VARCHAR(40) NOT NULL DEFAULT 'Usuarios', "
+            # Activo | Inactivo. Un usuario Inactivo no puede iniciar sesión.
+            f"estado VARCHAR(20) NOT NULL DEFAULT 'Activo', "
             f"creado_en {ts}, "
             f"ultimo_acceso {ts})"
         )
@@ -672,10 +747,67 @@ class SqlDriver(DbDriver):
             f"{fk_plc}, {fk_usr})"
         )
 
+        # ---------------------------------------------------------------- #
+        # recetas
+        # ---------------------------------------------------------------- #
+        # Una receta es la DEFINICIÓN de un parámetro configurable del proceso:
+        # qué tag es, de qué tipo, entre qué límites puede moverse y con qué
+        # valor arranca. Es la tabla que permite que un operario cambie una
+        # consigna sin tocar el PLC, y que el HMI valide el rango ANTES de
+        # escribirla.
+        #
+        # `valor_minimo` / `valor_maximo` no son decorativos: son la última
+        # barrera antes de mandar un valor a una máquina real. Si alguien teclea
+        # 900 °C donde el máximo son 90, se rechaza en el servidor.
+        #
+        # FKs con ON DELETE SET NULL, igual que en alarmas: borrar un usuario
+        # no debe llevarse por delante las recetas que creó.
+        fk_rec_plc = (
+            f"CONSTRAINT fk_{p}recetas_plc FOREIGN KEY (plc_prg_id) "
+            f"REFERENCES {t_plc} (id) ON DELETE SET NULL"
+        )
+        fk_rec_usr = (
+            f"CONSTRAINT fk_{p}recetas_usuario FOREIGN KEY (usuario_id) "
+            f"REFERENCES {t_usuarios} (id) ON DELETE SET NULL"
+        )
+        recetas = (
+            f"CREATE TABLE {t_recetas} ("
+            f"id {pk}, "
+            f"plc_prg_id {fk_tipo}, "
+            f"usuario_id {fk_tipo}, "
+            # Nombre del parámetro y nombre de la receta a la que pertenece.
+            # Una receta ("Producto A") agrupa varios parámetros.
+            f"nombre VARCHAR(160) NOT NULL, "
+            f"nombre_receta VARCHAR(160) NOT NULL, "
+            # Tag del PLC al que se escribe. Mismo formato que en plc_prg.
+            f"tag VARCHAR(400) NOT NULL, "
+            # BOOL | INT | DINT | REAL | LREAL | STRING...
+            f"tipo_dato VARCHAR(40) NOT NULL DEFAULT 'REAL', "
+            # Longitud para los STRING; ignorado en los numéricos.
+            f"longitud_dato {entero}, "
+            f"valor_default {real}, "
+            f"valor_minimo {real}, "
+            f"valor_maximo {real}, "
+            # Valor por defecto cuando el dato es de texto.
+            f"valor_texto VARCHAR(500), "
+            # Formato de presentación: cuántos decimales se muestran y cuántos
+            # se conservan al guardar. Van separados porque no siempre coinciden.
+            f"lugar_decimal {entero} NOT NULL DEFAULT 0, "
+            f"decimales {entero} NOT NULL DEFAULT 0, "
+            # Unidad de ingeniería (°C, bar, rpm) y ayuda para el operario.
+            f"unidad VARCHAR(30), "
+            f"informacion_herramienta VARCHAR(500), "
+            f"activo {entero} NOT NULL DEFAULT 1, "
+            f"creado_en {ts}, "
+            f"actualizado_en {ts}, "
+            f"{fk_rec_plc}, {fk_rec_usr})"
+        )
+
         tablas = [
             (t_usuarios, usuarios),
             (t_plc, plc),
             (t_alarmas, alarmas),
+            (t_recetas, recetas),
         ]
 
         # --- Idempotencia: "IF NOT EXISTS" no es estándar ---------------- #
@@ -696,6 +828,9 @@ class SqlDriver(DbDriver):
             (f"idx_{p}plc_prg_plc_ts", t_plc, "(plc_id, ts)"),
             (f"idx_{p}alarmas_estado", t_alarmas, "(estado, ts_activacion)"),
             (f"idx_{p}alarmas_tipo", t_alarmas, "(tipo, ts_activacion)"),
+            # recetas -> "dame los parámetros de esta receta"
+            (f"idx_{p}recetas_nombre", t_recetas, "(nombre_receta)"),
+            (f"idx_{p}recetas_tag", t_recetas, "(tag)"),
         ]
         for idx, tabla, cols in indices:
             if m == "mssql":

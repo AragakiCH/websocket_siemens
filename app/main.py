@@ -17,6 +17,7 @@ Arrancar con:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -26,13 +27,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import (db_routes, historian_routes, rest_routes,
-                     websocket_routes)
+from app.api import (ai_routes, auth_routes, crud_routes, db_routes,
+                     export_routes, historian_routes, lock_routes,
+                     project_routes, rest_routes, websocket_routes)
 from app.config.settings import get_settings
 from app.core.connection_manager import ConnectionManager
+from app.core.crud_manager import CrudManager
 from app.core.db_manager import DbManager
 from app.db.historian import Historizador
+from app.export.grabador import Grabador
+from app.ai.agent import Agente
+from app.core.auditoria import Auditoria
+from app.core.auth_manager import AuthManager
+from app.core.lock_manager import LockManager
 from app.core.plc_manager import PlcManager
+from app.db.project_store import ProjectStore
 
 
 def _configurar_logging(nivel: str) -> None:
@@ -71,16 +80,41 @@ async def lifespan(app: FastAPI):
     manager = ConnectionManager()
     plc_manager = PlcManager(manager, settings)
     db_manager = DbManager()
+    crud_manager = CrudManager(db_manager, settings)
     # El historizador escucha el MISMO flujo de tags que el WebSocket:
     # no abre una segunda sesión OPC UA ni añade carga al PLC.
     historizador = Historizador(db_manager, db_manager.store)
+    # El grabador comparte el mismo flujo de tags: mantiene en memoria el
+    # último valor de cada uno y lo muestrea a intervalo fijo.
+    grabador = Grabador(plc_manager)
+    # MULTIUSUARIO -------------------------------------------------- #
+    # El diseño del HMI vive AQUÍ, no en el localStorage de cada
+    # navegador: es lo único que permite que dos personas vean la misma
+    # pantalla. Va versionado para detectar escrituras simultáneas.
+    project_store = ProjectStore()
+    # Identidad: las cuentas están en la tabla SQL `usuarios`, así que
+    # este gestor necesita el DbManager para llegar a ellas.
+    auth_manager = AuthManager(db_manager, settings)
+    # Fase 4: 'el lápiz'. Un solo usuario edita; el resto ve en vivo en
+    # modo lectura. Caduca solo a los 30 s sin heartbeat, así que un
+    # navegador cerrado no deja la pantalla bloqueada para siempre.
+    lock_manager = LockManager(manager)
+    # Quién hizo qué. Escribe en un hilo aparte: auditar nunca debe
+    # retrasar la operación auditada.
+    auditoria = Auditoria()
 
     # Guardar en el estado de la app para que los routers accedan a ellos.
     app.state.settings = settings
     app.state.manager = manager
     app.state.plc_manager = plc_manager
     app.state.db_manager = db_manager
+    app.state.crud_manager = crud_manager
     app.state.historizador = historizador
+    app.state.grabador = grabador
+    app.state.project_store = project_store
+    app.state.auth_manager = auth_manager
+    app.state.lock_manager = lock_manager
+    app.state.auditoria = auditoria
 
     logger.info("=== Iniciando servicio OPC UA -> WebSocket (multi-PLC) ===")
     logger.info("Endpoint semilla: %s | discovery=%s | subred=%s",
@@ -88,19 +122,53 @@ async def lifespan(app: FastAPI):
                 settings.resolve_subnet())
     # El descubrimiento + supervisores corren en segundo plano: la API arranca
     # aunque ningún PLC esté disponible todavía.
+    auditoria.start()
+    auditoria.registrar("servicio.arranque", "", "",
+                        {"auth_requerida": settings.auth_requerida})
+
+    # Barrido de bloqueos abandonados. Hace falta un barrido ACTIVO: si
+    # nadie consulta el lock, los demás clientes no se enterarían de que
+    # quedó libre y seguirían en modo lectura sin motivo.
+    async def _barrer_locks():
+        while True:
+            await asyncio.sleep(5)
+            try:
+                await lock_manager.barrer_caducados()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Error barriendo bloqueos: %s", exc)
+
+    tarea_locks = asyncio.create_task(_barrer_locks())
+
     await plc_manager.start()
     # Conexiones a BD guardadas: se abren en paralelo. Una BD caída no impide
     # arrancar el servicio (el widget mostrará el error y podrá reintentar).
     await db_manager.start()
     await historizador.start(manager)
+    await grabador.start(manager)
+
+    # El asistente de IA se monta al final: su catálogo de herramientas se
+    # deriva del OpenAPI, y el RAG lee el estado del resto de componentes.
+    if settings.ai_enabled:
+        agente = Agente(app, settings)
+        app.state.agente = agente
+        agente.iniciar()
+    else:
+        app.state.agente = None
+        logger.info("Asistente de IA desactivado (PLC_AI_ENABLED=false).")
 
     try:
         yield
     finally:
         logger.info("=== Apagando servicio: cierre limpio ===")
+        tarea_locks.cancel()
+        auditoria.registrar("servicio.parada")
+        auditoria.stop()
         await plc_manager.stop()
         # Orden importante: primero el historizador (vuelca su buffer
         # pendiente), y solo después se cierran los pools de la BD.
+        await grabador.stop()
         await historizador.stop()
         await db_manager.stop()
 
@@ -282,6 +350,53 @@ Contrato completo para el frontend: `docs/API_DB.md`.
 
 ---
 
+## Exportar a Excel
+
+Los datos de los PLCs se pueden sacar a un `.xlsx` ordenado desde dos fuentes:
+
+| Fuente | Endpoint | Para qué |
+|---|---|---|
+| **En vivo** | `POST /export/grabaciones` | Muestrea los tags cada N ms durante un periodo (un ensayo, un arranque) |
+| **Base de datos** | `GET /export/historico/excel` | Cualquier periodo pasado ya historizado |
+
+Las dos generan el mismo fichero, con cuatro hojas: **Información**
+(metadatos), **Datos** (pivotado: una fila por instante, una columna por
+variable), **Estadísticas** (mín/máx/media/desviación) y **Tendencia**
+(gráfico de líneas).
+
+El muestreo a intervalo fijo es lo que hace que la tabla salga sin huecos:
+todas las variables comparten fila.
+
+Contrato completo: `docs/API_EXPORT.md`.
+
+---
+
+## Asistente de IA
+
+Un agente integrado que **entiende el proyecto, consulta el estado real y
+ejecuta acciones**. Comparte proceso, herramientas y datos con el resto del
+servicio.
+
+- `POST /ai/chat` — preguntar (respuesta completa, con traza y citas).
+- `WS /ai/ws` — respuesta en streaming, con aviso de qué herramienta usa.
+- `GET /ai/estado?comprobar=true` — verificar API key y modelo.
+
+Tres cosas que conviene saber:
+
+1. **Sus herramientas se derivan de esta misma página.** El agente lee el
+   OpenAPI en runtime: cuando añades un endpoint, lo sabe usar sin tocar
+   código. Documentar bien un endpoint es enseñárselo al agente.
+2. **RAG sobre la documentación del proyecto**, para que responda con lo que
+   está escrito y cite fichero y sección.
+3. **Por defecto solo lee.** Las acciones que modifican requieren activar
+   `PLC_AI_PERMITIR_ESCRITURA`, y algunas (borrar un PLC, crear esquemas)
+   están prohibidas siempre.
+
+Configuración en el `.env`: `PLC_AI_API_KEY`, `PLC_AI_MODEL`.
+Contrato completo: `docs/API_AI.md`.
+
+---
+
 ## Notas
 
 - El refresco mínimo real es **~100 ms** (límite del servidor OPC UA del
@@ -308,10 +423,16 @@ app.add_middleware(
 )
 
 # Routers.
+app.include_router(auth_routes.router)
+app.include_router(project_routes.router)
+app.include_router(lock_routes.router)
 app.include_router(rest_routes.router, tags=["REST"])
 app.include_router(websocket_routes.router, tags=["WebSocket"])
 app.include_router(db_routes.router)
+app.include_router(crud_routes.router)
 app.include_router(historian_routes.router)
+app.include_router(export_routes.router)
+app.include_router(ai_routes.router)
 
 # ------------------------------------------------------------------ #
 # Frontend React (frontend/dist generado con `npm run build`).

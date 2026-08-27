@@ -59,8 +59,29 @@ export function FlowConfigPanel({ node, nodes, onUpdateConfig, onUpdateStatus, o
 
       switch (node.type) {
         case 'connection': {
-          url = `${API_BASE}/db`;
           const c = node.config;
+
+          // El nodo APUNTA a una conexión que ya existe: guardar aquí no debe
+          // volver a darla de alta. Sería reenviar un POST /db con la
+          // contraseña vacía —`GET /db` nunca la devuelve— y el backend lo
+          // rechazaría por credenciales, que es un error que confunde: la
+          // conexión estaba perfectamente.
+          //
+          // Lo que sí tiene sentido es comprobar que responde, que además
+          // reabre el pool si se había caído.
+          if (c.usar_existente) {
+            const dbId = (c.db_id || '').trim();
+            if (!dbId) {
+              onUpdateStatus(node.id, 'error', 'Elige una conexión de la lista.');
+              setSaving(false);
+              return;
+            }
+            url = `${API_BASE}/db/${encodeURIComponent(dbId)}/test`;
+            body = {};
+            break;
+          }
+
+          url = `${API_BASE}/db`;
           body = {
             db_id: c.db_id,
             motor: c.motor,
@@ -206,7 +227,11 @@ export function FlowConfigPanel({ node, nodes, onUpdateConfig, onUpdateStatus, o
       {/* Form */}
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {node.type === 'connection' && (
-          <ConnectionForm config={node.config} onChange={handleChange} />
+          <ConnectionForm
+            config={node.config}
+            onChange={handleChange}
+            permitirExistente
+          />
         )}
         {node.type === 'historian' && (
           <HistorianForm

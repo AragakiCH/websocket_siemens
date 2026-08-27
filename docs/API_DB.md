@@ -150,135 +150,27 @@ Respuesta:
 
 ---
 
-## 1.b Esquema estándar del HMI
+## 1.b El esquema del HMI
 
-### `POST /db/{db_id}/esquema` — crear las tablas
-
-Crea las tres tablas del HMI con sus claves foráneas e índices, **adaptadas al
-motor** (los tipos cambian: `BIGSERIAL` en PostgreSQL, `IDENTITY(1,1)` en SQL
-Server, `AUTOINCREMENT` en SQLite…).
-
-```json
-POST /db/local/esquema
-{ "prefijo": "" }
-```
-
-```json
-{
-  "ok": true,
-  "db_id": "local",
-  "tablas_creadas": ["usuarios", "plc_prg", "alarmas"],
-  "tablas_existentes": [],
-  "errores": [],
-  "mensaje": "Esquema listo: 3 tabla(s) creada(s)."
-}
-```
-
-También se puede crear en el mismo momento del alta, mandando
-`"crear_esquema": true` (y opcionalmente `"prefijo_esquema"`) en `POST /db`.
-
-**Es idempotente**: llamarlo sobre una BD que ya tiene el esquema no falla ni
-toca los datos. La respuesta distingue `tablas_creadas` de `tablas_existentes`.
-
-Por defecto **no se crea nada** al dar de alta una conexión. Es deliberado: si
-conectas a un MES o un ERP de producción, no quieres que el servicio le escriba
-estructura sin que se lo pidas explícitamente.
-
-### Las tablas
-
-#### `usuarios` — quién opera el HMI
-
-| Columna | Tipo | Notas |
-|---|---|---|
-| `id` | PK autoincremental | |
-| `usuario` | VARCHAR(80) NOT NULL **UNIQUE** | login |
-| `password_hash` | VARCHAR(255) NOT NULL | **el hash, nunca la contraseña** |
-| `algoritmo` | VARCHAR(30) | `pbkdf2_sha256` por defecto; permite migrar de algoritmo sin invalidar las contraseñas existentes |
-| `email` | VARCHAR(160) | |
-| `categoria` | VARCHAR(40) | rol: `admin` \| `supervisor` \| `operador` \| `invitado` |
-| `estado` | VARCHAR(20) | `activo` \| `inactivo` \| `bloqueado` |
-| `creado_en` | timestamp | |
-| `ultimo_acceso` | timestamp | para auditoría y para detectar cuentas muertas |
-
-> Nunca guardes la contraseña en claro en esta tabla. Si alguien consigue leerla
-> —un backup, una captura, un `SELECT` mal dado— se lleva las credenciales de
-> todos los operarios de la planta.
-
-#### `plc_prg` — lecturas del PLC
-
-Esquema **estrecho**: una fila por `(ts, tag)`. Es el mismo formato que escribe
-el historizador, así que los widgets de tendencia consultan esta tabla sin
-adaptaciones.
-
-| Columna | Tipo | Notas |
-|---|---|---|
-| `id` | PK autoincremental | |
-| `ts` | timestamp NOT NULL | **cuándo se leyó** — sin esto no hay tendencias |
-| `plc_id` | VARCHAR(120) NOT NULL | distingue el mismo tag en dos PLCs |
-| `programa` | VARCHAR(200) | POU en Rexroth, Data Block en Siemens |
-| `tag` | VARCHAR(400) NOT NULL | `PLC_PRG.Temperatura` |
-| `valor_num` | double | numéricos y booleanos (0/1, para poder graficarlos) |
-| `valor_texto` | text | strings |
-| `tipo` | VARCHAR(40) | `LREAL`, `BOOL`, `DINT`… |
-
-Índices: `(tag, ts)` y `(plc_id, ts)` — son los dos patrones de consulta reales
-("este tag entre dos fechas", "todo lo de este PLC").
-
-**Por qué estrecho y no una columna por magnitud**: con columnas fijas, tener
-tres temperaturas no cabe, y cada cambio en el programa del PLC obliga a un
-`ALTER TABLE`. Con este esquema, agregar o quitar tags no toca la estructura
-nunca — que es justo lo que necesitas con el ctrlX, donde los programas varían.
-
-#### `alarmas` — eventos con su ciclo de vida
-
-| Columna | Tipo | Notas |
-|---|---|---|
-| `id` | PK autoincremental | |
-| `plc_prg_id` | FK → `plc_prg.id` | la lectura que la disparó (NULLable) |
-| `usuario_id` | FK → `usuarios.id` | quién la reconoció (NULLable) |
-| `tipo` | VARCHAR(20) | `proceso` \| `equipo` \| `comunicacion` \| `sistema` |
-| `area` | VARCHAR(80) | zona de planta |
-| `severidad` | int | 1 = crítica … 5 = informativa |
-| `mensaje` | VARCHAR(500) NOT NULL | texto que ve el operario |
-| `tag` | VARCHAR(400) | qué tag la disparó |
-| `valor_disparo` | double | con qué valor saltó (para auditarla) |
-| `estado` | VARCHAR(20) | `activa` \| `reconocida` \| `normalizada` |
-| `ts_activacion` | timestamp NOT NULL | cuándo saltó |
-| `ts_reconocimiento` | timestamp | cuándo la aceptó un operario |
-| `ts_normalizacion` | timestamp | cuándo volvió a la normalidad |
-
-Índices: `(estado, ts_activacion)` y `(tipo, ts_activacion)`.
-
-### Las relaciones, y por qué así
+Las tablas (`usuarios`, `plc_prg`, `alarmas`, `recetas`) **no se crean por
+API**. Se crean ejecutando un script SQL:
 
 ```
-usuarios.id  <──┐
-                ├── alarmas (plc_prg_id, usuario_id)
-plc_prg.id   <──┘
+sql/esquema_hmi_mssql.sql
+sql/esquema_hmi_postgresql.sql
+sql/esquema_hmi_mysql.sql
+sql/esquema_hmi_sqlite.sql
 ```
 
-* **PK simple, no compuesta.** Con una PK compuesta de `(id, plc_prg_id,
-  usuario_id)` no podrías tener dos alarmas distintas del mismo PLC y el mismo
-  usuario, que es exactamente el caso normal.
-* **Las dos FK son NULLables.** Una alarma existe desde que salta, aunque
-  todavía nadie la haya reconocido (`usuario_id` NULL), y puede venir de una
-  condición del sistema sin una lectura concreta detrás (`plc_prg_id` NULL).
-* **`ON DELETE SET NULL`.** Borrar un usuario no borra su historial de alarmas:
-  se pierde el "quién", no el evento. En una planta, el histórico de alarmas es
-  justo lo que no puedes perder cuando alguien deja la empresa.
+Es deliberado: una aplicación con permisos para alterar la estructura de la
+base de datos de producción es una aplicación que puede romperla. El usuario de
+BD del HMI solo necesita `db_datareader` + `db_datawriter`.
 
-> En SQLite las claves foráneas **no se aplican** salvo que ejecutes
-> `PRAGMA foreign_keys = ON` en cada conexión. PostgreSQL, MySQL (InnoDB) y SQL
-> Server las aplican siempre.
+Los scripts se **generan desde el propio código** con
+`python tools/generar_sql.py`, así que no pueden desincronizarse con lo que el
+backend espera encontrar.
 
-### Prefijo opcional
-
-`prefijo: "planta1"` crea `planta1_usuarios`, `planta1_plc_prg` y
-`planta1_alarmas`. Sirve para que dos instalaciones convivan en la misma base de
-datos. Se valida con lista blanca (letras, dígitos y guion bajo): un prefijo con
-`;` o espacios se rechaza con 400.
-
----
+Guía completa de despliegue: `docs/SERVIDOR_SQL.md`.
 
 ## 2. Consultas
 
