@@ -174,8 +174,21 @@ async def _avisar(request: Request, recurso: str, sesion=None,
         }],
     }}}}},
 )
-async def listar_conexiones(request: Request) -> dict:
-    return {"conexiones": _mgr(request).listar_conexiones()}
+async def listar_conexiones(
+    request: Request,
+    revisar: bool = Query(
+        default=False,
+        description="Preguntar al servidor antes de responder. Sin esto se "
+                    "devuelve el estado del pool, que puede estar obsoleto: "
+                    "una base borrada en el gestor sigue apareciendo como "
+                    "conectada hasta que algo intenta usarla. Cuesta una "
+                    "conexión por cada base dada de alta.",
+    ),
+) -> dict:
+    mgr = _mgr(request)
+    if revisar:
+        await mgr.revisar_conexiones()
+    return {"conexiones": mgr.listar_conexiones()}
 
 
 _RE_ODBC = re.compile(r"^ODBC Driver (\d+) for SQL Server$", re.IGNORECASE)

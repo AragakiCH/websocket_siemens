@@ -154,6 +154,13 @@ export function Login() {
   const [recarga, setRecarga] = useState(0);
   const [selectorAbierto, setSelectorAbierto] = useState(false);
 
+  // Revisar TODAS las bases contra el servidor cuesta una conexión por base,
+  // y con un servidor remoto apagado eso son segundos de pantalla en blanco.
+  // Se paga en los dos momentos en los que hace falta —al abrir el login y
+  // tras configurar una conexión— y no cada vez que se despliega el selector:
+  // al cambiar de base, el backend ya diagnostica ESA sola si falla.
+  const ultimaRevision = useRef(-1);
+
   // Se vuelve a preguntar en CADA cambio de base: `hay_usuarios` y
   // `bd_disponible` son propiedades de la base, no del sistema. Sin esto, al
   // cambiar de opción el login seguiría diciendo "crea la primera cuenta"
@@ -164,7 +171,14 @@ export function Login() {
     setErrorEstado('');
     setErrores({});
 
-    fetchEstadoAuth(dbId || undefined)
+    // Que el backend PREGUNTE al servidor por cada base, en vez de responder
+    // con el estado del pool que tiene abierto. Es lo que hace que borrar una
+    // base en SQL Server se vea aquí: sin esto el desplegable sigue
+    // ofreciendo, y marcando como viva, una base que ya no existe.
+    const revisar = ultimaRevision.current !== recarga;
+    ultimaRevision.current = recarga;
+
+    fetchEstadoAuth(dbId || undefined, revisar)
       .then((e) => {
         if (!vivo) return;
         setEstado(e);
@@ -523,7 +537,12 @@ export function Login() {
             {sinBd && (
               <div className="mb-7">
                 <AsistenteArranque
-                  motivo={estado?.bd?.mensaje || estado?.mensaje || t('auth.noDbBody')}
+                  // `estado.mensaje` va PRIMERO: cuando la base no
+                  // responde, el backend lo rellena con el diagnóstico de
+                  // esta misma comprobación ("La base 'X' no existe en el
+                  // servidor…"). `bd.mensaje` es el último error guardado,
+                  // que puede ser de hace horas.
+                  motivo={estado?.mensaje || estado?.bd?.mensaje || t('auth.noDbBody')}
                   onListo={(creada) => {
                     setSelectorAbierto(false);
                     // Cambiarse a la conexión recién creada. Recargar la que
@@ -1240,6 +1259,31 @@ function PanelEstado({
 }
 
 /**
+ * Etiqueta corta para el `<option>`: qué le pasa a esa base.
+ *
+ * Dentro de un `<select>` nativo no se puede pintar un punto de color por
+ * opción, así que el estado tiene que ir en el texto. Y tiene que ser el
+ * estado CONCRETO: "sin conexión" a secas hizo que una base borrada en SQL
+ * Server siguiera pareciendo un problema de red durante un buen rato.
+ */
+function etiquetaEstado(b: BaseDatos, t: (k: string) => string): string {
+  switch (b.estado) {
+    case 'base_no_existe':
+    case 'ruta_no_existe':
+      return t('auth.dbGone');
+    case 'sin_servidor':
+    case 'host_desconocido':
+    case 'timeout':
+      return t('auth.dbNoServer');
+    case 'credenciales':
+    case 'sin_permisos':
+      return t('auth.dbBadCreds');
+    default:
+      return t('auth.dbOffline');
+  }
+}
+
+/**
  * Selector de base de datos.
  *
  * No es un ajuste de conveniencia: **elige contra qué tabla `usuarios` se
@@ -1293,7 +1337,7 @@ function SelectorBase({
                   <select> nativo no se puede pintar un punto por opción. */}
               {b.nombre}
               {b.base_datos ? ` — ${b.base_datos}` : ''}
-              {b.conectado ? '' : `  (${t('auth.dbOffline')})`}
+              {b.conectado ? '' : `  (${etiquetaEstado(b, t)})`}
             </option>
           ))}
         </select>
@@ -1311,7 +1355,19 @@ function SelectorBase({
       {actual && !actual.conectado && (
         <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-relaxed text-state-error">
           <AlertCircleIcon className="mt-px h-3 w-3 shrink-0" />
-          <span className="min-w-0">{t('auth.dbPickerOffline')}</span>
+          <span className="min-w-0">
+            {/* Una base BORRADA y un servidor apagado se veían igual —
+                "no responde"— y no lo son: el primero se arregla desde
+                esta pantalla, el segundo no. Cuando el backend sabe cuál
+                de los dos es, se dice. */}
+            {actual.estado === 'base_no_existe'
+              ? t('auth.dbGoneHint')
+              : actual.estado_titulo
+                ? `${actual.estado_titulo}${
+                    actual.estado_sugerencia ? ` ${actual.estado_sugerencia}` : ''
+                  }`
+                : t('auth.dbPickerOffline')}
+          </span>
         </p>
       )}
     </div>

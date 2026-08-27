@@ -232,14 +232,50 @@ async def estado_auth(
                     "login lo usa al cambiar de opción: si hay cuentas o no "
                     "depende de la base, no del sistema.",
     ),
+    revisar: bool = Query(
+        default=False,
+        description="Preguntar al servidor por cada base antes de responder, "
+                    "en vez de fiarse del pool abierto. El login lo pide al "
+                    "cargarse: si alguien borró la base en el gestor, el pool "
+                    "puede seguir diciendo que está viva y el desplegable "
+                    "ofrece entrar en algo que ya no existe.",
+    ),
 ) -> dict:
     auth = _auth(request)
+
+    # Refrescar ANTES de contar: así `bases`, `bd` y `bd_disponible` cuentan
+    # todos la misma historia. Cuesta una conexión por base dada de alta.
+    if revisar:
+        try:
+            await auth.revisar_bases()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("No se pudieron revisar las bases: %s", exc)
+
+    bd_estado: dict = {}
     try:
         total = await auth.contar(db_id)
         disponible = True
         detalle = ""
     except ErrorAuth as exc:
         total, disponible, detalle = 0, False, exc.mensaje
+        # "No se pudo conectar a la base de datos de usuarios: <traza ODBC>"
+        # no le dice a nadie qué hacer. Se pregunta al servidor para poder
+        # decir cuál de los cuatro problemas distintos es — y, sobre todo,
+        # para distinguir "la base ya no existe" (que tiene arreglo desde
+        # esta misma pantalla: crearla) de "el servidor no responde" (que no).
+        try:
+            # Si ya se revisó arriba, la respuesta del servidor está en caché
+            # y volver a preguntar sería pagar dos veces el mismo timeout —
+            # que es justo el caso en el que más duele, con el servidor caído.
+            bd_estado = (auth.estado_base(db_id) if revisar
+                         else await auth.revisar_base(db_id))
+        except Exception as exc2:  # noqa: BLE001
+            logger.warning("No se pudo diagnosticar la base: %s", exc2)
+        if bd_estado and not bd_estado.get("ok"):
+            detalle = " ".join(
+                p for p in (bd_estado.get("titulo", ""),
+                            bd_estado.get("sugerencia", "")) if p
+            ).strip() or detalle
 
     # Qué base respalda las cuentas. Va aquí, en el endpoint público, porque
     # el login tiene que poder decir "vas a crear la cuenta en HMI PSI
@@ -261,6 +297,11 @@ async def estado_auth(
     return {
         "ok": True,
         "hay_usuarios": total > 0,
+        # Código estable del diagnóstico cuando la base no responde:
+        # `base_no_existe`, `sin_servidor`, `credenciales`, `timeout`...
+        # La vista lo usa para decidir qué ofrecer, no para enseñarlo.
+        "bd_estado": bd_estado.get("estado", "") if bd_estado else "",
+        "bd_sugerencia": bd_estado.get("sugerencia", "") if bd_estado else "",
         "num_usuarios": total,
         "auth_requerida": request.app.state.settings.auth_requerida,
         "bd_disponible": disponible,

@@ -116,6 +116,14 @@ const es: Dict = {
   'auth.dbChange': 'Cambiar',
   'auth.dbOnline': 'conectada',
   'auth.dbOffline': 'sin conexión',
+  // Por qué no responde. "sin conexión" a secas obliga a adivinar entre un
+  // servidor apagado, una contraseña cambiada y una base BORRADA, que son
+  // tres arreglos distintos — y solo el último se puede resolver desde aquí.
+  'auth.dbGone': 'ya no existe',
+  'auth.dbNoServer': 'servidor no responde',
+  'auth.dbBadCreds': 'credenciales rechazadas',
+  'auth.dbGoneHint':
+  'Esa base ya no está en el servidor: la conexión sigue guardada, pero la base fue borrada o nunca llegó a crearse. Puedes volver a crearla desde aquí.',
   'auth.dbNotFixed':
   'No hay PLC_AUTH_DB_ID en el .env: se está usando la primera conexión de la lista. Fíjala para que no cambie sola al agregar otra base.',
   'auth.dbUnknown': 'sin determinar',
@@ -369,6 +377,11 @@ const en: Dict = {
   'auth.dbChange': 'Change',
   'auth.dbOnline': 'connected',
   'auth.dbOffline': 'offline',
+  'auth.dbGone': 'no longer exists',
+  'auth.dbNoServer': 'server not responding',
+  'auth.dbBadCreds': 'credentials rejected',
+  'auth.dbGoneHint':
+  'That database is no longer on the server: the connection is still saved, but the database was dropped or never created. You can create it again from here.',
   'auth.dbNotFixed':
   'PLC_AUTH_DB_ID is not set in .env: the first connection in the list is being used. Pin it so it cannot change when another database is added.',
   'auth.dbUnknown': 'undetermined',

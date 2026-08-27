@@ -39,6 +39,15 @@ class DbManager:
         self._drivers: Dict[str, DbDriver] = {}
         # db_id -> último error de conexión (para mostrarlo en la vista)
         self._errores: Dict[str, str] = {}
+        # db_id -> última revisión CONTRA EL SERVIDOR (no contra el pool).
+        #
+        # Hay una diferencia que se nota mucho en la vista: `self._drivers`
+        # dice si TENEMOS un pool abierto, no si la base sigue estando ahí.
+        # Si alguien borra la base en SQL Server, el pool puede seguir
+        # marcado como vivo un buen rato y la pantalla enseña "conectada"
+        # sobre una base que ya no existe. Esto guarda la última respuesta
+        # real del servidor, con su código de diagnóstico.
+        self._estados: Dict[str, dict] = {}
         self._lock = asyncio.Lock()
 
     @property
@@ -177,6 +186,13 @@ class DbManager:
         async with self._lock:
             self._store.guardar_conexion(conexion, password)
             await self._abrir(conexion)
+            # Acabamos de verificarla arriba con `prueba.test()`: la revisión
+            # anterior (que podía decir "esa base no existe") ya no vale.
+            self._estados[db_id] = {
+                "db_id": db_id, "ok": True, "estado": "ok",
+                "titulo": "Responde correctamente.", "sugerencia": "",
+                "mensaje": "Conexión verificada al guardarla.",
+            }
 
         logger.info("Conexión '%s' dada de alta (%s).", db_id, motor)
         respuesta = {"ok": True, "db_id": db_id, "motor": motor,
@@ -200,6 +216,8 @@ class DbManager:
                     await driver.disconnect()
                 except Exception:  # noqa: BLE001
                     pass
+            self._estados.pop(db_id, None)
+            self._errores.pop(db_id, None)
             n_consultas = len(self._store.consultas_de(db_id))
             if not self._store.borrar_conexion(db_id):
                 return {"ok": False, "mensaje": f"No existe la conexión '{db_id}'."}
@@ -235,10 +253,113 @@ class DbManager:
                 password=self._store.password_de(db_id),
                 opciones=conexion.opciones or {},
             )
+            # El pool que acaba de fallar no sirve para nada y, mientras
+            # siga en el diccionario, `listar_conexiones()` lo cuenta como
+            # conectado. Se cierra aquí: la próxima consulta lo reabrirá si
+            # la base vuelve.
+            muerto = self._drivers.pop(db_id, None)
+            if muerto is not None:
+                try:
+                    await muerto.disconnect()
+                except Exception:  # noqa: BLE001
+                    pass
             self._errores[db_id] = f"{diag['titulo']}. {diag['sugerencia']}"
             return {"ok": False, "db_id": db_id,
                     "mensaje": f"{diag['titulo']}. {diag['sugerencia']}",
                     "diagnostico": diag}
+
+    # ================================================================== #
+    # Estado real: preguntarle al servidor, no al pool
+    # ================================================================== #
+    async def revisar_conexion(self, db_id: str,
+                               espera: float = 8.0) -> Dict[str, Any]:
+        """
+        Comprueba CONTRA EL SERVIDOR en qué estado está esta conexión y
+        cachea el resultado.
+
+        Devuelve siempre la misma forma, con `estado` tomado de los códigos
+        de `app/db/diagnostico.py`, que son estables y sirven para que la
+        vista decida qué ofrecer:
+
+            ok             -> responde; se puede entrar.
+            base_no_existe -> el servidor está, la base ya no. (Alguien la
+                              borró, o nunca se creó.) Esto es lo que
+                              distingue "la borré en SSMS" de "el servidor
+                              está apagado", que antes se veían igual.
+            sin_servidor / host_desconocido / timeout -> no se llega.
+            credenciales / sin_permisos -> se llega, pero no se entra.
+
+        El `espera` está para que una conexión a un servidor remoto apagado
+        no deje la pantalla del login colgada: un timeout es una respuesta
+        tan válida como cualquier otra.
+        """
+        if db_id not in self._store.conexiones:
+            estado = {"db_id": db_id, "ok": False, "estado": "no_registrada",
+                      "titulo": f"No existe la conexión '{db_id}'.",
+                      "sugerencia": "Dala de alta antes de usarla.",
+                      "mensaje": f"No existe la conexión '{db_id}'."}
+            self._estados.pop(db_id, None)
+            return estado
+
+        try:
+            r = await asyncio.wait_for(self.probar_conexion(db_id), espera)
+        except asyncio.TimeoutError:
+            estado = {
+                "db_id": db_id, "ok": False, "estado": "timeout",
+                "titulo": "El servidor no contestó a tiempo.",
+                "sugerencia": "Comprueba que está encendido y que el puerto "
+                              "está abierto en el cortafuegos.",
+                "mensaje": "El servidor no contestó a tiempo.",
+            }
+            self._errores[db_id] = estado["mensaje"]
+            self._estados[db_id] = estado
+            return estado
+        except Exception as exc:  # noqa: BLE001
+            estado = {"db_id": db_id, "ok": False, "estado": "desconocido",
+                      "titulo": str(exc), "sugerencia": "",
+                      "mensaje": str(exc)}
+            self._estados[db_id] = estado
+            return estado
+
+        if r.get("ok"):
+            estado = {"db_id": db_id, "ok": True, "estado": "ok",
+                      "titulo": "Responde correctamente.", "sugerencia": "",
+                      "mensaje": r.get("mensaje", "Conexión OK."),
+                      "latencia_ms": r.get("latencia_ms")}
+        else:
+            diag = r.get("diagnostico") or {}
+            estado = {
+                "db_id": db_id, "ok": False,
+                "estado": diag.get("codigo") or "desconocido",
+                "titulo": diag.get("titulo") or r.get("mensaje", ""),
+                "sugerencia": diag.get("sugerencia", ""),
+                "mensaje": r.get("mensaje", ""),
+                "diagnostico": diag or None,
+            }
+        self._estados[db_id] = estado
+        return estado
+
+    async def revisar_conexiones(self, espera: float = 8.0) -> List[dict]:
+        """Revisa todas a la vez. En paralelo: una caída no frena a las demás."""
+        ids = list(self._store.conexiones.keys())
+        if not ids:
+            return []
+        resultados = await asyncio.gather(
+            *(self.revisar_conexion(i, espera) for i in ids),
+            return_exceptions=True,
+        )
+        salida = []
+        for db_id, r in zip(ids, resultados):
+            if isinstance(r, BaseException):
+                r = {"db_id": db_id, "ok": False, "estado": "desconocido",
+                     "titulo": str(r), "sugerencia": "", "mensaje": str(r)}
+                self._estados[db_id] = r
+            salida.append(r)
+        return salida
+
+    def estado_cacheado(self, db_id: str) -> Dict[str, Any]:
+        """Última revisión conocida, sin tocar la red. `{}` si no hay ninguna."""
+        return dict(self._estados.get(db_id) or {})
 
     async def _driver_de(self, db_id: str) -> DbDriver:
         """
@@ -267,6 +388,16 @@ class DbManager:
             d["num_consultas"] = len(self._store.consultas_de(c.db_id))
             if c.db_id in self._errores:
                 d["ultimo_error"] = self._errores[c.db_id]
+            # Lo que dijo el SERVIDOR la última vez que se le preguntó. Manda
+            # sobre el pool: si la base ya no existe, da igual que nos quedara
+            # un pool abierto — la vista no debe decir "conectada".
+            est = self._estados.get(c.db_id)
+            if est:
+                d["estado"] = est.get("estado", "")
+                d["estado_titulo"] = est.get("titulo", "")
+                d["estado_sugerencia"] = est.get("sugerencia", "")
+                if not est.get("ok"):
+                    d["conectado"] = False
             salida.append(d)
         return salida
 

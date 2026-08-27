@@ -81,10 +81,15 @@ export function PanelBasesDatos() {
   const [diagFila, setDiagFila] = useState<Record<string, Diagnostico | undefined>>({});
   const [confirmar, setConfirmar] = useState('');
 
-  const recargar = useCallback(async () => {
+  // `revisar = true` -> el backend pregunta al SERVIDOR por cada conexión en
+  // vez de responder con el estado de su pool. Es más lento (una conexión por
+  // base) pero es la única forma de que esta lista diga la verdad: un pool
+  // abierto sobre una base que alguien acaba de borrar sigue diciendo
+  // "conectada" hasta que algo intenta usarla.
+  const recargar = useCallback(async (revisar = true) => {
     setCargando(true);
     try {
-      setConexiones(await cargarConexiones());
+      setConexiones(await cargarConexiones(revisar));
       setError('');
     } catch (e: any) {
       setError(e?.message ?? 'No se pudieron cargar las conexiones.');
@@ -260,6 +265,14 @@ export function PanelBasesDatos() {
                         ? ` · ${c.num_consultas} consulta(s)`
                         : ''}
                     </p>
+                    {/* Lo que contestó el servidor la última vez. Va aquí y no
+                        en un tooltip: es la diferencia entre "vuelve a
+                        intentarlo" y "esa base hay que volver a crearla". */}
+                    {!c.conectado && c.estado_titulo && (
+                      <p className="mt-0.5 truncate text-[11px] text-state-error">
+                        {c.estado_titulo}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -276,7 +289,13 @@ export function PanelBasesDatos() {
                         c.conectado ? 'text-state-ok' : 'text-state-error'
                       }`}
                     >
-                      {c.conectado ? 'conectada' : 'sin conexión'}
+                      {c.conectado
+                        ? 'conectada'
+                        : c.estado === 'base_no_existe'
+                          ? 'la base ya no existe'
+                          : c.estado === 'credenciales' || c.estado === 'sin_permisos'
+                            ? 'credenciales rechazadas'
+                            : 'sin conexión'}
                     </span>
                   </span>
 

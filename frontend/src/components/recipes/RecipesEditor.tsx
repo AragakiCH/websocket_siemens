@@ -2,10 +2,6 @@
 // RecipesEditor.tsx
 // Editor de recetas, con la misma estructura que el de TIA Portal.
 //
-// ⚠️ SOLO VISTA. Nada de esto habla con un PLC todavía: no hay "escribir en
-//    el PLC" ni "leer del PLC", que es lo que hace útil a una receta de
-//    verdad. Acá solo se define la estructura y se guarda en el navegador.
-//
 // SON TRES NIVELES, y esa es toda la idea:
 //
 //   Recipe        el contenedor. Dónde se guarda, cuántos registros caben,
@@ -22,27 +18,48 @@
 //     Clásico    │  30   │   20   │  60
 //     Doble      │  30   │   20   │  90
 //
-// En runtime el operador elegiría "Clásico" y el HMI escribiría 30, 20 y 60
-// en los tags de cada elemento. Eso es lo que falta.
+// DÓNDE VIVE AHORA
+//
+//   En la base de datos, en las cuatro tablas de recetas. Antes esto se
+//   guardaba en `localStorage`: una receta configurada en el PC de planta no
+//   existía en el de oficina, y bastaba con que alguien limpiara el navegador
+//   para perderla. Ahora cada celda es una fila de verdad, en la MISMA base
+//   con la que se entró al sistema.
+//
+//   Se guarda solo, sin botón: los cambios de texto se agrupan y se mandan
+//   tras una pausa (`RETARDO_GUARDADO`), y las altas y bajas van al momento.
+//   El indicador de la barra superior dice en qué punto está — un "guardado
+//   automático" sin señal visible es indistinguible de uno roto.
+//
+// LO QUE SIGUE FALTANDO
+//
+//   Escribir la receta EN EL PLC y leerla de vuelta. Ya hay dónde guardar las
+//   tres capas y con qué identificarlas; lo que falta es cargar un
+//   `receta_registro` en los tags de sus elementos. Ese paso, el día que
+//   exista, necesita identidad y auditoría obligatorias: es la primera vez
+//   que el HMI escribiría en una máquina.
 //
 // LAS CELDAS ROSADAS
-// Son el mismo código visual de TIA: un elemento SIN tag no tiene dónde
-// escribir su valor, así que su columna entera queda bloqueada en la pestaña
-// de registros hasta que se le asigne uno.
+//   Son el mismo código visual de TIA: un elemento SIN tag no tiene dónde
+//   escribir su valor, así que su columna entera queda bloqueada en la
+//   pestaña de registros hasta que se le asigne uno.
 // =========================================================================
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   BookOpenIcon,
   PlusIcon,
   Trash2Icon,
   CopyIcon,
-  TagIcon,
   InfoIcon,
   LayersIcon,
   ListIcon,
   AlertTriangleIcon,
   FolderOpenIcon,
+  Loader2Icon,
+  CheckCircle2Icon,
+  AlertCircleIcon,
+  RefreshCwIcon,
 } from 'lucide-react';
 import {
   Th,
@@ -53,126 +70,71 @@ import {
   IconoBoton,
   AccionesFila,
 } from '../ui/TableBits';
+import { apiGet, cargarTags, type TagRemoto } from '../flows/api';
+import { SelectorBaseRecetas } from './SelectorBaseRecetas';
+import { SelectorTagPlc } from './SelectorTagPlc';
+import {
+  fetchEstadoAuth,
+  getBasePreferida,
+  type BaseDatos,
+} from '../../services/authApi';
+import {
+  actualizarCrud,
+  borrarCrud,
+  crearCrud,
+  type RecursoCrud,
+} from '../../services/crudApi';
+import {
+  COMM_TYPES,
+  DATA_TYPES,
+  LARGO_TIPO,
+  RECIPE_TYPES,
+  aElemento,
+  aRecipe,
+  aRegistro,
+  cargarDetalle,
+  cargarRecetas,
+  claveValor,
+  crearValor,
+  getBaseRecetas,
+  setBaseRecetas,
+  nuevaRecetaDb,
+  nuevoElementoDb,
+  nuevoRegistroDb,
+  patchElementoADb,
+  patchRecetaADb,
+  patchRegistroADb,
+  valorADb,
+  type CommType,
+  type ElementDataType,
+  type MapaValores,
+  type Recipe,
+  type RecipeDataRecord,
+  type RecipeElement,
+  type RecipeType,
+} from '../../services/recetasApi';
 
-const STORAGE_KEY = 'hmi.recipes';
-
-// ─── Vocabulario de TIA ──────────────────────────────────────────
-
-/** `Limited` reserva memoria fija; `Unlimited` crece según haya espacio. */
-export const RECIPE_TYPES = ['Limited', 'Unlimited'] as const;
-export type RecipeType = (typeof RECIPE_TYPES)[number];
-
-/**
- * Cómo viajan los valores al PLC.
- *
- *   Tags   un tag por elemento, N escrituras sueltas. Hay un instante en que
- *          el PLC tiene el primer valor nuevo y el último viejo.
- *   Array  todos los elementos en un único tag de tipo array, en UNA sola
- *          escritura. Llegan juntos o no llega ninguno.
- */
-export const COMM_TYPES = ['Tags', 'Array'] as const;
-export type CommType = (typeof COMM_TYPES)[number];
-
-/** `''` = sin definir, que es como lo deja TIA mientras no haya tag. */
-export const DATA_TYPES = [
-  '',
-  'Bool',
-  'Byte',
-  'Int',
-  'UInt',
-  'DInt',
-  'UDInt',
-  'Real',
-  'LReal',
-  'String',
-] as const;
-export type ElementDataType = (typeof DATA_TYPES)[number];
-
-/**
- * Bytes que ocupa cada tipo. Es lo que TIA muestra en "Data length" y no se
- * escribe a mano: sale del tipo, así que acá también es de solo lectura.
- */
-const LARGO_TIPO: Record<string, number> = {
-  '': 0,
-  Bool: 1,
-  Byte: 1,
-  Int: 2,
-  UInt: 2,
-  DInt: 4,
-  UDInt: 4,
-  Real: 4,
-  LReal: 8,
-  String: 254,
+export { RECIPE_TYPES, COMM_TYPES, DATA_TYPES };
+export type {
+  CommType,
+  ElementDataType,
+  Recipe,
+  RecipeDataRecord,
+  RecipeElement,
+  RecipeType,
 };
 
-// ─── Modelo ──────────────────────────────────────────────────────
-
-export interface RecipeElement {
-  id: string;
-  name: string;
-  displayName: string;
-  /** Tag del PLC. `''` se muestra como `<None>` y bloquea la columna. */
-  tag: string;
-  dataType: ElementDataType;
-  defaultValue: string;
-  minValue: string;
-  maxValue: string;
-  decimals: string;
-  tooltip: string;
-}
-
-export interface RecipeDataRecord {
-  id: string;
-  name: string;
-  displayName: string;
-  number: number;
-  /** elementId -> valor escrito. Se indexa por id, no por nombre: así
-   *  renombrar un elemento no pierde los valores ya cargados. */
-  values: Record<string, string>;
-  comment: string;
-}
-
-export interface Recipe {
-  id: string;
-  name: string;
-  displayName: string;
-  number: number;
-  /** ISO. TIA la actualiza sola en cada cambio de estructura; acá igual. */
-  version: string;
-  path: string;
-  type: RecipeType;
-  maxRecords: string;
-  commType: CommType;
-  checkLimits: boolean;
-  tooltip: string;
-  elements: RecipeElement[];
-  records: RecipeDataRecord[];
-}
+/**
+ * Pausa antes de mandar los cambios de texto.
+ *
+ * Sin esto, escribir "azucar" serían seis PATCH. Con una pausa corta se manda
+ * uno solo con el texto final, y sigue sintiéndose inmediato porque la vista
+ * ya se actualizó — lo que se agrupa es la escritura, no lo que se ve.
+ */
+const RETARDO_GUARDADO = 600;
 
 type Pestana = 'elements' | 'records';
-
-// ─── Persistencia ────────────────────────────────────────────────
-
-function cargar(): Recipe[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const datos = JSON.parse(raw);
-    return Array.isArray(datos) ? datos : [];
-  } catch {
-    return [];
-  }
-}
-
-function guardar(recetas: Recipe[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(recetas));
-  } catch {
-    /* cuota llena o almacenamiento deshabilitado */
-  }
-}
-
-const nuevoId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+type EstadoGuardado = 'limpio' | 'guardando' | 'guardado' | 'error';
 
 /** Fecha corta, con el mismo aire que la columna Version de TIA. */
 function fmtVersion(iso: string): string {
@@ -187,30 +149,312 @@ function fmtVersion(iso: string): string {
 // ═════════════════════════════════════════════════════════════════
 
 export function RecipesEditor() {
-  const [recetas, setRecetas] = useState<Recipe[]>(cargar);
-  const [selId, setSelId] = useState<string | null>(null);
+  const [recetas, setRecetas] = useState<Recipe[]>([]);
+  const [selId, setSelId] = useState<number | null>(null);
   const [pestana, setPestana] = useState<Pestana>('elements');
+  const [cargando, setCargando] = useState(true);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
+  const [error, setError] = useState('');
+  const [guardado, setGuardado] = useState<EstadoGuardado>('limpio');
+  const [ocupado, setOcupado] = useState(false);
+  // Las variables de los PLCs, para poder ELEGIR el tag de un elemento en vez
+  // de teclearlo de memoria. Vienen de `GET /tags`, que son los tags
+  // descubiertos por browse OPC UA — o sea, los que existen de verdad.
+  const [tagsPlc, setTagsPlc] = useState<TagRemoto[]>([]);
+  const [cargandoTags, setCargandoTags] = useState(true);
+  const [hayPlcs, setHayPlcs] = useState(true);
   const sinMovimiento = useReducedMotion();
 
-  useEffect(() => { guardar(recetas); }, [recetas]);
+  // ── En qué base se guardan las recetas ────────────────────────
+  //
+  // Las cuatro tablas viven en UNA base, y se puede elegir cuál: la local del
+  // PC de planta o la del servidor. No es una propiedad de cada receta —una
+  // fila ya está guardada en algún sitio, no puede "apuntar" a otra base—
+  // sino de la pantalla entera: al cambiarla, todo lo que se lea y se escriba
+  // a partir de ese momento va ahí.
+  //
+  // Se recuerda por navegador y arranca en la del login, que es lo que espera
+  // quien no sepa que esto se puede cambiar.
+  const [dbRecetas, setDbRecetas] = useState<string>(
+    () => getBaseRecetas() || getBasePreferida()
+  );
+  const [bases, setBases] = useState<BaseDatos[]>([]);
+  // En un ref además del estado: las funciones que guardan se crean una vez y
+  // leyendo el estado capturarían el valor viejo. Con el ref, un cambio de
+  // base no puede mandar una escritura a la base anterior.
+  const dbRef = useRef(dbRecetas);
+  dbRef.current = dbRecetas;
 
-  // Si no hay nada elegido (primera carga, o se borró la seleccionada),
-  // cae sobre la primera: el panel de abajo nunca se queda vacío sin motivo.
+  // `receta_valores.id` de cada celda ya materializada. En un ref y no en el
+  // estado porque cambiarlo no repinta nada: es fontanería.
+  const valorIds = useRef<MapaValores>(new Map());
+  // Último texto tecleado en cada celda. Sirve para un caso concreto: si
+  // alguien sigue escribiendo mientras el POST que crea esa celda está en
+  // vuelo, al volver hay que mandar lo ÚLTIMO, no lo que se envió al crearla.
+  const ultimoValor = useRef(new Map<string, string>());
+  const creandoValor = useRef(new Set<string>());
+  const recargarRef = useRef<(id: number) => void>(() => {});
+  const selIdRef = useRef<number | null>(null);
+  selIdRef.current = selId;
+
+  // ── Guardado diferido ─────────────────────────────────────────
+  //
+  // Una cola indexada por `recurso:id`: dos cambios seguidos en la misma fila
+  // se funden en un PATCH, y filas distintas conviven sin pisarse.
+  const cola = useRef(
+    new Map<string, { recurso: RecursoCrud; id: number; patch: Record<string, any> }>()
+  );
+  const temporizador = useRef<number | null>(null);
+
+  const vaciarCola = useCallback(async () => {
+    temporizador.current = null;
+    const items = [...cola.current.values()];
+    cola.current.clear();
+    if (items.length === 0) return;
+
+    setGuardado('guardando');
+    try {
+      for (const it of items) {
+        await actualizarCrud(it.recurso, it.id, it.patch, dbRef.current);
+      }
+      setGuardado('guardado');
+      setError('');
+    } catch (e: any) {
+      setGuardado('error');
+      setError(e?.message ?? 'No se pudo guardar el cambio.');
+      // La vista ya había pintado el cambio y el servidor lo rechazó —por
+      // ejemplo un mínimo mayor que el máximo, que el backend valida porque
+      // esos números acaban en una máquina real. Se vuelve a leer, para que
+      // lo que se ve sea lo que hay y no un valor que solo existe aquí.
+      const id = selIdRef.current;
+      if (id) recargarRef.current(id);
+    }
+  }, []);
+
+  const programar = useCallback(
+    (recurso: RecursoCrud, id: number, patch: Record<string, any>) => {
+      if (!id || Object.keys(patch).length === 0) return;
+      const clave = `${recurso}:${id}`;
+      const previo = cola.current.get(clave);
+      cola.current.set(clave, {
+        recurso,
+        id,
+        patch: { ...(previo?.patch ?? {}), ...patch },
+      });
+      setGuardado('guardando');
+      if (temporizador.current) window.clearTimeout(temporizador.current);
+      temporizador.current = window.setTimeout(() => {
+        void vaciarCola();
+      }, RETARDO_GUARDADO);
+    },
+    [vaciarCola]
+  );
+
+  // Al salir de la pantalla no puede quedarse nada a medias en la cola.
   useEffect(() => {
-    if (recetas.length === 0) { setSelId(null); return; }
+    return () => {
+      if (temporizador.current) window.clearTimeout(temporizador.current);
+      const items = [...cola.current.values()];
+      cola.current.clear();
+      for (const it of items) {
+        void actualizarCrud(it.recurso, it.id, it.patch, dbRef.current).catch(
+          () => {}
+        );
+      }
+    };
+  }, []);
+
+  /** Envuelve una operación que va al servidor al momento (altas y bajas). */
+  const conServidor = useCallback(async (fn: () => Promise<void>) => {
+    setOcupado(true);
+    try {
+      await fn();
+      setError('');
+      setGuardado('guardado');
+    } catch (e: any) {
+      setError(e?.message ?? 'La operación falló.');
+      setGuardado('error');
+    } finally {
+      setOcupado(false);
+    }
+  }, []);
+
+  // ── Carga inicial ─────────────────────────────────────────────
+  const recargarTodo = useCallback(async () => {
+    setCargando(true);
+    try {
+      const lista = await cargarRecetas(dbRef.current);
+      valorIds.current = new Map();
+      ultimoValor.current.clear();
+      setRecetas(lista);
+      setError('');
+    } catch (e: any) {
+      setError(e?.message ?? 'No se pudieron cargar las recetas.');
+    } finally {
+      setCargando(false);
+    }
+    // `dbRecetas` en las dependencias: cambiar de base tiene que volver a
+    // leerlo todo, no quedarse con las recetas de la anterior.
+  }, [dbRecetas]);
+
+  useEffect(() => {
+    void recargarTodo();
+  }, [recargarTodo]);
+
+  /**
+   * Los tags de los PLCs.
+   *
+   * `GET /tags` viene VACÍO si ningún PLC ha conectado todavía: la lista se
+   * llena tras un browse OPC UA correcto. Eso no es un error, pero son dos
+   * situaciones muy distintas —no hay PLCs dados de alta, o los hay y están
+   * apagados— y se arreglan de forma distinta, así que se pregunta también
+   * por `GET /plcs` para poder decir cuál de las dos es.
+   *
+   * Un fallo aquí NO rompe la pantalla: el campo del tag sigue siendo de
+   * texto libre, que es justo lo que permite configurar recetas en la
+   * oficina con la máquina apagada.
+   */
+  const recargarTags = useCallback(async () => {
+    setCargandoTags(true);
+    try {
+      const [lista, plcs] = await Promise.all([
+        cargarTags(),
+        apiGet<{ plcs?: string[] }>('/plcs').catch(() => ({ plcs: [] })),
+      ]);
+      setTagsPlc(lista);
+      setHayPlcs((plcs?.plcs ?? []).length > 0);
+    } catch {
+      setTagsPlc([]);
+    } finally {
+      setCargandoTags(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void recargarTags();
+  }, [recargarTags]);
+
+  // El catálogo de bases dadas de alta. Se pide a `/auth/estado`, que es
+  // público y NO devuelve host ni credenciales: aquí solo hace falta el
+  // identificador y el nombre para poder elegir.
+  useEffect(() => {
+    let vivo = true;
+    fetchEstadoAuth()
+      .then((e) => {
+        if (!vivo) return;
+        const lista = e.bases ?? [];
+        setBases(lista);
+        // Si la base recordada ya no está dada de alta, no tiene sentido
+        // seguir intentando escribir en ella: se cae a la del login.
+        if (lista.length && !lista.some((b) => b.db_id === dbRef.current)) {
+          const alternativa =
+            lista.find((b) => b.db_id === getBasePreferida()) ??
+            lista.find((b) => b.por_defecto) ??
+            lista[0];
+          setBaseRecetas(alternativa.db_id);
+          setDbRecetas(alternativa.db_id);
+        }
+      })
+      .catch(() => {
+        /* sin catálogo se sigue usando la base actual */
+      });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  /**
+   * Cambiar la base de esta pantalla.
+   *
+   * Lo primero es vaciar la cola: lo que esté pendiente pertenece a la base
+   * ANTERIOR, y mandarlo después del cambio lo escribiría en la nueva, sobre
+   * una fila que allí es otra cosa o no existe. Es el único punto de todo
+   * esto donde el orden importa de verdad.
+   */
+  const cambiarBase = useCallback(
+    async (nueva: string) => {
+      if (!nueva || nueva === dbRef.current) return;
+      if (temporizador.current) {
+        window.clearTimeout(temporizador.current);
+        temporizador.current = null;
+      }
+      await vaciarCola();
+
+      setBaseRecetas(nueva);
+      dbRef.current = nueva;
+      valorIds.current = new Map();
+      ultimoValor.current.clear();
+      creandoValor.current.clear();
+      setRecetas([]);
+      setSelId(null);
+      setError('');
+      setGuardado('limpio');
+      setDbRecetas(nueva);
+    },
+    [vaciarCola]
+  );
+
+  // Si no hay nada elegido (primera carga, o se borró la seleccionada), cae
+  // sobre la primera: el panel de abajo nunca se queda vacío sin motivo.
+  useEffect(() => {
+    if (recetas.length === 0) {
+      setSelId(null);
+      return;
+    }
     if (!selId || !recetas.some((r) => r.id === selId)) setSelId(recetas[0].id);
   }, [recetas, selId]);
 
   const receta = recetas.find((r) => r.id === selId) ?? null;
 
-  /**
-   * Aplica un cambio a una receta y le sube la marca de tiempo.
-   *
-   * Todo pasa por acá para que `version` no se olvide nunca: en TIA esa
-   * columna es lo único que dice cuándo cambió la estructura, y una versión
-   * desactualizada es peor que no tenerla.
-   */
-  const editarReceta = useCallback((id: string, patch: Partial<Recipe>) => {
+  // ── Detalle de la receta seleccionada ─────────────────────────
+  //
+  // Los elementos y registros NO se bajan con la lista: con veinte recetas
+  // serían decenas de consultas para pintar una tabla de la que solo se mira
+  // una fila. Se cargan al seleccionarla, una vez.
+  const cargarDetalleDe = useCallback(async (id: number) => {
+    setCargandoDetalle(true);
+    try {
+      const { elements, records, valorIds: mapa } = await cargarDetalle(
+        id,
+        dbRef.current
+      );
+
+      // Se FUNDE con lo que ya había, no se reemplaza. Los ids de registro
+      // son únicos en toda la base, así que las claves de dos recetas nunca
+      // chocan — y al volver a una receta ya cargada (que no se vuelve a
+      // pedir) sus celdas seguirían sin id: el siguiente cambio crearía una
+      // segunda fila para la misma celda y una de las dos quedaría
+      // invisible. Antes se limpian las de ESTA receta, por si alguna se
+      // borró desde otro sitio.
+      const propios = new Set(records.map((r) => `${r.id}:`));
+      for (const clave of [...valorIds.current.keys()]) {
+        if ([...propios].some((p) => clave.startsWith(p))) {
+          valorIds.current.delete(clave);
+        }
+      }
+      for (const [k, v] of mapa) valorIds.current.set(k, v);
+      ultimoValor.current.clear();
+      setRecetas((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, elements, records, cargada: true } : r))
+      );
+      setError('');
+    } catch (e: any) {
+      setError(e?.message ?? 'No se pudo cargar el detalle de la receta.');
+    } finally {
+      setCargandoDetalle(false);
+    }
+  }, []);
+
+  recargarRef.current = (id: number) => {
+    void cargarDetalleDe(id);
+  };
+
+  useEffect(() => {
+    if (selId && receta && !receta.cargada) void cargarDetalleDe(selId);
+  }, [selId, receta, cargarDetalleDe]);
+
+  /** Cambia la receta en memoria. No toca el servidor. */
+  const parchearLocal = useCallback((id: number, patch: Partial<Recipe>) => {
     setRecetas((prev) =>
       prev.map((r) =>
         r.id === id ? { ...r, ...patch, version: new Date().toISOString() } : r
@@ -219,193 +463,347 @@ export function RecipesEditor() {
   }, []);
 
   // ── Recetas ───────────────────────────────────────────────────
+  const editarReceta = useCallback(
+    (id: number, patch: Partial<Recipe>) => {
+      parchearLocal(id, patch);
+      programar('recetas', id, patchRecetaADb(patch));
+    },
+    [parchearLocal, programar]
+  );
+
   const agregarReceta = useCallback(() => {
-    setRecetas((prev) => {
-      const n = prev.length === 0 ? 1 : Math.max(...prev.map((r) => r.number)) + 1;
-      const nueva: Recipe = {
-        id: nuevoId(),
-        name: `Recipe_${n}`,
-        displayName: `Recipe_${n}`,
-        number: n,
-        version: new Date().toISOString(),
-        path: '\\Flash\\Recipes',
-        type: 'Limited',
-        maxRecords: '500',
-        commType: 'Tags',
-        checkLimits: true,
-        tooltip: '',
-        elements: [],
-        records: [],
-      };
+    void conServidor(async () => {
+      const n =
+        recetas.length === 0 ? 1 : Math.max(...recetas.map((r) => r.number)) + 1;
+      const { fila } = await crearCrud(
+        'recetas',
+        nuevaRecetaDb(n),
+        dbRef.current
+      );
+      const nueva = { ...aRecipe(fila), cargada: true };
+      setRecetas((prev) => [...prev, nueva]);
       setSelId(nueva.id);
       setPestana('elements');
-      return [...prev, nueva];
     });
-  }, []);
+  }, [recetas, conServidor]);
 
-  const borrarReceta = useCallback((id: string) => {
-    setRecetas((prev) => prev.filter((r) => r.id !== id));
-  }, []);
-
-  const duplicarReceta = useCallback((id: string) => {
-    setRecetas((prev) => {
-      const orig = prev.find((r) => r.id === id);
-      if (!orig) return prev;
-      const n = Math.max(...prev.map((r) => r.number)) + 1;
-      // Ids nuevos para elementos y registros, y el mapa de valores se
-      // reindexa: si se copiaran los ids, las dos recetas compartirían
-      // elementos y editar una movería la otra.
-      const mapa = new Map<string, string>();
-      const elements = orig.elements.map((e) => {
-        const id2 = nuevoId();
-        mapa.set(e.id, id2);
-        return { ...e, id: id2 };
+  const borrarReceta = useCallback(
+    (id: number) => {
+      void conServidor(async () => {
+        // El backend borra en orden lo que cuelga de ella (valores, registros
+        // y elementos): ninguna FK del esquema lleva ON DELETE, porque SQL
+        // Server no admite dos caminos en cascada hacia la misma tabla.
+        await borrarCrud('recetas', id, dbRef.current);
+        setRecetas((prev) => prev.filter((r) => r.id !== id));
       });
-      const records = orig.records.map((rec) => ({
-        ...rec,
-        id: nuevoId(),
-        values: Object.fromEntries(
-          Object.entries(rec.values).map(([k, v]) => [mapa.get(k) ?? k, v])
-        ),
-      }));
-      const copia: Recipe = {
-        ...orig,
-        id: nuevoId(),
-        name: `${orig.name}_copia`,
-        displayName: `${orig.displayName}_copia`,
-        number: n,
-        version: new Date().toISOString(),
-        elements,
-        records,
-      };
-      const i = prev.findIndex((r) => r.id === id);
-      return [...prev.slice(0, i + 1), copia, ...prev.slice(i + 1)];
-    });
-  }, []);
+    },
+    [conServidor]
+  );
+
+  const duplicarReceta = useCallback(
+    (id: number) => {
+      void conServidor(async () => {
+        const orig = recetas.find((r) => r.id === id);
+        if (!orig) return;
+        // Duplicar necesita el detalle completo, y puede que esa receta nunca
+        // se haya abierto en esta sesión.
+        const detalle = orig.cargada
+          ? { elements: orig.elements, records: orig.records }
+          : await cargarDetalle(id, dbRef.current);
+
+        const n = Math.max(...recetas.map((r) => r.number)) + 1;
+        const { fila } = await crearCrud(
+          'recetas',
+          {
+          ...nuevaRecetaDb(n),
+          nombre: `${orig.name}_copia`,
+          nombre_visible: `${orig.displayName || orig.name}_copia`,
+          ruta: orig.path,
+          tipo: orig.type,
+          max_registros: Number(orig.maxRecords) || 0,
+          tipo_comunicacion: orig.commType,
+          comprobar_limites: orig.checkLimits ? 1 : 0,
+          informacion_herramienta: orig.tooltip,
+          },
+          dbRef.current
+        );
+        const nuevaId = Number(fila.id);
+
+        // Ids NUEVOS para elementos y registros: si se copiaran los del
+        // original, las dos recetas compartirían filas y editar una movería
+        // la otra. Por eso hace falta el mapa viejo -> nuevo antes de los
+        // valores, que referencian a los dos.
+        const mapaElem = new Map<number, number>();
+        for (const [i, e] of detalle.elements.entries()) {
+          const { id: nid } = await crearCrud(
+            'receta_elementos',
+            { ...nuevoElementoDb(nuevaId, i), ...patchElementoADb(e) },
+            dbRef.current
+          );
+          mapaElem.set(e.id, nid);
+        }
+
+        for (const [i, rec] of detalle.records.entries()) {
+          const { id: nid } = await crearCrud(
+            'receta_registros',
+            { ...nuevoRegistroDb(nuevaId, i + 1), ...patchRegistroADb(rec) },
+            dbRef.current
+          );
+          for (const [elemId, texto] of Object.entries(rec.values)) {
+            const destino = mapaElem.get(Number(elemId));
+            if (!destino || texto === '') continue;
+            await crearValor(nid, destino, texto, dbRef.current);
+          }
+        }
+
+        const copia = { ...aRecipe(fila), cargada: false };
+        const i = recetas.findIndex((r) => r.id === id);
+        setRecetas((prev) => [...prev.slice(0, i + 1), copia, ...prev.slice(i + 1)]);
+      });
+    },
+    [recetas, conServidor]
+  );
 
   // ── Elementos ─────────────────────────────────────────────────
   const agregarElemento = useCallback(() => {
     if (!receta) return;
-    const n = receta.elements.length + 1;
-    const nuevo: RecipeElement = {
-      id: nuevoId(),
-      name: `Recipe_element_${n}`,
-      displayName: `Recipe_element_${n}`,
-      tag: '',
-      dataType: '',
-      defaultValue: '',
-      minValue: '',
-      maxValue: '',
-      decimals: '0',
-      tooltip: '',
-    };
-    editarReceta(receta.id, { elements: [...receta.elements, nuevo] });
-  }, [receta, editarReceta]);
+    const idReceta = receta.id;
+    const orden = receta.elements.length;
+    void conServidor(async () => {
+      const { fila } = await crearCrud(
+        'receta_elementos',
+        nuevoElementoDb(idReceta, orden),
+        dbRef.current
+      );
+      setRecetas((prev) =>
+        prev.map((r) =>
+          r.id === idReceta ? { ...r, elements: [...r.elements, aElemento(fila)] } : r
+        )
+      );
+    });
+  }, [receta, conServidor]);
 
   const editarElemento = useCallback(
-    (elemId: string, patch: Partial<RecipeElement>) => {
+    (elemId: number, patch: Partial<RecipeElement>) => {
       if (!receta) return;
-      editarReceta(receta.id, {
-        elements: receta.elements.map((e) =>
-          e.id === elemId ? { ...e, ...patch } : e
-        ),
-      });
+      const idReceta = receta.id;
+      setRecetas((prev) =>
+        prev.map((r) =>
+          r.id === idReceta
+            ? {
+                ...r,
+                elements: r.elements.map((e) =>
+                  e.id === elemId ? { ...e, ...patch } : e
+                ),
+              }
+            : r
+        )
+      );
+      programar('receta_elementos', elemId, patchElementoADb(patch));
     },
-    [receta, editarReceta]
+    [receta, programar]
   );
 
-  /** Borra el elemento Y su valor en cada registro: si no, quedan huérfanos. */
+  /** Borra el elemento. El backend se lleva sus valores en los registros. */
   const borrarElemento = useCallback(
-    (elemId: string) => {
+    (elemId: number) => {
       if (!receta) return;
-      editarReceta(receta.id, {
-        elements: receta.elements.filter((e) => e.id !== elemId),
-        records: receta.records.map((r) => {
-          const { [elemId]: _, ...resto } = r.values;
-          return { ...r, values: resto };
-        }),
+      const idReceta = receta.id;
+      void conServidor(async () => {
+        await borrarCrud('receta_elementos', elemId, dbRef.current);
+        setRecetas((prev) =>
+          prev.map((r) => {
+            if (r.id !== idReceta) return r;
+            return {
+              ...r,
+              elements: r.elements.filter((e) => e.id !== elemId),
+              records: r.records.map((rec) => {
+                const { [String(elemId)]: _, ...resto } = rec.values;
+                return { ...rec, values: resto };
+              }),
+            };
+          })
+        );
+        for (const clave of [...valorIds.current.keys()]) {
+          if (clave.endsWith(`:${elemId}`)) valorIds.current.delete(clave);
+        }
       });
     },
-    [receta, editarReceta]
+    [receta, conServidor]
   );
 
   // ── Registros ─────────────────────────────────────────────────
   const agregarRegistro = useCallback(() => {
     if (!receta) return;
+    const idReceta = receta.id;
     const n =
       receta.records.length === 0
         ? 1
         : Math.max(...receta.records.map((r) => r.number)) + 1;
-    // Arranca con el valor por defecto de cada elemento, como hace TIA.
-    const values: Record<string, string> = {};
-    for (const e of receta.elements) values[e.id] = e.defaultValue;
-    const nuevo: RecipeDataRecord = {
-      id: nuevoId(),
-      name: `Recipe_data_record_${n}`,
-      displayName: `Recipe_data_record_${n}`,
-      number: n,
-      values,
-      comment: '',
-    };
-    editarReceta(receta.id, { records: [...receta.records, nuevo] });
-  }, [receta, editarReceta]);
+    void conServidor(async () => {
+      const { fila } = await crearCrud(
+        'receta_registros',
+        nuevoRegistroDb(idReceta, n),
+        dbRef.current
+      );
+      // Sin celdas todavía: se crean cuando alguien escriba una. La rejilla
+      // enseña mientras tanto el valor por defecto de cada elemento como
+      // marcador —igual que TIA— y así `receta_valores` no se llena de filas
+      // vacías que nadie pidió.
+      setRecetas((prev) =>
+        prev.map((r) =>
+          r.id === idReceta ? { ...r, records: [...r.records, aRegistro(fila)] } : r
+        )
+      );
+    });
+  }, [receta, conServidor]);
 
   const editarRegistro = useCallback(
-    (recId: string, patch: Partial<RecipeDataRecord>) => {
+    (recId: number, patch: Partial<RecipeDataRecord>) => {
       if (!receta) return;
-      editarReceta(receta.id, {
-        records: receta.records.map((r) =>
-          r.id === recId ? { ...r, ...patch } : r
-        ),
-      });
+      const idReceta = receta.id;
+      setRecetas((prev) =>
+        prev.map((r) =>
+          r.id === idReceta
+            ? {
+                ...r,
+                records: r.records.map((rec) =>
+                  rec.id === recId ? { ...rec, ...patch } : rec
+                ),
+              }
+            : r
+        )
+      );
+      programar('receta_registros', recId, patchRegistroADb(patch));
     },
-    [receta, editarReceta]
+    [receta, programar]
   );
 
+  /**
+   * Una celda de la rejilla.
+   *
+   * La primera vez que se escribe en ella hay que CREAR la fila de
+   * `receta_valores`; después basta con actualizarla. El `creandoValor` evita
+   * el caso feo: teclear rápido lanzaría dos POST y quedarían dos filas para
+   * la misma celda, y a partir de ahí una de las dos sería invisible.
+   */
   const editarValor = useCallback(
-    (recId: string, elemId: string, valor: string) => {
+    (recId: number, elemId: number, valor: string) => {
       if (!receta) return;
-      const rec = receta.records.find((r) => r.id === recId);
-      if (!rec) return;
-      editarRegistro(recId, { values: { ...rec.values, [elemId]: valor } });
+      const idReceta = receta.id;
+      const clave = claveValor(recId, elemId);
+
+      setRecetas((prev) =>
+        prev.map((r) =>
+          r.id === idReceta
+            ? {
+                ...r,
+                records: r.records.map((rec) =>
+                  rec.id === recId
+                    ? { ...rec, values: { ...rec.values, [String(elemId)]: valor } }
+                    : rec
+                ),
+              }
+            : r
+        )
+      );
+      ultimoValor.current.set(clave, valor);
+
+      const existente = valorIds.current.get(clave);
+      if (existente) {
+        programar('receta_valores', existente, valorADb(valor));
+        return;
+      }
+      if (creandoValor.current.has(clave)) return;
+
+      creandoValor.current.add(clave);
+      setGuardado('guardando');
+      void crearValor(recId, elemId, valor, dbRef.current)
+        .then((nid) => {
+          valorIds.current.set(clave, nid);
+          // Puede haber seguido escribiendo mientras iba el POST.
+          const ultimo = ultimoValor.current.get(clave);
+          if (ultimo !== undefined && ultimo !== valor) {
+            programar('receta_valores', nid, valorADb(ultimo));
+          } else {
+            setGuardado('guardado');
+          }
+        })
+        .catch((e: any) => {
+          setGuardado('error');
+          setError(e?.message ?? 'No se pudo guardar el valor.');
+        })
+        .finally(() => {
+          creandoValor.current.delete(clave);
+        });
     },
-    [receta, editarRegistro]
+    [receta, programar]
   );
 
   const borrarRegistro = useCallback(
-    (recId: string) => {
+    (recId: number) => {
       if (!receta) return;
-      editarReceta(receta.id, {
-        records: receta.records.filter((r) => r.id !== recId),
+      const idReceta = receta.id;
+      void conServidor(async () => {
+        await borrarCrud('receta_registros', recId, dbRef.current);
+        setRecetas((prev) =>
+          prev.map((r) =>
+            r.id === idReceta
+              ? { ...r, records: r.records.filter((rec) => rec.id !== recId) }
+              : r
+          )
+        );
+        for (const clave of [...valorIds.current.keys()]) {
+          if (clave.startsWith(`${recId}:`)) valorIds.current.delete(clave);
+        }
       });
     },
-    [receta, editarReceta]
+    [receta, conServidor]
   );
 
   const duplicarRegistro = useCallback(
-    (recId: string) => {
+    (recId: number) => {
       if (!receta) return;
+      const idReceta = receta.id;
       const orig = receta.records.find((r) => r.id === recId);
       if (!orig) return;
       const n = Math.max(...receta.records.map((r) => r.number)) + 1;
-      const copia: RecipeDataRecord = {
-        ...orig,
-        id: nuevoId(),
-        name: `${orig.name}_copia`,
-        displayName: `${orig.displayName}_copia`,
-        number: n,
-        values: { ...orig.values },
-      };
-      const i = receta.records.findIndex((r) => r.id === recId);
-      editarReceta(receta.id, {
-        records: [
-          ...receta.records.slice(0, i + 1),
-          copia,
-          ...receta.records.slice(i + 1),
-        ],
+      void conServidor(async () => {
+        const { fila } = await crearCrud(
+          'receta_registros',
+          {
+            ...nuevoRegistroDb(idReceta, n),
+            nombre: `${orig.name}_copia`,
+            nombre_visible: `${orig.displayName || orig.name}_copia`,
+            comentario: orig.comment,
+          },
+          dbRef.current
+        );
+        const nuevo = aRegistro(fila);
+        for (const [elemId, texto] of Object.entries(orig.values)) {
+          if (texto === '') continue;
+          const nid = await crearValor(
+            nuevo.id,
+            Number(elemId),
+            texto,
+            dbRef.current
+          );
+          valorIds.current.set(claveValor(nuevo.id, Number(elemId)), nid);
+          nuevo.values[elemId] = texto;
+        }
+        setRecetas((prev) =>
+          prev.map((r) => {
+            if (r.id !== idReceta) return r;
+            const i = r.records.findIndex((x) => x.id === recId);
+            return {
+              ...r,
+              records: [...r.records.slice(0, i + 1), nuevo, ...r.records.slice(i + 1)],
+            };
+          })
+        );
       });
     },
-    [receta, editarReceta]
+    [receta, conServidor]
   );
 
   // Elementos incompletos: sin ellos los registros no pueden guardar nada.
@@ -435,12 +833,21 @@ export function RecipesEditor() {
           <div className="leading-tight">
             <p className="text-sm font-bold text-navy dark:text-slate-100">Recetas</p>
             <p className="text-[11px] text-slate-400">
-              {recetas.length === 0
-                ? 'Ninguna configurada'
-                : `${recetas.length} receta${recetas.length === 1 ? '' : 's'}`}
+              {cargando
+                ? 'Cargando…'
+                : recetas.length === 0
+                  ? 'Ninguna configurada'
+                  : `${recetas.length} receta${recetas.length === 1 ? '' : 's'}`}
             </p>
           </div>
         </div>
+
+        <SelectorBaseRecetas
+          valor={dbRecetas}
+          bases={bases}
+          deshabilitado={cargando || ocupado}
+          onCambiar={(v) => void cambiarBase(v)}
+        />
 
         {receta && (
           <div className="hidden items-center gap-1.5 md:flex">
@@ -459,21 +866,61 @@ export function RecipesEditor() {
           </div>
         )}
 
+        {/* Estado del guardado automático. Sin esta señal, "se guarda solo"
+            es indistinguible de "no se guarda": el único momento en que se
+            nota la diferencia es al recargar, y entonces ya es tarde. */}
+        <EstadoAutoguardado estado={guardado} ocupado={ocupado} />
+
+        <button
+          onClick={() => {
+            void recargarTodo();
+            void recargarTags();
+          }}
+          disabled={cargando || ocupado}
+          title="Volver a leer las recetas y los tags de los PLCs"
+          className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 outline-none transition hover:bg-slate-100 hover:text-slate-600 disabled:opacity-40 dark:hover:bg-navy-slate/40"
+        >
+          <RefreshCwIcon className={`h-4 w-4 ${cargando ? 'animate-spin' : ''}`} />
+        </button>
+
         <button
           onClick={agregarReceta}
-          className="ml-auto flex min-h-[34px] items-center gap-1.5 rounded-lg bg-siemens px-3 py-1.5 text-xs font-semibold text-white outline-none transition hover:bg-siemens-600 focus-visible:ring-2 focus-visible:ring-siemens/50"
+          disabled={ocupado}
+          className="flex min-h-[34px] items-center gap-1.5 rounded-lg bg-siemens px-3 py-1.5 text-xs font-semibold text-white outline-none transition hover:bg-siemens-600 focus-visible:ring-2 focus-visible:ring-siemens/50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <PlusIcon className="h-3.5 w-3.5" />
           Agregar receta
         </button>
       </div>
 
+      {/* El error del servidor, tal cual lo mandó. Se queda hasta que algo
+          vuelva a salir bien: un fallo de guardado que se borra solo a los
+          tres segundos es un fallo que nadie llega a leer. */}
+      {error && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 border-b border-state-error/30 bg-state-error/5 px-4 py-2.5 text-xs leading-relaxed text-state-error"
+        >
+          <AlertCircleIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0 break-words">{error}</span>
+          <button
+            type="button"
+            onClick={() => setError('')}
+            className="ml-auto shrink-0 rounded px-1.5 font-semibold underline-offset-2 hover:underline"
+          >
+            Ocultar
+          </button>
+        </div>
+      )}
+
       {/* ══ Cuerpo: maestro arriba, detalle abajo ═══════════════ */}
       <div className="flex flex-1 flex-col gap-3 overflow-hidden p-3">
 
         {/* ── Maestro: la lista de recetas ─────────────────────── */}
         <Panel titulo="Recipes" className="min-h-[130px] flex-[4]">
-          {recetas.length === 0 ? (
+          {cargando ? (
+            <Cargando texto="Leyendo las recetas de la base de datos…" />
+          ) : recetas.length === 0 ? (
             <Vacio
               icono={<BookOpenIcon className="h-9 w-9" />}
               titulo="Todavía no hay recetas"
@@ -563,7 +1010,12 @@ export function RecipesEditor() {
                               value={r.path}
                               onChange={(v) => editarReceta(r.id, { path: v })}
                               placeholder="\Flash\Recipes"
-                              aria-label="Ruta de almacenamiento"
+                              // Es el campo Path de TIA: la carpeta DEL PANEL
+                              // donde quedan los ficheros. No es dónde se
+                              // guarda esto — eso se elige arriba, en
+                              // "Guardar en".
+                              title="Carpeta del panel HMI, como en TIA. La base de datos donde se guardan estas tablas se elige arriba, en «Guardar en»."
+                              aria-label="Ruta de almacenamiento en el panel"
                               className="pl-7 font-mono"
                             />
                           </div>
@@ -692,7 +1144,9 @@ export function RecipesEditor() {
             </div>
 
             <div className="mp-scroll mp-scroll-dark flex-1 overflow-auto">
-              {pestana === 'elements' ? (
+              {cargandoDetalle && !receta.cargada ? (
+                <Cargando texto="Cargando elementos y registros…" />
+              ) : pestana === 'elements' ? (
                 receta.elements.length === 0 ? (
                   <Vacio
                     icono={<LayersIcon className="h-9 w-9" />}
@@ -744,22 +1198,28 @@ export function RecipesEditor() {
                               />
                             </td>
                             <td className="px-1 py-1">
-                              <div className="relative">
-                                <TagIcon
-                                  className={`pointer-events-none absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 ${
-                                    e.tag.trim() ? 'text-siemens' : 'text-slate-400'
-                                  }`}
-                                />
-                                <Celda
-                                  value={e.tag}
-                                  onChange={(v) => editarElemento(e.id, { tag: v })}
-                                  // Mismo texto que muestra TIA sin tag.
-                                  placeholder="<None>"
-                                  title="Sin tag, la columna de este elemento queda bloqueada en Data records"
-                                  aria-label="Tag del PLC"
-                                  className="pl-7 font-mono"
-                                />
-                              </div>
+                              {/* Texto libre CON ayuda, no un desplegable
+                                  cerrado: la lista de tags solo existe tras
+                                  un browse OPC UA correcto, y hay que poder
+                                  configurar la receta con el PLC apagado. */}
+                              <SelectorTagPlc
+                                valor={e.tag}
+                                tags={tagsPlc}
+                                cargando={cargandoTags}
+                                sinPlcs={!hayPlcs}
+                                onElegir={(tag, tipoTia) =>
+                                  editarElemento(e.id, {
+                                    tag,
+                                    // El tipo del tag solo se copia si el
+                                    // elemento no tenía uno: una elección
+                                    // hecha a mano manda sobre lo que diga
+                                    // el servidor OPC.
+                                    ...(tipoTia && !e.dataType
+                                      ? { dataType: tipoTia as ElementDataType }
+                                      : {}),
+                                  })
+                                }
+                              />
                             </td>
                             <td className="px-1 py-1">
                               <CeldaSelect
@@ -929,19 +1389,31 @@ export function RecipesEditor() {
 
                           {/* Un valor por elemento. Rosa = el elemento no
                               tiene tag, así que no hay dónde escribirlo. */}
+                          {/* Antes, un elemento sin tag bloqueaba su columna
+                              entera —es lo que hace TIA— y no se podía ni
+                              anotar el valor. Pero el orden real de trabajo
+                              es el contrario: primero se conoce la fórmula y
+                              después se cablea a qué tag va cada ingrediente.
+                              Así que la celda se escribe siempre y el aviso
+                              se queda como aviso: ámbar, con el porqué en el
+                              tooltip y el ⚠ en la cabecera de la columna. */}
                           {receta.elements.map((e) => {
-                            const bloqueada = !e.tag.trim();
+                            const sinTagAqui = !e.tag.trim();
                             return (
                               <td key={e.id} className="px-1 py-1">
                                 <Celda
-                                  value={rec.values[e.id] ?? ''}
+                                  value={rec.values[String(e.id)] ?? ''}
                                   onChange={(v) => editarValor(rec.id, e.id, v)}
                                   placeholder={e.defaultValue || '0'}
                                   numerica
-                                  bloqueada={bloqueada}
+                                  className={
+                                    sinTagAqui
+                                      ? 'ring-1 ring-inset ring-amber-400/40'
+                                      : ''
+                                  }
                                   title={
-                                    bloqueada
-                                      ? `«${e.name}» no tiene tag asignado. Ponle uno en la pestaña Elements para poder cargar su valor.`
+                                    sinTagAqui
+                                      ? `El valor se guarda, pero «${e.name}» todavía no tiene tag: hasta que se lo asignes en Elements no hay dónde escribirlo en el PLC.`
                                       : undefined
                                   }
                                   aria-label={`${e.name} en ${rec.name}`}
@@ -988,9 +1460,10 @@ export function RecipesEditor() {
             <div className="flex items-start gap-2 border-t border-slate-100 bg-slate-50/70 px-4 py-2.5 dark:border-navy-slate dark:bg-navy/40">
               <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0 text-slate-400" />
               <p className="min-w-0 text-[11px] leading-relaxed text-slate-400">
-                Vista de configuración: se guarda en este navegador. Todavía no
-                existe «escribir en el PLC» ni «leer del PLC», que es lo que
-                hace que una receta sirva de algo.
+                Se guarda solo en la base de datos, en las cuatro tablas de
+                recetas. Lo que todavía no existe es «escribir en el PLC» ni
+                «leer del PLC»: cargar un registro en los tags de sus
+                elementos es lo que hace que una receta sirva de algo.
               </p>
             </div>
           </div>
@@ -1062,6 +1535,55 @@ function BotonPestana({
         {contador}
       </span>
     </button>
+  );
+}
+
+/**
+ * "Guardando… / Guardado / No se pudo guardar".
+ *
+ * Tres estados y ninguno más. `limpio` no dice nada a propósito: al abrir la
+ * pantalla no se ha guardado nada, y un "guardado" ahí sería mentira.
+ */
+function EstadoAutoguardado({
+  estado,
+  ocupado,
+}: {
+  estado: 'limpio' | 'guardando' | 'guardado' | 'error';
+  ocupado: boolean;
+}) {
+  if (estado === 'limpio' && !ocupado) return null;
+  const trabajando = ocupado || estado === 'guardando';
+  if (trabajando) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+        <Loader2Icon className="h-3 w-3 animate-spin" />
+        Guardando…
+      </span>
+    );
+  }
+  if (estado === 'error') {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-state-error">
+        <AlertCircleIcon className="h-3 w-3" />
+        No se pudo guardar
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-state-ok">
+      <CheckCircle2Icon className="h-3 w-3" />
+      Guardado
+    </span>
+  );
+}
+
+/** Espera con explicación: decir QUÉ se está cargando cuesta lo mismo. */
+function Cargando({ texto }: { texto: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
+      <Loader2Icon className="h-6 w-6 animate-spin text-slate-300 dark:text-slate-600" />
+      <p className="text-xs text-slate-400">{texto}</p>
+    </div>
   );
 }
 

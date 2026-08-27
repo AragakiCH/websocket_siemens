@@ -136,6 +136,14 @@ export function apiPost<T = any>(ruta: string, cuerpo?: any): Promise<T> {
   });
 }
 
+export function apiPatch<T = any>(ruta: string, cuerpo?: any): Promise<T> {
+  return pedir<T>(ruta, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(cuerpo ?? {}),
+  });
+}
+
 export function apiDelete<T = any>(ruta: string): Promise<T> {
   return pedir<T>(ruta, { method: 'DELETE' });
 }
@@ -164,6 +172,9 @@ export interface Diagnostico {
     | 'ruta_no_existe'
     | 'tls'
     | 'timeout'
+    // La conexión funcionó y el fallo fue una sentencia del esquema. No es
+    // un problema de red ni de credenciales: es DDL.
+    | 'ddl'
     | 'desconocido';
   titulo: string;
   mensaje: string;
@@ -187,11 +198,22 @@ export interface ConexionRemota {
   num_consultas?: number;
   autoconectar?: boolean;
   ultimo_error?: string;
+  /** Último diagnóstico contra el servidor (solo si se pidió `revisar`). */
+  estado?: Diagnostico['codigo'] | 'ok' | 'no_registrada' | '';
+  estado_titulo?: string;
+  estado_sugerencia?: string;
 }
 
 /** Conexiones guardadas en el backend, con su estado de pool en vivo. */
-export async function cargarConexiones(): Promise<ConexionRemota[]> {
-  const data = await apiGet<{ conexiones: ConexionRemota[] }>('/db');
+export async function cargarConexiones(
+  revisar = false
+): Promise<ConexionRemota[]> {
+  // Sin `revisar`, `conectado` es el estado del POOL: puede decir "conectada"
+  // sobre una base que alguien acaba de borrar en el gestor. Con `revisar`, el
+  // backend pregunta al servidor y devuelve además el porqué (`estado`).
+  const data = await apiGet<{ conexiones: ConexionRemota[] }>(
+    revisar ? '/db?revisar=true' : '/db'
+  );
   return Array.isArray(data?.conexiones) ? data.conexiones : [];
 }
 
@@ -262,6 +284,7 @@ export function provisionarBase(cfg: Record<string, any>): Promise<{
   mensaje: string;
   pasos?: PasoProvision[];
   base_datos?: string;
+  diagnostico?: Diagnostico;
 }> {
   return apiPost('/db/provision', cfg);
 }

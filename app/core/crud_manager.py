@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.db.sql_driver import _nombre_seguro, ts_para_motor
 
@@ -39,6 +39,66 @@ logger = logging.getLogger("crud_manager")
 
 # Tope de filas por página: protege al navegador y a la BD.
 MAX_LIMITE = 500
+
+
+# ====================================================================== #
+# Qué hay que hacer ANTES de borrar una fila
+# ====================================================================== #
+# Ninguna clave foránea del esquema lleva `ON DELETE` — ver la nota larga en
+# `SqlDriver.ddl_esquema_hmi()`. Resumido: SQL Server rechaza el esquema
+# entero (Msg 1785) en cuanto una tabla es alcanzable por dos caminos en
+# cascada, y aquí lo es por diseño: un `receta_valor` depende a la vez del
+# registro y del elemento.
+#
+# Lo que el motor no hace, lo hace esto: por cada recurso, las sentencias que
+# dejan el terreno limpio antes del DELETE, EN ORDEN. Es el mismo efecto que
+# tenían las cascadas, con dos ventajas — funciona igual en los cuatro
+# motores, y está escrito donde se puede leer.
+#
+# Los nombres de tabla se sustituyen desde `_tablas_hmi()`, que aplica el
+# prefijo del esquema y valida el identificador. Del cliente solo llega `:id`,
+# bindeado.
+TABLAS_HMI: Tuple[str, ...] = (
+    "usuarios", "plc_prg", "alarmas_def", "alarmas", "recetas",
+    "receta_elementos", "receta_registros", "receta_valores",
+)
+
+DEPENDENCIAS: Dict[str, Tuple[str, ...]] = {
+    # Borrar a una persona no puede borrar lo que hizo: se pierde el "quién",
+    # nunca el registro. Es lo que hacía `ON DELETE SET NULL`.
+    #
+    # Hoy no se llega aquí: `usuarios` no está en `RECURSOS` y la API no
+    # ofrece borrar cuentas (se desactivan con PATCH /auth/usuarios). Se deja
+    # escrito porque el día que ese borrado exista, el fallo sería silencioso
+    # y del peor tipo: perder el historial de alarmas de un turno entero por
+    # dar de baja a quien lo reconoció.
+    "usuarios": (
+        "UPDATE {alarmas} SET usuario_id = NULL WHERE usuario_id = :id",
+        "UPDATE {recetas} SET usuario_id = NULL WHERE usuario_id = :id",
+        "UPDATE {receta_registros} SET usuario_id = NULL WHERE usuario_id = :id",
+    ),
+    # Quitar una regla de alarma no borra los eventos que ya provocó: el
+    # historial es justo lo que se quiere conservar.
+    "alarmas_def": (
+        "UPDATE {alarmas} SET alarma_def_id = NULL WHERE alarma_def_id = :id",
+    ),
+    # Una receta sí se lleva todo lo suyo, de abajo arriba: primero los
+    # valores (que dependen de dos padres), luego registros y elementos.
+    "recetas": (
+        "DELETE FROM {receta_valores} WHERE receta_registro_id IN "
+        "(SELECT id FROM {receta_registros} WHERE receta_id = :id)",
+        "DELETE FROM {receta_valores} WHERE receta_elemento_id IN "
+        "(SELECT id FROM {receta_elementos} WHERE receta_id = :id)",
+        "DELETE FROM {receta_registros} WHERE receta_id = :id",
+        "DELETE FROM {receta_elementos} WHERE receta_id = :id",
+    ),
+    "receta_elementos": (
+        "DELETE FROM {receta_valores} WHERE receta_elemento_id = :id",
+    ),
+    "receta_registros": (
+        "DELETE FROM {receta_valores} WHERE receta_registro_id = :id",
+    ),
+}
 
 
 class Recurso:
@@ -75,11 +135,56 @@ class Recurso:
 # ====================================================================== #
 # Catálogo cerrado de recursos
 # ====================================================================== #
+# Las cinco clases de alarma de TIA Portal, de más a menos grave. Se guardan
+# con su nombre en inglés porque es como aparecen en TIA y en el editor de la
+# vista: traducirlas aquí obligaría a traducir de vuelta al comparar.
+CLASES_ALARMA = ("Critical", "Error", "Warning", "Maintenance", "Information")
+
+# Cómo se evalúa una alarma. 'bit' es la discreta de TIA (mira un bit del
+# tag); las demás son analógicas y comparan contra `valor_limite`.
+COMPARADORES = ("bit", ">", ">=", "<", "<=", "==", "!=")
+
+
 RECURSOS: Dict[str, Recurso] = {
+    # ------------------------------------------------------------------ #
+    # alarmas_def · la CONFIGURACIÓN: qué se vigila
+    # ------------------------------------------------------------------ #
+    # Esto es lo que edita una persona, y lo que el editor de alarmas de la
+    # vista ha estado enseñando sin tener dónde guardarlo. Es el equivalente
+    # a la tabla "Discrete alarms" de TIA Portal.
+    "alarmas_def": Recurso(
+        tabla="alarmas_def",
+        columnas={
+            "id": "entero",
+            "nombre": "texto",
+            "texto": "texto",
+            "clase": "texto",
+            "tag": "texto",
+            "bit_disparo": "entero",
+            "comparador": "texto",
+            "valor_limite": "numero",
+            "banda_muerta": "numero",
+            "tag_reconocimiento": "texto",
+            "bit_reconocimiento": "entero",
+            "area": "texto",
+            "activo": "entero",
+            "creado_en": "fecha",
+            "actualizado_en": "fecha",
+        },
+        obligatorias=["nombre", "texto"],
+        filtros=["clase", "tag", "area", "activo", "comparador"],
+        orden_defecto="id",
+        marca_creado="creado_en",
+        marca_actualizado="actualizado_en",
+    ),
+    # ------------------------------------------------------------------ #
+    # alarmas · los EVENTOS: qué pasó y cuándo
+    # ------------------------------------------------------------------ #
     "alarmas": Recurso(
         tabla="alarmas",
         columnas={
             "id": "entero",
+            "alarma_def_id": "entero",
             "plc_prg_id": "entero",
             "usuario_id": "entero",
             "tipo": "texto",
@@ -95,18 +200,50 @@ RECURSOS: Dict[str, Recurso] = {
         },
         obligatorias=["mensaje"],
         filtros=["estado", "tipo", "area", "severidad", "tag", "usuario_id",
-                 "plc_prg_id"],
+                 "plc_prg_id", "alarma_def_id"],
         orden_defecto="ts_activacion",
         marca_creado="ts_activacion",
     ),
+    # ------------------------------------------------------------------ #
+    # RECETAS · tres niveles, como en TIA Portal
+    # ------------------------------------------------------------------ #
+    #   recetas            "Recipe_1"            la receta
+    #   receta_elementos   limon, azucar, pisco  sus columnas
+    #   receta_registros   "Mezcla del lunes"    una mezcla concreta
+    #   receta_valores     30 ml, 20 g, 60 ml    sus valores
     "recetas": Recurso(
         tabla="recetas",
         columnas={
             "id": "entero",
-            "plc_prg_id": "entero",
             "usuario_id": "entero",
             "nombre": "texto",
-            "nombre_receta": "texto",
+            "nombre_visible": "texto",
+            "numero": "entero",
+            "version": "texto",
+            "ruta": "texto",
+            "tipo": "texto",
+            "max_registros": "entero",
+            "tipo_comunicacion": "texto",
+            "comprobar_limites": "entero",
+            "informacion_herramienta": "texto",
+            "activo": "entero",
+            "creado_en": "fecha",
+            "actualizado_en": "fecha",
+        },
+        obligatorias=["nombre"],
+        filtros=["nombre", "numero", "tipo", "activo", "usuario_id"],
+        orden_defecto="numero",
+        marca_creado="creado_en",
+        marca_actualizado="actualizado_en",
+    ),
+    "receta_elementos": Recurso(
+        tabla="receta_elementos",
+        columnas={
+            "id": "entero",
+            "receta_id": "entero",
+            "plc_prg_id": "entero",
+            "nombre": "texto",
+            "nombre_visible": "texto",
             "tag": "texto",
             "tipo_dato": "texto",
             "longitud_dato": "entero",
@@ -118,16 +255,50 @@ RECURSOS: Dict[str, Recurso] = {
             "decimales": "entero",
             "unidad": "texto",
             "informacion_herramienta": "texto",
+            "orden": "entero",
             "activo": "entero",
             "creado_en": "fecha",
             "actualizado_en": "fecha",
         },
-        obligatorias=["nombre", "nombre_receta", "tag"],
-        filtros=["nombre_receta", "tag", "tipo_dato", "activo", "usuario_id",
-                 "plc_prg_id"],
-        orden_defecto="id",
+        obligatorias=["receta_id", "nombre"],
+        filtros=["receta_id", "tag", "tipo_dato", "activo", "plc_prg_id"],
+        orden_defecto="orden",
         marca_creado="creado_en",
         marca_actualizado="actualizado_en",
+    ),
+    "receta_registros": Recurso(
+        tabla="receta_registros",
+        columnas={
+            "id": "entero",
+            "receta_id": "entero",
+            "usuario_id": "entero",
+            "nombre": "texto",
+            "nombre_visible": "texto",
+            "numero": "entero",
+            "comentario": "texto",
+            "ts_ultima_carga": "fecha",
+            "activo": "entero",
+            "creado_en": "fecha",
+            "actualizado_en": "fecha",
+        },
+        obligatorias=["receta_id", "nombre"],
+        filtros=["receta_id", "numero", "activo", "usuario_id"],
+        orden_defecto="numero",
+        marca_creado="creado_en",
+        marca_actualizado="actualizado_en",
+    ),
+    "receta_valores": Recurso(
+        tabla="receta_valores",
+        columnas={
+            "id": "entero",
+            "receta_registro_id": "entero",
+            "receta_elemento_id": "entero",
+            "valor_num": "numero",
+            "valor_texto": "texto",
+        },
+        obligatorias=["receta_registro_id", "receta_elemento_id"],
+        filtros=["receta_registro_id", "receta_elemento_id"],
+        orden_defecto="id",
     ),
     # Solo lectura: la escribe el historizador, no las personas.
     "plc_prg": Recurso(
@@ -191,6 +362,11 @@ class CrudManager:
         """Nombre real de la tabla, con el prefijo del esquema si lo hay."""
         prefijo = getattr(self._s, "esquema_prefijo", "") or ""
         return _nombre_seguro(f"{prefijo}{recurso.tabla}")
+
+    def _tablas_hmi(self) -> Dict[str, str]:
+        """Nombres reales de las tablas del esquema, con prefijo y validados."""
+        prefijo = getattr(self._s, "esquema_prefijo", "") or ""
+        return {n: _nombre_seguro(f"{prefijo}{n}") for n in TABLAS_HMI}
 
     async def _driver(self, db_id: Optional[str]):
         try:
@@ -359,16 +535,39 @@ class CrudManager:
         if recurso.marca_actualizado:
             valores[recurso.marca_actualizado] = ahora
 
-        campos = list(valores)
-        sql = (f"INSERT INTO {tabla} ({', '.join(campos)}) "
-               f"VALUES ({', '.join(':' + c for c in campos)})")
         try:
-            await driver._ejecutar_interno(sql, valores)
+            nuevo_id = await driver.insertar(tabla, valores)
         except Exception as exc:  # noqa: BLE001
             raise self._traducir(exc, tabla)
 
-        logger.info("CRUD: creado %s en %s", recurso_nombre, tabla)
+        # Un id 0 no es un id: significa que la fila se creó pero no se pudo
+        # leer cuál es. Devolverlo tal cual es peor que fallar — la vista se
+        # queda con un objeto que apunta a la nada, y el error real aparece
+        # tres pasos después, disfrazado ("Faltan campos obligatorios:
+        # receta_id"). Se dice aquí, donde todavía se entiende.
+        if not nuevo_id:
+            logger.error("INSERT en '%s' sin id devuelto (motor %s).",
+                         tabla, driver.motor)
+            raise ErrorCrud(
+                f"La fila se creó en '{tabla}', pero el servidor no devolvió "
+                f"su identificador, así que no se puede seguir trabajando con "
+                f"ella. Actualiza la vista para verla.", 500)
+
+        # La fila COMPLETA, no solo el id. La tabla tiene columnas con valor
+        # por defecto (`activo`, `tipo`, `max_registros`, las marcas de
+        # tiempo) y quien acaba de crear la fila no las conoce: sin esto la
+        # vista pinta una fila a medias y la corrige sola en el siguiente
+        # refresco, que es justo el parpadeo que se nota.
+        fila: Dict[str, Any] = {}
+        if nuevo_id:
+            try:
+                fila = (await self.obtener(recurso_nombre, nuevo_id, db_id))["fila"]
+            except Exception:  # noqa: BLE001
+                fila = {}
+
+        logger.info("CRUD: creado %s id=%s en %s", recurso_nombre, nuevo_id, tabla)
         return {"ok": True, "recurso": recurso_nombre, "tabla": tabla,
+                "id": nuevo_id, "fila": fila,
                 "mensaje": f"{recurso_nombre.rstrip('s').capitalize()} creado."}
 
     # ================================================================== #
@@ -446,6 +645,23 @@ class CrudManager:
 
         driver = await self._driver(db_id)
         tabla = self._tabla(recurso)
+
+        # Lo que el motor ya no hace por nosotros. No va en una transacción
+        # única a propósito: `_ejecutar_interno()` confirma cada sentencia, y
+        # si algo se corta a medias el resultado es una fila padre que sigue
+        # ahí con menos hijos — repetir el borrado la termina. Lo contrario
+        # (padre borrado, hijos huérfanos) sí sería irreparable, y ese orden
+        # no puede ocurrir: la padre se borra la última.
+        limpieza = DEPENDENCIAS.get((recurso_nombre or "").strip().lower(), ())
+        if limpieza:
+            nombres = self._tablas_hmi()
+            for plantilla in limpieza:
+                try:
+                    await driver._ejecutar_interno(
+                        plantilla.format(**nombres), {"id": id_})
+                except Exception as exc:  # noqa: BLE001
+                    raise self._traducir(exc, tabla)
+
         try:
             filas = await driver._ejecutar_interno(
                 f"DELETE FROM {tabla} WHERE id = :id", {"id": id_})
@@ -466,7 +682,7 @@ class CrudManager:
         Solo cuando se tocan campos cuya regla depende de otros campos. Se
         evita así un SELECT extra en cada PATCH que no lo necesite.
         """
-        if recurso == "recetas":
+        if recurso == "receta_elementos":
             return bool({"valor_default", "valor_minimo", "valor_maximo"}
                         & set(valores))
         return False
@@ -480,12 +696,12 @@ class CrudManager:
         """
         Validaciones que van más allá del tipo de dato.
 
-        La de recetas es la importante: `valor_minimo <= valor_maximo` y el
-        default dentro del rango. Estos números acaban escribiéndose en una
-        máquina real; un rango invertido convierte la última barrera de
-        seguridad en un adorno.
+        La de los elementos de receta es la importante: `valor_minimo <=
+        valor_maximo` y el default dentro del rango. Estos números acaban
+        escribiéndose en una máquina real; un rango invertido convierte la
+        última barrera de seguridad en un adorno.
         """
-        if recurso == "recetas":
+        if recurso == "receta_elementos":
             mn = valores.get("valor_minimo")
             mx = valores.get("valor_maximo")
             df = valores.get("valor_default")
@@ -500,6 +716,26 @@ class CrudManager:
                 if mx is not None and df > mx:
                     raise ErrorCrud(
                         f"valor_default ({df}) supera el máximo ({mx}).")
+
+        if recurso == "alarmas_def":
+            clase = valores.get("clase")
+            if clase and clase not in CLASES_ALARMA:
+                raise ErrorCrud(
+                    f"clase debe ser una de: {', '.join(CLASES_ALARMA)}. "
+                    f"Son las cinco de TIA Portal, en el mismo orden de "
+                    f"gravedad.")
+            comp = valores.get("comparador")
+            if comp and comp not in COMPARADORES:
+                raise ErrorCrud(
+                    f"comparador debe ser uno de: {', '.join(COMPARADORES)}. "
+                    f"'bit' es una alarma discreta (mira un bit del tag); el "
+                    f"resto son analógicas y necesitan `valor_limite`.")
+            # Una alarma analógica sin límite no puede dispararse nunca: es
+            # una regla que parece configurada y no vigila nada.
+            if comp and comp != "bit" and valores.get("valor_limite") is None:
+                raise ErrorCrud(
+                    f"Con comparador '{comp}' hace falta `valor_limite`: sin "
+                    f"él la alarma no puede evaluarse y nunca saltaría.")
 
         if recurso == "alarmas":
             sev = valores.get("severidad")

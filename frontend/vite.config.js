@@ -38,6 +38,17 @@ export default defineConfig({
       // /historian/{id}/start, /stop, /datos, flush y el DELETE.
       '/db': BACKEND,
       '/historian': BACKEND,
+      // CRUD del esquema del HMI: alarmas, definiciones de alarma y los
+      // cuatro niveles de recetas. Sin esta línea, `GET /crud/recetas`
+      // se lo queda Vite y responde el index.html de la SPA con un 404,
+      // que en la consola se ve como "el backend no tiene ese endpoint"
+      // cuando en realidad la petición nunca salió de aquí.
+      '/crud': BACKEND,
+      // Carpeta de datos de la aplicación instalada (ver §11) y copia zip.
+      '/sistema': BACKEND,
+      // Exportaciones (CSV/XLSX) y el asistente de IA.
+      '/export': BACKEND,
+      '/ai': BACKEND,
     },
   },
   build: {

@@ -1245,9 +1245,732 @@ definirse — o sea, **no arranca la aplicación entera**. Está en
 
 ---
 
-## 12 · Resumen en cuatro líneas
+## 12 · Alarmas: definición y evento son dos cosas
+
+El CRUD decía «alarmas y recetas» pero solo tenía ejemplos de recetas, y el
+editor de alarmas de la vista llevaba desde el principio con un cartel de
+`⚠️ SOLO VISTA`. Mirando por qué, apareció algo más de fondo que un ejemplo
+que faltaba.
+
+### 12.1 · El desajuste
+
+La tabla `alarmas` guardaba **eventos**: `ts_activacion`,
+`ts_reconocimiento`, `estado`, `usuario_id`. Es un historial.
+
+El editor de la vista —y la tabla *Discrete alarms* de TIA Portal— editan otra
+cosa: **definiciones**. Name, Alarm text, Alarm class, Trigger tag. La
+configuración de qué vigilar.
+
+No había dónde guardar eso. Por eso el editor no podía dejar de ser una maqueta:
+no le faltaba un endpoint, le faltaba una tabla.
+
+### 12.2 · Dos tablas
+
+```
+alarmas_def   QUÉ vigilar.  "Si DB1.temperatura pasa de 80, es un Error y
+              dice «Temperatura alta»."  Se configura una vez.
+
+alarmas       QUÉ PASÓ.  "El 26/08 a las 14:32 saltó con valor 83.4; Ana la
+              reconoció a las 14:35."  Una fila por evento, crecen sin parar.
+```
+
+Meterlo todo en una tabla obliga a repetir el texto y la clase en cada evento,
+y hace imposible responder *"¿qué alarmas tengo configuradas?"* sin que hayan
+saltado al menos una vez. Es la separación que hacen TIA y WinCC, por lo mismo.
+
+`alarmas` gana una FK `alarma_def_id`, **NULLable a propósito**: una alarma de
+sistema ("se perdió la conexión con el PLC") no viene de ninguna regla
+configurada y el evento debe poder existir igual.
+
+### 12.3 · Los campos, calcados de TIA
+
+Para que migrar una configuración existente sea copiar columnas y no traducir:
+
+| TIA Portal | `alarmas_def` |
+|---|---|
+| Name | `nombre` |
+| Alarm text | `texto` |
+| Alarm class | `clase` — Critical · Error · Warning · Maintenance · Information |
+| Trigger tag | `tag` (formato `"<plc>\|<tag>"`, el mismo del WebSocket) |
+| Trigger bit | `bit_disparo` |
+| HMI acknowledgment tag | `tag_reconocimiento` + `bit_reconocimiento` |
+
+Y tres que TIA resuelve en una tabla aparte para alarmas analógicas, y que aquí
+caben en la misma porque lo único que cambia es la comparación:
+
+- `comparador` — `bit` (discreta) · `>` `>=` `<` `<=` `==` `!=` (analógicas)
+- `valor_limite` — el umbral
+- `banda_muerta` — **histéresis**. Sin ella, un valor oscilando en el límite
+  genera cientos de eventos por minuto. Es el campo que separa un sistema de
+  alarmas usable de uno que nadie mira.
+
+### 12.4 · El CRUD
+
+`alarmas_def` entra en el catálogo cerrado, así que hereda todo lo que ya
+tenían los otros recursos: filtros, paginación, columnas en lista blanca y
+valores bindeados.
+
+Tres validaciones propias, y ninguna es cosmética:
+
+| Se rechaza | Por qué |
+|---|---|
+| `clase` fuera de las cinco | Una clase inventada no la pinta el editor y la alarma se vuelve invisible |
+| `comparador` fuera de los siete | Igual: nada sabría evaluarla |
+| Analógica sin `valor_limite` | **Una regla que parece configurada y no puede dispararse nunca.** El peor fallo posible en un sistema de alarmas: silencio que parece calma |
+
+Y Swagger deja de mentir: hay ejemplos de definición discreta, definición
+analógica y evento, más dos de `PATCH` (silenciar una definición durante un
+mantenimiento, subir un umbral).
+
+### 12.5 · Para una base que YA existe
+
+`CREATE TABLE IF NOT EXISTS` crea `alarmas_def` sola al volver a ejecutar el
+esquema, pero **no añade la columna nueva a una `alarmas` que ya está creada**.
+En SQL Server:
+
+```sql
+ALTER TABLE alarmas ADD alarma_def_id BIGINT NULL;
+ALTER TABLE alarmas ADD CONSTRAINT fk_alarmas_def
+    FOREIGN KEY (alarma_def_id) REFERENCES alarmas_def (id) ON DELETE SET NULL;
+```
+
+En una instalación nueva no hace falta: sale ya con todo.
+
+### 12.6 · Lo que sigue faltando
+
+**El motor de alarmas.** Ahora hay dónde guardar las reglas y dónde guardar los
+eventos, pero **nada evalúa las reglas todavía**: nadie mira los cambios de tag
+del WebSocket y decide si una definición se cumple.
+
+Es el paso siguiente, y ahora sí es un paso pequeño: engancharse a
+`ConnectionManager.registrar_observador()` —igual que el historizador y el
+grabador— y, por cada cambio, comprobar las definiciones activas de ese tag.
+La parte difícil, que era decidir qué se guarda y dónde, ya está.
+
+---
+
+## 13 · Recetas: tres niveles, cuatro tablas
+
+La tabla `recetas` guardaba **solo el nivel del medio** de lo que TIA llama
+recetas, con el nombre de la receta como texto suelto repetido en cada fila.
+
+TIA tiene tres niveles, y hacen falta los tres:
+
+```
+Recipes         Recipe_1, Recipe_2       la receta      Name · Number · Version · Path
+  Elements      limon, azucar, pisco     las columnas   Tag · Data type · Min · Max
+  Data records  "Mezcla del lunes"       los valores    una fila = una mezcla concreta
+```
+
+Sin el tercero una receta no sirve de nada: **los data records son las mezclas
+que se cargan al PLC**. Sin el primero, `comprobar_limites`, `numero` y
+`version` no tienen dónde vivir.
+
+### 13.1 · El reparto
+
+| Tabla | Qué guarda |
+|---|---|
+| `recetas` | Recipe_1 · nombre, numero, version, ruta, tipo, max_registros, tipo_comunicacion, **comprobar_limites** |
+| `receta_elementos` | limon, azucar, pisco · tag, tipo_dato, min, max, decimales, unidad, orden |
+| `receta_registros` | Recipe_data_record_1 · nombre, numero, comentario, ts_ultima_carga |
+| `receta_valores` | 30 ml, 20 g, 60 ml · una fila por (registro, elemento) |
+
+`recetas` pasa a significar lo que dice. Lo que había antes es ahora
+`receta_elementos`, colgando de una FK de verdad en vez de repetir el nombre de
+la receta como texto en cada fila.
+
+### 13.2 · Por qué la cuarta tabla es estrecha
+
+Es la decisión que menos se espera. TIA **enseña** los data records como una
+rejilla ancha —una columna por elemento— pero guardarlo así significaría una
+columna REAL por ingrediente:
+
+- añadir "hielo" a la receta obligaría a un `ALTER TABLE`;
+- y la tabla se llenaría de `NULL`, porque cada receta tiene elementos
+  distintos y todas comparten la misma tabla.
+
+Con `receta_valores` estrecha, añadir un ingrediente no toca nunca la
+estructura. **Verificado**: se añadió un cuarto elemento a una receta con un
+data record ya cargado, sin tocar el esquema.
+
+Es el mismo razonamiento por el que `plc_prg` es estrecha, ya escrito en
+`SERVIDOR_SQL.md`. La rejilla ancha se reconstruye al leer, con un pivote —
+trabajo de la vista, no de la base.
+
+Regalo de propina: `valor_num` + `valor_texto` permiten que un elemento sea
+`REAL` y otro `STRING` sin inventar una columna por tipo.
+
+### 13.3 · Borrados en cascada, y uno que no
+
+| FK | Regla | Por qué |
+|---|---|---|
+| `receta_elementos.receta_id` | **CASCADE** | Un elemento sin receta no significa nada |
+| `receta_registros.receta_id` | **CASCADE** | Igual |
+| `receta_valores.*` | **CASCADE** | Un valor sin registro ni elemento es basura |
+| `*.usuario_id` | **SET NULL** | Borrar a quien creó la receta no debe llevarse la receta |
+
+Verificado: borrar la receta deja las tres tablas hijas a cero.
+
+### 13.4 · `comprobar_limites` deja de ser decorativo
+
+Ese check de TIA ahora tiene dónde guardarse, y con él el backend puede validar
+cada valor contra el `valor_minimo`/`valor_maximo` de su elemento **antes** de
+escribirlo en la máquina.
+
+La validación del CRUD ya lo hace al guardar el elemento —rango invertido y
+default fuera de rango se rechazan— pero lo importante llega al cargar un data
+record al PLC: ahí es donde un 900 donde el máximo son 90 deja de ser un dato y
+pasa a ser una máquina rota.
+
+### 13.5 · Para una base que YA existe
+
+Las cuatro tablas se crean solas al reejecutar el esquema, pero la vieja
+`recetas` **sigue ahí con la estructura antigua** y las nuevas no se crearán
+porque el nombre ya está ocupado. En una instalación en marcha:
+
+```sql
+-- Con la tabla vacía (el caso de una puesta en marcha):
+DROP TABLE recetas;
+-- y reejecutar el esquema, que las crea las cuatro.
+```
+
+Si ya hubiera datos, hay que renombrarla a `receta_elementos`, crear la
+cabecera y rellenar `receta_id` a partir del antiguo `nombre_receta`.
+
+### 13.6 · Lo que sigue faltando
+
+Lo mismo que en alarmas, y por el mismo motivo: **escribir al PLC**. El editor
+de recetas de la vista lo dice en su propio pie —*"todavía no existe «escribir
+en el PLC» ni «leer del PLC», que es lo que hace que una receta sirva de algo"*.
+
+Ahora hay dónde guardar las tres capas; lo que falta es el paso de cargar un
+`receta_registro` en los tags de sus elementos. Y ese paso, el día que exista,
+necesita identidad y auditoría obligatorias: es la primera vez que el HMI
+escribiría en una máquina.
+
+---
+
+## 14 · Borrar la base y que la vista se entere
+
+Al recrear `HMI_PRUEBAS` para estrenar el esquema de 8 tablas salieron tres
+cosas a la vez. Las tres eran reales, y las tres están arregladas.
+
+### 14.1 · La vista seguía enseñando una base que ya no existía
+
+El desplegable del login mostraba `HMI local1 — HMI_PRUEBAS (sin conexión)`
+después de haberla borrado en SQL Server.
+
+**Por qué.** `GET /db` devolvía `conectado` mirando `self._drivers`, que es el
+diccionario de *pools abiertos*. Un pool dice si NOSOTROS tenemos una conexión,
+no si la base sigue estando ahí. Son dos preguntas distintas y la vista
+enseñaba la respuesta a la que no había hecho nadie.
+
+Y no es solo un matiz cosmético: `sin conexión` a secas junta tres problemas
+que se arreglan de tres formas distintas —el servidor está apagado, la
+contraseña ya no vale, o **la base fue borrada**— y solo el último se puede
+resolver desde la propia pantalla.
+
+**El arreglo.** `DbManager` gana una revisión *contra el servidor*:
+
+| Método | Qué hace |
+|---|---|
+| `revisar_conexion(db_id, espera)` | Prueba esa conexión y guarda el veredicto con su código de diagnóstico. Con timeout: un servidor apagado responde "no contesta" en segundos, no en minutos. |
+| `revisar_conexiones()` | Todas a la vez (`asyncio.gather`): una caída no frena a las demás. |
+| `estado_cacheado(db_id)` | La última respuesta conocida, sin tocar la red. |
+
+El veredicto se guarda en `self._estados` y `listar_conexiones()` lo aplica
+**por encima** del pool: si el servidor dijo que la base no existe, `conectado`
+pasa a `false` aunque nos quedara un pool abierto. Además, cuando una prueba
+falla ahora se cierra el pool muerto en vez de dejarlo en el diccionario
+diciendo que está vivo.
+
+Se pide explícitamente, porque cuesta una conexión por base:
+
+```
+GET /db?revisar=true
+GET /auth/estado?revisar=true
+```
+
+El login lo pide **al abrirse** y después de configurar una conexión, no cada
+vez que se cambia de base en el desplegable: al cambiar de base, si esa falla,
+el backend ya diagnostica esa sola. Con un servidor remoto apagado, la
+diferencia es una pantalla de acceso que tarda seis segundos frente a una que
+tarda seis por cada base dada de alta.
+
+Ahora el `<option>` dice **qué** pasa, no solo que algo pasa:
+
+```
+HMI local1 — HMI_PRUEBAS  (ya no existe)
+HMI PSI    — HMI_PSI      (servidor no responde)
+```
+
+Y debajo, para `base_no_existe`: *"Esa base ya no está en el servidor: la
+conexión sigue guardada, pero la base fue borrada o nunca llegó a crearse.
+Puedes volver a crearla desde aquí."*
+
+> **La conexión guardada no se borra sola.** Es deliberado: `conexiones.json`
+> es tu configuración, no un reflejo del servidor. Que la base no esté hoy no
+> significa que no vuelva mañana —una restauración, un servidor que arranca
+> tarde—, y borrarte la conexión (con su usuario, su driver y sus opciones)
+> por un fallo temporal sería peor que enseñarla en rojo.
+
+### 14.2 · Dos mensajes que se contradecían en la misma pantalla
+
+En una sola pasada del formulario de creación salía esto:
+
+```
+✓ La base 'HMI_PRUEBAS' ya existía; no se toca.
+✗ La base se creó, pero el esquema falló. No se pudo conectar.
+```
+
+Las dos no pueden ser verdad. **Era un bug de redacción, no de lógica**: el
+paso 1 distingue bien entre crear y encontrar, pero los mensajes de error de
+los pasos 2, 3 y 4 estaban escritos como si la base siempre se acabara de
+crear. `provisionar()` guarda ahora lo que pasó de verdad:
+
+```python
+hecho_base = (f"La base '{base}' ya existía"
+              if existe else f"La base '{base}' se creó")
+```
+
+…y los tres pasos siguientes lo citan. El mensaje pasa a ser
+`La base 'HMI_PRUEBAS' ya existía, pero el esquema falló. …`, que sí se puede
+leer junto al paso 1 sin tener que decidir a cuál de los dos creer.
+
+### 14.3 · `DROP DATABASE` borra el USER, no el LOGIN
+
+El diagnóstico decía `El servidor rechazó el usuario 'hmi_ls'`. Dos cosas:
+
+1. **`hmi_ls` es un error al teclear `hmi_app`.** Ese login no existe.
+2. Aun escribiéndolo bien, después de borrar la base **hacía falta rehacer el
+   usuario**. En SQL Server son dos objetos distintos:
+
+   * el **LOGIN** vive en el servidor (`master.sys.server_principals`) y
+     **sobrevive** al `DROP DATABASE`;
+   * el **USER** vive dentro de cada base (`sys.database_principals`) y se va
+     con ella, junto con sus `GRANT`.
+
+   Por eso `hmi_app` puede seguir conectando a `master` y aun así no poder
+   entrar en la base recreada: el login está, el usuario no. Es también la
+   razón por la que el diagnóstico ambiguo `18456 + 4060` se resuelve
+   probando `master` (§8).
+
+**Qué hacer:** en el formulario de creación, dejar marcado *"crear el usuario
+de la aplicación"* con el mismo nombre y la misma contraseña de siempre. El
+paso 3 detecta que el login ya existe, no le toca la contraseña, y solo
+re-mapea el USER dentro de la base nueva con sus `GRANT`. El paso 4 lo verifica
+entrando **como ese usuario**.
+
+### 14.4 · De paso: conexiones duplicadas
+
+En las capturas había `local` y `local1` apuntando casi a lo mismo. No es un
+fallo —cada `db_id` es una conexión distinta a propósito— pero un desplegable
+con dos entradas casi idénticas es una forma segura de entrar en la base
+equivocada y ver "usuario o contraseña incorrectos" con la contraseña buena.
+Se borran desde **Configuración → Bases de datos**, con la papelera de la fila.
+
+---
+
+## 15 · El esquema que SQL Server no dejaba crear (Msg 1785)
+
+El síntoma: la base `HMI_PRUEBAS2` **se creaba bien** —aparece en el Object
+Explorer— y acto seguido el panel decía
+
+```
+✓ Base 'HMI_PRUEBAS2' creada con collation Modern_Spanish_CI_AS.
+✗ La base 'HMI_PRUEBAS2' se creó, pero el esquema falló. No se pudo conectar.
+```
+
+**No era un problema de permisos ni de conexión.** El paso 1 acababa de entrar
+con las mismas credenciales y crear una base entera; si no pudiera conectar, no
+habría base. Lo que falló fue una sentencia `CREATE TABLE`, y el mensaje mentía
+por dos motivos que se arreglan aparte.
+
+### 15.1 · La causa: dos caminos en cascada hacia la misma tabla
+
+SQL Server prohíbe que una tabla sea alcanzable por **más de un camino en
+cascada** desde la misma tabla padre, y cuenta como cascada tanto
+`ON DELETE CASCADE` como `ON DELETE SET NULL`. Al crear la clave foránea que
+cierra el segundo camino, aborta con:
+
+```
+Msg 1785 · Introducing FOREIGN KEY constraint 'fk_receta_valores_elemento'
+on table 'receta_valores' may cause cycles or multiple cascade paths.
+```
+
+El esquema de recetas de §13 tiene dos de esos cruces:
+
+```
+recetas ──CASCADE──▶ receta_registros ──CASCADE──▶ receta_valores
+recetas ──CASCADE──▶ receta_elementos ──CASCADE──▶ receta_valores
+
+usuarios ─SET NULL─▶ recetas ──CASCADE──▶ receta_registros
+usuarios ─SET NULL──────────────────────▶ receta_registros
+```
+
+Y **no son un error de modelado**. Un valor de receta depende de dos cosas a la
+vez (de qué registro es y de qué elemento es); una alarma, de quién la
+reconoció y de qué la disparó. El modelo está bien; lo que no cabe es delegar
+el borrado en el motor.
+
+Que el fallo apareciera ahora y no antes tiene explicación: hasta §13 el
+esquema eran 4 tablas sin ese cruce. El `local_hmi_psi_mssql.sql` regenerado
+traía el mismo problema, así que ejecutarlo a mano en SSMS habría fallado
+igual — no era la aplicación.
+
+### 15.2 · El arreglo: ninguna FK lleva `ON DELETE`
+
+Las claves foráneas siguen ahí —la integridad referencial no se toca—, pero sin
+acción de borrado. Lo que hacía el motor lo hace ahora `CrudManager.borrar()`,
+con un mapa explícito:
+
+```python
+DEPENDENCIAS = {
+    "usuarios": (            # se pierde el "quién", nunca el registro
+        "UPDATE {alarmas} SET usuario_id = NULL WHERE usuario_id = :id",
+        "UPDATE {recetas} SET usuario_id = NULL WHERE usuario_id = :id",
+        "UPDATE {receta_registros} SET usuario_id = NULL WHERE usuario_id = :id",
+    ),
+    "alarmas_def": (         # quitar la regla no borra los eventos que provocó
+        "UPDATE {alarmas} SET alarma_def_id = NULL WHERE alarma_def_id = :id",
+    ),
+    "recetas": (             # de abajo arriba: valores, registros, elementos
+        ...
+    ),
+}
+```
+
+Tres cosas se ganan con esto:
+
+| | Antes | Ahora |
+|---|---|---|
+| SQL Server | no podía crear el esquema | lo crea |
+| Los cuatro motores | DDL distinto de hecho | DDL idéntico |
+| Borrado en cascada | implícito en el motor | escrito en el código, y auditable |
+
+Los nombres de tabla se sustituyen desde `_tablas_hmi()`, que aplica el prefijo
+del esquema y valida el identificador; del cliente solo llega `:id`, bindeado.
+La limpieza no va en una transacción única a propósito: si se corta a medias
+queda una fila padre con menos hijos y repetir el borrado lo termina — el orden
+inverso (padre borrada, hijos huérfanos) no puede ocurrir, porque la padre se
+borra la última.
+
+### 15.3 · Y que el mensaje diga la verdad
+
+`diagnosticar()` sabe leer errores de **conexión**. Un `Msg 1785` no lo entiende
+y caía en el cajón de "No se pudo conectar" — justo lo contrario de lo que
+pasaba, porque estábamos dentro de la base.
+
+Ahora el paso 2 separa las dos cosas:
+
+* **falla `connect()`** → "…pero no se pudo entrar en ella para crear las
+  tablas", con el diagnóstico de conexión de siempre;
+* **falla una sentencia** → `Falló la creación de 'receta_registros'`, con el
+  nombre del objeto concreto y el **detalle técnico** del motor desplegable
+  debajo, que es lo único que se puede buscar.
+
+Sin ese detalle a la vista, este fallo era indistinguible de un problema de
+permisos — que es exactamente lo que parecía.
+
+### 15.4 · Qué hacer con una base ya creada a medias
+
+`HMI_PRUEBAS2` quedó con las primeras tablas creadas y las últimas no. El DDL
+es idempotente, así que reintentar la crea el resto; pero las tablas que ya
+existen conservan las cascadas viejas y el esquema queda mezclado. Como está
+vacía, sale más limpio borrarla y volver a crearla:
+
+```sql
+USE master;
+ALTER DATABASE HMI_PRUEBAS2 SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+DROP DATABASE HMI_PRUEBAS2;
+```
+
+(El `SINGLE_USER` es lo que evita el `Msg 3702 · cannot drop database because
+it is currently in use` cuando el backend aún tiene el pool abierto.)
+
+---
+
+## 16 · Recetas conectadas de verdad
+
+Hasta aquí el editor de recetas era una maqueta honesta: decía en su propio pie
+que se guardaba **en el navegador**. Ya no. Las tres capas consumen el CRUD y
+viven en la base de datos con la que se entró al sistema.
+
+### 16.1 · Lo que faltaba en el backend: el `id` de lo recién creado
+
+`POST /crud/{recurso}` respondía `"Receta creado."` y nada más. Con eso no se
+puede construir nada jerárquico: tras crear una receta hace falta su `id` para
+crear sus elementos con `receta_id = <ese id>`, y la vista no lo tenía. La
+alternativa —volver a listar y quedarse con la última— es adivinar, y con dos
+pestañas abiertas adivina mal.
+
+`SqlDriver.insertar()` hace el INSERT y devuelve el id:
+
+| Motor | Cómo |
+|---|---|
+| SQL Server | `INSERT ... OUTPUT INSERTED.id VALUES (...)` — en la misma sentencia |
+| PostgreSQL | `INSERT ... RETURNING id` — en la misma sentencia |
+| MySQL | `SELECT LAST_INSERT_ID()` — misma conexión, mismo `begin()` |
+| SQLite | `SELECT last_insert_rowid()` — igual |
+
+**Por qué SQL Server no usa `SCOPE_IDENTITY()`, que es lo que enseña cualquier
+manual.** La primera versión lo hacía, en una segunda sentencia dentro del
+mismo `begin()`. Devolvía **NULL siempre**. Las filas se creaban —se veían en
+SSMS, con sus ids 1 y 2— pero la vista recibía `id = 0`, y a partir de ahí todo
+lo que colgaba de esa fila fallaba con mensajes que no señalaban al culpable:
+
+```
+Faltan campos obligatorios: receta_id.      ← al añadir un elemento
+No existe recetas con id 0.                 ← al borrar la receta
+```
+
+El motivo: **pyodbc manda las consultas con parámetros a través de
+`sp_executesql`**, que abre un ámbito propio. `SCOPE_IDENTITY()` devuelve la
+identidad *del ámbito actual*, así que preguntada en la sentencia siguiente
+—otro ámbito— no ve nada. El manual no miente; lo que no dice es que el driver
+mete un ámbito por el medio.
+
+`@@IDENTITY` sí lo vería (es de la sesión, no del ámbito), pero devuelve la
+identidad del último insert de la sesión **incluido el que haga un trigger**:
+es justo la trampa que hay que evitar. `OUTPUT INSERTED.id` resuelve las dos
+cosas — va en la misma sentencia, así que no hay ámbito que perder, y devuelve
+la fila que se acaba de insertar y no la que insertara otra cosa. Su única
+limitación es una tabla con un trigger `INSTEAD OF`; el esquema del HMI no
+tiene triggers.
+
+**Y un id 0 ya no viaja.** Ni el backend ni el cliente lo aceptan: `crear()`
+responde 500 con *"la fila se creó pero el servidor no devolvió su
+identificador"*, y `crudApi.crearCrud()` lanza antes de construir el objeto.
+Un fallo que se nota tres pasos después, disfrazado de otro, cuesta mucho más
+de encontrar que uno que se nota donde ocurre.
+
+Y `crear()` devuelve además la **fila completa**: la tabla tiene columnas con
+valor por defecto (`activo`, `tipo`, `max_registros`, las marcas de tiempo) que
+quien la crea no conoce. Sin eso la vista pinta una fila a medias y se corrige
+sola en el siguiente refresco — ese parpadeo se nota.
+
+### 16.2 · Dos archivos nuevos en el frontend
+
+```
+services/crudApi.ts      cliente genérico de /crud/*  (sirve para alarmas también)
+services/recetasApi.ts   traduce columnas <-> modelo de la vista, y compone las lecturas
+```
+
+`crudApi` manda **siempre** `db_id`: el de la base con la que se entró
+(`hmi.auth.db`). Sin eso el backend usaría la primera conexión de la lista y,
+con una base local y otra en el servidor dadas de alta, las recetas se
+guardarían en una y se leerían de la otra. El síntoma habría sido "se borran
+solas".
+
+Dos conversiones de `recetasApi` que no son cosméticas:
+
+* **Celda vacía → `null`, nunca `''`.** El backend valida por tipo y
+  `float('')` revienta con *"el campo 'valor_minimo' esperaba un valor de tipo
+  numero y llegó ''"*, que no le dice nada a quien solo borró una celda.
+* **Un valor va a `valor_num` si es número y a `valor_texto` si no.** Nunca a
+  las dos: si estuvieran las dos, "¿cuál manda?" tendría que responderla cada
+  consumidor, y el que escriba en el PLC se equivocaría el día que no
+  coincidan.
+
+### 16.3 · Cómo se guarda
+
+Sin botón de guardar, con un indicador en la barra superior — *Guardando… /
+Guardado / No se pudo guardar*. Un guardado automático sin señal visible es
+indistinguible de uno roto.
+
+* **Texto**: se agrupa en una cola indexada por `recurso:id` y se manda tras
+  600 ms de pausa. Escribir "azucar" es **un** PATCH, no seis. La vista se
+  actualiza al instante; lo que se agrupa es la escritura.
+* **Altas y bajas**: van al momento, porque hasta que el servidor no
+  responde no hay `id` con el que seguir trabajando.
+* **Al salir de la pantalla** se vacía la cola pendiente. Un cambio escrito y
+  no guardado por cambiar de pestaña es la peor forma de perder trabajo.
+* **Si el servidor rechaza un cambio** —por ejemplo un mínimo mayor que el
+  máximo, que el backend valida porque esos números acaban en una máquina
+  real— se enseña el mensaje y **se vuelve a leer la receta**, para que lo
+  que se ve sea lo que hay y no un valor que solo existe en el navegador.
+
+### 16.4 · Dos decisiones que se notan al usarlo
+
+**El detalle se carga al seleccionar la receta, no con la lista.** Con veinte
+recetas serían decenas de consultas para pintar una tabla de la que se mira una
+fila.
+
+**Las celdas se materializan al escribirlas.** Un registro nuevo no crea una
+fila en `receta_valores` por cada elemento: la rejilla enseña el
+`valor por defecto` del elemento como marcador —igual que TIA— y la fila
+aparece cuando alguien teclea algo. Un registro con quince elementos de los que
+se llenan tres son tres filas, no quince.
+
+Hay un detalle fino ahí: teclear rápido en una celda virgen podría lanzar dos
+`POST` y dejar **dos filas para la misma celda**, con una de las dos invisible
+para siempre. Un candado por celda (`creandoValor`) lo impide, y lo que se
+tecleó mientras el alta iba en camino se manda después, para no perder las
+últimas letras.
+
+### 16.5 · La trampa del proxy de Vite (HTTP 404 que no es del backend)
+
+Con todo escrito, la vista devolvía esto:
+
+```
+POST http://localhost:5173/crud/recetas?db_id=local  404 (Not Found)
+```
+
+Fíjate en el puerto: **5173**, no 8000. La petición nunca salió del servidor de
+desarrollo. `vite.config.js` reenvía al backend solo los prefijos que están en
+su lista, y `/crud` no estaba; para todo lo demás Vite responde el `index.html`
+de la SPA, que como no es lo que se pidió llega como un 404. El backend ni se
+enteró — su log no tiene ninguna línea de `/crud`, y eso es lo que lo delata.
+
+Faltaban cuatro prefijos, no uno. Ya están:
+
+```js
+'/crud': BACKEND,      // alarmas, definiciones y los cuatro niveles de recetas
+'/sistema': BACKEND,   // carpeta de datos y copia zip (§11)
+'/export': BACKEND,    // exportaciones CSV/XLSX
+'/ai': BACKEND,        // asistente
+```
+
+> **Regla para la próxima vez.** Cada router nuevo del backend necesita su
+> línea en el proxy. Comprobar que la lista está completa es un comando:
+>
+> ```bash
+> grep -rhoP '@router\.\w+\(\s*"\K/[a-z_]+' app/api/ | sort -u
+> ```
+>
+> Y el síntoma siempre es el mismo: un 404 **del 5173**. Si el puerto del
+> error es el de Vite, el problema está aquí, no en el backend.
+
+**Hay que reiniciar `npm run dev`.** `vite.config.js` se lee al arrancar; el
+HMR no lo recarga.
+
+### 16.6 · De paso: el log del historizador ya no se inunda
+
+En el mismo arranque salía esto cada dos segundos, para siempre:
+
+```
+[WARNING] historian: No se pudo escribir el histórico de 'g1':
+          (sqlite3.OperationalError) unable to open database file
+```
+
+El grupo `g1` apunta a la conexión `e2e`, un SQLite en `/tmp/e2e.db` que quedó
+de las pruebas y que en Windows no existe. El error es legítimo; repetirlo
+1.800 veces por hora no: tapa cualquier otra cosa que pase, que es justo lo que
+hay que mirar cuando algo va mal.
+
+Ahora un fallo **idéntico** se avisa la primera vez y luego cada 30 intentos,
+con la cuenta (`lleva 300 intentos fallidos seguidos`), y se registra también
+la recuperación. Un error *distinto* siempre se avisa: puede ser otra cosa. El
+contador va además en `GET /historian`, en `fallos_seguidos`.
+
+Las conexiones de prueba (`prod`, `hist`, `e2e`, todas a `/tmp/*.db`) se pueden
+borrar desde **Configuración → Bases de datos**; el grupo `g1` que las usa,
+desde el editor de flujos.
+
+### 16.7 · Elegir el tag, y poder escribir el valor
+
+Dos cosas que faltaban para que la pantalla se pueda usar de verdad.
+
+**El tag de un elemento se elige, no se recuerda.** La celda *Tag* ahora ofrece
+las variables de los PLCs (`GET /tags`, los tags descubiertos por browse OPC
+UA), filtrando mientras escribes por PLC y por nombre a la vez. De cada uno se
+ve el Data Block —o el POU, en Rexroth—, el tipo OPC y el **último valor
+recibido**, que es lo que confirma que es el tag correcto cuando hay varios con
+nombres parecidos.
+
+Sigue siendo un campo de **texto libre**, no un desplegable cerrado, y es
+deliberado: la lista solo existe tras un browse correcto, así que un
+desplegable haría imposible configurar las recetas en la oficina con la máquina
+apagada. Cuando no hay nada que ofrecer, la lista dice cuál de los dos motivos
+es —no hay PLCs dados de alta, o los hay y ninguno ha conectado—, porque se
+arreglan de forma distinta.
+
+El formato que se guarda es `plc_id|tag`, el mismo del WebSocket, el
+historizador y `plc_prg`; lo arma `claveTag()`, igual que el backend en
+`on_mensaje()`. Sin el prefijo del PLC, dos equipos con un `Temperatura` cada
+uno serían indistinguibles.
+
+Al elegir de la lista se rellena además **Data type** a partir del tipo OPC
+(`Float → Real`, `Boolean → Bool`, `Int32 → DInt`…), pero **solo si el elemento
+no tenía tipo**: una elección hecha a mano manda sobre lo que diga el servidor
+OPC, y un tipo inventado decide cuántos bytes se le mandan a una máquina.
+
+**La columna rosada ya no bloquea.** TIA bloquea los valores de un elemento sin
+tag, y eso copiamos. Pero el orden real de trabajo es el contrario: primero se
+conoce la fórmula —30 de limón, 20 de azúcar— y después se cablea a qué tag va
+cada ingrediente. Bloquear obliga a hacerlo al revés.
+
+Ahora la celda se escribe siempre y el aviso se queda como aviso: un borde
+ámbar, el ⚠ en la cabecera de la columna, el contador «N sin tag» en la barra,
+y el tooltip diciendo lo único que importa —*el valor se guarda, pero hasta que
+ese elemento tenga tag no hay dónde escribirlo en el PLC*—. Es la diferencia
+entre una advertencia y un muro.
+
+### 16.8 · Elegir en qué base se guardan las recetas
+
+La pantalla tiene ahora un **«Guardar en»** en la barra superior con las
+conexiones dadas de alta: la local del PC de planta, la del servidor, la que
+sea. Al cambiarla, todo lo que se lea y se escriba a partir de ese momento va a
+esa base — las cuatro tablas, no solo la cabecera.
+
+**Por qué no está en la columna `Path`, que es donde se pidió.** `Path` es el
+campo de TIA que dice en qué carpeta **del panel** quedan los ficheros
+(`\Flash\Recipes`), y hay una razón de fondo para no reutilizarlo: una receta
+no puede *apuntar* a una base de datos, porque esa fila **ya está guardada en
+una**. Si `Path` dijera «servidor» mientras la fila vive en la base local,
+serían dos afirmaciones contradictorias sobre el mismo dato — exactamente el
+problema de §14.2, en otra forma.
+
+La base es de la **pantalla**, no de cada receta. Así que el selector va arriba,
+donde ya estaba la píldora que decía en cuál se estaba trabajando, y ahora
+además deja cambiarla. La columna `Path` se queda como en TIA, con un tooltip
+que aclara la diferencia.
+
+**Cómo está hecho.** El `db_id` viaja **explícito** en cada llamada
+(`listarCrud(recurso, opciones, dbId)`, `crearCrud(recurso, datos, dbId)`…) y
+no en una variable global del módulo. Con una global, elegir la base en recetas
+cambiaría también dónde escriben las alarmas: un efecto a distancia imposible
+de ver leyendo el código de ninguna de las dos pantallas.
+
+Dentro del editor se lee de un `ref`, no del estado. Las funciones que guardan
+se crean una vez, y leyendo el estado capturarían el valor viejo: un cambio de
+base podría mandar una escritura a la base anterior.
+
+**Y el orden importa en un punto.** Al cambiar de base, lo PRIMERO es vaciar la
+cola de guardado diferido: lo que está pendiente pertenece a la base anterior,
+y mandarlo después del cambio lo escribiría en la nueva, sobre una fila que
+allí es otra cosa —o no existe—. Es el único sitio de todo esto donde una
+carrera tendría consecuencias de verdad.
+
+La elección se recuerda por navegador (`hmi.recetas.db`) y arranca en la base
+del login. Si la base recordada ya no está dada de alta, se cae sola a la del
+login en vez de seguir escribiendo contra algo que no existe.
+
+**Y no es un `<select>` nativo, por un motivo concreto.** La primera versión sí
+lo era y en modo oscuro salía un panel blanco con el texto casi ilegible: esa
+lista la dibuja el sistema operativo con SU tema, y no hay CSS que la alcance.
+El control propio cuesta unas cincuenta líneas, se ve igual en los dos temas, y
+de paso cabe lo que un `<option>` no admite — el punto de estado de la
+conexión, el motor y el nombre de la base en una segunda línea. Con una base
+local y otra en el servidor, "¿cuál es cuál?" se responde de un vistazo en vez
+de leyendo `db_id`.
+
+### 16.9 · Lo que sigue faltando
+
+Lo mismo que en alarmas, y es lo importante: **escribir en el PLC**. Ya hay
+dónde guardar las tres capas y con qué identificarlas; falta cargar un
+`receta_registro` en los tags de sus elementos. Ese paso, el día que exista,
+necesita identidad y auditoría obligatorias: es la primera vez que el HMI
+escribiría en una máquina.
+
+---
+
+## 17 · Resumen en siete líneas
 
 1. `sqlcmd` interactivo + pegar SQL = errores fantasma. Usa siempre `-Q`.
 2. Un error de sintaxis descarta **el lote entero**, incluidas las sentencias correctas que iban antes.
 3. `docker cp` + `sqlcmd -i` chocan por permisos: manda el `.sql` por stdin con `<`.
 4. Verifica con el usuario de la aplicación (`hmi_app`), no con `sa`: es la prueba que representa lo que hará el HMI.
+5. Un pool abierto no demuestra que la base exista. Para saberlo hay que preguntar: `GET /db?revisar=true`.
+6. SQL Server rechaza dos caminos en cascada hacia la misma tabla (Msg 1785): ninguna FK del esquema lleva `ON DELETE`, el orden lo pone la aplicación.
+7. Un `INSERT` que no devuelve el `id` no sirve para construir jerarquías: hay que preguntarlo en la MISMA conexión y transacción.

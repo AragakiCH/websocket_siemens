@@ -32,6 +32,18 @@ export interface BaseDatos {
   base_datos: string;
   conectado: boolean;
   por_defecto: boolean;
+  /**
+   * Código estable del último diagnóstico contra el servidor, cuando se pidió
+   * (`revisar=true`). Los que importan aquí:
+   *
+   *   'ok'              -> responde.
+   *   'base_no_existe'  -> el servidor está, la base ya no. Se puede crear.
+   *   'sin_servidor' | 'host_desconocido' | 'timeout' -> no se llega.
+   *   'credenciales' | 'sin_permisos' -> se llega, pero no se entra.
+   */
+  estado?: string;
+  estado_titulo?: string;
+  estado_sugerencia?: string;
 }
 
 export interface Permisos {
@@ -58,12 +70,18 @@ export interface InfoBd {
   etiqueta_motor?: string;
   base_datos?: string;
   conectado?: boolean;
+  estado?: string;
+  estado_titulo?: string;
+  estado_sugerencia?: string;
   tabla?: string;
   mensaje?: string;
 }
 
 export interface EstadoAuth {
   hay_usuarios: boolean;
+  /** Diagnóstico de la base elegida cuando `bd_disponible` es false. */
+  bd_estado?: string;
+  bd_sugerencia?: string;
   num_usuarios: number;
   auth_requerida: boolean;
   bd_disponible: boolean;
@@ -216,12 +234,23 @@ export async function fetchAuth(
  * Lanza si el backend no responde. El login lo trata como "no puedo saber en
  * qué estado estoy" y lo dice, en vez de pintar un formulario que va a fallar.
  */
-export async function fetchEstadoAuth(dbId?: string): Promise<EstadoAuth> {
+export async function fetchEstadoAuth(
+  dbId?: string,
+  revisar = false
+): Promise<EstadoAuth> {
   // `hay_usuarios` depende de la BASE, no del sistema: cada una tiene su
   // propia tabla `usuarios`. Por eso al cambiar de opción hay que volver a
   // preguntar, o el login diría "crea la primera cuenta" sobre una base que
   // ya tiene diez.
-  const q = dbId ? `?db_id=${encodeURIComponent(dbId)}` : '';
+  //
+  // `revisar` le pide al backend que PREGUNTE al servidor en vez de fiarse
+  // del pool que tiene abierto. Es lo que hace que borrar una base en SQL
+  // Server se note aquí: sin esto, el pool puede seguir diciendo que está
+  // viva y el desplegable ofrece entrar en algo que ya no existe.
+  const p = new URLSearchParams();
+  if (dbId) p.set('db_id', dbId);
+  if (revisar) p.set('revisar', 'true');
+  const q = p.toString() ? `?${p}` : '';
   const r = await fetch(`/auth/estado${q}`);
   if (!r.ok) throw new Error(`El servidor respondió ${r.status}.`);
   return r.json();

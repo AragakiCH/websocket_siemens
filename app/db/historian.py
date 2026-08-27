@@ -50,6 +50,16 @@ logger = logging.getLogger("historian")
 # a que el servicio se quede sin memoria y tumbe también la vista en vivo.
 MAX_BUFFER = 50_000
 
+# Cada cuántos fallos IDÉNTICOS seguidos se vuelve a avisar.
+#
+# Un grupo que no puede escribir falla en cada ciclo, y a dos segundos por
+# ciclo son 1.800 líneas por hora diciendo exactamente lo mismo. El log deja
+# de servir: tapa cualquier otra cosa que esté pasando, que es justo lo que se
+# necesita mirar cuando algo va mal. Se avisa la primera vez y luego cada N
+# intentos, con la cuenta — que es el dato que de verdad falta en la línea
+# repetida.
+RECORDATORIO_FALLOS = 30
+
 
 def _ahora_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -96,6 +106,10 @@ class GrupoHistorizacion:
         self.filas_descartadas: int = 0
         self.ultimo_error: str = ""
         self.ultima_escritura: str = ""
+        # Fallos idénticos seguidos, para no repetir el mismo aviso en el log
+        # y para poder decir "lleva 300 intentos" en vez de solo "falló".
+        self.fallos_seguidos: int = 0
+        self._error_reportado: str = ""
         self._tabla_lista = False
         # Mapa campo->columna real, resuelto al preparar la tabla.
         self._mapa: Dict[str, str] = {}
@@ -144,6 +158,7 @@ class GrupoHistorizacion:
             "filas_descartadas": self.filas_descartadas,
             "ultima_escritura": self.ultima_escritura,
             "ultimo_error": self.ultimo_error,
+            "fallos_seguidos": self.fallos_seguidos,
         }
 
 
@@ -363,15 +378,34 @@ class Historizador:
             grupo.filas_escritas += len(lote)
             grupo.ultima_escritura = _ahora_iso()
             grupo.ultimo_error = ""
+            if grupo.fallos_seguidos:
+                logger.info("El histórico de '%s' volvió a escribir tras %d "
+                            "intento(s) fallido(s).",
+                            grupo_id, grupo.fallos_seguidos)
+                grupo.fallos_seguidos = 0
+                grupo._error_reportado = ""
 
         except Exception as exc:  # noqa: BLE001
-            grupo.ultimo_error = str(exc)
+            texto = str(exc)
+            grupo.ultimo_error = texto
             grupo._tabla_lista = False
             # Devolver el lote al principio del buffer para reintentar.
             pendientes = lote + self._buffer.get(grupo_id, [])
             self._buffer[grupo_id] = pendientes[-MAX_BUFFER:]
-            logger.warning("No se pudo escribir el histórico de '%s': %s",
-                           grupo_id, exc)
+
+            if texto != grupo._error_reportado:
+                # Un error NUEVO siempre se cuenta: puede ser otra cosa.
+                grupo.fallos_seguidos = 1
+                grupo._error_reportado = texto
+                logger.warning("No se pudo escribir el histórico de '%s': %s",
+                               grupo_id, texto)
+            else:
+                grupo.fallos_seguidos += 1
+                if grupo.fallos_seguidos % RECORDATORIO_FALLOS == 0:
+                    logger.warning(
+                        "El histórico de '%s' lleva %d intentos fallidos "
+                        "seguidos con el mismo error: %s",
+                        grupo_id, grupo.fallos_seguidos, texto)
 
     # ================================================================== #
     # Gestión de grupos

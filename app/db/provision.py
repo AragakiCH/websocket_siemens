@@ -419,6 +419,11 @@ async def provisionar(
                      admin_usuario, admin_password, opciones)
 
     # ---------------- 1 · La base de datos ----------------------------
+    # Se guarda fuera del `try` porque los mensajes de los pasos 2, 3 y 4 la
+    # citan: decir "la base se creó" cuando el paso 1 acaba de decir "ya
+    # existía" son dos afirmaciones contradictorias en la misma pantalla, y
+    # quien lo lee no sabe a cuál creer.
+    existe = False
     try:
         eng = _motor_autocommit(url_admin)
         try:
@@ -438,26 +443,70 @@ async def provisionar(
         return {"ok": False, "pasos": pasos.items, "diagnostico": diag,
                 "mensaje": f"{diag['titulo']}. {diag['sugerencia']}"}
 
+    # Lo que de verdad pasó con la base. Se cita literal más abajo.
+    hecho_base = (f"La base '{base}' ya existía"
+                  if existe else f"La base '{base}' se creó")
+
     # ---------------- 2 · Las tablas ----------------------------------
     if crear_esquema:
+        driver = SqlDriver(motor=motor, host=host, puerto=puerto,
+                           base_datos=base, usuario=admin_usuario,
+                           password=admin_password, opciones=opciones)
+
+        # CONECTAR y CREAR TABLAS son dos fallos distintos y hasta ahora se
+        # contaban como el mismo. `diagnosticar()` sabe leer errores de
+        # conexión; un error de DDL ("Msg 1785 · may cause cycles or multiple
+        # cascade paths") no lo entiende y caía en el cajón de "No se pudo
+        # conectar" — que era justo lo contrario de lo que pasaba, porque
+        # estábamos dentro de la base. Separarlos es la diferencia entre
+        # "revisa tus credenciales" y "la sentencia que crea 'X' falló".
         try:
-            driver = SqlDriver(motor=motor, host=host, puerto=puerto,
-                               base_datos=base, usuario=admin_usuario,
-                               password=admin_password, opciones=opciones)
             await driver.connect()
-            try:
-                for _, sentencia in driver.ddl_esquema_hmi():
-                    await driver._ejecutar_interno(sentencia)
-            finally:
-                await driver.disconnect()
-            pasos.ok("esquema", "Tablas del HMI creadas (o ya existían): "
-                                "usuarios, plc_prg, alarmas, recetas.")
         except Exception as exc:  # noqa: BLE001
             diag = diagnosticar(exc, motor=motor, host=host, puerto=puerto,
                                 base_datos=base, opciones=opciones)
             return {"ok": False, "pasos": pasos.items, "diagnostico": diag,
-                    "mensaje": f"La base se creó, pero el esquema falló. "
-                               f"{diag['titulo']}."}
+                    "mensaje": f"{hecho_base}, pero no se pudo entrar en ella "
+                               f"para crear las tablas. {diag['titulo']}."}
+
+        objeto = ""
+        try:
+            for nombre, sentencia in driver.ddl_esquema_hmi():
+                objeto = nombre
+                await driver._ejecutar_interno(sentencia)
+        except Exception as exc:  # noqa: BLE001
+            diag = diagnosticar(exc, motor=motor, host=host, puerto=puerto,
+                                base_datos=base, opciones=opciones)
+            # El diagnóstico de conexión no aplica: se sobreescribe con lo
+            # que de verdad ocurrió, conservando el texto literal del motor
+            # en `detalle`, que es lo único que se puede buscar.
+            diag = {
+                **diag,
+                "codigo": "ddl",
+                "titulo": f"Falló la creación de '{objeto}'",
+                "mensaje": (
+                    f"Se entró en '{base}' sin problema, pero el servidor "
+                    f"rechazó la sentencia que crea '{objeto}'. No es un "
+                    f"problema de conexión ni de permisos de acceso."
+                ),
+                "sugerencia": (
+                    "El detalle técnico de abajo es el mensaje literal del "
+                    "motor. Si menciona permisos, esa cuenta puede entrar "
+                    "pero no crear objetos: hace falta db_owner o dbcreator. "
+                    "Si menciona 'cycles or multiple cascade paths', el "
+                    "esquema es el problema, no tú."
+                ),
+            }
+            return {"ok": False, "pasos": pasos.items, "diagnostico": diag,
+                    "mensaje": f"{hecho_base}, pero falló al crear "
+                               f"'{objeto}'. Mira el detalle técnico."}
+        finally:
+            await driver.disconnect()
+
+        pasos.ok("esquema", "Tablas del HMI creadas (o ya existían): "
+                            "usuarios, plc_prg, alarmas_def, alarmas, "
+                            "recetas, receta_elementos, receta_registros, "
+                            "receta_valores.")
     else:
         pasos.info("esquema", "No se pidió crear las tablas.")
 
@@ -472,8 +521,8 @@ async def provisionar(
             diag = diagnosticar(exc, motor=motor, host=host, puerto=puerto,
                                 base_datos=base, opciones=opciones)
             return {"ok": False, "pasos": pasos.items, "diagnostico": diag,
-                    "mensaje": f"La base y las tablas están, pero no se pudo "
-                               f"crear el usuario: {diag['titulo']}."}
+                    "mensaje": f"{hecho_base} y las tablas están, pero no se "
+                               f"pudo crear el usuario: {diag['titulo']}."}
     else:
         pasos.info("usuario", "No se pidió crear usuario; se usará uno que ya "
                               "exista.")
@@ -507,7 +556,7 @@ async def provisionar(
             return {
                 "ok": False, "pasos": pasos.items, "diagnostico": diag,
                 "mensaje": (
-                    f"La base y las tablas están creadas, pero "
+                    f"{hecho_base} y las tablas están, pero "
                     f"'{usuario_prueba}' todavía no puede entrar: "
                     f"{diag['titulo']}."
                 ),

@@ -294,8 +294,48 @@ class AuthManager:
                 "base_datos": c.get("base_datos", ""),
                 "conectado": bool(c.get("conectado")),
                 "por_defecto": c["db_id"] == defecto,
+                # Por qué no responde, cuando no responde. "sin conexión" a
+                # secas obliga a adivinar entre un servidor apagado, una
+                # contraseña cambiada y una base borrada, que son tres
+                # arreglos distintos.
+                "estado": c.get("estado", ""),
+                "estado_titulo": c.get("estado_titulo", ""),
+                "estado_sugerencia": c.get("estado_sugerencia", ""),
             })
         return salida
+
+    async def revisar_bases(self) -> List[Dict[str, Any]]:
+        """
+        Pregunta al servidor por TODAS las bases dadas de alta y refresca el
+        catálogo. Lo llama el login al abrirse: sin esto, la lista enseña lo
+        que había en el pool al arrancar el backend, que después de borrar
+        una base en el gestor es exactamente lo contrario de la realidad.
+        """
+        return await self._db.revisar_conexiones()
+
+    async def revisar_base(self, db_id: Optional[str] = None,
+                           espera: float = 6.0) -> Dict[str, Any]:
+        """
+        Igual, pero solo la base elegida. `{}` si no hay ninguna.
+
+        La espera es más corta que la del panel de administración a
+        propósito: esto lo llama el LOGIN, y una pantalla de acceso que se
+        queda quince segundos en blanco porque un servidor remoto está
+        apagado es peor que una que dice "no contesta" en seis.
+        """
+        try:
+            elegida = self._db_id(db_id)
+        except ErrorAuth:
+            return {}
+        return await self._db.revisar_conexion(elegida, espera)
+
+    def estado_base(self, db_id: Optional[str] = None) -> Dict[str, Any]:
+        """Última revisión conocida de esa base, sin tocar la red."""
+        try:
+            elegida = self._db_id(db_id)
+        except ErrorAuth:
+            return {}
+        return self._db.estado_cacheado(elegida)
 
     def info_bd(self, db_id: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -347,6 +387,9 @@ class AuthManager:
             "etiqueta_motor": c.get("etiqueta_motor", ""),
             "base_datos": c.get("base_datos", ""),
             "conectado": bool(c.get("conectado")),
+            "estado": c.get("estado", ""),
+            "estado_titulo": c.get("estado_titulo", ""),
+            "estado_sugerencia": c.get("estado_sugerencia", ""),
             "tabla": self.tabla,
             "mensaje": c.get("ultimo_error", ""),
         }

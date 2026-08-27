@@ -472,6 +472,85 @@ class SqlDriver(DbDriver):
             )
             return resultado.rowcount or 0
 
+    async def insertar(self, tabla: str, valores: Dict[str, Any]) -> int:
+        """
+        INSERT que devuelve el `id` de la fila creada.
+
+        Existe porque sin el id no se puede construir nada jerárquico: al
+        crear una receta hay que crear después sus elementos con
+        `receta_id = <ese id>`, y la vista se quedaba sin saberlo. Antes
+        `crear()` devolvía "creado" y nada más, así que el frontend tenía que
+        volver a listar y adivinar cuál era la nueva fila — que con dos
+        pestañas abiertas es exactamente eso, adivinar.
+
+        Cada motor lo dice a su manera, y las tres que preguntan aparte
+        necesitan lo mismo: que la pregunta viaje por la MISMA conexión y
+        dentro de la MISMA transacción que el INSERT. Por eso hay un solo
+        `begin()` para las dos sentencias.
+
+        SQL SERVER ES DISTINTO, Y ESTO COSTÓ ENCONTRARLO
+        ------------------------------------------------
+        La primera versión usaba `SELECT SCOPE_IDENTITY()` en una segunda
+        sentencia, que es lo que enseña cualquier manual. Devolvía **NULL
+        siempre**: las filas se creaban —se veían en SSMS— pero la vista
+        recibía `id = 0`, y a partir de ahí todo lo que colgaba de esa fila
+        fallaba con "Faltan campos obligatorios: receta_id" o "No existe
+        recetas con id 0".
+
+        El motivo es que pyodbc manda las consultas con parámetros a través
+        de `sp_executesql`. Eso abre un ÁMBITO propio, y `SCOPE_IDENTITY()`
+        devuelve la identidad del ámbito actual: consultado en la sentencia
+        siguiente —otro ámbito— no ve nada. El manual no miente; lo que no
+        dice es que el driver mete un ámbito por el medio.
+
+        `@@IDENTITY` sí lo vería (es de la sesión, no del ámbito) pero
+        devuelve la identidad del ÚLTIMO insert de la sesión, incluido el que
+        haga un trigger: es exactamente la trampa que hay que evitar. Así que
+        se usa `OUTPUT INSERTED.id`, que resuelve las dos cosas a la vez: va
+        en la MISMA sentencia (no hay ámbito que perder) y devuelve la fila
+        que se acaba de insertar, no la que insertara otra cosa.
+
+        La única limitación de `OUTPUT` es una tabla con un trigger `INSTEAD
+        OF`, que obliga a `OUTPUT ... INTO`. El esquema del HMI no tiene
+        triggers; el día que alguno los añada, esto hay que revisarlo.
+        """
+        if self._engine is None:
+            raise RuntimeError("insertar() llamado sin conexión.")
+        campos = list(valores)
+        columnas = ", ".join(campos)
+        marcadores = ", ".join(":" + c for c in campos)
+        sql = f"INSERT INTO {tabla} ({columnas}) VALUES ({marcadores})"
+
+        async with self._engine.begin() as conn:
+            # Los dos motores que lo devuelven en la PROPIA sentencia. Es la
+            # forma fiable: no hay una segunda consulta que pueda caer en
+            # otro ámbito o en otra conexión.
+            if self.motor in ("postgresql", "mssql"):
+                if self.motor == "postgresql":
+                    devuelve = sql + " RETURNING id"
+                else:
+                    devuelve = (
+                        f"INSERT INTO {tabla} ({columnas}) "
+                        f"OUTPUT INSERTED.id VALUES ({marcadores})"
+                    )
+                r = await asyncio.wait_for(
+                    conn.execute(text(devuelve), valores),
+                    timeout=self.timeout_s)
+                fila = r.first()
+                return int(fila[0]) if fila and fila[0] is not None else 0
+
+            # MySQL y SQLite: la función es de la CONEXIÓN, no del ámbito, y
+            # aquí la conexión es la misma. Sí sería incorrecta si se pidiera
+            # fuera de este `begin()`.
+            await asyncio.wait_for(conn.execute(text(sql), valores),
+                                   timeout=self.timeout_s)
+            consulta_id = ("SELECT LAST_INSERT_ID()" if self.motor == "mysql"
+                           else "SELECT last_insert_rowid()")
+            r = await asyncio.wait_for(conn.execute(text(consulta_id)),
+                                       timeout=self.timeout_s)
+            fila = r.first()
+            return int(fila[0]) if fila and fila[0] is not None else 0
+
     def ddl_tabla_historico(self, tabla: str) -> List[str]:
         """
         Sentencias CREATE TABLE/INDEX del histórico, adaptadas al motor.
@@ -625,8 +704,10 @@ class SqlDriver(DbDriver):
         Ambas son NULLables a propósito: una alarma existe desde que salta,
         aunque todavía nadie la haya reconocido, y puede venir de una
         condición del sistema que no corresponde a una lectura concreta.
-        `ON DELETE SET NULL` evita que borrar un usuario borre su historial
-        de alarmas: se pierde el "quién", no el evento.
+Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
+        pone `usuario_id` a NULL antes de borrarlo. Se pierde el "quién", no
+        el evento. Ninguna FK de este esquema lleva `ON DELETE` — ver la nota
+        más abajo, en la definición de las claves foráneas.
 
         Todas las sentencias son IDEMPOTENTES: ejecutarlas sobre una BD que
         ya tiene el esquema no falla ni borra datos.
@@ -635,7 +716,11 @@ class SqlDriver(DbDriver):
         t_usuarios = f"{p}usuarios"
         t_plc = f"{p}plc_prg"
         t_alarmas = f"{p}alarmas"
+        t_alarmas_def = f"{p}alarmas_def"
         t_recetas = f"{p}recetas"
+        t_rec_elem = f"{p}receta_elementos"
+        t_rec_reg = f"{p}receta_registros"
+        t_rec_val = f"{p}receta_valores"
 
         m = self.motor
         # --- Tipos que cambian entre motores ---------------------------- #
@@ -712,22 +797,117 @@ class SqlDriver(DbDriver):
         )
 
         # ---------------------------------------------------------------- #
-        # alarmas
+        # alarmas_def  ·  DEFINICIÓN de las alarmas (la configuración)
+        # ---------------------------------------------------------------- #
+        # Son DOS tablas y no una, y la distinción es la que hace que un
+        # sistema de alarmas funcione:
+        #
+        #   alarmas_def  QUÉ vigilar. "Si DB1.temperatura pasa de 80, es un
+        #                Error y dice «Temperatura alta en el reactor»."
+        #                Se configura una vez y no cambia en meses.
+        #
+        #   alarmas      QUÉ PASÓ. "El 26/08 a las 14:32 saltó, con valor
+        #                83.4; Ana la reconoció a las 14:35; se normalizó a
+        #                las 14:41." Una fila por evento, y crecen sin parar.
+        #
+        # Meterlo todo en una tabla obliga a repetir el texto y la clase en
+        # cada evento, y hace imposible responder "¿qué alarmas tengo
+        # configuradas?" sin que hayan saltado al menos una vez. Es la misma
+        # separación que hacen TIA Portal y WinCC, y por el mismo motivo.
+        #
+        # Los campos siguen los de la tabla "Discrete alarms" de TIA para que
+        # migrar una configuración existente sea copiar columnas, no traducir:
+        #   Name -> nombre · Alarm text -> texto · Alarm class -> clase
+        #   Trigger tag -> tag · Trigger bit -> bit_disparo
+        #   HMI acknowledgment tag -> tag_reconocimiento
+        alarmas_def = (
+            f"CREATE TABLE {t_alarmas_def} ("
+            f"id {pk}, "
+            f"nombre VARCHAR(120) NOT NULL, "
+            f"texto VARCHAR(500) NOT NULL, "
+            # Critical | Error | Warning | Maintenance | Information
+            # (las cinco clases de TIA; son las que ya ofrece el editor).
+            f"clase VARCHAR(20) NOT NULL DEFAULT 'Error', "
+            # Tag que la dispara, en el formato del WebSocket: "<plc>|<tag>".
+            f"tag VARCHAR(400), "
+            # Alarma discreta: qué bit del tag se vigila.
+            f"bit_disparo {entero} DEFAULT 0, "
+            # Cómo se evalúa. 'bit' = discreta (la de TIA); el resto son
+            # alarmas ANALÓGICAS, que TIA trata aparte y aquí caben en la
+            # misma tabla porque solo cambia la comparación.
+            #   bit | > | >= | < | <= | == | !=
+            f"comparador VARCHAR(10) NOT NULL DEFAULT 'bit', "
+            f"valor_limite {real}, "
+            # Histéresis: cuánto tiene que volver el valor para considerarla
+            # normalizada. Sin esto, un valor oscilando en el límite genera
+            # cientos de eventos por minuto.
+            f"banda_muerta {real} DEFAULT 0, "
+            # HMI acknowledgment tag: el PLC puede reconocerla por su cuenta.
+            f"tag_reconocimiento VARCHAR(400), "
+            f"bit_reconocimiento {entero} DEFAULT 0, "
+            f"area VARCHAR(80), "
+            f"activo {entero} NOT NULL DEFAULT 1, "
+            f"creado_en {ts}, "
+            f"actualizado_en {ts})"
+        )
+
+        # ---------------------------------------------------------------- #
+        # alarmas  ·  EVENTOS (el historial)
         # ---------------------------------------------------------------- #
         # PK simple + FKs simples (no una PK compuesta de los tres campos):
         # con una PK compuesta no podrías tener dos alarmas distintas del
         # mismo PLC y el mismo usuario, que es justo lo normal.
+        # ---------------------------------------------------------------- #
+        # POR QUÉ NINGUNA CLAVE FORÁNEA LLEVA `ON DELETE`
+        #
+        # SQL Server prohíbe que una tabla sea alcanzable por MÁS DE UN camino
+        # en cascada desde la misma tabla padre, y cuenta como cascada tanto
+        # `ON DELETE CASCADE` como `ON DELETE SET NULL`. Al crear la
+        # constraint que cierra el segundo camino, aborta con:
+        #
+        #     Msg 1785 · Introducing FOREIGN KEY constraint '...' on table
+        #     '...' may cause cycles or multiple cascade paths.
+        #
+        # Este esquema tiene dos de esos cruces, y no por un error de
+        # modelado:
+        #
+        #   recetas ─CASCADE→ receta_registros ─CASCADE→ receta_valores
+        #   recetas ─CASCADE→ receta_elementos ─CASCADE→ receta_valores
+        #
+        #   usuarios ─SET NULL→ recetas ─CASCADE→ receta_registros
+        #   usuarios ─SET NULL──────────────────→ receta_registros
+        #
+        # Un valor de receta depende de DOS cosas a la vez (de qué registro
+        # es y de qué elemento es); una alarma, de quién la reconoció Y de qué
+        # la disparó. El modelo es correcto; lo que no cabe es delegar el
+        # borrado en el motor.
+        #
+        # Así que el borrado en orden lo hace la aplicación, en
+        # `CrudManager.borrar()` (ver `DEPENDENCIAS` allí): pone a NULL las
+        # referencias de auditoría y borra las filas hijas antes que la padre.
+        # Se gana además que el esquema es IDÉNTICO en los cuatro motores
+        # —SQL Server era el único que no podía crearlo— y que ningún borrado
+        # en cascada ocurre por sorpresa: está escrito en el código.
+        # ---------------------------------------------------------------- #
         fk_plc = (
             f"CONSTRAINT fk_{p}alarmas_plc FOREIGN KEY (plc_prg_id) "
-            f"REFERENCES {t_plc} (id) ON DELETE SET NULL"
+            f"REFERENCES {t_plc} (id)"
         )
         fk_usr = (
             f"CONSTRAINT fk_{p}alarmas_usuario FOREIGN KEY (usuario_id) "
-            f"REFERENCES {t_usuarios} (id) ON DELETE SET NULL"
+            f"REFERENCES {t_usuarios} (id)"
+        )
+        fk_def = (
+            f"CONSTRAINT fk_{p}alarmas_def FOREIGN KEY (alarma_def_id) "
+            f"REFERENCES {t_alarmas_def} (id)"
         )
         alarmas = (
             f"CREATE TABLE {t_alarmas} ("
             f"id {pk}, "
+            # Qué definición lo produjo. NULLable a propósito: una alarma de
+            # sistema ("se perdió la conexión con el PLC") no viene de ninguna
+            # regla configurada, y el evento debe poder existir igual.
+            f"alarma_def_id {fk_tipo}, "
             f"plc_prg_id {fk_tipo}, "
             f"usuario_id {fk_tipo}, "
             # proceso | equipo | comunicacion | sistema
@@ -744,70 +924,175 @@ class SqlDriver(DbDriver):
             f"ts_activacion {ts} NOT NULL, "
             f"ts_reconocimiento {ts}, "
             f"ts_normalizacion {ts}, "
-            f"{fk_plc}, {fk_usr})"
+            f"{fk_plc}, {fk_usr}, {fk_def})"
         )
 
         # ---------------------------------------------------------------- #
-        # recetas
         # ---------------------------------------------------------------- #
-        # Una receta es la DEFINICIÓN de un parámetro configurable del proceso:
-        # qué tag es, de qué tipo, entre qué límites puede moverse y con qué
-        # valor arranca. Es la tabla que permite que un operario cambie una
-        # consigna sin tocar el PLC, y que el HMI valide el rango ANTES de
-        # escribirla.
+        # RECETAS · cuatro tablas, como en TIA Portal
+        # ---------------------------------------------------------------- #
+        # TIA organiza las recetas en tres niveles, y hacen falta los tres:
         #
-        # `valor_minimo` / `valor_maximo` no son decorativos: son la última
-        # barrera antes de mandar un valor a una máquina real. Si alguien teclea
-        # 900 °C donde el máximo son 90, se rechaza en el servidor.
+        #   Recipes       "Recipe_1"              -> recetas
+        #   Elements      limon, azucar, pisco    -> receta_elementos
+        #   Data records  "Mezcla del lunes"      -> receta_registros
+        #                                            + receta_valores
         #
-        # FKs con ON DELETE SET NULL, igual que en alarmas: borrar un usuario
-        # no debe llevarse por delante las recetas que creó.
-        fk_rec_plc = (
-            f"CONSTRAINT fk_{p}recetas_plc FOREIGN KEY (plc_prg_id) "
-            f"REFERENCES {t_plc} (id) ON DELETE SET NULL"
-        )
+        # La cuarta tabla es la que sorprende. TIA ENSEÑA los data records como
+        # una rejilla ancha —una columna por elemento— pero guardarlo así
+        # significaría una columna REAL por ingrediente: añadir "hielo" a la
+        # receta obligaría a un ALTER TABLE, y la tabla se llenaría de NULL
+        # porque cada receta tiene elementos distintos.
+        #
+        # Con `receta_valores` estrecha —una fila por (registro, elemento)—
+        # añadir un ingrediente no toca nunca la estructura. Es el mismo
+        # razonamiento por el que `plc_prg` es estrecha. La rejilla ancha se
+        # reconstruye al leer, con un pivote: es trabajo de la vista.
+        #
+        # Y da algo gratis: `valor_num` + `valor_texto` permiten que un
+        # elemento sea REAL y otro STRING sin inventar una columna por tipo.
+        # ---------------------------------------------------------------- #
         fk_rec_usr = (
             f"CONSTRAINT fk_{p}recetas_usuario FOREIGN KEY (usuario_id) "
-            f"REFERENCES {t_usuarios} (id) ON DELETE SET NULL"
+            f"REFERENCES {t_usuarios} (id)"
         )
         recetas = (
             f"CREATE TABLE {t_recetas} ("
             f"id {pk}, "
-            f"plc_prg_id {fk_tipo}, "
             f"usuario_id {fk_tipo}, "
-            # Nombre del parámetro y nombre de la receta a la que pertenece.
-            # Una receta ("Producto A") agrupa varios parámetros.
             f"nombre VARCHAR(160) NOT NULL, "
-            f"nombre_receta VARCHAR(160) NOT NULL, "
+            f"nombre_visible VARCHAR(160), "
+            # Número de receta de TIA: el PLC la selecciona por número, no por
+            # nombre, así que es el campo por el que se busca de verdad.
+            f"numero {entero}, "
+            f"version VARCHAR(40), "
+            # Dónde las guarda el panel (\Flash\Recipes en TIA). Aquí es
+            # informativo: los datos viven en estas tablas.
+            f"ruta VARCHAR(300), "
+            # Limited = tope de registros; Unlimited = sin tope.
+            f"tipo VARCHAR(20) NOT NULL DEFAULT 'Limited', "
+            f"max_registros {entero} NOT NULL DEFAULT 500, "
+            # Tags | DataBlock: cómo se transfiere al PLC.
+            f"tipo_comunicacion VARCHAR(20) NOT NULL DEFAULT 'Tags', "
+            # El "Check limits" de TIA. NO es decorativo: con él activo, el
+            # backend valida cada valor contra el min/max de su elemento ANTES
+            # de escribirlo en la máquina.
+            f"comprobar_limites {entero} NOT NULL DEFAULT 1, "
+            f"informacion_herramienta VARCHAR(500), "
+            f"activo {entero} NOT NULL DEFAULT 1, "
+            f"creado_en {ts}, "
+            f"actualizado_en {ts}, "
+            f"{fk_rec_usr})"
+        )
+
+        # --- Elements: las COLUMNAS de la receta ------------------------- #
+        # Lo que antes era la tabla `recetas` entera. Ahora cuelga de una
+        # receta con una FK de verdad, en vez de repetir su nombre como texto.
+        #
+        # Un elemento sin receta no significa nada, así que borrar la receta
+        # se lleva sus elementos — pero lo hace `CrudManager.borrar()`, en
+        # orden y a la vista, no un `ON DELETE CASCADE` del motor. Borrar a
+        # quien la creó, en cambio, solo pone `usuario_id` a NULL.
+        fk_ele_rec = (
+            f"CONSTRAINT fk_{p}receta_elementos_receta FOREIGN KEY (receta_id) "
+            f"REFERENCES {t_recetas} (id)"
+        )
+        fk_ele_plc = (
+            f"CONSTRAINT fk_{p}receta_elementos_plc FOREIGN KEY (plc_prg_id) "
+            f"REFERENCES {t_plc} (id)"
+        )
+        receta_elementos = (
+            f"CREATE TABLE {t_rec_elem} ("
+            f"id {pk}, "
+            f"receta_id {fk_tipo} NOT NULL, "
+            f"plc_prg_id {fk_tipo}, "
+            f"nombre VARCHAR(160) NOT NULL, "
+            f"nombre_visible VARCHAR(160), "
             # Tag del PLC al que se escribe. Mismo formato que en plc_prg.
-            f"tag VARCHAR(400) NOT NULL, "
+            f"tag VARCHAR(400), "
             # BOOL | INT | DINT | REAL | LREAL | STRING...
             f"tipo_dato VARCHAR(40) NOT NULL DEFAULT 'REAL', "
             # Longitud para los STRING; ignorado en los numéricos.
             f"longitud_dato {entero}, "
             f"valor_default {real}, "
+            # `valor_minimo` / `valor_maximo` son la última barrera antes de
+            # mandar un valor a una máquina real. Si alguien teclea 900 °C
+            # donde el máximo son 90, se rechaza en el servidor.
             f"valor_minimo {real}, "
             f"valor_maximo {real}, "
-            # Valor por defecto cuando el dato es de texto.
             f"valor_texto VARCHAR(500), "
             # Formato de presentación: cuántos decimales se muestran y cuántos
             # se conservan al guardar. Van separados porque no siempre coinciden.
             f"lugar_decimal {entero} NOT NULL DEFAULT 0, "
             f"decimales {entero} NOT NULL DEFAULT 0, "
-            # Unidad de ingeniería (°C, bar, rpm) y ayuda para el operario.
             f"unidad VARCHAR(30), "
             f"informacion_herramienta VARCHAR(500), "
+            # En qué orden se pintan las columnas de la rejilla.
+            f"orden {entero} NOT NULL DEFAULT 0, "
             f"activo {entero} NOT NULL DEFAULT 1, "
             f"creado_en {ts}, "
             f"actualizado_en {ts}, "
-            f"{fk_rec_plc}, {fk_rec_usr})"
+            f"{fk_ele_rec}, {fk_ele_plc})"
+        )
+
+        # --- Data records: la CABECERA de cada mezcla concreta ----------- #
+        fk_reg_rec = (
+            f"CONSTRAINT fk_{p}receta_registros_receta FOREIGN KEY (receta_id) "
+            f"REFERENCES {t_recetas} (id)"
+        )
+        fk_reg_usr = (
+            f"CONSTRAINT fk_{p}receta_registros_usuario FOREIGN KEY (usuario_id) "
+            f"REFERENCES {t_usuarios} (id)"
+        )
+        receta_registros = (
+            f"CREATE TABLE {t_rec_reg} ("
+            f"id {pk}, "
+            f"receta_id {fk_tipo} NOT NULL, "
+            f"usuario_id {fk_tipo}, "
+            f"nombre VARCHAR(160) NOT NULL, "
+            f"nombre_visible VARCHAR(160), "
+            f"numero {entero}, "
+            f"comentario VARCHAR(500), "
+            # Cuándo se cargó por última vez al PLC. Es la pregunta que se
+            # hace siempre después de un lote que salió mal.
+            f"ts_ultima_carga {ts}, "
+            f"activo {entero} NOT NULL DEFAULT 1, "
+            f"creado_en {ts}, "
+            f"actualizado_en {ts}, "
+            f"{fk_reg_rec}, {fk_reg_usr})"
+        )
+
+        # --- Los VALORES, en formato estrecho ---------------------------- #
+        fk_val_reg = (
+            f"CONSTRAINT fk_{p}receta_valores_registro "
+            f"FOREIGN KEY (receta_registro_id) "
+            f"REFERENCES {t_rec_reg} (id)"
+        )
+        fk_val_ele = (
+            f"CONSTRAINT fk_{p}receta_valores_elemento "
+            f"FOREIGN KEY (receta_elemento_id) "
+            f"REFERENCES {t_rec_elem} (id)"
+        )
+        receta_valores = (
+            f"CREATE TABLE {t_rec_val} ("
+            f"id {pk}, "
+            f"receta_registro_id {fk_tipo} NOT NULL, "
+            f"receta_elemento_id {fk_tipo} NOT NULL, "
+            f"valor_num {real}, "
+            f"valor_texto VARCHAR(500), "
+            f"{fk_val_reg}, {fk_val_ele})"
         )
 
         tablas = [
             (t_usuarios, usuarios),
             (t_plc, plc),
+            # alarmas_def va antes: `alarmas` la referencia con una FK.
+            (t_alarmas_def, alarmas_def),
             (t_alarmas, alarmas),
             (t_recetas, recetas),
+            (t_rec_elem, receta_elementos),
+            (t_rec_reg, receta_registros),
+            (t_rec_val, receta_valores),
         ]
 
         # --- Idempotencia: "IF NOT EXISTS" no es estándar ---------------- #
@@ -828,9 +1113,18 @@ class SqlDriver(DbDriver):
             (f"idx_{p}plc_prg_plc_ts", t_plc, "(plc_id, ts)"),
             (f"idx_{p}alarmas_estado", t_alarmas, "(estado, ts_activacion)"),
             (f"idx_{p}alarmas_tipo", t_alarmas, "(tipo, ts_activacion)"),
+            # alarmas_def -> "qué reglas vigilan este tag" (lo que preguntará
+            # el motor de alarmas en cada cambio de valor).
+            (f"idx_{p}alarmas_def_tag", t_alarmas_def, "(tag)"),
+            (f"idx_{p}alarmas_def_activo", t_alarmas_def, "(activo)"),
             # recetas -> "dame los parámetros de esta receta"
-            (f"idx_{p}recetas_nombre", t_recetas, "(nombre_receta)"),
-            (f"idx_{p}recetas_tag", t_recetas, "(tag)"),
+            (f"idx_{p}recetas_nombre", t_recetas, "(nombre)"),
+            (f"idx_{p}receta_elem_receta", t_rec_elem, "(receta_id, orden)"),
+            (f"idx_{p}receta_elem_tag", t_rec_elem, "(tag)"),
+            (f"idx_{p}receta_reg_receta", t_rec_reg, "(receta_id)"),
+            # El índice que hace barato el pivote: "dame todos los valores de
+            # este registro" es la consulta que arma la rejilla.
+            (f"idx_{p}receta_val_registro", t_rec_val, "(receta_registro_id)"),
         ]
         for idx, tabla, cols in indices:
             if m == "mssql":
@@ -853,7 +1147,9 @@ class SqlDriver(DbDriver):
     def tablas_esquema_hmi(self, prefijo: str = "") -> List[str]:
         """Nombres de las tablas del esquema estándar, en orden de creación."""
         p = _prefijo_seguro(prefijo)
-        return [f"{p}usuarios", f"{p}plc_prg", f"{p}alarmas"]
+        return [f"{p}usuarios", f"{p}plc_prg", f"{p}alarmas_def",
+                f"{p}alarmas", f"{p}recetas", f"{p}receta_elementos",
+                f"{p}receta_registros", f"{p}receta_valores"]
 
     def sql_insert_lectura(self, prefijo: str = "") -> str:
         """INSERT parametrizado para la tabla `plc_prg` del esquema estándar."""

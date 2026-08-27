@@ -184,28 +184,131 @@ async def crear(
     sesion: Sesion = Depends(exigir_rol("Usuarios")),
     db_id: Optional[str] = Query(default=None),
     cuerpo: CuerpoLibre = Body(..., openapi_examples={
-        "receta": {
-            "summary": "Parámetro de receta",
-            "description": "Un parámetro configurable del proceso, con sus "
-                           "límites de seguridad.",
+        "alarma_def_discreta": {
+            "summary": "DEFINICIÓN de alarma discreta (recurso: alarmas_def)",
+            "description": "Equivale a una fila de «Discrete alarms» en TIA "
+                           "Portal. Es la CONFIGURACIÓN —qué vigilar—, no un "
+                           "evento: se crea una vez y no cambia en meses.\n\n"
+                           "`comparador: bit` significa que se mira el bit "
+                           "`bit_disparo` del tag, igual que el «Trigger bit» "
+                           "de TIA.",
             "value": {
-                "nombre_receta": "Producto A",
-                "nombre": "Temperatura de consigna",
-                "tag": "192.168.50.1|DB_snap7.setpoint_temp",
-                "tipo_dato": "REAL",
-                "valor_default": 65.0,
-                "valor_minimo": 40.0,
-                "valor_maximo": 90.0,
-                "decimales": 1,
-                "lugar_decimal": 1,
-                "unidad": "°C",
-                "informacion_herramienta": "Temperatura objetivo del reactor.",
+                "nombre": "Alarma_1",
+                "texto": "Fallo de comunicación con PLC",
+                "clase": "Error",
+                "tag": "192.168.50.1|DB_snap7.estado_com",
+                "bit_disparo": 0,
+                "comparador": "bit",
+                "tag_reconocimiento": "192.168.50.1|DB_snap7.ack_alarmas",
+                "bit_reconocimiento": 0,
+                "area": "Sala eléctrica",
                 "activo": 1,
             },
         },
-        "alarma": {
-            "summary": "Alarma de proceso",
+        "alarma_def_analogica": {
+            "summary": "DEFINICIÓN de alarma analógica (recurso: alarmas_def)",
+            "description": "TIA las trata en una tabla aparte; aquí caben en "
+                           "la misma porque lo único que cambia es la "
+                           "comparación.\n\n"
+                           "`banda_muerta` es la histéresis: sin ella, un "
+                           "valor oscilando en el límite generaría cientos de "
+                           "eventos por minuto.",
             "value": {
+                "nombre": "Temp_Reactor_Alta",
+                "texto": "Temperatura del reactor por encima de 80 °C",
+                "clase": "Critical",
+                "tag": "192.168.50.1|DB_snap7.temperatura",
+                "comparador": ">",
+                "valor_limite": 80.0,
+                "banda_muerta": 2.0,
+                "area": "Reactor 1",
+                "activo": 1,
+            },
+        },
+        "receta_cabecera": {
+            "summary": "1· LA RECETA (recurso: recetas)",
+            "description": "El primer nivel de TIA: la receta en sí. Es lo que "
+                           "el PLC selecciona por `numero`, no por nombre.\n\n"
+                           "`comprobar_limites` es el «Check limits» de TIA, y "
+                           "no es decorativo: con él activo el backend valida "
+                           "cada valor contra el mín/máx de su elemento ANTES "
+                           "de escribirlo en la máquina.",
+            "value": {
+                "nombre": "Recipe_1",
+                "nombre_visible": "Pisco Sour",
+                "numero": 1,
+                "version": "27/8/2026",
+                "ruta": "\\Flash\\Recipes",
+                "tipo": "Limited",
+                "max_registros": 500,
+                "tipo_comunicacion": "Tags",
+                "comprobar_limites": 1,
+                "activo": 1,
+            },
+        },
+        "receta_elemento": {
+            "summary": "2· UN ELEMENTO (recurso: receta_elementos)",
+            "description": "Una columna de la receta: qué tag es, de qué tipo "
+                           "y entre qué límites puede moverse.\n\n"
+                           "`valor_minimo` y `valor_maximo` son la última "
+                           "barrera antes de mandar un valor a una máquina "
+                           "real: si alguien teclea 900 donde el máximo son "
+                           "90, se rechaza en el servidor.",
+            "value": {
+                "receta_id": 1,
+                "nombre": "limon",
+                "nombre_visible": "Zumo de limón",
+                "tag": "192.168.50.1|DB_snap7.limon_ml",
+                "tipo_dato": "REAL",
+                "valor_default": 30.0,
+                "valor_minimo": 10.0,
+                "valor_maximo": 80.0,
+                "decimales": 1,
+                "lugar_decimal": 1,
+                "unidad": "ml",
+                "informacion_herramienta": "Zumo recién exprimido.",
+                "orden": 0,
+                "activo": 1,
+            },
+        },
+        "receta_registro": {
+            "summary": "3· UN DATA RECORD (recurso: receta_registros)",
+            "description": "La cabecera de una mezcla concreta. Sus valores "
+                           "van aparte, en `receta_valores`: uno por elemento.",
+            "value": {
+                "receta_id": 1,
+                "nombre": "Recipe_data_record_1",
+                "nombre_visible": "Mezcla clásica",
+                "numero": 1,
+                "comentario": "La proporción de siempre.",
+                "activo": 1,
+            },
+        },
+        "receta_valor": {
+            "summary": "4· UN VALOR del data record (recurso: receta_valores)",
+            "description": "Una celda de la rejilla que enseña TIA. Se guarda "
+                           "en formato ESTRECHO —una fila por (registro, "
+                           "elemento)— para que añadir un ingrediente nuevo no "
+                           "obligue nunca a un ALTER TABLE. La rejilla ancha "
+                           "se reconstruye al leer.\n\n"
+                           "`valor_num` para los numéricos, `valor_texto` para "
+                           "los STRING: así conviven tipos distintos sin "
+                           "inventar una columna por tipo.",
+            "value": {
+                "receta_registro_id": 1,
+                "receta_elemento_id": 1,
+                "valor_num": 30.0,
+            },
+        },
+        "alarma_evento": {
+            "summary": "EVENTO de alarma (recurso: alarmas)",
+            "description": "Lo que PASÓ. Normalmente lo escribe el motor de "
+                           "alarmas, no una persona. `alarma_def_id` enlaza "
+                           "con la definición que lo produjo; va vacío en las "
+                           "alarmas de sistema, que no vienen de ninguna regla "
+                           "configurada.",
+            "value": {
+                "alarma_def_id": 2,
                 "tipo": "proceso",
                 "area": "Reactor 1",
                 "severidad": 2,
@@ -248,9 +351,27 @@ async def actualizar(
             "summary": "Reconocer una alarma",
             "value": {"estado": "reconocida", "usuario_id": 3},
         },
-        "ajustar_receta": {
-            "summary": "Cambiar el valor por defecto de una receta",
-            "value": {"valor_default": 70.0},
+        "ajustar_elemento": {
+            "summary": "Cambiar el rango de un elemento (receta_elementos)",
+            "description": "Se valida que el default siga dentro del rango: "
+                           "subir un mínimo por encima del valor por defecto "
+                           "dejaría una receta que no se puede cargar.",
+            "value": {"valor_minimo": 15.0, "valor_default": 35.0},
+        },
+        "corregir_valor": {
+            "summary": "Corregir un valor del data record (receta_valores)",
+            "value": {"valor_num": 32.5},
+        },
+        "desactivar_definicion": {
+            "summary": "Silenciar una definición de alarma (alarmas_def)",
+            "description": "Poner `activo: 0` deja de generar eventos nuevos "
+                           "sin borrar la regla ni su historial. Es lo que se "
+                           "quiere durante un mantenimiento programado.",
+            "value": {"activo": 0},
+        },
+        "cambiar_umbral": {
+            "summary": "Subir el umbral de una alarma analógica",
+            "value": {"valor_limite": 85.0, "banda_muerta": 3.0},
         },
     }),
 ) -> dict:

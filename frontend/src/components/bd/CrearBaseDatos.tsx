@@ -43,7 +43,12 @@ import {
   ShieldAlertIcon,
   WandSparklesIcon,
 } from 'lucide-react';
-import { provisionarBase, type PasoProvision } from '../flows/api';
+import {
+  provisionarBase,
+  type Diagnostico,
+  type PasoProvision,
+} from '../flows/api';
+import { PanelDiagnostico } from './PanelDiagnostico';
 
 /** Administrador habitual de cada motor, para no dejar el campo en blanco. */
 const ADMIN_SUGERIDO: Record<string, string> = {
@@ -84,6 +89,10 @@ export function CrearBaseDatos({
   const [trabajando, setTrabajando] = useState(false);
   const [error, setError] = useState('');
   const [pasos, setPasos] = useState<PasoProvision[]>([]);
+  // El diagnóstico completo del fallo. Sin esto solo se veía el titular
+  // —"No se pudo conectar"— y el mensaje literal del motor, que es lo único
+  // que se puede buscar y lo único que dice qué sentencia falló, se perdía.
+  const [diag, setDiag] = useState<Diagnostico | undefined>();
   const [listo, setListo] = useState(false);
 
   // Solo se puede ofrecer crear el usuario si el formulario trae con cuál.
@@ -122,6 +131,7 @@ export function CrearBaseDatos({
     } catch (e: any) {
       setError(e?.message ?? 'No se pudo crear la base de datos.');
       setPasos(e?.data?.pasos ?? []);
+      setDiag(e?.data?.diagnostico ?? e?.diagnostico);
     } finally {
       setTrabajando(false);
     }
@@ -265,6 +275,11 @@ export function CrearBaseDatos({
           <span className="min-w-0 break-words">{error}</span>
         </p>
       )}
+
+      {/* Debajo del titular, lo que de verdad dijo el servidor. Plegado, pero
+          presente: un "falló al crear 'recetas'" sin el mensaje del motor
+          obliga a adivinar entre permisos, sintaxis y esquema. */}
+      {diag && <PanelDiagnostico diagnostico={diag} />}
 
       {!listo && (
         <>

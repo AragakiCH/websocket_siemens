@@ -51,8 +51,14 @@ CABECERA = """\
 --    recetas    Parámetros configurables del proceso, con sus límites de
 --               seguridad. La escribe /crud/recetas.
 --
---  Las FK usan ON DELETE SET NULL: borrar un usuario no se lleva por delante
---  su historial de alarmas. Se pierde el "quién", no el evento.
+--  Ninguna FK lleva ON DELETE. No es un olvido: SQL Server rechaza el
+--  esquema entero (Msg 1785, "may cause cycles or multiple cascade paths")
+--  en cuanto una tabla es alcanzable por dos caminos en cascada, y aquí lo
+--  es por diseño — un receta_valores depende del registro Y del elemento.
+--  El borrado en orden lo hace la aplicación (CrudManager.borrar): pone a
+--  NULL las referencias de auditoría y borra las hijas antes que la padre.
+--  Borrar un usuario sigue sin llevarse su historial de alarmas: se pierde
+--  el "quién", no el evento.
 --
 --  Es IDEMPOTENTE: ejecutarlo sobre una base de datos que ya lo tiene no
 --  falla ni toca los datos existentes.
