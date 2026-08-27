@@ -2,10 +2,24 @@
 // zipWidgetLoader.ts
 // ===========================================================================
 // Carga widgets personalizados desde archivos ZIP que contienen:
-//   - widget.json  (obligatorio) — metadatos del widget
-//   - widget.html  (obligatorio) — plantilla visual (HTML/SVG)
-//   - widget.css   (opcional)    — estilos del widget
-//   - widget.js    (opcional)    — lógica dinámica del widget
+//   - un .json  (obligatorio) — metadatos del widget
+//   - un .html  (obligatorio) — plantilla visual (HTML/SVG)
+//   - un .css   (opcional)    — estilos del widget
+//   - un .js    (opcional)    — lógica dinámica del widget
+//
+// LOS NOMBRES DE ARCHIVO SON LIBRES
+// Lo que manda es la EXTENSIÓN, no el nombre: `manometro.html` vale igual que
+// `widget.html`. Antes se exigían los cuatro nombres exactos, y un ZIP con
+// `index.html` dentro se rechazaba sin que quedara claro por qué — cuando el
+// widget era perfectamente válido.
+//
+// Da igual que estén en la raíz del ZIP o dentro de una carpeta (que es lo
+// que pasa cuando se comprime una carpeta con el botón derecho en Windows).
+//
+// Si hubiera DOS archivos de la misma extensión, gana el que se llame
+// `widget.<ext>`; y si no hay ninguno así, se rechaza el ZIP diciendo cuáles
+// encontró. Elegir uno al azar sería peor: el widget cargaría con la mitad
+// equivocada y el autor no tendría forma de saberlo.
 //
 // Los widgets cargados se persisten en localStorage y se integran
 // automáticamente en el catálogo del Designer.
@@ -96,7 +110,7 @@ function validarAccepts(valor: unknown): DataType[] | undefined {
 
   if (!Array.isArray(valor)) {
     throw new Error(
-      'widget.json: "accepts" debe ser una lista, por ejemplo ' +
+      'El .json del widget: "accepts" debe ser una lista, por ejemplo ' +
       '["double", "int"]. Usa [] si el widget es decorativo y no lee ' +
       'ninguna variable.'
     );
@@ -105,7 +119,7 @@ function validarAccepts(valor: unknown): DataType[] | undefined {
   const malos = valor.filter((v) => !esTipoValido(v));
   if (malos.length > 0) {
     throw new Error(
-      `widget.json: tipo no reconocido en "accepts": ` +
+      `El .json del widget: tipo no reconocido en "accepts": ` +
       `${malos.map((m) => JSON.stringify(m)).join(', ')}. ` +
       `Los válidos son: ${TIPOS_VALIDOS.join(', ')}. ` +
       `Ojo: son los tipos del frontend, no los del PLC — REAL y LREAL van ` +
@@ -119,19 +133,19 @@ function validarAccepts(valor: unknown): DataType[] | undefined {
 
 function validateMeta(raw: unknown): ZipWidgetMeta {
   if (!raw || typeof raw !== 'object') {
-    throw new Error('widget.json debe ser un objeto JSON válido.');
+    throw new Error('El .json del widget debe ser un objeto JSON válido.');
   }
   const obj = raw as Record<string, unknown>;
 
   if (typeof obj.kind !== 'string' || !obj.kind.trim()) {
-    throw new Error('widget.json: falta "kind" (string no vacío).');
+    throw new Error('El .json del widget: falta "kind" (string no vacío).');
   }
   if (typeof obj.label !== 'string' || !obj.label.trim()) {
-    throw new Error('widget.json: falta "label" (string no vacío).');
+    throw new Error('El .json del widget: falta "label" (string no vacío).');
   }
   if (!VALID_CATEGORIES.includes(obj.category as string)) {
     throw new Error(
-      `widget.json: "category" debe ser uno de: ${VALID_CATEGORIES.join(', ')}.`
+      `El .json del widget: "category" debe ser uno de: ${VALID_CATEGORIES.join(', ')}.`
     );
   }
   const dw = typeof obj.defaultWidth === 'number' ? obj.defaultWidth : 160;
@@ -149,48 +163,109 @@ function validateMeta(raw: unknown): ZipWidgetMeta {
 
 // ---- Parseo del ZIP --------------------------------------------------- //
 
+/** Un archivo del ZIP que sí nos interesa. */
+interface ArchivoZip {
+  /** Nombre sin la carpeta, tal cual lo escribió el autor. */
+  nombre: string;
+  obj: JSZip.JSZipObject;
+}
+
+/** Extensiones que el cargador entiende. Cualquier otra se ignora. */
+const EXTENSIONES = ['json', 'html', 'css', 'js'] as const;
+type Extension = (typeof EXTENSIONES)[number];
+
+/**
+ * Agrupa el contenido del ZIP por extensión, ignorando la basura.
+ *
+ * Lo que se descarta y por qué:
+ *   - carpetas (`dir`), que no son archivos;
+ *   - `__MACOSX/`, que mete macOS al comprimir y duplica cada archivo;
+ *   - los que empiezan por punto (`.DS_Store`, `._widget.html`), que son
+ *     metadatos del sistema y no del widget.
+ *
+ * Sin esos filtros, un ZIP hecho en un Mac aparentaría tener dos `.html` y
+ * se rechazaría por ambiguo.
+ */
+function agruparPorExtension(zip: JSZip): Record<Extension, ArchivoZip[]> {
+  const grupos = { json: [], html: [], css: [], js: [] } as Record<
+    Extension,
+    ArchivoZip[]
+  >;
+
+  for (const ruta of Object.keys(zip.files)) {
+    const obj = zip.files[ruta];
+    if (obj.dir) continue;
+    if (ruta.startsWith('__MACOSX/') || ruta.includes('/__MACOSX/')) continue;
+
+    const nombre = ruta.split('/').pop() ?? '';
+    if (!nombre || nombre.startsWith('.')) continue;
+
+    const punto = nombre.lastIndexOf('.');
+    if (punto < 1) continue;
+    const ext = nombre.slice(punto + 1).toLowerCase() as Extension;
+    if (!(EXTENSIONES as readonly string[]).includes(ext)) continue;
+
+    grupos[ext].push({ nombre, obj });
+  }
+  return grupos;
+}
+
+/**
+ * Elige el archivo de una extensión. Lanza con un mensaje útil si no puede.
+ *
+ * `obligatorio` distingue los dos casos: sin `.json` ni `.html` no hay widget
+ * que cargar; sin `.css` ni `.js` sí lo hay, solo que estático.
+ */
+function elegirArchivo(
+  lista: ArchivoZip[],
+  ext: Extension,
+  obligatorio: boolean
+): ArchivoZip | null {
+  if (lista.length === 0) {
+    if (!obligatorio) return null;
+    throw new Error(
+      `El ZIP debe contener un archivo .${ext} (el nombre da igual: ` +
+      `"widget.${ext}", "mi-widget.${ext}"... lo que manda es la extensión).`
+    );
+  }
+  if (lista.length === 1) return lista[0];
+
+  // Varios candidatos: gana la convención antes que el azar.
+  const preferido = lista.find((a) => a.nombre.toLowerCase() === `widget.${ext}`);
+  if (preferido) return preferido;
+
+  throw new Error(
+    `El ZIP tiene ${lista.length} archivos .${ext} y no se puede adivinar ` +
+    `cuál es el bueno: ${lista.map((a) => a.nombre).join(', ')}. ` +
+    `Deja solo uno, o llama "widget.${ext}" al que quieras usar.`
+  );
+}
+
 export async function parseWidgetZip(file: File): Promise<ZipWidget> {
   const zip = await JSZip.loadAsync(file);
+  const grupos = agruparPorExtension(zip);
 
-  // Buscar archivos (pueden estar en la raíz o dentro de una carpeta)
-  const findFile = (name: string): JSZip.JSZipObject | null => {
-    // Busca exacto en la raíz
-    if (zip.files[name]) return zip.files[name];
-    // Busca dentro de subcarpetas (solo un nivel)
-    for (const path of Object.keys(zip.files)) {
-      if (path.endsWith('/' + name) && !zip.files[path].dir) {
-        return zip.files[path];
-      }
-    }
-    return null;
-  };
-
-  const jsonFile = findFile('widget.json');
-  if (!jsonFile) {
-    throw new Error('El ZIP debe contener un archivo "widget.json".');
-  }
-
-  const htmlFile = findFile('widget.html');
-  if (!htmlFile) {
-    throw new Error('El ZIP debe contener un archivo "widget.html".');
-  }
-
-  const cssFile = findFile('widget.css');
-  const jsFile = findFile('widget.js');
+  const jsonFile = elegirArchivo(grupos.json, 'json', true)!;
+  const htmlFile = elegirArchivo(grupos.html, 'html', true)!;
+  const cssFile = elegirArchivo(grupos.css, 'css', false);
+  const jsFile = elegirArchivo(grupos.js, 'js', false);
 
   // Leer contenidos
-  const jsonText = await jsonFile.async('string');
+  const jsonText = await jsonFile.obj.async('string');
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonText);
   } catch {
-    throw new Error('widget.json no es JSON válido.');
+    throw new Error(
+      `"${jsonFile.nombre}" no es JSON válido. Revisa que no le falte una ` +
+      `coma o una comilla.`
+    );
   }
 
   const meta = validateMeta(parsed);
-  const html = await htmlFile.async('string');
-  const css = cssFile ? await cssFile.async('string') : '';
-  const js = jsFile ? await jsFile.async('string') : '';
+  const html = await htmlFile.obj.async('string');
+  const css = cssFile ? await cssFile.obj.async('string') : '';
+  const js = jsFile ? await jsFile.obj.async('string') : '';
 
   return { meta, html, css, js };
 }

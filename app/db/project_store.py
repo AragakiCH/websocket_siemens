@@ -75,6 +75,29 @@ def validar_id(project_id: str) -> str:
     return pid
 
 
+def _orden_pantalla(doc: dict) -> tuple:
+    """
+    Orden de las pestanas del Disenador.
+
+    Tres criterios, en este orden:
+
+      1. `principal` SIEMPRE primero. Es la pantalla que el backend garantiza
+         que existe y la que se abre cuando cualquier otra desaparece, asi que
+         moverla de sitio segun su nombre alfabetico solo despista.
+      2. Despues, por fecha de creacion: las nuevas se anaden a la DERECHA,
+         que es como se comporta cualquier barra de pestanas.
+      3. El id como desempate, para que el orden sea estable si dos pantallas
+         se crearon en el mismo milisegundo.
+
+    Antes esto ordenaba solo por `project_id`, de modo que crear "alarmas"
+    la colocaba delante de "principal".
+    """
+    pid = doc.get("project_id", "")
+    return (0 if pid == PROYECTO_POR_DEFECTO else 1,
+            doc.get("creado_en", ""),
+            pid)
+
+
 class ConflictoDeVersion(Exception):
     """
     La versión sobre la que se editó ya no es la actual.
@@ -145,6 +168,11 @@ class ProjectStore:
             "project_id": project_id,
             "nombre": nombre or project_id,
             "version": 1,
+            # Momento de creacion. Es lo unico que permite ordenar las
+            # pantallas como se crearon: `actualizado_en` cambia en cada
+            # guardado, asi que ordenar por el barajaria las pestanas cada vez
+            # que alguien mueve un widget.
+            "creado_en": _ahora_iso(),
             "actualizado_en": _ahora_iso(),
             "actualizado_por": "",
             "canvas": {},
@@ -157,6 +185,10 @@ class ProjectStore:
         doc.setdefault("project_id", pid)
         doc.setdefault("nombre", pid)
         doc.setdefault("version", 1)
+        # Los proyectos creados antes de que existiera este campo se quedan
+        # con "" a proposito: ordena antes que cualquier fecha, asi que las
+        # pantallas de siempre siguen apareciendo antes que las nuevas.
+        doc.setdefault("creado_en", "")
         doc.setdefault("actualizado_en", _ahora_iso())
         doc.setdefault("actualizado_por", "")
         doc.setdefault("canvas", {})
@@ -196,11 +228,12 @@ class ProjectStore:
                 "project_id": d["project_id"],
                 "nombre": d["nombre"],
                 "version": d["version"],
+                "creado_en": d.get("creado_en", ""),
                 "actualizado_en": d["actualizado_en"],
                 "actualizado_por": d["actualizado_por"],
                 "num_widgets": len(d["widgets"]),
             }
-            for d in sorted(self._cache.values(), key=lambda x: x["project_id"])
+            for d in sorted(self._cache.values(), key=_orden_pantalla)
         ]
 
     def obtener(self, project_id: str) -> Optional[dict]:
@@ -238,6 +271,31 @@ class ProjectStore:
             await self._escribir_async(pid)
         logger.info("Proyecto '%s' creado por '%s'.", pid, usuario or "-")
         return doc
+
+    async def renombrar(self, project_id: str, nombre: str,
+                        usuario: str = "") -> dict:
+        """
+        Cambia la etiqueta visible de una pantalla. NO toca el `project_id`.
+
+        El id es el nombre del fichero en disco y la clave del lock de edicion,
+        asi que cambiarlo obligaria a mover ficheros y dejaria sin lapiz a
+        quien estuviera editando. El nombre visible, en cambio, es solo una
+        etiqueta: se puede cambiar en caliente sin que nadie pierda nada.
+        """
+        pid = validar_id(project_id)
+        nombre = (nombre or "").strip()
+        if not nombre:
+            raise ValueError("El nombre de la pantalla no puede estar vacio.")
+        if len(nombre) > 80:
+            raise ValueError("El nombre no puede pasar de 80 caracteres.")
+        async with self._lock_async:
+            doc = self._cache.get(pid)
+            if doc is None:
+                raise KeyError(pid)
+            doc["nombre"] = nombre
+            self._sellar(doc, usuario)
+            await self._escribir_async(pid)
+            return doc
 
     async def guardar_todo(self, project_id: str, widgets: List[dict],
                            canvas: Optional[dict] = None,

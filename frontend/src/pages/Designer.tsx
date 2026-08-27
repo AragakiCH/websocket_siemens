@@ -8,7 +8,8 @@ import {
   EyeIcon,
   LayoutDashboardIcon,
   WorkflowIcon,
-  BellIcon } from
+  BellIcon,
+  BookOpenIcon } from
 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { HmiWidget, WidgetKind, defaultStyle } from '../models/widget';
@@ -27,8 +28,10 @@ import { useLock } from '../hooks/useLock';
 import { recursoDisenador } from '../services/lockApi';
 import { FlowEditor } from '../components/flows/FlowEditor';
 import { AlarmsEditor } from '../components/alarms/AlarmsEditor';
+import { RecipesEditor } from '../components/recipes/RecipesEditor';
+import { PantallasBar } from '../components/hmi/PantallasBar';
 
-type DesignerTab = 'designer' | 'flows' | 'alarms';
+type DesignerTab = 'designer' | 'flows' | 'alarms' | 'recipes';
 
 let counter = 1;
 
@@ -45,6 +48,7 @@ export function Designer() {
     projectId,
     projectVersion,
     setProjectVersion,
+    pantallaCargada,
     permisos,
     presentes,
     setWidgets,
@@ -71,10 +75,17 @@ export function Designer() {
 
   
 
-  // ---- Tamaño del lienzo (px) — persistido en localStorage --------------
-  const saved = useMemo(() => loadDesign(), []);
-  const [canvasW, setCanvasW] = useState<number>(saved?.canvas.width ?? 1280);
-  const [canvasH, setCanvasH] = useState<number>(saved?.canvas.height ?? 760);
+  // ---- Tamaño del lienzo (px) ------------------------------------------
+  // Es POR PANTALLA: cada HMI puede estar pensado para una resolución
+  // distinta (un panel de 7\" y un puesto de 24\" no comparten lienzo). Se
+  // reajusta en el efecto de hidratación de más abajo, cada vez que se cambia
+  // de pestaña.
+  // Solo para el primer render: a partir de ahí manda el efecto de
+  // hidratación, que relee el lienzo cada vez que se cambia de pantalla.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const inicial = useMemo(() => loadDesign(projectId), []);
+  const [canvasW, setCanvasW] = useState<number>(inicial?.canvas.width ?? 1280);
+  const [canvasH, setCanvasH] = useState<number>(inicial?.canvas.height ?? 760);
 
   // Texto que se escribe en los inputs (se aplica al salir / dar Enter).
   const [wInput, setWInput] = useState(String(canvasW));
@@ -91,45 +102,81 @@ export function Designer() {
     setHInput(String(v));
   };
 
-  // Al entrar, si el store está vacío pero hay un diseño guardado, lo carga
-  // (para que sobreviva a un refresh de la página).
-  useEffect(() => {
-    if (widgets.length === 0 && saved?.widgets?.length) {
-      setWidgets(saved.widgets);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // La hidratación de los widgets la hace el AppStore (es quien sabe qué
+  // pantalla está abierta). Aquí solo queda lo que es del lienzo.
 
-  // Guardado en DOS niveles.
+  // ── Cambiar de pantalla, y las dos trampas que esconde ────────────────
   //
-  // 1) CACHÉ LOCAL, inmediata: si se recarga la página no se pierde nada.
-  // 2) SERVIDOR, con debounce de 400 ms: es lo que ven los demás usuarios.
+  // Cambiar de pestaña no es instantáneo, y en la ventana que dura hay dos
+  // formas distintas de corromper el diseño. Por eso hacen falta DOS señales
+  // y no una:
+  //
+  //   `cargada`  los WIDGETS en memoria ya son los de esta pantalla. Lo dice
+  //              el AppStore, que es quien los pide al servidor.
+  //   `listo`    además, el LIENZO ya es el de esta pantalla.
+  //
+  // Sin lo primero, guardar escribiría los widgets de la pantalla anterior
+  // encima de la nueva. Sin lo segundo, la pantalla nueva heredaría en
+  // silencio las medidas de la anterior — porque el efecto que vuelca la
+  // caché correría antes de que el lienzo se hubiera adoptado, y el efecto de
+  // hidratación leería justo eso.
+  const [errorGuardado, setErrorGuardado] = useState<string>('');
+  const cargada = pantallaCargada === projectId;
+  const [lienzoDe, setLienzoDe] = useState<string>('');
+  const listo = cargada && lienzoDe === projectId;
+
+  // Firma de lo último que se sabe guardado (o recién cargado). Sin ella,
+  // hidratar una pantalla dispararía un guardado inmediato que solo sirve
+  // para subirle la versión y difundir un cambio que no existe.
+  const firmaGuardada = useRef<string>('');
+  const firmaActual = JSON.stringify({
+    widgets,
+    canvas: { width: canvasW, height: canvasH },
+  });
+
+  // Adopción del lienzo de la pantalla recién cargada. Corre UNA vez por
+  // pantalla: en cuanto `lienzoDe` la señala, la guarda de arriba lo impide.
+  useEffect(() => {
+    if (!cargada || lienzoDe === projectId) return;
+    const c = loadDesign(projectId)?.canvas;
+    const w = clampCanvas(c?.width || 1280);
+    const h = clampCanvas(c?.height || 760);
+    setCanvasW(w);
+    setCanvasH(h);
+    setWInput(String(w));
+    setHInput(String(h));
+    firmaGuardada.current = JSON.stringify({
+      widgets,
+      canvas: { width: w, height: h },
+    });
+    setSelectedId(null);
+    setErrorGuardado('');
+    setLienzoDe(projectId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargada, lienzoDe, projectId]);
+
+  // Caché local, inmediata: si se recarga la página no se pierde nada.
+  useEffect(() => {
+    if (!listo) return;
+    saveDesign({ widgets, canvas: { width: canvasW, height: canvasH } }, projectId);
+  }, [listo, widgets, canvasW, canvasH, projectId]);
+
+  // Guardado al SERVIDOR, con debounce de 400 ms: es lo que ven los demás.
   //
   // El debounce importa. Arrastrar un widget dos segundos genera decenas de
   // renders; sin él serían decenas de escrituras a disco y decenas de
   // broadcasts a todos los clientes conectados. Con él, se manda una vez al
   // soltar (o cada 400 ms si el arrastre es largo).
   useEffect(() => {
-    saveDesign({ widgets, canvas: { width: canvasW, height: canvasH } }, projectId);
-  }, [widgets, canvasW, canvasH, projectId]);
-
-  // Marca de "todavía no he cargado del servidor": evita que el primer render
-  // (con el store vacío) borre el proyecto de todo el mundo.
-  const yaHidratado = useRef(false);
-  useEffect(() => {
-    if (projectVersion > 0) yaHidratado.current = true;
-  }, [projectVersion]);
-
-  const [errorGuardado, setErrorGuardado] = useState<string>('');
-
-  useEffect(() => {
-    if (!yaHidratado.current) return;
+    if (!listo) return;
     // Sin permiso de edición no se intenta escribir: el backend respondería
     // 403 y saldría un error por cada movimiento del ratón.
     if (permisos && !permisos.editar_diseño) return;
     // Sin el lápiz no se escribe: el backend responderia 423 en cada
     // movimiento del raton.
     if (!lock.puedeEditar) return;
+    // Nada cambió desde lo último guardado: no hay nada que mandar.
+    if (firmaActual === firmaGuardada.current) return;
 
     const id = setTimeout(async () => {
       try {
@@ -138,6 +185,7 @@ export function Designer() {
           projectVersion,
           projectId
         );
+        firmaGuardada.current = firmaActual;
         setProjectVersion(v);
         setErrorGuardado('');
       } catch (e: any) {
@@ -155,7 +203,7 @@ export function Designer() {
     }, 400);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [widgets, canvasW, canvasH, projectId]);
+  }, [listo, firmaActual, projectId, lock.puedeEditar]);
 
   const selected = widgets.find((w) => w.id === selectedId) ?? null;
 
@@ -242,7 +290,13 @@ export function Designer() {
   // Abre la vista previa en una pestaña nueva (guarda antes por si acaso).
   const openPreview = () => {
     saveDesign({ widgets, canvas: { width: canvasW, height: canvasH } }, projectId);
-    window.open('/preview', '_blank', 'noopener');
+    // La pantalla activa viaja en la URL: abrir la vista previa desde la
+    // pestaña "Horno 2" tiene que enseñar el Horno 2, no la principal.
+    window.open(
+      `/preview?pantalla=${encodeURIComponent(projectId)}`,
+      '_blank',
+      'noopener'
+    );
   };
 
   const rawRate = UPDATE_RATE_OPTIONS.find((o) => o.value === config.updateRate);
@@ -304,6 +358,17 @@ export function Designer() {
             >
               <BellIcon className="h-3.5 w-3.5" />
               Alarmas
+            </button>
+            <button
+              onClick={() => setActiveTab('recipes')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition ${
+                activeTab === 'recipes'
+                  ? 'bg-white text-navy shadow-sm dark:bg-navy-slate dark:text-slate-100'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+              }`}
+            >
+              <BookOpenIcon className="h-3.5 w-3.5" />
+              Recetas
             </button>
           </div>
         </div>
@@ -436,8 +501,16 @@ export function Designer() {
       {/* ═══ Contenido según pestaña activa ═══ */}
       {activeTab === 'alarms' ? (
         <AlarmsEditor />
+      ) : activeTab === 'recipes' ? (
+        <RecipesEditor />
       ) : activeTab === 'designer' ? (
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Las pantallas del HMI. Van a ancho completo, sobre las tres
+            columnas: la paleta de widgets y el inspector son los MISMOS para
+            todas las pantallas, lo único que cambia debajo es el lienzo. */}
+        <PantallasBar puedeEditar={puedeEditar} />
+
+        <div className="flex flex-1 overflow-hidden">
         <WidgetSidebar />
 
         {/* Canvas */}
@@ -483,6 +556,7 @@ export function Designer() {
           onChange={(patch) => selected && patchWidget(selected.id, patch)}
           onStyleChange={(patch) => selected && patchStyle(selected.id, patch)}
           onDelete={() => selected && deleteWidget(selected.id)} />
+        </div>
       </div>
       ) : (
         <FlowEditor />

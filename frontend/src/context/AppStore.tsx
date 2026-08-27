@@ -27,7 +27,11 @@ import {
 '../services/authApi';
 import {
   cargarProyecto,
+  listarProyectos,
   loadDesign,
+  getUltimaPantalla,
+  setUltimaPantalla,
+  ResumenPantalla,
   PROYECTO_POR_DEFECTO } from
 '../utils/designStorage';
 interface AppStore {
@@ -69,10 +73,28 @@ interface AppStore {
   cerrarSesion: () => Promise<void>;
   /** Quién más está mirando ahora mismo. */
   presentes: {usuario: string;categoria: string;}[];
-  /** Proyecto abierto y su versión (para el control de conflictos). */
+  /** Pantalla abierta y su versión (para el control de conflictos). */
   projectId: string;
   projectVersion: number;
   setProjectVersion: (v: number) => void;
+  /**
+   * Pantalla cuyos widgets están AHORA en `widgets`.
+   *
+   * No es lo mismo que `projectId`: entre que alguien cambia de pestaña y
+   * llega la respuesta del servidor hay una ventana en la que `projectId` ya
+   * es la nueva y `widgets` todavía son los de la anterior. Guardar en esa
+   * ventana escribiría el diseño de una pantalla encima de otra, así que el
+   * Diseñador NO guarda mientras estos dos no coincidan.
+   *
+   * Cadena vacía = cargando.
+   */
+  pantallaCargada: string;
+  /** Todas las pantallas del proyecto, para la barra de pestañas. */
+  pantallas: ResumenPantalla[];
+  /** Vuelve a pedir la lista al servidor (tras crear, borrar o renombrar). */
+  refrescarPantallas: () => Promise<void>;
+  /** Cambia la pantalla activa del Diseñador. */
+  abrirPantalla: (projectId: string) => void;
 
   // canvas widgets
   widgets: HmiWidget[];
@@ -99,12 +121,16 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   // El diseño arranca desde la CACHÉ local para pintar al instante, y se
   // reconcilia con el servidor en cuanto responde (ver el efecto de abajo).
   const [widgets, setWidgets] = useState<HmiWidget[]>(
-    () => loadDesign()?.widgets ?? []
+    () => loadDesign(getUltimaPantalla())?.widgets ?? []
   );
   const [sesion, setSesion] = useState<UsuarioSesion | null>(null);
   const [permisos, setPermisos] = useState<Permisos | null>(null);
   const [presentes, setPresentes] = useState<{usuario: string;categoria: string;}[]>([]);
-  const [projectId] = useState<string>(PROYECTO_POR_DEFECTO);
+  // La última pantalla abierta se recuerda por navegador: al recargar vuelves
+  // a donde estabas, no al principio.
+  const [projectId, setProjectId] = useState<string>(getUltimaPantalla);
+  const [pantallaCargada, setPantallaCargada] = useState<string>('');
+  const [pantallas, setPantallas] = useState<ResumenPantalla[]>([]);
   const [projectVersion, setProjectVersion] = useState<number>(0);
   const [osDark, setOsDark] = useState<boolean>(systemPrefersDark);
   // Subscribe to the emulated PLC value stream.
@@ -214,16 +240,53 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   // ================================================================ //
   // MULTIUSUARIO: proyecto compartido
   // ================================================================ //
-  // Hidratación inicial desde el servidor. Los widgets ya se pintaron desde
-  // la caché local, así que esto solo reconcilia.
+  const refrescarPantallas = useCallback(async () => {
+    try {
+      setPantallas(await listarProyectos());
+    } catch {
+      // Sin lista, la barra se queda con lo último que sabía. Es preferible a
+      // vaciarla: perder las pestañas por un backend que parpadeó asustaría
+      // más que un dato de un minuto atrás.
+    }
+  }, []);
+
+  useEffect(() => {
+    void refrescarPantallas();
+  }, [refrescarPantallas]);
+
+  const abrirPantalla = useCallback((destino: string) => {
+    if (!destino) return;
+    setUltimaPantalla(destino);
+    setProjectId(destino);
+  }, []);
+
+  // Hidratación de la pantalla activa. Se dispara también al CAMBIAR de
+  // pestaña, y por eso el orden importa:
+  //
+  //   1. `pantallaCargada = ''`  -> el Diseñador deja de guardar AHORA MISMO.
+  //   2. se pintan los widgets de la caché local de la pantalla destino, para
+  //      que el cambio se vea instantáneo aunque la red tarde.
+  //   3. llega el servidor -> widgets y versión reales.
+  //   4. `pantallaCargada = projectId` -> se vuelve a permitir guardar.
+  //
+  // Sin el paso 1, un arrastre a medio guardar podría escribirse en la
+  // pantalla equivocada al cambiar de pestaña.
   useEffect(() => {
     let vivo = true;
+    setPantallaCargada('');
+    setProjectVersion(0);
+    setWidgets(loadDesign(projectId)?.widgets ?? []);
+
     void (async () => {
       const p = await cargarProyecto(projectId);
-      if (!vivo || !p) return;
-      setWidgets(p.widgets);
-      setProjectVersion(p.version);
+      if (!vivo) return;
+      if (p) {
+        setWidgets(p.widgets);
+        setProjectVersion(p.version);
+      }
+      setPantallaCargada(projectId);
     })();
+
     return () => {
       vivo = false;
     };
@@ -239,6 +302,24 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
       if (msg.type === 'presence') {
         setPresentes(msg.usuarios ?? []);
         return;
+      }
+
+      // Alguien borró una pantalla. Si era la que yo tenía abierta, no puedo
+      // quedarme mirando un diseño que ya no existe: se salta a la principal,
+      // que el backend garantiza que siempre está.
+      if (msg.type === 'project.removed') {
+        void refrescarPantallas();
+        if (msg.project_id === projectId) abrirPantalla(PROYECTO_POR_DEFECTO);
+        return;
+      }
+
+      if (msg.type === 'project.updated') {
+        const accion = msg.cambio?.accion;
+        // Cambios que alteran la LISTA (no el contenido de mi pantalla):
+        // hay que repintar las pestañas aunque el cambio sea de otra pantalla.
+        if (accion === 'proyecto_creado' || accion === 'proyecto_renombrado') {
+          void refrescarPantallas();
+        }
       }
 
       if (msg.type === 'project.updated' && msg.project_id === projectId) {
@@ -272,7 +353,7 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     };
     window.addEventListener('hmi:ws', alEvento as EventListener);
     return () => window.removeEventListener('hmi:ws', alEvento as EventListener);
-  }, [projectId, sesion]);
+  }, [projectId, sesion, refrescarPantallas, abrirPantalla]);
 
   const disconnect = useCallback(() => setConnected(false), []);
   const toggleVariable = useCallback((id: string, selected: boolean) => {
@@ -345,6 +426,10 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     projectId,
     projectVersion,
     setProjectVersion,
+    pantallaCargada,
+    pantallas,
+    refrescarPantallas,
+    abrirPantalla,
     widgets,
     setWidgets
   };

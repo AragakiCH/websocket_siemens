@@ -144,6 +144,25 @@ const es: Dict = {
   'menu.mainDesc': 'Diseñe su pantalla HMI con widgets y datos en tiempo real.',
   'menu.open': 'Abrir',
 
+
+  // Pantallas del HMI (pestañas del Diseñador)
+  'screens.barLabel': 'Pantallas del HMI',
+  'screens.new': 'Pantalla',
+  'screens.defaultName': 'Pantalla',
+  'screens.copySuffix': '(copia)',
+  'screens.duplicate': 'Duplicar',
+  'screens.duplicateHint': 'Crear una copia de la pantalla activa, con sus widgets',
+  'screens.renameHint': 'Doble clic para renombrar',
+  'screens.delete': 'Eliminar pantalla',
+  'screens.cantDeleteMain':
+  'La pantalla principal no se puede eliminar: siempre debe existir una. Puedes vaciarla.',
+  'screens.deleteTitle': 'Eliminar esta pantalla',
+  'screens.deleteBody1': 'Se va a borrar del servidor la pantalla ',
+  'screens.deleteBody2':
+  ' con todos sus widgets. Esta acción no se puede deshacer.',
+  'screens.deleteConfirm': 'Eliminar',
+  'screens.cancel': 'Cancelar',
+
   // Config
   'config.title': 'Configuración',
   'config.subtitle':
@@ -374,6 +393,24 @@ const en: Dict = {
   'menu.mainTitle': 'Main View',
   'menu.mainDesc': 'Design your HMI screen with widgets and live data.',
   'menu.open': 'Open',
+
+  // HMI screens (Designer tabs)
+  'screens.barLabel': 'HMI screens',
+  'screens.new': 'Screen',
+  'screens.defaultName': 'Screen',
+  'screens.copySuffix': '(copy)',
+  'screens.duplicate': 'Duplicate',
+  'screens.duplicateHint': 'Create a copy of the active screen, widgets included',
+  'screens.renameHint': 'Double-click to rename',
+  'screens.delete': 'Delete screen',
+  'screens.cantDeleteMain':
+  'The main screen cannot be deleted: there must always be one. You can empty it instead.',
+  'screens.deleteTitle': 'Delete this screen',
+  'screens.deleteBody1': 'The screen ',
+  'screens.deleteBody2':
+  ' and all its widgets will be removed from the server. This cannot be undone.',
+  'screens.deleteConfirm': 'Delete',
+  'screens.cancel': 'Cancel',
 
   'config.title': 'Settings',
   'config.subtitle':

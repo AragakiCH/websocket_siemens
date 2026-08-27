@@ -42,6 +42,68 @@ export const DESIGN_KEY = 'hmi.design';
 /** Proyecto por defecto; coincide con el que crea el backend al arrancar. */
 export const PROYECTO_POR_DEFECTO = 'principal';
 
+/**
+ * Una pantalla en el selector, tal y como la resume `GET /proyectos`.
+ *
+ * Deliberadamente SIN los widgets: la lista se pide cada vez que alguien crea
+ * o borra una pantalla, y con diez pantallas de cincuenta widgets eso serian
+ * cientos de KB por refresco para pintar unas pestanas.
+ */
+export interface ResumenPantalla {
+  project_id: string;
+  nombre: string;
+  version: number;
+  /** Cuándo se creó. Es lo que da el orden de las pestañas. */
+  creado_en?: string;
+  actualizado_en: string;
+  actualizado_por: string;
+  num_widgets: number;
+}
+
+/**
+ * Ultima pantalla abierta, recordada en ESTE navegador.
+ *
+ * Es una preferencia local, no configuracion compartida: dos personas pueden
+ * estar trabajando en pantallas distintas del mismo proyecto, y al recargar
+ * cada una debe volver a la suya. Por eso no vive en el servidor.
+ */
+const PANTALLA_KEY = 'hmi.design.ultima';
+
+export function getUltimaPantalla(): string {
+  try {
+    return localStorage.getItem(PANTALLA_KEY) ?? PROYECTO_POR_DEFECTO;
+  } catch {
+    return PROYECTO_POR_DEFECTO;
+  }
+}
+
+export function setUltimaPantalla(projectId: string): void {
+  try {
+    if (projectId) localStorage.setItem(PANTALLA_KEY, projectId);
+  } catch {
+    /* sin storage: se abrira la pantalla por defecto */
+  }
+}
+
+/**
+ * Convierte un nombre escrito por una persona en un `project_id` valido.
+ *
+ * El backend valida contra `^[A-Za-z0-9_-]{1,64}$` porque el id ES el nombre
+ * del fichero en disco: un id con `../` o `/` permitiria escribir fuera de la
+ * carpeta. Aqui se sanea antes de mandarlo para que "Horno 2 - Linea A" no
+ * rebote con un 400 que el usuario no puede interpretar.
+ */
+export function idDesdeNombre(nombre: string): string {
+  const base = (nombre || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')   // quita acentos
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 64);
+  return base || `pantalla_${Date.now().toString(36)}`;
+}
+
 // ===================================================================== //
 // Caché local (ya NO es la fuente de verdad)
 // ===================================================================== //
@@ -79,10 +141,97 @@ export function loadDesign(
 // ===================================================================== //
 // Servidor (fuente de verdad)
 // ===================================================================== //
-/** Lista de proyectos disponibles, para el selector de pantallas. */
-export async function listarProyectos(): Promise<any[]> {
+/** Lista de pantallas disponibles, para el selector del Disenador. */
+export async function listarProyectos(): Promise<ResumenPantalla[]> {
   const d = await fetchAuth('/proyectos');
   return d.proyectos ?? [];
+}
+
+/**
+ * Crea una pantalla vacia. Devuelve su `project_id` real.
+ *
+ * El id se deriva del nombre, pero si ya existe se le anade un sufijo en vez
+ * de fallar: crear dos pantallas llamadas "Horno" es algo perfectamente
+ * razonable, y que la segunda rebote con "ya existe" seria hacerle pagar al
+ * usuario un detalle de implementacion que no eligio.
+ */
+export async function crearPantalla(nombre: string): Promise<ResumenPantalla> {
+  const base = idDesdeNombre(nombre);
+  let intento = base;
+  for (let i = 2; i <= 50; i++) {
+    try {
+      const d = await fetchAuth('/proyectos', {
+        method: 'POST',
+        body: JSON.stringify({ project_id: intento, nombre }),
+      });
+      return {
+        project_id: d.project_id,
+        nombre: d.nombre,
+        version: d.version,
+        actualizado_en: d.actualizado_en,
+        actualizado_por: d.actualizado_por,
+        num_widgets: 0,
+      };
+    } catch (e: any) {
+      // 409 = id repetido. Cualquier otro error (403, 503...) se propaga:
+      // reintentar con otro nombre no lo arreglaria y solo haria 50 llamadas.
+      if (e?.status !== 409) throw e;
+      intento = `${base}_${i}`.slice(0, 64);
+    }
+  }
+  throw new Error('No se pudo encontrar un identificador libre para la pantalla.');
+}
+
+/** Cambia la etiqueta visible. Exige tener el lapiz de esa pantalla. */
+export async function renombrarPantalla(
+  projectId: string,
+  nombre: string
+): Promise<number> {
+  const d = await fetchAuth(`/proyectos/${encodeURIComponent(projectId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ nombre }),
+  });
+  return d.version;
+}
+
+/** Borra una pantalla del servidor. Exige rol Supervisor. */
+export async function borrarPantalla(projectId: string): Promise<void> {
+  await fetchAuth(`/proyectos/${encodeURIComponent(projectId)}`, {
+    method: 'DELETE',
+  });
+  try {
+    localStorage.removeItem(claveCache(projectId));
+  } catch {
+    /* la cache local es prescindible */
+  }
+}
+
+/**
+ * Copia una pantalla entera con otro nombre.
+ *
+ * Se hace en dos pasos (crear + PUT) porque el backend no tiene un endpoint de
+ * duplicado, y no hace falta: crear una pantalla vacia y volcarle los widgets
+ * es exactamente lo mismo, y de paso reutiliza la validacion que ya existe.
+ *
+ * Los widgets conservan su `id` a proposito: son unicos DENTRO de una
+ * pantalla, no entre pantallas, y mantenerlos hace que el diseno copiado sea
+ * identico bit a bit.
+ */
+export async function duplicarPantalla(
+  origen: string,
+  nombre: string
+): Promise<ResumenPantalla> {
+  const doc = await cargarProyecto(origen);
+  const nueva = await crearPantalla(nombre);
+  if (doc && (doc.widgets.length > 0 || doc.canvas.width > 0)) {
+    // version null = forzar: la pantalla acaba de nacer, no hay nada que pisar.
+    await guardarProyecto(
+      { widgets: doc.widgets, canvas: doc.canvas },
+      null,
+      nueva.project_id
+    );
+  }
+  return { ...nueva, num_widgets: doc?.widgets.length ?? 0 };
 }
 
 /**
