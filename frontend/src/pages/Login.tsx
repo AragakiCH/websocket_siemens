@@ -686,6 +686,11 @@ export function Login() {
                     </button>
                   ) : undefined
                 }
+                debajo={
+                  esRegistro && form.password.length > 0 ? (
+                    <MedidorFuerza nivel={fuerza} t={t} />
+                  ) : undefined
+                }
               >
                 <EntradaPassword
                   id="password"
@@ -699,9 +704,6 @@ export function Login() {
                   etiquetaVer={t('auth.showPass')}
                   etiquetaOcultar={t('auth.hidePass')}
                 />
-                {esRegistro && form.password.length > 0 && (
-                  <MedidorFuerza nivel={fuerza} t={t} />
-                )}
               </Campo>
 
               {/* No hay restablecimiento por correo, y decirlo es mejor que un
@@ -1032,6 +1034,7 @@ function Campo({
   requerido,
   accion,
   children,
+  debajo,
 }: {
   id: string;
   label: string;
@@ -1041,6 +1044,20 @@ function Campo({
   requerido?: boolean;
   accion?: React.ReactNode;
   children: React.ReactNode;
+  /**
+   * Contenido que va DEBAJO del control, fuera de su caja de posicionamiento.
+   *
+   * Existe por un desajuste concreto: el icono de la izquierda y el ojo de la
+   * derecha se centran con `top-1/2` respecto al `div.relative` que envuelve
+   * al control. Si algo más crece dentro de ese div —como el medidor de
+   * fuerza de la contraseña— el div se hace más alto, su centro baja, y los
+   * dos iconos se van al fondo del campo. Se veía descuadrado justo al
+   * empezar a escribir la contraseña, que es cuando aparece el medidor.
+   *
+   * Poniéndolo aquí, el `div.relative` vuelve a medir exactamente lo que mide
+   * el input y los iconos quedan centrados pase lo que pase.
+   */
+  debajo?: React.ReactNode;
 }) {
   return (
     <div>
@@ -1065,6 +1082,8 @@ function Campo({
         </span>
         {children}
       </div>
+
+      {debajo}
 
       {error ? (
         <p

@@ -13,26 +13,40 @@
 // seguridad: el backend rechaza con 403 a quien no tenga permiso aunque
 // llegue a esta URL a mano.
 //
+// LA FORMA DE LA PANTALLA
+// El histórico manda y ocupa la columna ancha; conectados, bloqueos y
+// cuentas son CONTEXTO y viven en un raíl a la derecha. Antes los cuatro
+// eran tarjetas del mismo tamaño en una rejilla 2×2, y eso decía que las
+// cuatro cosas pesan lo mismo — cuando en realidad tres se leen de un
+// vistazo y la cuarta es a la que se viene.
+//
 // Los conectados y los bloqueos se refrescan solos al recibir eventos por el
 // WebSocket (`presence` y `lock.changed`), así que no hay polling para eso.
 // La auditoría sí es bajo demanda: es un histórico, no cambia mientras miras.
 // =========================================================================
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeftIcon,
   UsersIcon,
   LockIcon,
-  ScrollTextIcon,
+  UnlockIcon,
   ShieldCheckIcon,
   RefreshCwIcon,
-  CircleIcon,
   AlertCircleIcon,
   UserXIcon,
   UserCheckIcon,
-  UnlockIcon } from
-'lucide-react';
+  SearchIcon,
+  CpuIcon,
+  LayoutDashboardIcon,
+  ServerIcon,
+  DatabaseIcon,
+  HistoryIcon,
+  MonitorIcon,
+  FileTextIcon,
+  type LucideIcon,
+} from 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import {
   Bloqueo,
@@ -48,9 +62,98 @@ import {
   fetchConectados,
   fetchCuentas,
   forzarBloqueo,
-  haceCuanto } from
-'../services/activityApi';
+  haceCuanto,
+} from '../services/activityApi';
 
+// ---------------------------------------------------------------------- //
+// Presentación de un evento
+// ---------------------------------------------------------------------- //
+
+/**
+ * Etiquetas cortas para las pestañas.
+ *
+ * `FAMILIAS` vive en `activityApi` y sus textos ("Control de edición") están
+ * pensados para un desplegable, donde hay sitio. En una fila de pestañas
+ * seis palabras largas obligan a partir la línea, así que aquí se acortan
+ * SOLO para la pestaña. El valor que se manda al backend es el mismo.
+ */
+const TAB_CORTO: Record<string, string> = {
+  'lock.': 'Edición',
+  'bd.': 'Bases',
+};
+
+/**
+ * Icono y color por familia de evento.
+ *
+ * El color no es decorativo: separa de un golpe lo que AÑADE de lo que
+ * QUITA. En una lista de doscientas líneas, "Agregó un PLC" y "Quitó un PLC"
+ * se distinguen antes por el color del icono que leyendo el verbo.
+ */
+function pintaDe(accion: string): { Icono: LucideIcon; clase: string } {
+  const quita = /\.(baja|borrado|forzado|parada)/.test(accion);
+  const anade = /\.(alta|creado|adquirido|arranque)/.test(accion);
+  const tono = quita
+    ? 'bg-state-error/10 text-state-error ring-state-error/25'
+    : anade
+      ? 'bg-siemens/10 text-siemens ring-siemens/25'
+      : 'bg-slate-100 text-slate-400 ring-slate-200 dark:bg-navy-slate/50 dark:ring-navy-slate';
+
+  const familia = accion.split('.')[0];
+  const Icono =
+    familia === 'plc' ? CpuIcon :
+    familia === 'proyecto' ? LayoutDashboardIcon :
+    familia === 'lock' ? LockIcon :
+    familia === 'usuario' ? ShieldCheckIcon :
+    familia === 'bd' ? DatabaseIcon :
+    ServerIcon;
+
+  return { Icono, clase: tono };
+}
+
+/** Iniciales para el avatar. `anónimo` se marca con una interrogación. */
+function inicial(usuario: string): string {
+  const u = (usuario || '').trim();
+  if (!u || u.toLowerCase().includes('anónimo') || u.toLowerCase().includes('anonimo')) {
+    return '?';
+  }
+  return u[0].toUpperCase();
+}
+
+const esAnonimo = (u: string) =>
+  !u || u.toLowerCase().includes('anónimo') || u.toLowerCase().includes('anonimo');
+
+/**
+ * Etiqueta del día al que pertenece un evento.
+ *
+ * Se agrupa por día porque es como se busca de verdad: nadie recuerda la
+ * hora exacta, pero sí "fue hoy" o "fue ayer".
+ */
+function diaDe(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const hoy = new Date();
+  const ayer = new Date();
+  ayer.setDate(hoy.getDate() - 1);
+  const mismo = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+  if (mismo(d, hoy)) return 'Hoy';
+  if (mismo(d, ayer)) return 'Ayer';
+  return d.toLocaleDateString(undefined, {
+    day: '2-digit', month: 'long', year: 'numeric',
+  });
+}
+
+/** Solo la hora, para la segunda línea de la columna «Cuándo». */
+function horaDe(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? ''
+    : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+// ═════════════════════════════════════════════════════════════════════════
 export function Actividad() {
   const navigate = useNavigate();
   const { permisos, sesion, presentes } = useAppStore();
@@ -65,6 +168,11 @@ export function Actividad() {
   const [filtroAccion, setFiltroAccion] = useState('');
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+
+  // Cuántos eventos se PINTAN. La petición ya trae el lote entero, así que
+  // «Ver más» no vuelve a preguntar nada: solo deja de recortar la lista.
+  // Doscientas filas de golpe son doscientos nodos que nadie va a leer.
+  const [mostrar, setMostrar] = useState(12);
 
   const esSupervisor = !!permisos?.gestionar_usuarios;
 
@@ -101,6 +209,12 @@ export function Actividad() {
   useEffect(() => {
     void cargarTodo();
   }, [cargarTodo]);
+
+  // Al cambiar de filtro se vuelve a empezar por arriba: seguir en «40
+  // eventos» tras cambiar de pestaña enseña un tramo que nadie pidió.
+  useEffect(() => {
+    setMostrar(12);
+  }, [filtroUsuario, filtroAccion]);
 
   // Presencia y bloqueos en vivo: llegan por WebSocket, sin polling.
   useEffect(() => {
@@ -147,6 +261,33 @@ export function Actividad() {
   };
 
   // ------------------------------------------------------------------ //
+  // Derivados de presentación
+  // ------------------------------------------------------------------ //
+  const visibles = eventos.slice(0, mostrar);
+
+  /** Filas ya intercaladas con su separador de día. */
+  const filas = useMemo(() => {
+    const out: Array<
+      | { tipo: 'dia'; dia: string; n: number }
+      | { tipo: 'ev'; ev: EventoAuditoria; i: number }
+    > = [];
+    let ultimo = '';
+    visibles.forEach((ev, i) => {
+      const d = diaDe(ev.ts);
+      if (d !== ultimo) {
+        out.push({
+          tipo: 'dia',
+          dia: d,
+          n: eventos.filter((x) => diaDe(x.ts) === d).length,
+        });
+        ultimo = d;
+      }
+      out.push({ tipo: 'ev', ev, i });
+    });
+    return out;
+  }, [visibles, eventos]);
+
+  // ------------------------------------------------------------------ //
   // Vista
   // ------------------------------------------------------------------ //
   if (permisos && !permisos.gestionar_bd && !esSupervisor) {
@@ -164,323 +305,518 @@ export function Actividad() {
   }
 
   return (
-    <Marco onVolver={() => navigate('/menu')} onRefrescar={cargarTodo}
-      cargando={cargando}>
-
-      {error &&
-      <div className="mb-5 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3">
-          <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-          <p className="text-xs text-red-400">{error}</p>
+    <Marco
+      onVolver={() => navigate('/menu')}
+      onRefrescar={cargarTodo}
+      cargando={cargando}
+    >
+      {/* ── Encabezado de la sección ─────────────────────────────── */}
+      <div className="mb-5 flex items-start gap-3">
+        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-siemens-50 text-siemens dark:bg-siemens/15">
+          <HistoryIcon className="h-4.5 w-4.5" />
+        </span>
+        <div className="min-w-0">
+          <h1 className="text-lg font-bold leading-tight text-navy dark:text-slate-100">
+            Actividad y sesiones
+          </h1>
+          <p className="mt-0.5 text-[12.5px] text-slate-400">
+            {eventos.length} evento{eventos.length === 1 ? '' : 's'} registrado
+            {eventos.length === 1 ? '' : 's'} en este equipo. Las horas son de la
+            zona local.
+          </p>
         </div>
-      }
+      </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      {error && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-state-error/30 bg-state-error/10 px-3.5 py-3">
+          <AlertCircleIcon className="mt-px h-4 w-4 shrink-0 text-state-error" />
+          <p className="min-w-0 text-xs text-state-error">{error}</p>
+        </div>
+      )}
 
-        {/* ══════════ CONECTADOS ══════════ */}
-        <Tarjeta
-          icono={<UsersIcon className="h-4 w-4" />}
-          titulo="Trabajando ahora"
-          resumen={`${conectados.length} persona(s) · ${sockets} pantalla(s)`}>
+      {/* El histórico manda; el resto es contexto y va al raíl derecho. */}
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
 
-          {conectados.length === 0 ?
-          <Vacio texto="Nadie más conectado en este momento." /> :
+        {/* ══════════════════ HISTÓRICO ══════════════════ */}
+        <section className="min-w-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card dark:border-navy-slate dark:bg-navy-soft">
 
-          <ul className="divide-y divide-slate-200 dark:divide-navy-slate">
-              {conectados.map((u) =>
-            <li key={u.usuario} className="flex items-center gap-3 py-2.5">
-                  {/* El punto verde es la señal más rápida de "está vivo". */}
-                  <CircleIcon className="h-2.5 w-2.5 fill-state-ok text-state-ok" />
-                  <span className="flex-1 text-sm font-medium text-navy dark:text-slate-100">
-                    {u.usuario}
-                    {u.usuario === sesion?.usuario &&
-                <span className="ml-1.5 text-[11px] font-normal text-slate-400">(tú)</span>
-                }
-                  </span>
-                  <span className="text-xs text-slate-400">{u.categoria}</span>
-                </li>
-            )}
-            </ul>
-          }
-          <p className="mt-3 text-[11px] text-slate-400">
-            Una persona con dos pestañas abiertas cuenta una sola vez; por eso
-            puede haber más pantallas que personas.
-          </p>
-        </Tarjeta>
+          {/* Pestañas + buscador */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-3 py-2.5 dark:border-navy-slate">
+            <div className="flex flex-wrap items-center gap-1">
+              {FAMILIAS.map((f) => (
+                <button
+                  key={f.valor}
+                  type="button"
+                  onClick={() => setFiltroAccion(f.valor)}
+                  aria-pressed={filtroAccion === f.valor}
+                  className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-siemens/40 ${
+                    filtroAccion === f.valor
+                      ? 'bg-slate-100 text-navy shadow-sm ring-1 ring-slate-200 dark:bg-navy-slate dark:text-slate-100 dark:ring-navy-slate'
+                      : 'text-slate-500 hover:text-navy dark:text-slate-400 dark:hover:text-slate-200'
+                  }`}
+                >
+                  {TAB_CORTO[f.valor] ?? f.etiqueta}
+                </button>
+              ))}
+            </div>
 
-        {/* ══════════ BLOQUEOS ══════════ */}
-        <Tarjeta
-          icono={<LockIcon className="h-4 w-4" />}
-          titulo="Control de edición"
-          resumen={`${bloqueos.length} pantalla(s) en edición`}>
-
-          {bloqueos.length === 0 ?
-          <Vacio texto="Nadie está editando ninguna pantalla." /> :
-
-          <ul className="divide-y divide-slate-200 dark:divide-navy-slate">
-              {bloqueos.map((b) =>
-            <li key={b.recurso} className="flex items-center gap-3 py-2.5">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-navy dark:text-slate-100">
-                      {b.usuario}
-                    </p>
-                    <p className="text-[11px] text-slate-400">
-                      {b.recurso} · caduca en {Math.round(b.segundos_restantes)} s
-                    </p>
-                  </div>
-                  {/* Quitarle el lápiz a otro es acción de Supervisor y queda
-                      registrada en la auditoría. */}
-                  {esSupervisor && b.usuario !== sesion?.usuario &&
-              <button
-                onClick={() => void quitarLapiz(b.recurso)}
-                title="Quitarle el control (queda registrado)"
-                className="flex items-center gap-1 rounded-lg bg-state-warn/15 px-2 py-1 text-[11px] font-semibold text-state-warn transition hover:bg-state-warn/25">
-                      <UnlockIcon className="h-3 w-3" />
-                      Tomar control
-                    </button>
-              }
-                </li>
-            )}
-            </ul>
-          }
-          <p className="mt-3 text-[11px] text-slate-400">
-            El control se suelta solo a los 30 s sin actividad, así que un
-            navegador cerrado no deja la pantalla bloqueada.
-          </p>
-        </Tarjeta>
-
-        {/* ══════════ CUENTAS ══════════ */}
-        <Tarjeta
-          icono={<ShieldCheckIcon className="h-4 w-4" />}
-          titulo="Cuentas"
-          resumen={`${cuentas.length} cuenta(s)`}>
-
-          {cuentas.length === 0 ?
-          <Vacio texto="Sin permiso para ver las cuentas, o no hay ninguna." /> :
-
-          <ul className="divide-y divide-slate-200 dark:divide-navy-slate">
-              {cuentas.map((u) => {
-              const activo = u.estado === 'Activo';
-              const enLinea = conectados.some((c) => c.usuario === u.usuario);
-              return (
-                <li key={u.id} className="flex items-center gap-3 py-2.5">
-                    <CircleIcon
-                    className={`h-2.5 w-2.5 ${
-                    enLinea ?
-                    'fill-state-ok text-state-ok' :
-                    'fill-slate-300 text-slate-300 dark:fill-navy-slate dark:text-navy-slate'}`
-                    } />
-
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-navy dark:text-slate-100">
-                        {u.usuario}
-                        <span className="ml-1.5 text-[11px] font-normal text-slate-400">
-                          {u.categoria}
-                        </span>
-                      </p>
-                      <p className="text-[11px] text-slate-400"
-                      title={fechaLocal(u.ultimo_acceso)}>
-                        {u.ultimo_acceso ?
-                      `Último acceso ${haceCuanto(u.ultimo_acceso)}` :
-                      'Nunca ha entrado'}
-                      </p>
-                    </div>
-                    {!activo &&
-                  <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-navy-slate dark:text-slate-400">
-                        INACTIVO
-                      </span>
-                  }
-                    {esSupervisor && u.usuario !== sesion?.usuario &&
-                  <button
-                    onClick={() => void alternarCuenta(u)}
-                    title={activo ?
-                    'Desactivar: cierra sus sesiones al instante' :
-                    'Reactivar la cuenta'}
-                    className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition ${
-                    activo ?
-                    'bg-red-500/10 text-red-400 hover:bg-red-500/20' :
-                    'bg-state-ok/10 text-state-ok hover:bg-state-ok/20'}`
-                    }>
-                        {activo ?
-                    <><UserXIcon className="h-3 w-3" />Desactivar</> :
-                    <><UserCheckIcon className="h-3 w-3" />Activar</>}
-                      </button>
-                  }
-                  </li>);
-
-            })}
-            </ul>
-          }
-        </Tarjeta>
-
-        {/* ══════════ AUDITORÍA ══════════ */}
-        <div className="lg:col-span-2">
-          <Tarjeta
-            icono={<ScrollTextIcon className="h-4 w-4" />}
-            titulo="Histórico de actividad"
-            resumen={`${eventos.length} evento(s)`}
-            cabecera={
-            <div className="flex flex-wrap items-center gap-2">
-                <select
-                value={filtroAccion}
-                onChange={(e) => setFiltroAccion(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-navy outline-none dark:border-navy-slate dark:bg-navy dark:text-slate-200">
-                  {FAMILIAS.map((f) =>
-                <option key={f.valor} value={f.valor}>{f.etiqueta}</option>
-                )}
-                </select>
-                <input
+            <div className="relative min-w-[180px] flex-1 sm:max-w-[240px]">
+              <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
                 value={filtroUsuario}
                 onChange={(e) => setFiltroUsuario(e.target.value)}
                 placeholder="Filtrar por usuario…"
-                className="w-40 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-navy outline-none placeholder-slate-400 dark:border-navy-slate dark:bg-navy dark:text-slate-200" />
+                aria-label="Filtrar los eventos por usuario"
+                className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-9 pr-3 text-xs text-navy outline-none transition placeholder:text-slate-400 focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+              />
+            </div>
+          </div>
 
-              </div>
-            }>
-
-            {eventos.length === 0 ?
-            <Vacio texto="Sin eventos que coincidan con el filtro." /> :
-
-            <div className="max-h-[26rem] overflow-y-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 bg-white text-[11px] uppercase text-slate-400 dark:bg-navy-soft">
-                    <tr>
-                      <th className="py-2 pr-3 font-semibold">Cuándo</th>
-                      <th className="py-2 pr-3 font-semibold">Quién</th>
-                      <th className="py-2 pr-3 font-semibold">Qué hizo</th>
-                      <th className="py-2 font-semibold">Sobre qué</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-navy-slate">
-                    {eventos.map((ev, i) =>
-                  <tr key={`${ev.ts}-${i}`}>
-                        <td className="whitespace-nowrap py-2 pr-3 text-xs text-slate-400"
-                    title={fechaLocal(ev.ts)}>
-                          {haceCuanto(ev.ts)}
-                        </td>
-                        <td className="py-2 pr-3 text-xs font-medium text-navy dark:text-slate-200">
-                          {ev.usuario}
-                        </td>
-                        <td className="py-2 pr-3 text-xs text-navy dark:text-slate-300">
-                          {etiquetaAccion(ev.accion)}
-                        </td>
-                        <td className="py-2 text-xs text-slate-400">
-                          {ev.recurso}
-                          {ev.detalle &&
-                      <span className="ml-1.5 text-[11px] text-slate-400">
-                              {Object.entries(ev.detalle).
-                        map(([k, v]) => `${k}: ${v}`).
-                        join(' · ')}
-                            </span>
-                      }
+          {eventos.length === 0 ? (
+            <div className="px-4 py-16 text-center">
+              <HistoryIcon className="mx-auto mb-3 h-8 w-8 text-slate-300 dark:text-slate-600" />
+              <p className="text-sm font-semibold text-slate-500 dark:text-slate-300">
+                Sin eventos que coincidan
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Prueba con otra pestaña o vacía el filtro de usuario.
+              </p>
+            </div>
+          ) : (
+            <div className="mp-scroll mp-scroll-dark overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead>
+                  <tr>
+                    <Th className="w-36">Cuándo</Th>
+                    <Th className="w-44">Quién</Th>
+                    <Th className="w-[300px]">Qué hizo</Th>
+                    <Th>Sobre qué</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filas.map((f) =>
+                    f.tipo === 'dia' ? (
+                      <tr key={`dia-${f.dia}`}>
+                        <td
+                          colSpan={4}
+                          className="bg-slate-50 px-4 py-1.5 dark:bg-navy/60"
+                        >
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            {f.dia}
+                          </span>
+                          <span className="ml-2 text-[10px] tabular-nums text-slate-400 opacity-70">
+                            {f.n}
+                          </span>
                         </td>
                       </tr>
+                    ) : (
+                      <FilaEvento
+                        key={`${f.ev.ts}-${f.i}`}
+                        ev={f.ev}
+                        esYo={f.ev.usuario === sesion?.usuario}
+                      />
+                    )
                   )}
-                  </tbody>
-                </table>
-              </div>
-            }
-            <p className="mt-3 text-[11px] text-slate-400">
-              Se guarda en <code>datos/auditoria.jsonl</code>, una línea por
-              evento. Las horas se muestran en la zona de este equipo.
-            </p>
-          </Tarjeta>
-        </div>
-      </div>
-    </Marco>);
+                </tbody>
+              </table>
+            </div>
+          )}
 
+          {/* Pie: de dónde sale esto, y cómo ver más */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/70 px-4 py-2.5 dark:border-navy-slate dark:bg-navy/40">
+            <p className="flex items-center gap-1.5 text-[11px] text-slate-400">
+              <FileTextIcon className="h-3.5 w-3.5 shrink-0" />
+              Se guarda en{' '}
+              <code className="rounded bg-slate-200/70 px-1 font-mono text-[10.5px] text-slate-500 dark:bg-navy-slate/60 dark:text-slate-300">
+                datos/auditoria.jsonl
+              </code>
+              , una línea por evento.
+            </p>
+            {mostrar < eventos.length && (
+              <button
+                onClick={() => setMostrar((n) => n + 10)}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-[11.5px] font-semibold text-slate-600 outline-none transition hover:bg-white focus-visible:ring-2 focus-visible:ring-siemens/40 dark:border-navy-slate dark:text-slate-300 dark:hover:bg-navy-soft"
+              >
+                Ver {Math.min(10, eventos.length - mostrar)} eventos más
+              </button>
+            )}
+          </div>
+        </section>
+
+        {/* ══════════════════ RAÍL DERECHO ══════════════════ */}
+        <aside className="w-full shrink-0 space-y-4 xl:w-[330px]">
+
+          {/* ── Trabajando ahora ── */}
+          <TarjetaRail
+            icono={<UsersIcon className="h-3.5 w-3.5" />}
+            titulo="Trabajando ahora"
+            contador={
+              <span
+                className="flex items-center gap-1 text-[11px] tabular-nums text-slate-400"
+                title={`${sockets} pestaña(s) abierta(s)`}
+              >
+                <MonitorIcon className="h-3 w-3" />
+                {sockets}
+              </span>
+            }
+          >
+            {conectados.length === 0 ? (
+              <Vacio texto="Nadie más conectado en este momento." />
+            ) : (
+              <ul className="divide-y divide-slate-100 dark:divide-navy-slate/60">
+                {conectados.map((u) => (
+                  <li key={u.usuario} className="flex items-center gap-2.5 px-4 py-2.5">
+                    {/* El punto verde es la señal más rápida de "está vivo". */}
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-state-ok" />
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-navy dark:text-slate-100">
+                      {u.usuario}
+                      {u.usuario === sesion?.usuario && (
+                        <span className="ml-1.5 text-[11px] font-normal text-slate-400">
+                          (tú)
+                        </span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-[11px] text-slate-400">
+                      {u.categoria}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Nota>
+              Una persona con dos pestañas abiertas cuenta una sola vez; por eso
+              puede haber más pantallas que personas.
+            </Nota>
+          </TarjetaRail>
+
+          {/* ── Control de edición ── */}
+          <TarjetaRail
+            icono={<LockIcon className="h-3.5 w-3.5" />}
+            titulo="Control de edición"
+            contador={
+              <span className="text-[11px] tabular-nums text-slate-400">
+                {bloqueos.length}
+              </span>
+            }
+          >
+            {bloqueos.length === 0 ? (
+              <Vacio texto="Nadie está editando ninguna pantalla." icono={<LockIcon className="h-3.5 w-3.5" />} />
+            ) : (
+              <ul className="divide-y divide-slate-100 dark:divide-navy-slate/60">
+                {bloqueos.map((b) => (
+                  <li key={b.recurso} className="flex items-center gap-2.5 px-4 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-semibold text-navy dark:text-slate-100">
+                        {b.usuario}
+                      </p>
+                      <p className="truncate font-mono text-[10.5px] text-slate-400">
+                        {b.recurso} · {Math.round(b.segundos_restantes)} s
+                      </p>
+                    </div>
+                    {/* Quitarle el lápiz a otro es acción de Supervisor y
+                        queda registrada en la auditoría. */}
+                    {esSupervisor && b.usuario !== sesion?.usuario && (
+                      <button
+                        onClick={() => void quitarLapiz(b.recurso)}
+                        title="Quitarle el control (queda registrado)"
+                        className="flex shrink-0 items-center gap-1 rounded-lg bg-state-warn/15 px-2 py-1 text-[11px] font-semibold text-state-warn outline-none transition hover:bg-state-warn/25 focus-visible:ring-2 focus-visible:ring-state-warn/40"
+                      >
+                        <UnlockIcon className="h-3 w-3" />
+                        Tomar
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Nota>
+              El control se suelta solo a los{' '}
+              <b className="font-semibold text-slate-500 dark:text-slate-300">30 s</b>{' '}
+              sin actividad, así que un navegador cerrado no deja la pantalla
+              bloqueada.
+            </Nota>
+          </TarjetaRail>
+
+          {/* ── Cuentas ── */}
+          <TarjetaRail
+            icono={<ShieldCheckIcon className="h-3.5 w-3.5" />}
+            titulo="Cuentas"
+            contador={
+              <span className="text-[11px] tabular-nums text-slate-400">
+                {cuentas.length}
+              </span>
+            }
+          >
+            {cuentas.length === 0 ? (
+              <Vacio texto="Sin permiso para ver las cuentas, o no hay ninguna." />
+            ) : (
+              <ul className="divide-y divide-slate-100 dark:divide-navy-slate/60">
+                {cuentas.map((u) => {
+                  const activo = u.estado === 'Activo';
+                  const enLinea = conectados.some((c) => c.usuario === u.usuario);
+                  return (
+                    <li key={u.id} className="flex items-center gap-2.5 px-4 py-2.5">
+                      <span
+                        className={`h-2 w-2 shrink-0 rounded-full ${
+                          enLinea
+                            ? 'bg-state-ok'
+                            : 'bg-slate-300 dark:bg-navy-slate'
+                        }`}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13px] font-semibold text-navy dark:text-slate-100">
+                          {u.usuario}
+                          <span className="ml-1.5 text-[11px] font-normal text-slate-400">
+                            {u.categoria}
+                          </span>
+                        </p>
+                        <p
+                          className="truncate text-[10.5px] text-slate-400"
+                          title={fechaLocal(u.ultimo_acceso)}
+                        >
+                          {u.ultimo_acceso
+                            ? `Último acceso ${haceCuanto(u.ultimo_acceso)}`
+                            : 'Nunca ha entrado'}
+                        </p>
+                      </div>
+                      {!activo && (
+                        <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-[9.5px] font-bold text-slate-500 dark:bg-navy-slate dark:text-slate-400">
+                          INACTIVO
+                        </span>
+                      )}
+                      {esSupervisor && u.usuario !== sesion?.usuario && (
+                        <button
+                          onClick={() => void alternarCuenta(u)}
+                          title={
+                            activo
+                              ? 'Desactivar: cierra sus sesiones al instante'
+                              : 'Reactivar la cuenta'
+                          }
+                          className={`flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[10.5px] font-semibold outline-none transition focus-visible:ring-2 ${
+                            activo
+                              ? 'bg-state-error/10 text-state-error hover:bg-state-error/20 focus-visible:ring-state-error/40'
+                              : 'bg-state-ok/10 text-state-ok hover:bg-state-ok/20 focus-visible:ring-state-ok/40'
+                          }`}
+                        >
+                          {activo ? (
+                            <><UserXIcon className="h-3 w-3" />Desactivar</>
+                          ) : (
+                            <><UserCheckIcon className="h-3 w-3" />Activar</>
+                          )}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+          </TarjetaRail>
+        </aside>
+      </div>
+    </Marco>
+  );
 }
 
 // ====================================================================== //
 // Piezas de presentación
 // ====================================================================== //
+
+/** Una fila del histórico. */
+function FilaEvento({ ev, esYo }: { ev: EventoAuditoria; esYo: boolean }) {
+  const { Icono, clase } = pintaDe(ev.accion);
+  const anon = esAnonimo(ev.usuario);
+
+  return (
+    <tr className="border-t border-slate-100 transition-colors hover:bg-slate-50/70 dark:border-navy-slate/50 dark:hover:bg-navy/40">
+      {/* Cuándo: relativo arriba (se lee más rápido) y hora exacta debajo */}
+      <td className="whitespace-nowrap px-4 py-2.5 align-top" title={fechaLocal(ev.ts)}>
+        <p className="text-[12px] font-semibold text-navy dark:text-slate-200">
+          {haceCuanto(ev.ts)}
+        </p>
+        <p className="font-mono text-[10.5px] tabular-nums text-slate-400">
+          {horaDe(ev.ts)}
+        </p>
+      </td>
+
+      {/* Quién */}
+      <td className="px-4 py-2.5 align-top">
+        <span className="flex items-center gap-2">
+          <span
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+              anon
+                ? 'bg-slate-100 text-slate-400 dark:bg-navy-slate/60'
+                : 'bg-siemens/15 text-siemens dark:text-siemens-200'
+            }`}
+          >
+            {inicial(ev.usuario)}
+          </span>
+          <span
+            className={`min-w-0 truncate text-[12.5px] ${
+              anon
+                ? 'text-slate-400'
+                : 'font-semibold text-navy dark:text-slate-100'
+            }`}
+          >
+            {ev.usuario}
+            {esYo && (
+              <span className="ml-1 text-[10.5px] font-normal text-slate-400">
+                (tú)
+              </span>
+            )}
+          </span>
+        </span>
+      </td>
+
+      {/* Qué hizo */}
+      <td className="px-4 py-2.5 align-top">
+        <span className="flex items-center gap-2">
+          <span
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ring-1 ${clase}`}
+          >
+            <Icono className="h-3 w-3" />
+          </span>
+          <span className="min-w-0 text-[12.5px] text-navy dark:text-slate-200">
+            {etiquetaAccion(ev.accion)}
+          </span>
+        </span>
+      </td>
+
+      {/* Sobre qué */}
+      <td className="px-4 py-2.5 align-top">
+        <span className="flex flex-wrap items-center gap-1.5">
+          {ev.recurso && (
+            <code className="font-mono text-[11.5px] text-slate-500 dark:text-slate-400">
+              {ev.recurso}
+            </code>
+          )}
+          {ev.detalle &&
+            Object.entries(ev.detalle).map(([k, v]) => (
+              <span
+                key={k}
+                className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 dark:bg-navy-slate/50 dark:text-slate-400"
+              >
+                {k}: {String(v)}
+              </span>
+            ))}
+        </span>
+      </td>
+    </tr>
+  );
+}
+
+function Th({
+  children,
+  className = '',
+}: {
+  children?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <th
+      scope="col"
+      className={`whitespace-nowrap border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-navy-slate dark:bg-navy ${className}`}
+    >
+      {children}
+    </th>
+  );
+}
+
+/** Tarjeta del raíl derecho. */
+function TarjetaRail({
+  icono,
+  titulo,
+  contador,
+  children,
+}: {
+  icono: React.ReactNode;
+  titulo: string;
+  contador?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card dark:border-navy-slate dark:bg-navy-soft">
+      <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-2.5 dark:border-navy-slate">
+        <span className="text-siemens">{icono}</span>
+        <h2 className="min-w-0 flex-1 truncate text-[11px] font-bold uppercase tracking-wider text-navy dark:text-slate-100">
+          {titulo}
+        </h2>
+        {contador}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Vacio({ texto, icono }: { texto: string; icono?: React.ReactNode }) {
+  return (
+    <p className="flex items-center gap-2 px-4 py-4 text-[12px] text-slate-400">
+      {icono && <span className="shrink-0">{icono}</span>}
+      <span className="min-w-0">{texto}</span>
+    </p>
+  );
+}
+
+function Nota({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="border-t border-slate-100 bg-slate-50/70 px-4 py-2.5 text-[11px] leading-relaxed text-slate-400 dark:border-navy-slate/60 dark:bg-navy/40">
+      {children}
+    </p>
+  );
+}
+
+/** Marco de la página: cabecera con volver y actualizar. */
 function Marco({
   children,
   onVolver,
   onRefrescar,
-  cargando
-
-
-
-
-
-
-}: {children: React.ReactNode;onVolver: () => void;onRefrescar?: () => void;cargando?: boolean;}) {
+  cargando,
+}: {
+  children: React.ReactNode;
+  onVolver: () => void;
+  onRefrescar?: () => void;
+  cargando?: boolean;
+}) {
   return (
-    <div className="mp-scroll mp-scroll-dark h-full w-full overflow-y-auto bg-slate-50 dark:bg-navy">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 dark:border-navy-slate dark:bg-navy-soft">
-        <div className="flex items-center gap-3">
+    <div className="flex h-full w-full flex-col bg-slate-50 dark:bg-navy">
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-3 dark:border-navy-slate dark:bg-navy-soft">
+        <div className="flex min-w-0 items-center gap-3">
           <button
             onClick={onVolver}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-navy dark:hover:bg-navy-slate/40 dark:hover:text-slate-100">
-            <ArrowLeftIcon className="h-4 w-4" />
+            aria-label="Volver al menú"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 outline-none transition hover:bg-slate-100 hover:text-navy focus-visible:ring-2 focus-visible:ring-siemens/40 dark:hover:bg-navy-slate/40 dark:hover:text-slate-100"
+          >
+            <ArrowLeftIcon className="h-5 w-5" />
           </button>
-          <div>
-            <p className="text-sm font-bold text-navy dark:text-slate-100">
+          <div className="min-w-0">
+            <p className="truncate text-[15px] font-bold text-navy dark:text-slate-100">
               Actividad
             </p>
-            <p className="text-xs text-slate-400">
+            <p className="truncate text-[11.5px] text-slate-400">
               Quién está trabajando y qué se ha hecho
             </p>
           </div>
         </div>
-        {onRefrescar &&
-        <button
-          onClick={onRefrescar}
-          disabled={cargando}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-navy disabled:opacity-50 dark:hover:bg-navy-slate/40 dark:hover:text-slate-100">
-            <RefreshCwIcon className={`h-4 w-4 ${cargando ? 'animate-spin' : ''}`} />
+        {onRefrescar && (
+          <button
+            onClick={onRefrescar}
+            disabled={cargando}
+            className="flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 outline-none transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-siemens/40 disabled:opacity-50 dark:border-navy-slate dark:text-slate-300 dark:hover:bg-navy-slate/40"
+          >
+            <RefreshCwIcon className={`h-3.5 w-3.5 ${cargando ? 'animate-spin' : ''}`} />
             Actualizar
           </button>
-        }
+        )}
       </header>
+
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mx-auto max-w-6xl px-6 py-6">
+        className="mp-scroll mp-scroll-dark flex-1 overflow-y-auto p-5"
+      >
         {children}
       </motion.div>
-    </div>);
-
-}
-
-function Tarjeta({
-  icono,
-  titulo,
-  resumen,
-  cabecera,
-  children
-
-
-
-
-
-
-}: {icono: React.ReactNode;titulo: string;resumen?: string;cabecera?: React.ReactNode;children: React.ReactNode;}) {
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-navy-slate dark:bg-navy-soft">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-siemens/10 text-siemens">
-            {icono}
-          </span>
-          <div>
-            <h2 className="text-sm font-bold text-navy dark:text-slate-100">
-              {titulo}
-            </h2>
-            {resumen &&
-            <p className="text-[11px] text-slate-400">{resumen}</p>
-            }
-          </div>
-        </div>
-        {cabecera}
-      </div>
-      {children}
-    </section>);
-
-}
-
-function Vacio({ texto }: {texto: string;}) {
-  return (
-    <p className="py-6 text-center text-xs text-slate-400">{texto}</p>);
-
+    </div>
+  );
 }

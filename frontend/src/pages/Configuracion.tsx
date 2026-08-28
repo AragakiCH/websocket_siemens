@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -7,7 +7,7 @@ import {
   CheckCircle2Icon,
   DatabaseIcon,
   SlidersHorizontalIcon,
-  NetworkIcon,
+  CpuIcon,
   WifiOffIcon,
   PlusIcon,
   Trash2Icon,
@@ -16,35 +16,51 @@ import {
   AlertCircleIcon,
   FileCodeIcon,
   InfoIcon,
-  ListChecksIcon,
-  HardDriveIcon,
+  TagIcon,
+  ActivityIcon,
+  Link2Icon,
+  RefreshCwIcon,
+  MonitorIcon,
+  type LucideIcon,
 } from 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { UPDATE_RATE_OPTIONS, DataType, PlcVendor } from '../models/plc';
 import { formatValue } from '../utils/format';
-import { SelectField } from '../components/ui/Field';
 import { fetchRexrothPrograms } from '../services/rexrothApi';
 import { PanelBasesDatos } from '../components/bd/PanelBasesDatos';
 import { PanelCarpetaDatos } from '../components/sistema/PanelCarpetaDatos';
 
 // =========================================================================
-// SISTEMA VISUAL DE ESTA VISTA
+// LA VISTA DE CONFIGURACIÓN, EN TRES SECCIONES
 //
-// Antes cada bloque se maquetaba por su cuenta: unos encabezados dentro de la
-// tarjeta y otros fuera, tres estilos de cabecera de tabla, y una rejilla de
-// 3 columnas con spans 3/2/3/1 que dejaba la tercera columna VACÍA al lado de
-// las variables y dos columnas muertas al lado de la configuración general.
-// De ahí venía la sensación de desorden, más que de cada pieza suelta.
+// Antes era una sola página con cinco bloques apilados: PLCs, variables,
+// bases de datos, ajustes y carpeta de datos. Todo a la vez, todo del mismo
+// peso visual, y con la lista de variables —la única que crece sin límite—
+// empujando el resto fuera de la pantalla.
 //
-// Ahora hay tres piezas y todo se construye con ellas.
+// Ahora hay un panel lateral con TRES destinos, y cada uno responde a una
+// pregunta distinta:
+//
+//   Controladores    ¿qué PLCs hay y qué variables quiero de cada uno?
+//   Bases de datos   ¿dónde se guarda y qué conexiones responden?
+//   Sistema          ¿cómo se comporta esta vista y dónde viven mis datos?
+//
+// Dentro de Controladores el patrón es maestro-detalle en tres columnas
+// —lista de PLCs, variables del elegido, ficha del enlace— porque la
+// pregunta real nunca fue "enséñame todos los tags de todos los PLCs a la
+// vez", sino "de ESTE controlador, ¿cuáles quiero?".
+//
+// Lo que NO cambió: ni un `fetch`, ni un handler, ni el modal de alta. Esto
+// reorganiza la superficie, no el motor.
 // =========================================================================
+
+type Seccion = 'controladores' | 'bd' | 'sistema';
 
 /**
  * Color del tipo de dato.
  *
- * Llevaba solo variantes claras (`bg-purple-100`), así que en modo oscuro
- * salían pastillas pastel flotando sobre el fondo azul. Ahora cada tipo tiene
- * su par claro/oscuro y un anillo que le da borde en vez de dejarlo al aire.
+ * Cada tipo lleva su par claro/oscuro y un anillo que le da borde: con solo
+ * las variantes claras, en modo oscuro salían pastillas pastel flotando.
  */
 const typeColor: Record<DataType, string> = {
   bool:
@@ -74,54 +90,16 @@ interface PlcInfo {
   publishing_interval_ms: number;
 }
 
-/**
- * Encabezado de sección. UNO solo para las cuatro secciones.
- *
- * `acciones` va a la derecha en la misma línea base que el título: los
- * botones de "Añadir" y los contadores estaban antes cada uno a su manera, y
- * con cuatro secciones eso ya se lee como descuido.
- */
-function Seccion({
-  icon,
-  titulo,
-  descripcion,
-  acciones,
-  children,
-  className = '',
-}: {
-  icon: React.ReactNode;
-  titulo: string;
-  descripcion?: string;
-  acciones?: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <section className={className}>
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="flex min-w-0 items-start gap-2.5">
-          <span className="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-siemens-50 text-siemens dark:bg-siemens/15">
-            {icon}
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-sm font-bold leading-tight text-navy dark:text-slate-100">
-              {titulo}
-            </h2>
-            {descripcion && (
-              <p className="mt-0.5 text-[11.5px] leading-relaxed text-slate-400">
-                {descripcion}
-              </p>
-            )}
-          </div>
-        </div>
-        {acciones && (
-          <div className="flex shrink-0 items-center gap-2">{acciones}</div>
-        )}
-      </div>
-      {children}
-    </section>
-  );
-}
+/** IP legible a partir del endpoint OPC UA. */
+const ipDe = (endpoint: string) =>
+  endpoint.replace('opc.tcp://', '').replace(/:.*$/, '');
+
+const marcaDe = (vendor: string) =>
+  vendor === 'rexroth' ? 'Bosch Rexroth ctrlX' : 'Siemens S7-1500';
+
+// =========================================================================
+// Piezas del sistema visual
+// =========================================================================
 
 /** Superficie base. Todas las tarjetas de la vista salen de aquí. */
 function Tarjeta({
@@ -140,8 +118,40 @@ function Tarjeta({
   );
 }
 
-/** Punto + texto de estado. Mismo par en los PLCs y en las bases de datos. */
-export function ChipEstado({ ok, si, no }: { ok: boolean; si: string; no: string }) {
+/** Encabezado de sección: icono, título, descripción y acciones. */
+function CabeceraSeccion({
+  icon,
+  titulo,
+  descripcion,
+  acciones,
+}: {
+  icon: React.ReactNode;
+  titulo: string;
+  descripcion: string;
+  acciones?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-siemens-50 text-siemens dark:bg-siemens/15">
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold leading-tight text-navy dark:text-slate-100">
+            {titulo}
+          </h2>
+          <p className="mt-0.5 text-[12.5px] leading-relaxed text-slate-400">
+            {descripcion}
+          </p>
+        </div>
+      </div>
+      {acciones && <div className="flex shrink-0 items-center gap-2">{acciones}</div>}
+    </div>
+  );
+}
+
+/** Punto + texto de estado. El mismo par en PLCs y en bases de datos. */
+function ChipEstado({ ok, si, no }: { ok: boolean; si: string; no: string }) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${
@@ -159,7 +169,39 @@ export function ChipEstado({ ok, si, no }: { ok: boolean; si: string; no: string
   );
 }
 
-/** Celda de cabecera. Sustituye a los `shadow-[inset_...]` escritos a mano. */
+/**
+ * Indicador de la barra superior.
+ *
+ * Los tres dicen lo mismo de un vistazo: cuántos de cuántos. Un número solo
+ * ("6 variables") no informa; "3/5 bases" sí, porque lleva dentro el total.
+ */
+function ChipDato({
+  icon,
+  valor,
+  etiqueta,
+  alerta,
+}: {
+  icon: React.ReactNode;
+  valor: string;
+  etiqueta: string;
+  alerta?: boolean;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs ring-1 ${
+        alerta
+          ? 'bg-state-error/10 text-state-error ring-state-error/25'
+          : 'bg-siemens/10 text-siemens-700 ring-siemens/20 dark:text-siemens-200'
+      }`}
+    >
+      {icon}
+      <b className="font-bold tabular-nums">{valor}</b>
+      <span className="opacity-70">{etiqueta}</span>
+    </span>
+  );
+}
+
+/** Celda de cabecera de tabla. */
 function Th({
   children,
   className = '',
@@ -177,104 +219,193 @@ function Th({
   );
 }
 
-// =========================================================================
-// Tabla de PLCs (una por marca)
-// =========================================================================
-function PlcTable({
-  title,
-  plcs,
-  onRemove,
-  t,
-  showModo,
+/** Entrada del panel lateral. */
+function ItemNav({
+  activo,
+  onClick,
+  icon: Icono,
+  label,
+  badge,
+  alerta,
 }: {
-  title: string;
-  plcs: PlcInfo[];
-  onRemove: (id: string) => void;
-  t: (k: string) => string;
-  showModo?: boolean;
+  activo: boolean;
+  onClick: () => void;
+  icon: LucideIcon;
+  label: string;
+  badge?: string;
+  alerta?: boolean;
 }) {
   return (
-    <Tarjeta>
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-navy-slate dark:bg-navy">
-        <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          {title}
-        </h3>
-        <span className="text-[11px] tabular-nums text-slate-400">
-          {plcs.length} PLC{plcs.length === 1 ? '' : 's'}
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={activo ? 'page' : undefined}
+      className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-siemens/40 ${
+        activo
+          ? 'bg-siemens/10 text-siemens ring-1 ring-siemens/25 dark:text-siemens-200'
+          : 'text-slate-500 hover:bg-slate-100 hover:text-navy dark:text-slate-400 dark:hover:bg-navy-slate/40 dark:hover:text-slate-100'
+      }`}
+    >
+      <Icono className="h-4 w-4 shrink-0" />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {badge && (
+        <span
+          className={`shrink-0 whitespace-nowrap text-[11px] tabular-nums ${
+            alerta ? 'font-bold text-state-error' : 'font-medium text-slate-400'
+          }`}
+        >
+          {alerta && <span aria-hidden="true">● </span>}
+          {badge}
         </span>
+      )}
+    </button>
+  );
+}
+
+/**
+ * Tarjeta de un controlador en la lista de la izquierda.
+ *
+ * Es un BOTÓN entero, no una fila con un enlace dentro: el gesto natural es
+ * "pulsar el PLC para ver lo suyo", y reducir eso a un área de clic pequeña
+ * solo produce clics que no hacen nada.
+ */
+function TarjetaPlc({
+  plc,
+  activo,
+  enUso,
+  onClick,
+  t,
+}: {
+  plc: PlcInfo;
+  activo: boolean;
+  enUso: number;
+  onClick: () => void;
+  t: (k: string) => string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={activo}
+      className={`w-full rounded-xl border p-3 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-siemens/40 ${
+        activo
+          ? 'border-siemens/40 bg-siemens/5 ring-1 ring-siemens/20 dark:bg-siemens/10'
+          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-navy-slate dark:bg-navy-soft dark:hover:bg-navy/60'
+      }`}
+    >
+      <div className="flex items-start gap-2.5">
+        <span
+          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+            activo
+              ? 'bg-siemens/15 text-siemens'
+              : 'bg-slate-100 text-slate-400 dark:bg-navy dark:text-slate-500'
+          }`}
+        >
+          <CpuIcon className="h-4 w-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-bold text-navy dark:text-slate-100">
+            {plc.plc}
+          </p>
+          <p className="truncate font-mono text-[11px] text-slate-400">
+            {ipDe(plc.endpoint)}
+          </p>
+        </div>
+        <ChipEstado
+          ok={plc.conectado}
+          si={t('config.plcOnline')}
+          no={t('config.plcOffline')}
+        />
       </div>
 
-      {/* Scroll en los dos ejes con la cabecera fija: con muchos PLCs la
-          tarjeta ya no crece sin fin, y en pantallas angostas las columnas se
-          desplazan en vez de comprimirse hasta ser ilegibles. */}
-      <div className="mp-scroll mp-scroll-dark max-h-72 overflow-auto">
-        <table className="w-full min-w-[620px] text-left text-sm">
-          <thead className="sticky top-0 z-10">
-            <tr>
-              <Th>ID</Th>
-              <Th>IP</Th>
-              <Th className="w-36">{t('config.status')}</Th>
-              <Th className="w-20 text-right">Tags</Th>
-              {showModo && <Th className="w-28">{t('config.readMode')}</Th>}
-              <Th className="w-14" />
-            </tr>
-          </thead>
-          <tbody>
-            {plcs.map((p) => {
-              const ip = p.endpoint.replace('opc.tcp://', '').replace(/:.*$/, '');
-              return (
-                <tr
-                  key={p.plc}
-                  className="group border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/70 dark:border-navy-slate/50 dark:hover:bg-navy/40"
-                >
-                  <td className="px-4 py-2.5 font-medium text-navy dark:text-slate-100">
-                    {p.plc}
-                  </td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-slate-500 dark:text-slate-400">
-                    {ip}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <ChipEstado
-                      ok={p.conectado}
-                      si={t('config.plcOnline')}
-                      no={t('config.plcOffline')}
-                    />
-                  </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-slate-600 dark:text-slate-300">
-                    {p.num_tags}
-                  </td>
-                  {showModo && (
-                    <td className="px-4 py-2.5">
-                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-navy dark:text-slate-300">
-                        {p.modo_lectura}
-                      </span>
-                    </td>
-                  )}
-                  <td className="px-4 py-2.5">
-                    {/* Se revela al pasar por encima de la fila: borrar un PLC
-                        de producción no debe ser lo primero que salta a la
-                        vista en una tabla que se consulta a diario. */}
-                    <button
-                      onClick={() => onRemove(p.plc)}
-                      title={t('config.removePlc')}
-                      aria-label={`${t('config.removePlc')}: ${p.plc}`}
-                      className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 opacity-0 outline-none transition hover:bg-state-error/10 hover:text-state-error focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-siemens/40 group-hover:opacity-100 dark:hover:bg-state-error/10"
-                    >
-                      <Trash2Icon className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="mt-2.5 flex items-center gap-3 border-t border-slate-100 pt-2 text-[11px] text-slate-400 dark:border-navy-slate/60">
+        <span className="inline-flex items-center gap-1">
+          <TagIcon className="h-3 w-3" />
+          <b className="tabular-nums text-slate-500 dark:text-slate-300">
+            {plc.num_tags}
+          </b>{' '}
+          tags
+        </span>
+        {enUso > 0 && (
+          <span className="text-siemens">
+            <b className="tabular-nums">{enUso}</b> en uso
+          </span>
+        )}
+        <span className="ml-auto truncate font-mono">{plc.modo_lectura}</span>
       </div>
-    </Tarjeta>
+    </button>
+  );
+}
+
+/** Fila de la ficha del enlace: etiqueta a la izquierda, dato a la derecha. */
+function FilaDato({
+  etiqueta,
+  children,
+}: {
+  etiqueta: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0 dark:border-navy-slate/60">
+      <span className="shrink-0 text-[12px] text-slate-400">{etiqueta}</span>
+      <span className="min-w-0 truncate text-right text-[12.5px] font-medium text-navy dark:text-slate-100">
+        {children}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Fila de ajuste: nombre y explicación a la izquierda, control a la derecha.
+ *
+ * `SelectField` pone la etiqueta ENCIMA del control, que en una columna
+ * estrecha va bien pero aquí desperdicia el ancho y deja la explicación sin
+ * sitio. Esta variante es solo maquetación: el `<select>` es el mismo control
+ * nativo de siempre.
+ */
+function FilaAjuste<T extends string | number>({
+  titulo,
+  descripcion,
+  value,
+  options,
+  onChange,
+}: {
+  titulo: string;
+  descripcion: string;
+  value: T;
+  options: { label: string; value: T }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-slate-100 px-4 py-3.5 last:border-0 dark:border-navy-slate/60">
+      <div className="min-w-0 flex-1">
+        <p className="text-[13.5px] font-semibold text-navy dark:text-slate-100">
+          {titulo}
+        </p>
+        <p className="mt-0.5 text-[11.5px] leading-relaxed text-slate-400">
+          {descripcion}
+        </p>
+      </div>
+      <select
+        value={String(value)}
+        onChange={(e) => {
+          const m = options.find((o) => String(o.value) === e.target.value);
+          if (m) onChange(m.value);
+        }}
+        className="w-full min-w-[180px] shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100 sm:w-auto"
+      >
+        {options.map((o) => (
+          <option key={String(o.value)} value={String(o.value)}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 
 // =========================================================================
-// Página Configuración
+// Página
 // =========================================================================
 export function Configuracion() {
   const navigate = useNavigate();
@@ -290,6 +421,15 @@ export function Configuracion() {
   } = useAppStore();
 
   const [saved, setSaved] = useState(false);
+
+  // ── Estado de INTERFAZ ───────────────────────────────────────────────
+  // Qué sección se está viendo, qué controlador está elegido y qué se
+  // escribió en el buscador. Nada de esto sale al backend ni cambia lo
+  // que se guarda: es dónde está mirando el usuario, no qué hay.
+  const [seccion, setSeccion] = useState<Seccion>('controladores');
+  const [plcSel, setPlcSel] = useState<string>('');
+  const [buscaVar, setBuscaVar] = useState('');
+  const [bdCuenta, setBdCuenta] = useState({ total: 0, conectadas: 0 });
   const selectedCount = variables.filter((v) => v.selected).length;
 
   // ---------- PLCs desde GET /health ----------
@@ -489,270 +629,550 @@ export function Configuracion() {
     setTimeout(() => setSaved(false), 2200);
   };
 
+  // ── Derivados de PRESENTACIÓN ────────────────────────────────────────
+  // Todo lo de aquí abajo se calcula a partir de `plcs` y `varGroups`, que
+  // ya existían. No hay ni una petición nueva.
+
+  // Controlador elegido. Si no hay ninguno —primera carga, o se borró el
+  // que estaba— cae sobre el primero CONECTADO, que es el que tiene algo
+  // que enseñar; si no hay ninguno conectado, sobre el primero de la lista.
+  useEffect(() => {
+    if (plcs.length === 0) { setPlcSel(''); return; }
+    if (plcSel && plcs.some((p) => p.plc === plcSel)) return;
+    setPlcSel((plcs.find((p) => p.conectado) ?? plcs[0]).plc);
+  }, [plcs, plcSel]);
+
+  const plcInfoSel = plcs.find((p) => p.plc === plcSel) ?? null;
+  const grupoSel = varGroups.find((g) => g.plcId === plcSel) ?? null;
+
+  const varsFiltradas = useMemo(() => {
+    const q = buscaVar.trim().toLowerCase();
+    const vars = grupoSel?.vars ?? [];
+    return q ? vars.filter((v) => v.name.toLowerCase().includes(q)) : vars;
+  }, [grupoSel, buscaVar]);
+
+  const marcadasDelSel = (grupoSel?.vars ?? []).filter((v) => v.selected);
+
+  // Marcar o quitar de golpe lo que se está viendo. Usa el MISMO
+  // `toggleVariable` de siempre, una vez por variable: no hay un camino
+  // nuevo, solo se ahorra el clic repetido.
+  const marcarTodas = (valor: boolean) => {
+    for (const v of varsFiltradas) {
+      if (v.selected !== valor) toggleVariable(v.id, valor);
+    }
+  };
+
+  const plcsEnLinea = plcs.filter((p) => p.conectado).length;
+
+  // Cuántas variables se están mostrando por PLC, para la tarjeta lateral.
+  const enUsoPorPlc = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const g of varGroups) {
+      m.set(g.plcId, g.vars.filter((v) => v.selected).length);
+    }
+    return m;
+  }, [varGroups]);
+
   // =========================================================================
   // Render
   // =========================================================================
   return (
-    <div className="flex min-h-full w-full flex-col bg-slate-50 dark:bg-navy">
-      {/* Header */}
-      <header className="shrink-0 border-b border-slate-200 bg-white dark:border-navy-slate dark:bg-navy-soft">
-        <div className="flex items-center justify-between gap-4 px-6 py-3.5">
-        <div className="flex min-w-0 items-center gap-3">
+    <div className="flex h-full w-full overflow-hidden bg-slate-50 dark:bg-navy">
+
+      {/* ══════════════════════════════════════════════════════════ */}
+      {/* Panel lateral                                              */}
+      {/* ══════════════════════════════════════════════════════════ */}
+      <aside className="hidden w-56 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-navy-slate dark:bg-navy-soft md:flex">
+
+        {/* Marca + salida. La flecha de volver vive aquí y no en la barra
+            superior: es navegación, igual que los tres destinos de abajo. */}
+        <div className="flex items-center gap-2.5 border-b border-slate-200 px-4 py-4 dark:border-navy-slate">
           <button
             onClick={() => navigate('/menu')}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 dark:hover:bg-navy-slate/40"
+            title="Volver al menú"
+            aria-label="Volver al menú"
+            className="group flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-siemens/10 text-siemens outline-none transition hover:bg-siemens hover:text-white focus-visible:ring-2 focus-visible:ring-siemens/40"
           >
-            <ArrowLeftIcon className="h-5 w-5" />
+            <MonitorIcon className="h-4 w-4 group-hover:hidden" />
+            <ArrowLeftIcon className="hidden h-4 w-4 group-hover:block" />
           </button>
-          <div>
-            <h1 className="text-lg font-bold text-navy dark:text-slate-100">
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-bold text-navy dark:text-slate-100">
+              Psi Core
+            </p>
+            <p className="truncate text-[11px] text-slate-400">
               {t('config.title')}
-            </h1>
-            <p className="text-xs text-slate-400">{t('config.subtitle')}</p>
+            </p>
           </div>
         </div>
-        <button
-          onClick={handleSave}
-          className="flex items-center gap-2 rounded-lg bg-siemens px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-siemens-600"
-        >
-          <SaveIcon className="h-4 w-4" />
-          {t('config.save')}
-        </button>
+
+        <nav className="flex-1 space-y-1 p-2.5">
+          <p className="px-2 pb-1.5 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            {t('config.title')}
+          </p>
+          <ItemNav
+            activo={seccion === 'controladores'}
+            onClick={() => setSeccion('controladores')}
+            icon={CpuIcon}
+            label={t('config.plcConnection')}
+            badge={plcs.length ? `${plcsEnLinea}/${plcs.length}` : '0'}
+            alerta={plcs.length > 0 && plcsEnLinea < plcs.length}
+          />
+          <ItemNav
+            activo={seccion === 'bd'}
+            onClick={() => setSeccion('bd')}
+            icon={DatabaseIcon}
+            label="Bases de datos"
+            badge={String(bdCuenta.total)}
+            alerta={bdCuenta.total > bdCuenta.conectadas}
+          />
+          <ItemNav
+            activo={seccion === 'sistema'}
+            onClick={() => setSeccion('sistema')}
+            icon={SlidersHorizontalIcon}
+            label="Sistema"
+            badge={`${selectedCount} vars`}
+          />
+        </nav>
+
+        {/* Pie: que el servicio responda es la primera pregunta cuando algo
+            no va, y tenerla siempre a la vista ahorra el viaje a /health. */}
+        <div className="border-t border-slate-200 px-4 py-3 dark:border-navy-slate">
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold text-state-ok">
+            <span className="h-1.5 w-1.5 rounded-full bg-state-ok" />
+            Servicio activo
+          </p>
+          <p className="mt-0.5 truncate font-mono text-[10.5px] text-slate-400">
+            {window.location.host}
+          </p>
         </div>
-      </header>
+      </aside>
 
-      {/* La rejilla ocupa TODO el ancho disponible. Lo que evita que se
-          desparrame no es un tope de píxeles, son las proporciones: a partir
-          de 1536 px las variables se llevan 9 de 12 columnas y la
-          configuración general se queda en 3, para que tres desplegables no
-          acaben midiendo 600 px de ancho. */}
-      <div className="mp-scroll mp-scroll-dark flex-1 overflow-auto">
-        <div className="grid grid-cols-1 items-start gap-6 p-6 xl:grid-cols-12">
+      {/* ══════════════════════════════════════════════════════════ */}
+      {/* Columna de contenido                                       */}
+      {/* ══════════════════════════════════════════════════════════ */}
+      <div className="flex min-w-0 flex-1 flex-col">
 
-          {/* ========================================================= */}
-          {/* PLCs                                                      */}
-          {/* ========================================================= */}
-          <Seccion
-            className="xl:col-span-12"
-            icon={<NetworkIcon className="h-3.5 w-3.5" />}
-            titulo={t('config.plcConnection')}
-            descripcion="Controladores dados de alta. El estado se refresca solo cada 5 segundos."
-            acciones={
-              <button
-                onClick={openModal}
-                className="flex min-h-[32px] items-center gap-1.5 rounded-lg bg-siemens px-3 text-xs font-semibold text-white shadow-sm outline-none transition hover:bg-siemens-600 focus-visible:ring-2 focus-visible:ring-siemens/50"
-              >
-                <PlusIcon className="h-3.5 w-3.5" />
-                {t('config.addPlc')}
-              </button>
-            }
-          >
-            {plcs.length === 0 ? (
-              <Tarjeta className="flex items-center gap-3 px-4 py-5">
-                <WifiOffIcon className="h-5 w-5 shrink-0 text-slate-400" />
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {t('config.noPlc')}
-                </p>
-              </Tarjeta>
-            ) : (
-              /* Dos marcas en paralelo cuando hay sitio: son tablas
-                 independientes y una debajo de otra desperdicia el ancho. */
-              <div className="grid gap-4 xl:grid-cols-2">
-                {siemensPlcs.length > 0 && (
-                  <PlcTable
-                    title="Siemens S7-1500"
-                    plcs={siemensPlcs}
-                    onRemove={eliminarPlc}
-                    t={t}
-                  />
-                )}
-                {rexrothPlcs.length > 0 && (
-                  <PlcTable
-                    title="Bosch Rexroth ctrlX"
-                    plcs={rexrothPlcs}
-                    onRemove={eliminarPlc}
-                    t={t}
-                    showModo
-                  />
-                )}
-              </div>
-            )}
-          </Seccion>
+        {/* ── Barra superior ─────────────────────────────────────── */}
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-slate-200 bg-white px-5 py-3 dark:border-navy-slate dark:bg-navy-soft">
+          <div className="flex min-w-0 items-center gap-3">
+            {/* En móvil el panel lateral no cabe, así que la vuelta al menú
+                reaparece aquí. */}
+            <button
+              onClick={() => navigate('/menu')}
+              aria-label="Volver al menú"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 dark:hover:bg-navy-slate/40 md:hidden"
+            >
+              <ArrowLeftIcon className="h-5 w-5" />
+            </button>
+            <div className="min-w-0">
+              <h1 className="truncate text-[17px] font-bold leading-tight text-navy dark:text-slate-100">
+                {t('config.title')}
+              </h1>
+              <p className="truncate text-[11.5px] text-slate-400">
+                {t('config.subtitle')}
+              </p>
+            </div>
+          </div>
 
-          {/* ========================================================= */}
-          {/* Variables por PLC                                         */}
-          {/* ========================================================= */}
-          <Seccion
-            className="xl:col-span-8 2xl:col-span-9"
-            icon={<ListChecksIcon className="h-3.5 w-3.5" />}
-            titulo={t('config.variables')}
-            descripcion="Solo las marcadas aparecen en el Diseñador."
-            acciones={
-              <span className="rounded-full bg-siemens-50 px-2.5 py-1 text-[11px] font-semibold text-siemens ring-1 ring-siemens/20 dark:bg-siemens/15 dark:text-siemens-200">
-                {selectedCount} {t('config.selected')}
-              </span>
-            }
-          >
-            {varGroups.length === 0 ? (
-              <Tarjeta className="px-4 py-8 text-center">
-                <p className="text-sm text-slate-400">
-                  Todavía no hay tags. Aparecen solos en cuanto un PLC conecta
-                  y termina su descubrimiento.
-                </p>
-              </Tarjeta>
-            ) : (
-              <div className="space-y-4">
-                {varGroups.map(({ plcId, label, vars, tagCount }) => (
-                  <Tarjeta key={plcId}>
-                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-navy-slate dark:bg-navy">
-                      <h3 className="truncate text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        {label}
-                      </h3>
-                      <span className="shrink-0 text-[11px] tabular-nums text-slate-400">
-                        {tagCount} tags
+          <div className="flex flex-wrap items-center gap-2">
+            <ChipDato
+              icon={<CpuIcon className="h-3.5 w-3.5" />}
+              valor={`${plcsEnLinea}/${plcs.length}`}
+              etiqueta={plcs.length === 1 ? 'PLC en línea' : 'PLC en línea'}
+              alerta={plcs.length > 0 && plcsEnLinea === 0}
+            />
+            <ChipDato
+              icon={<TagIcon className="h-3.5 w-3.5" />}
+              valor={String(selectedCount)}
+              etiqueta="variables activas"
+            />
+            <ChipDato
+              icon={<DatabaseIcon className="h-3.5 w-3.5" />}
+              valor={`${bdCuenta.conectadas}/${bdCuenta.total}`}
+              etiqueta="bases conectadas"
+              alerta={bdCuenta.total > 0 && bdCuenta.conectadas === 0}
+            />
+            <button
+              onClick={() => void refreshPlcs()}
+              className="flex min-h-[34px] items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 outline-none transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-siemens/40 dark:border-navy-slate dark:text-slate-300 dark:hover:bg-navy-slate/40"
+            >
+              <RefreshCwIcon className="h-3.5 w-3.5" />
+              Refrescar
+            </button>
+          </div>
+        </header>
+
+        {/* ── Contenido de la sección ────────────────────────────── */}
+        <main className="mp-scroll mp-scroll-dark flex-1 overflow-auto p-5">
+
+          {/* ═════════════ CONTROLADORES ═════════════ */}
+          {seccion === 'controladores' && (
+            <>
+              <CabeceraSeccion
+                icon={<CpuIcon className="h-4.5 w-4.5" />}
+                titulo={t('config.plcConnection')}
+                descripcion="Elige un PLC para ver y marcar sus variables. El estado se refresca solo cada 5 segundos."
+                acciones={
+                  <button
+                    onClick={openModal}
+                    className="flex min-h-[36px] items-center gap-1.5 rounded-lg bg-siemens px-3.5 text-xs font-semibold text-white shadow-sm outline-none transition hover:bg-siemens-600 focus-visible:ring-2 focus-visible:ring-siemens/50"
+                  >
+                    <PlusIcon className="h-4 w-4" />
+                    {t('config.addPlc')}
+                  </button>
+                }
+              />
+
+              {plcs.length === 0 ? (
+                <Tarjeta className="flex items-center gap-3 px-5 py-8">
+                  <WifiOffIcon className="h-6 w-6 shrink-0 text-slate-400" />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-300">
+                      {t('config.noPlc')}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      Pulsa «{t('config.addPlc')}» para dar de alta el primero.
+                    </p>
+                  </div>
+                </Tarjeta>
+              ) : (
+                /* Maestro-detalle en tres columnas: lista de PLCs, variables
+                   del elegido, y ficha del enlace. Antes se apilaban TODOS
+                   los grupos de variables de TODOS los PLCs, y con dos
+                   controladores la página ya no cabía en pantalla. */
+                <div className="grid gap-4 xl:grid-cols-[minmax(240px,280px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(240px,280px)_minmax(0,1fr)_minmax(240px,300px)]">
+
+                  {/* ── Lista de controladores ── */}
+                  <div className="space-y-4">
+                    {[
+                      { titulo: 'Bosch Rexroth ctrlX', lista: rexrothPlcs },
+                      { titulo: 'Siemens S7-1500', lista: siemensPlcs },
+                    ]
+                      .filter((g) => g.lista.length > 0)
+                      .map((g) => (
+                        <div key={g.titulo}>
+                          <div className="mb-2 flex items-baseline justify-between gap-2 px-0.5">
+                            <p className="truncate text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                              {g.titulo}
+                            </p>
+                            <span className="shrink-0 text-[10.5px] tabular-nums text-slate-400">
+                              {g.lista.length} PLC{g.lista.length === 1 ? '' : 's'}
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {g.lista.map((p) => (
+                              <TarjetaPlc
+                                key={p.plc}
+                                plc={p}
+                                activo={p.plc === plcSel}
+                                enUso={enUsoPorPlc.get(p.plc) ?? 0}
+                                onClick={() => { setPlcSel(p.plc); setBuscaVar(''); }}
+                                t={t}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+
+                  {/* ── Variables del PLC elegido ── */}
+                  <Tarjeta className="flex flex-col">
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-slate-200 px-4 py-3 dark:border-navy-slate">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-[13.5px] font-bold text-navy dark:text-slate-100">
+                          {plcInfoSel ? `Variables de ${plcInfoSel.plc}` : 'Variables'}
+                        </h3>
+                        <p className="truncate text-[11px] text-slate-400">
+                          {plcInfoSel
+                            ? `${marcaDe(plcInfoSel.vendor)} · ${ipDe(plcInfoSel.endpoint)}`
+                            : 'Elige un controlador de la lista'}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-siemens-50 px-2.5 py-1 text-[11px] font-semibold text-siemens ring-1 ring-siemens/20 dark:bg-siemens/15 dark:text-siemens-200">
+                        {marcadasDelSel.length} {t('config.selected')}
                       </span>
                     </div>
 
-                    <div className="mp-scroll mp-scroll-dark max-h-[22rem] overflow-auto">
-                      <table className="w-full min-w-[420px] text-left text-sm">
-                        <thead className="sticky top-0 z-10">
-                          <tr>
-                            <Th className="w-11" />
-                            <Th>{t('config.colName')}</Th>
-                            <Th className="w-24">{t('config.colType')}</Th>
-                            <Th className="w-32 text-right">
-                              {t('config.colValue')}
-                            </Th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {vars.map((v) => (
-                            <tr
-                              key={v.id}
-                              className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/70 dark:border-navy-slate/50 dark:hover:bg-navy/40"
-                            >
-                              <td className="py-2 pl-4 pr-0">
-                                <input
-                                  type="checkbox"
-                                  checked={v.selected}
-                                  onChange={(e) =>
-                                    toggleVariable(v.id, e.target.checked)
-                                  }
-                                  className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-siemens dark:border-navy-slate"
-                                  aria-label={`${t('config.selectVar')} ${v.name}`}
-                                />
-                              </td>
-                              <td className="px-4 py-2 font-medium text-navy dark:text-slate-100">
-                                {v.name}
-                              </td>
-                              <td className="px-4 py-2">
-                                <span
-                                  className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ${typeColor[v.type]}`}
+                    {!grupoSel || grupoSel.vars.length === 0 ? (
+                      <div className="px-4 py-12 text-center">
+                        <TagIcon className="mx-auto mb-3 h-7 w-7 text-slate-300 dark:text-slate-600" />
+                        <p className="text-sm font-semibold text-slate-500 dark:text-slate-300">
+                          Sin variables todavía
+                        </p>
+                        <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-slate-400">
+                          Aparecen solas en cuanto el controlador conecta y termina
+                          su descubrimiento de tags.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-2.5 dark:border-navy-slate/60">
+                          <div className="relative min-w-0 flex-1">
+                            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="search"
+                              value={buscaVar}
+                              onChange={(e) => setBuscaVar(e.target.value)}
+                              placeholder="Buscar variable…"
+                              aria-label="Buscar variable por nombre"
+                              className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-9 pr-3 text-xs text-navy outline-none transition placeholder:text-slate-400 focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+                            />
+                          </div>
+                          <button
+                            onClick={() => marcarTodas(true)}
+                            className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-500 outline-none transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-siemens/40 dark:border-navy-slate dark:text-slate-400 dark:hover:bg-navy-slate/40"
+                          >
+                            Marcar todas
+                          </button>
+                          <button
+                            onClick={() => marcarTodas(false)}
+                            className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-500 outline-none transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-siemens/40 dark:border-navy-slate dark:text-slate-400 dark:hover:bg-navy-slate/40"
+                          >
+                            Quitar todas
+                          </button>
+                        </div>
+
+                        <div className="mp-scroll mp-scroll-dark max-h-[26rem] overflow-auto">
+                          <table className="w-full min-w-[440px] text-left text-sm">
+                            <thead className="sticky top-0 z-10">
+                              <tr>
+                                <Th className="w-11">
+                                  <span className="sr-only">{t('config.selectVar')}</span>
+                                </Th>
+                                <Th>{t('config.colName')}</Th>
+                                <Th className="w-24">{t('config.colType')}</Th>
+                                <Th className="w-32 text-right">{t('config.colValue')}</Th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {varsFiltradas.map((v) => (
+                                <tr
+                                  key={v.id}
+                                  className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/70 dark:border-navy-slate/50 dark:hover:bg-navy/40"
                                 >
-                                  {v.type}
-                                </span>
-                              </td>
-                              {/* tabular-nums: sin esto las cifras bailan de
-                                  fila en fila y la columna deja de leerse
-                                  como una columna. */}
-                              <td className="px-4 py-2 text-right font-mono text-xs tabular-nums text-slate-600 dark:text-slate-300">
-                                {formatValue(v)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                                  <td className="py-2 pl-4 pr-0">
+                                    <input
+                                      type="checkbox"
+                                      checked={v.selected}
+                                      onChange={(e) => toggleVariable(v.id, e.target.checked)}
+                                      className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-siemens dark:border-navy-slate"
+                                      aria-label={`${t('config.selectVar')} ${v.name}`}
+                                    />
+                                  </td>
+                                  <td className="px-4 py-2 font-mono text-[12.5px] font-medium text-navy dark:text-slate-100">
+                                    {v.name}
+                                  </td>
+                                  <td className="px-4 py-2">
+                                    <span
+                                      className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ${typeColor[v.type]}`}
+                                    >
+                                      {v.type}
+                                    </span>
+                                  </td>
+                                  {/* tabular-nums: sin esto las cifras bailan
+                                      de fila en fila y la columna deja de
+                                      leerse como una columna. */}
+                                  <td className="px-4 py-2 text-right font-mono text-xs tabular-nums text-slate-600 dark:text-slate-300">
+                                    {formatValue(v)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+
+                          {varsFiltradas.length === 0 && (
+                            <p className="px-4 py-8 text-center text-xs text-slate-400">
+                              Ninguna variable coincide con «{buscaVar}».
+                            </p>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    <p className="mt-auto flex items-start gap-2 border-t border-slate-100 bg-slate-50/70 px-4 py-2.5 text-[11px] leading-relaxed text-slate-400 dark:border-navy-slate dark:bg-navy/40">
+                      <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+                      <span className="min-w-0">
+                        {t('config.onlySelected')} {t('config.mainView')}.
+                      </span>
+                    </p>
                   </Tarjeta>
-                ))}
+
+                  {/* ── Ficha del enlace + lectura en vivo ── */}
+                  <div className="hidden space-y-4 2xl:block">
+                    {plcInfoSel && (
+                      <>
+                        <Tarjeta>
+                          <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-2.5 dark:border-navy-slate">
+                            <Link2Icon className="h-3.5 w-3.5 text-siemens" />
+                            <h3 className="text-[12px] font-bold text-navy dark:text-slate-100">
+                              Enlace
+                            </h3>
+                          </div>
+                          <FilaDato etiqueta="Estado">
+                            <ChipEstado
+                              ok={plcInfoSel.conectado}
+                              si={t('config.plcOnline')}
+                              no={t('config.plcOffline')}
+                            />
+                          </FilaDato>
+                          <FilaDato etiqueta="Marca">{marcaDe(plcInfoSel.vendor)}</FilaDato>
+                          <FilaDato etiqueta="Dirección">
+                            <span className="font-mono text-[12px]">
+                              {ipDe(plcInfoSel.endpoint)}
+                            </span>
+                          </FilaDato>
+                          <FilaDato etiqueta={t('config.readMode')}>
+                            <span className="font-mono text-[12px]">
+                              {plcInfoSel.modo_lectura}
+                            </span>
+                          </FilaDato>
+                          <FilaDato etiqueta="Muestreo">
+                            <span className="font-mono text-[12px] tabular-nums">
+                              {plcInfoSel.sampling_interval_ms} ms
+                            </span>
+                          </FilaDato>
+
+                          <div className="border-t border-slate-100 p-3 dark:border-navy-slate/60">
+                            <button
+                              onClick={() => eliminarPlc(plcInfoSel.plc)}
+                              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-state-error/30 px-3 py-2 text-[11.5px] font-semibold text-state-error outline-none transition hover:bg-state-error/10 focus-visible:ring-2 focus-visible:ring-state-error/40"
+                            >
+                              <Trash2Icon className="h-3.5 w-3.5" />
+                              {t('config.removePlc')}
+                            </button>
+                          </div>
+                        </Tarjeta>
+
+                        {/* Lectura en vivo: SOLO lo marcado. Es la
+                            comprobación de "¿lo que elegí es lo que quería?"
+                            sin tener que irse al Diseñador a mirarlo. */}
+                        {marcadasDelSel.length > 0 && (
+                          <Tarjeta>
+                            <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-2.5 dark:border-navy-slate">
+                              <span className="flex items-center gap-2">
+                                <ActivityIcon className="h-3.5 w-3.5 text-siemens" />
+                                <h3 className="text-[12px] font-bold text-navy dark:text-slate-100">
+                                  Lectura en vivo
+                                </h3>
+                              </span>
+                              <span className="text-[11px] tabular-nums text-slate-400">
+                                {marcadasDelSel.length}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-px bg-slate-100 dark:bg-navy-slate/60">
+                              {marcadasDelSel.map((v) => (
+                                <div
+                                  key={v.id}
+                                  className="bg-white px-3 py-2.5 dark:bg-navy-soft"
+                                >
+                                  <p className="truncate font-mono text-[10.5px] text-slate-400">
+                                    {v.name.split('.').pop()}
+                                  </p>
+                                  <p className="truncate font-mono text-[13px] font-bold tabular-nums text-navy dark:text-slate-100">
+                                    {formatValue(v)}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </Tarjeta>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ═════════════ BASES DE DATOS ═════════════ */}
+          {seccion === 'bd' && (
+            <>
+              <CabeceraSeccion
+                icon={<DatabaseIcon className="h-4.5 w-4.5" />}
+                titulo="Bases de datos"
+                descripcion="Cada base tiene sus propias cuentas, alarmas y recetas. La que use el login se elige al entrar."
+              />
+              <PanelBasesDatos onEstado={setBdCuenta} />
+            </>
+          )}
+
+          {/* ═════════════ SISTEMA ═════════════ */}
+          {seccion === 'sistema' && (
+            <>
+              <CabeceraSeccion
+                icon={<SlidersHorizontalIcon className="h-4.5 w-4.5" />}
+                titulo={t('config.general')}
+                descripcion="Ajustes de esta vista y de este navegador, y dónde vive la configuración de este equipo."
+                acciones={
+                  <button
+                    onClick={handleSave}
+                    className="flex min-h-[36px] items-center gap-1.5 rounded-lg bg-siemens px-3.5 text-xs font-semibold text-white shadow-sm outline-none transition hover:bg-siemens-600 focus-visible:ring-2 focus-visible:ring-siemens/50"
+                  >
+                    <SaveIcon className="h-4 w-4" />
+                    {t('config.save')}
+                  </button>
+                }
+              />
+
+              <div className="grid gap-5 xl:grid-cols-2">
+                <div>
+                  <h3 className="mb-2 px-0.5 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                    Ajustes generales
+                  </h3>
+                  <Tarjeta>
+                    <FilaAjuste
+                      titulo={t('config.updateRate')}
+                      descripcion="Cada cuánto se repintan los valores en pantalla."
+                      value={config.updateRate}
+                      options={rateOptions}
+                      onChange={setUpdateRate}
+                    />
+                    <FilaAjuste
+                      titulo={t('config.theme')}
+                      descripcion="Apariencia de la interfaz en este navegador."
+                      value={config.theme}
+                      options={[
+                        { label: t('config.themeLight'), value: 'light' as const },
+                        { label: t('config.themeDark'), value: 'dark' as const },
+                        { label: t('config.themeAuto'), value: 'auto' as const },
+                      ]}
+                      onChange={setTheme}
+                    />
+                    <FilaAjuste
+                      titulo={t('config.language')}
+                      descripcion="Textos de menús, avisos y mensajes."
+                      value={config.language}
+                      options={[
+                        { label: t('config.langEs'), value: 'es' as const },
+                        { label: t('config.langEn'), value: 'en' as const },
+                      ]}
+                      onChange={setLanguage}
+                    />
+                  </Tarjeta>
+
+                  <p className="mt-3 flex items-start gap-2 rounded-lg bg-slate-100 px-3 py-2.5 text-[11.5px] leading-relaxed text-slate-500 dark:bg-navy dark:text-slate-400">
+                    <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <span className="min-w-0">
+                      Ahora mismo hay{' '}
+                      <b className="font-semibold text-navy dark:text-slate-100">
+                        {selectedCount} variables
+                      </b>{' '}
+                      marcadas. {t('config.onlySelected')} {t('config.mainView')}.
+                    </span>
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className="mb-2 px-0.5 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                    Carpeta de datos
+                  </h3>
+                  <PanelCarpetaDatos />
+                </div>
               </div>
-            )}
-          </Seccion>
-
-          {/* ========================================================= */}
-          {/* Configuración general                                     */}
-          {/* ========================================================= */}
-          {/* Va AL LADO de las variables, no debajo. Antes la rejilla era de
-              3 columnas con spans 3/2/3/1: la tercera columna de la fila de
-              variables quedaba vacía y esta sección se quedaba sola con dos
-              columnas muertas al lado. `sticky` la mantiene a la vista
-              mientras se recorre una lista larga de tags. */}
-          <Seccion
-            className="xl:col-span-4 2xl:col-span-3 xl:sticky xl:top-6"
-            icon={<SlidersHorizontalIcon className="h-3.5 w-3.5" />}
-            titulo={t('config.general')}
-            descripcion="Ajustes de esta vista y de este navegador."
-          >
-            <Tarjeta className="space-y-4 p-4">
-              <SelectField
-                label={t('config.updateRate')}
-                value={config.updateRate}
-                options={rateOptions}
-                onChange={setUpdateRate}
-              />
-              <SelectField
-                label={t('config.theme')}
-                value={config.theme}
-                options={[
-                  { label: t('config.themeLight'), value: 'light' },
-                  { label: t('config.themeDark'), value: 'dark' },
-                  { label: t('config.themeAuto'), value: 'auto' },
-                ]}
-                onChange={setTheme}
-              />
-              <SelectField
-                label={t('config.language')}
-                value={config.language}
-                options={[
-                  { label: t('config.langEs'), value: 'es' },
-                  { label: t('config.langEn'), value: 'en' },
-                ]}
-                onChange={setLanguage}
-              />
-
-              <p className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2.5 text-[11.5px] leading-relaxed text-slate-500 dark:bg-navy dark:text-slate-400">
-                <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0 text-slate-400" />
-                <span className="min-w-0">
-                  {t('config.onlySelected')}{' '}
-                  <span className="font-semibold text-navy dark:text-slate-100">
-                    {t('config.mainView')}
-                  </span>
-                  .
-                </span>
-              </p>
-            </Tarjeta>
-          </Seccion>
-
-          {/* ========================================================= */}
-          {/* Bases de datos                                            */}
-          {/* ========================================================= */}
-          {/* Aquí se dan de alta la segunda base y las siguientes. El
-              asistente del login solo aparece cuando no hay NINGUNA y se
-              cierra para siempre en cuanto existe la primera cuenta. */}
-          <Seccion
-            className="xl:col-span-12"
-            icon={<DatabaseIcon className="h-3.5 w-3.5" />}
-            titulo="Bases de datos"
-            descripcion="Cada base tiene sus propias cuentas, alarmas y recetas. La que use el login se elige al entrar."
-          >
-            <PanelBasesDatos />
-          </Seccion>
-
-          {/* ========================================================= */}
-          {/* Carpeta de datos                                          */}
-          {/* ========================================================= */}
-          {/* Dónde queda todo lo que se configura, y cómo llevárselo. Va
-              después de las bases de datos porque es la pregunta que
-              aparece justo cuando ya hay algo que perder. */}
-          <Seccion
-            className="xl:col-span-12"
-            icon={<HardDriveIcon className="h-3.5 w-3.5" />}
-            titulo="Carpeta de datos"
-            descripcion="Dónde vive la configuración de este equipo, y cómo hacer una copia antes de reinstalar o actualizar."
-          >
-            <PanelCarpetaDatos />
-          </Seccion>
-        </div>
+            </>
+          )}
+        </main>
       </div>
 
       {/* =============================================================== */}
