@@ -11,7 +11,7 @@ import {
 import { useAppStore } from '../context/AppStore';
 export function MainMenu() {
   const navigate = useNavigate();
-  const { plcIp, plcVendor, disconnect, t, permisos, presentes } = useAppStore();
+  const { disconnect, t, permisos, presentes } = useAppStore();
   // La tarjeta de Actividad solo se ofrece a quien puede usarla. El
   // permiso REAL lo aplica el backend en cada endpoint; esto es comodidad,
   // no seguridad.
@@ -21,9 +21,6 @@ export function MainMenu() {
   const otros = presentes.filter(
     (p) => !p.usuario.includes('anónimo')
   ).length;
-  // Etiqueta legible de la marca, para saber de un vistazo contra qué PLC se
-  // está trabajando cuando hay Siemens y Rexroth mezclados.
-  const marca = plcVendor === 'rexroth' ? 'Rexroth' : 'Siemens';
   const handleLogout = () => {
     disconnect();
     navigate('/');
@@ -39,10 +36,6 @@ export function MainMenu() {
             <p className="text-sm font-bold text-navy dark:text-slate-100">
               Psi Core
             </p>
-            <p className="text-xs text-slate-400">
-              {t('menu.connectedTo')} {plcIp} · {marca}
-            </p>
-            {/* IP movida a /config */}
           </div>
         </div>
         {/* Salir vuelve al acceso (/). La sesion todavia no se valida
@@ -94,6 +87,12 @@ export function MainMenu() {
 
           {verActividad &&
           <MenuCard
+            /* Tres tarjetas en una rejilla de dos columnas dejan la tercera
+               pegada a la izquierda, desalineada de las de arriba. Ocupando
+               las DOS columnas y volviendo al ancho de UNA (`50%` menos medio
+               `gap-6`, que son 0.75rem) queda centrada bajo las otras dos,
+               con exactamente su mismo tamaño. */
+            className="md:col-span-2 md:mx-auto md:w-[calc(50%-0.75rem)]"
             title="Actividad"
             description={
             otros > 1 ?
@@ -117,7 +116,8 @@ function MenuCard({
   icon,
   onClick,
   delay,
-  open
+  open,
+  className = ''
 
 
 
@@ -125,7 +125,7 @@ function MenuCard({
 
 
 
-}: {title: string;description: string;icon: React.ReactNode;onClick: () => void;delay: number;open: string;}) {
+}: {title: string;description: string;icon: React.ReactNode;onClick: () => void;delay: number;open: string;className?: string;}) {
   return (
     <motion.button
       onClick={onClick}
@@ -148,7 +148,7 @@ function MenuCard({
       whileTap={{
         scale: 0.99
       }}
-      className="group flex flex-col items-start gap-5 rounded-2xl border border-slate-200 bg-white p-8 text-left shadow-card transition-shadow hover:border-siemens/40 hover:shadow-cardHover dark:border-navy-slate dark:bg-navy-soft">
+      className={`group flex flex-col items-start gap-5 rounded-2xl border border-slate-200 bg-white p-8 text-left shadow-card transition-shadow hover:border-siemens/40 hover:shadow-cardHover dark:border-navy-slate dark:bg-navy-soft ${className}`}>
       
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-siemens-50 text-siemens transition-colors group-hover:bg-siemens group-hover:text-white dark:bg-siemens/15">
         {icon}

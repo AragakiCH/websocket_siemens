@@ -48,11 +48,21 @@ const ICONO: Record<string, typeof AlertCircleIcon> = {
 export function PanelDiagnostico({
   diagnostico,
   mensajeCrudo,
+  compacto = false,
 }: {
   /** Lo que devolvió el backend. Si falta, se muestra `mensajeCrudo` a secas. */
   diagnostico?: Diagnostico;
   /** Texto de respaldo cuando el fallo no llegó a producir diagnóstico. */
   mensajeCrudo?: string;
+  /**
+   * Variante para ir DENTRO de una fila de tabla.
+   *
+   * Quita el margen superior (lo pone la fila) y aprieta el espaciado. En el
+   * formulario de alta el panel es el protagonista y puede respirar; en una
+   * lista de seis conexiones, uno desplegado medía cinco veces una fila
+   * normal y rompía el ritmo de la tabla entera.
+   */
+  compacto?: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
 
@@ -63,7 +73,9 @@ export function PanelDiagnostico({
     return (
       <p
         role="alert"
-        className="mt-4 flex items-start gap-2 rounded-lg border border-state-error/30 bg-state-error/5 px-3 py-2.5 text-xs leading-relaxed text-state-error"
+        className={`flex items-start gap-2 rounded-lg border border-state-error/30 bg-state-error/5 px-3 py-2 text-[11.5px] leading-relaxed text-state-error ${
+          compacto ? '' : 'mt-4'
+        }`}
       >
         <AlertCircleIcon className="mt-px h-3.5 w-3.5 shrink-0" />
         <span className="min-w-0 break-words">{mensajeCrudo}</span>
@@ -76,7 +88,9 @@ export function PanelDiagnostico({
   return (
     <div
       role="alert"
-      className="mt-4 rounded-xl border border-state-error/30 bg-state-error/5 p-3.5"
+      className={`rounded-lg border border-state-error/30 bg-state-error/5 ${
+        compacto ? 'p-3' : 'mt-4 p-3.5'
+      }`}
     >
       {/* Qué pasó */}
       <div className="flex items-start gap-2.5">

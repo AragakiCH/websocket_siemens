@@ -225,7 +225,7 @@ export function FlowConfigPanel({ node, nodes, onUpdateConfig, onUpdateStatus, o
       </div>
 
       {/* Form */}
-      <div className="flex-1 overflow-y-auto px-4 py-3">
+      <div className="mp-scroll mp-scroll-dark flex-1 overflow-y-auto overscroll-contain px-4 py-3">
         {node.type === 'connection' && (
           <ConnectionForm
             config={node.config}
@@ -259,7 +259,7 @@ export function FlowConfigPanel({ node, nodes, onUpdateConfig, onUpdateStatus, o
       {/* Status message */}
       {node.statusMsg && (
         <div
-          className={`mx-4 mb-2 flex max-h-40 gap-2 overflow-y-auto rounded-md border px-3 py-2 text-[11px] ${
+          className={`mx-4 mb-2 flex max-h-40 gap-2 overflow-y-auto overscroll-contain rounded-md border px-3 py-2 text-[11px] ${
             node.status === 'ok'
               ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/20 dark:bg-green-500/10 dark:text-green-400'
               : node.status === 'error'

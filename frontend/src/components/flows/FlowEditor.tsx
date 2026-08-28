@@ -299,9 +299,22 @@ export function FlowEditor() {
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onWheel={handleWheel}
     >
-      <div className="relative flex-1 overflow-hidden bg-slate-50 dark:bg-navy">
+      {/* El zoom con la rueda vive AQUI, en el lienzo, no en la raiz.
+          Estaba en el contenedor de fuera, que envuelve tambien al panel de
+          configuracion de la derecha: rodar la rueda para recorrer un
+          formulario largo, o la lista de tags del Historian, hacia zoom sobre
+          los nodos al mismo tiempo. Dos cosas moviendose a la vez con el
+          mismo gesto.
+
+          El pan (onPointerDown/Move/Up) SI se queda en la raiz a proposito:
+          `handlePointerDown` solo arranca si el clic fue sobre el fondo
+          (`data-canvas`), y tenerlo arriba es lo que permite seguir
+          arrastrando aunque el cursor se salga por encima del panel. */}
+      <div
+        className="relative flex-1 overflow-hidden bg-slate-50 dark:bg-navy"
+        onWheel={handleWheel}
+      >
 
         {/* ── Layer 0: Background dots (pan target) ── */}
         <div
