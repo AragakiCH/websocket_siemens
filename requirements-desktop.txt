@@ -1,0 +1,22 @@
+# ==========================================================================
+# requirements-desktop.txt
+# Solo para EMPAQUETAR Psi Core como aplicación de escritorio (.exe).
+#
+# No hace falta para desarrollar ni para correr el backend: son las
+# herramientas del build. Se instala encima de requirements.txt:
+#
+#     pip install -r requirements.txt
+#     pip install -r requirements-desktop.txt
+#     desktop\build_exe.bat
+# ==========================================================================
+
+# La ventana nativa. En Windows usa Edge WebView2, que ya viene con Windows
+# 10 y 11: no hay que empaquetar ningún motor de navegador.
+pywebview==5.3.2
+
+# El empaquetador. Genera dist\PsiCore\ a partir de desktop/psi_core.spec.
+pyinstaller==6.11.1
+
+# El instalador NO es un paquete de pip: es Inno Setup 6, que se instala
+# aparte desde https://jrsoftware.org/isdl.php. `build_exe.bat` lo detecta y,
+# si no está, genera solo el ZIP portable.

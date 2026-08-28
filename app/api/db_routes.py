@@ -37,6 +37,7 @@ from pydantic import BaseModel, Field
 
 from app.api.auth_routes import exigir_rol, sesion_actual, usuario_de
 from app.core.auth_manager import Sesion
+from app.db.entorno import revisar as revisar_entorno
 from app.db.provision import provisionar
 
 router = APIRouter()
@@ -209,6 +210,55 @@ def _preferencia_driver(nombre: str) -> tuple:
     if "native client" in nombre.lower():
         return (1, 0, nombre)
     return (2, 0, nombre)
+
+
+@router.get(
+    "/db/entorno",
+    tags=["Bases de datos"],
+    summary="Qué hace falta INSTALAR en esta máquina para usar un motor",
+    description="Se pregunta **antes** de intentar conectar, y sin pedir "
+                "credenciales.\n\n"
+                "`diagnosticar()` mira un error y explica qué significa, pero "
+                "llega tarde: para tener un error hay que haber rellenado un "
+                "formulario apuntando a algo que quizá ni está instalado. Un "
+                "PC recién estrenado no tiene un problema de contraseña — no "
+                "tiene SQL Server —, y «no se pudo conectar a localhost:1433» "
+                "no se lo dice a nadie.\n\n"
+                "Comprueba, en este orden: el conector de Python, el driver "
+                "ODBC (que **no** lo instala `pip`), las instancias de SQL "
+                "Server registradas en esta máquina, y si su puerto responde. "
+                "Devuelve qué falta, por qué hace falta y cómo se instala.\n\n"
+                "**No descarga ni instala nada.** Instalar un motor son "
+                "cientos de megas, exige administrador y, a medias, deja el "
+                "equipo en un estado que esta aplicación no sabría arreglar.\n\n"
+                "Es público a propósito: hace falta ANTES de que exista "
+                "ninguna cuenta, que es justo cuando no hay con qué "
+                "autenticarse.",
+    responses={200: {"content": {"application/json": {"example": {
+        "ok": True, "motor": "mssql", "etiqueta": "SQL Server", "listo": False,
+        "instalado": {"paquete": True, "drivers_compatibles": [],
+                      "instancias": [], "puerto": 1433,
+                      "puerto_abierto": False},
+        "faltantes": [{
+            "que": "SQL Server (edición Express, gratuita)",
+            "por_que": "No hay ninguna instancia instalada en este equipo.",
+            "como": "Descárgalo e instálalo con la opción «Básica»…",
+            "enlace": "https://www.microsoft.com/es-es/sql-server/sql-server-downloads",
+            "critico": True,
+        }],
+        "mensaje": "Falta una cosa: sql server (edición express, gratuita).",
+    }}}}},
+)
+async def entorno_bd(
+    motor: str = Query(default="mssql",
+                       description="mssql | mysql | postgresql | sqlite"),
+    host: str = Query(default="localhost",
+                      description="Dónde buscar el motor. Por defecto, esta "
+                                  "misma máquina."),
+    puerto: Optional[int] = Query(
+        default=None, description="Puerto a sondear. Por defecto, el del motor."),
+) -> dict:
+    return revisar_entorno(motor=motor, host=host, puerto=puerto)
 
 
 @router.get(

@@ -57,3 +57,12 @@ openpyxl==3.1.5              # Generación de ficheros Excel con formato y gráf
 # ==========================================================================
 httpx>=0.27                  # Cliente HTTP async (ya lo usa FastAPI/Starlette)
 # El RAG usa BM25 implementado en Python puro: sin dependencias adicionales.
+
+# ==========================================================================
+# Zona horaria en Windows
+# ==========================================================================
+# Linux trae la base de datos de zonas horarias del sistema; Windows NO. Sin
+# esto, `ZoneInfo("America/Lima")` —que es lo que usa PLC_TIMEZONE para poner
+# la hora en alarmas e histórico— falla con ZoneInfoNotFoundError en cuanto la
+# aplicación se instala en un PC de planta.
+tzdata==2025.2

@@ -1965,7 +1965,152 @@ escribiría en una máquina.
 
 ---
 
-## 17 · Resumen en siete líneas
+## 17 · Psi Core como aplicación de escritorio
+
+Hasta aquí esto se arrancaba con `uvicorn` en una consola y se abría en una
+pestaña del navegador. Para instalarlo en el PC de una planta eso no vale:
+nadie va a escribir un comando, y una pestaña se cierra sin querer.
+
+### 17.1 · Un ejecutable que abre su propia ventana
+
+`desktop/psi_core.py` hace las dos cosas en un solo proceso: arranca uvicorn en
+un hilo *daemon* y abre una **ventana nativa** (pywebview → Edge WebView2, que
+ya viene con Windows 10 y 11) apuntando a ella.
+
+Sin barra de direcciones y sin pestañas: nadie puede navegar a otro sitio,
+recargar la URL equivocada ni dejar el HMI detrás de veinte pestañas. Y al
+cerrar la ventana se cierra el backend — el hilo es daemon justamente para eso,
+para que no quede un `.exe` en el Administrador de tareas después de «cerrar».
+
+Tres decisiones que se notan al usarlo:
+
+| | |
+|---|---|
+| **Escucha solo en 127.0.0.1** | Un HMI de planta no debe quedar publicado en la red del taller porque alguien hizo doble clic. Para varios puestos sigue estando `servidor.py`, donde publicar es una decisión y no un accidente. |
+| **Puerto 8000 o el primero libre** | En un PC cualquiera puede haber otra cosa en el 8000, y así conviven dos instalaciones sin pelearse. |
+| **Espera a `/health` antes de abrir** | El primer arranque de un `.exe` de PyInstaller descomprime medio Python. Sin la espera, la ventana abre sobre un servidor que aún no existe y enseña «no se puede acceder a este sitio». |
+
+**Y una que evita un cierre inmediato.** Un `.exe` en modo ventana
+(`console=False`) arranca con `sys.stdout is None`: el primer `print` —el de
+uvicorn, sin ir más lejos— revienta con `AttributeError: 'NoneType' object has
+no attribute 'write'` y el programa se cierra sin enseñar nada. Por eso
+`_redirigir_salida()` manda todo a
+`C:\ProgramData\PsiCore\datos\registro\psi_core.log`. Va a la carpeta de
+datos y no junto al `.exe` porque en Archivos de programa un usuario normal no
+puede escribir — que es el mismo motivo de §11.
+
+Si WebView2 no estuviera disponible, no se muere: cae al navegador en modo
+aplicación (`--app=`) y lo deja escrito en el registro.
+
+**La trampa que costó un rato: `npm run dev` y el backend NO sirven lo mismo.**
+
+```
+npm run dev  ->  compila EN MEMORIA a cada cambio.        Siempre al día.
+el backend   ->  sirve `frontend/dist`, una CARPETA que
+                 solo cambia cuando alguien ejecuta
+                 `npm run build`.                          Tan vieja como su
+                                                           última compilación.
+```
+
+La primera prueba de la ventana abrió una vista de hacía seis semanas —otro
+logo, otro formulario— mientras el 5173 enseñaba la actual. Y no había un solo
+error en ninguna parte: los dos servían exactamente lo que les habían dado.
+
+Por eso `psi_core.py` compara ahora la fecha de `frontend/dist/index.html` con
+la del archivo más reciente de `frontend/src` y avisa si el build se quedó
+atrás, diciendo cuántos días. Cuesta unos milisegundos y convierte un misterio
+en una línea. (Empaquetado no se comprueba: ahí el build viaja dentro del
+programa y no hay `src` con qué compararlo.)
+
+### 17.2 · El paquete: carpeta, no un solo archivo
+
+`desktop/psi_core.spec` genera `dist\PsiCore\` en modo **carpeta**. Un
+`onefile` se descomprime entero en `%TEMP%` en **cada** arranque —entre cinco y
+quince segundos— y algunos antivirus lo tratan como sospechoso justamente por
+eso. Como igualmente se distribuye con un instalador, que sean cien archivos en
+vez de uno no lo nota nadie, y arranca en un segundo.
+
+En `hiddenimports` van los que PyInstaller **no puede ver**: los que se
+importan por cadena en tiempo de ejecución. Los protocolos de uvicorn, los
+cuatro conectores de base de datos (`aioodbc`, `aiosqlite`, `aiomysql`,
+`asyncpg`) y `tzdata`. Este último se añadió también a `requirements.txt`:
+Linux trae la base de zonas horarias del sistema, **Windows no**, y sin él
+`ZoneInfo("America/Lima")` falla en cuanto la aplicación llega a un PC de
+planta.
+
+### 17.3 · El instalador
+
+`desktop/instalador.iss` (Inno Setup 6) produce un `PsiCore_Setup_1.0.0.exe`:
+un archivo que se le pasa a cualquier equipo. Instala en Archivos de programa,
+crea accesos directos y registra el desinstalador en Configuración →
+Aplicaciones.
+
+Dos líneas de ese script son las importantes:
+
+```ini
+[Dirs]
+Name: "{commonappdata}\PsiCore";        Permissions: users-modify
+Name: "{commonappdata}\PsiCore\datos"; Permissions: users-modify
+```
+
+Sin ellas, en un PC donde quien trabaja no es administrador, Psi Core arranca
+**perfectamente** y pierde cada cambio al cerrar, sin un solo mensaje de error.
+Es el fallo más silencioso de todos.
+
+Y la carpeta de datos **no aparece** en `[UninstallDelete]`, a propósito. El
+desinstalador lo dice antes de empezar, porque «¿me borra esto la
+configuración?» hay que responderlo antes de pulsar, no después. El `.env` se
+instala con `onlyifdoesntexist`: actualizar de versión no pisa la configuración
+de la instalación anterior.
+
+`build_exe.bat` hace las cinco cosas seguidas —React, PyInstaller, ZIP
+portable, instalador— y si Inno Setup no está, avisa y deja el ZIP en vez de
+fallar.
+
+### 17.4 · «No tienes SQL Server» dicho a tiempo
+
+`diagnosticar()` (§8) explica un error de conexión. Pero llega tarde: para
+tener un error hay que haber rellenado host, usuario y contraseña de algo que
+quizá ni está instalado. **Un PC recién estrenado no tiene un problema de
+contraseña: no tiene SQL Server**, y «no se pudo conectar a localhost:1433» no
+se lo dice a nadie.
+
+`app/db/entorno.py` se pregunta **antes**, sin datos y sin intentar nada
+(`GET /db/entorno?motor=mssql`, público porque hace falta cuando todavía no hay
+ninguna cuenta con la que autenticarse):
+
+| Se comprueba | Cómo, y por qué así |
+|---|---|
+| El conector de Python | Se importa de verdad. |
+| El driver ODBC | `pyodbc.drivers()`, que es lo que ve la conexión. La lista del Administrador de orígenes de datos puede diferir por la separación 32/64 bits. |
+| SQL Server instalado | El **registro** (`Instance Names\SQL`), no los servicios: responde «¿está instalado?» y no «¿está arrancado ahora?», que llevan a consejos opuestos. Y se lee sin ser administrador. |
+| El puerto | Un socket con timeout corto. Instalado pero sin responder es el caso clásico de TCP/IP desactivado — viene así de fábrica. |
+
+Devuelve los pasos **en orden**, con qué es, por qué hace falta, cómo se
+instala y el enlace oficial. El orden importa: instalar el driver ODBC sin
+tener SQL Server no arregla nada, y saltarse el primero hace que el segundo
+parezca roto.
+
+La distinción que más tiempo ahorra está escrita explícitamente: **el driver
+ODBC no es un paquete de pip**. Es un componente de Windows. `pip install
+pyodbc` no lo instala nunca, y ese malentendido es el que convierte un `IM002`
+en una tarde perdida.
+
+En la vista, `PanelEntornoBd` sale solo ante los códigos que significan «aquí
+no hay con qué conectar» (`falta_driver`, `falta_paquete`, `sin_servidor`,
+`host_desconocido`, `timeout`) y, si no, con el enlace *«¿Qué necesito tener
+instalado en este equipo?»*. Enseña primero lo que **sí** hay —para no repetir
+una instalación ya hecha— y después los pasos que faltan.
+
+**No descarga ni instala nada**, y lo dice: son cientos de megas, exige
+administrador y una instalación a medias dejaría el equipo en un estado que
+esta aplicación no sabría arreglar. SSMS aparece aparte, marcado como
+opcional, porque no hace falta para nada: la base y las tablas las crea la
+propia pantalla.
+
+---
+
+## 18 · Resumen en ocho líneas
 
 1. `sqlcmd` interactivo + pegar SQL = errores fantasma. Usa siempre `-Q`.
 2. Un error de sintaxis descarta **el lote entero**, incluidas las sentencias correctas que iban antes.
@@ -1974,3 +2119,4 @@ escribiría en una máquina.
 5. Un pool abierto no demuestra que la base exista. Para saberlo hay que preguntar: `GET /db?revisar=true`.
 6. SQL Server rechaza dos caminos en cascada hacia la misma tabla (Msg 1785): ninguna FK del esquema lleva `ON DELETE`, el orden lo pone la aplicación.
 7. Un `INSERT` que no devuelve el `id` no sirve para construir jerarquías: hay que preguntarlo en la MISMA conexión y transacción.
+8. Empaquetado: el programa va a Archivos de programa y los datos a `ProgramData` con permiso de escritura para todos — sin eso, la aplicación funciona y pierde todo en silencio.

@@ -47,6 +47,7 @@ import {
   CheckCircle2Icon,
   DatabaseIcon,
   InfoIcon,
+  HardDriveDownloadIcon,
   Loader2Icon,
   PlugZapIcon,
 } from 'lucide-react';
@@ -54,6 +55,7 @@ import { ConnectionForm } from '../flows/bd/ConnectionForm';
 import { guardarConexion, type Diagnostico } from '../flows/api';
 import { PanelDiagnostico } from '../bd/PanelDiagnostico';
 import { CrearBaseDatos } from '../bd/CrearBaseDatos';
+import { PanelEntornoBd } from '../bd/PanelEntornoBd';
 
 /**
  * Valores de partida.
@@ -98,6 +100,10 @@ export function AsistenteArranque({
   const [error, setError] = useState('');
   const [diagnostico, setDiagnostico] = useState<Diagnostico | undefined>();
   const [ok, setOk] = useState('');
+  // El repaso del equipo se pide a mano o lo abre solo un diagnóstico que
+  // signifique "aquí no hay con qué conectar". No sale siempre: en un equipo
+  // ya configurado sería ruido delante de un formulario de dos campos.
+  const [verEntorno, setVerEntorno] = useState(false);
 
   const cambiar = (patch: Record<string, any>) => {
     setConfig((c) => ({ ...c, ...patch }));
@@ -186,6 +192,33 @@ export function AsistenteArranque({
 
       {(error || diagnostico) && (
         <PanelDiagnostico diagnostico={diagnostico} mensajeCrudo={error} />
+      )}
+
+      {/* Lo que hay que INSTALAR, no lo que hay que corregir.
+          Sale solo ante los códigos que significan "aquí no hay con qué
+          conectar" —falta el driver, falta el paquete, no responde nadie— y
+          se puede pedir a mano en cualquier momento con el enlace de abajo.
+          Es la respuesta que necesita un PC recién estrenado, donde el
+          problema no es la contraseña: es que SQL Server no está. */}
+      {(verEntorno ||
+        ['falta_driver', 'falta_paquete', 'sin_servidor', 'host_desconocido',
+         'timeout'].includes(diagnostico?.codigo ?? '')) && (
+        <PanelEntornoBd
+          motor={String(config.motor || 'mssql')}
+          host={String(config.host || 'localhost')}
+          puerto={config.puerto}
+        />
+      )}
+
+      {!verEntorno && (
+        <button
+          type="button"
+          onClick={() => setVerEntorno(true)}
+          className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-siemens underline-offset-2 outline-none transition hover:underline focus-visible:underline"
+        >
+          <HardDriveDownloadIcon className="h-3 w-3" />
+          ¿Qué necesito tener instalado en este equipo?
+        </button>
       )}
 
       {/* Solo ante lo que se puede arreglar CREANDO algo: falta la base, o
