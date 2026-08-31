@@ -34,6 +34,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import text
+from sqlalchemy.engine import URL
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from app.db.db_driver import DbDriver, ResultadoConsulta
@@ -171,6 +172,86 @@ def _prefijo_seguro(prefijo: str) -> str:
 
 
 # ====================================================================== #
+# SQL Server: instancias con nombre y driver ODBC
+# ====================================================================== #
+def _host_e_instancia(host: str) -> Tuple[str, str]:
+    """
+    Separa `HOST\\INSTANCIA` en sus dos partes.
+
+    Acepta las tres formas en las que la gente lo escribe de verdad:
+    `localhost\\SQLEXPRESS`, `localhost\\\\SQLEXPRESS` (pegado desde una cadena
+    de conexión con la barra escapada) y `localhost/SQLEXPRESS` (por costumbre
+    de escribir rutas con barra normal).
+
+    Devuelve `(host, "")` si no hay instancia.
+    """
+    h = (host or "").strip()
+    if not h:
+        return "", ""
+    # Normaliza la barra doble y la barra normal a una sola invertida.
+    normal = h.replace("\\\\", "\\").replace("/", "\\")
+    if "\\" not in normal:
+        return h, ""
+    base, _, inst = normal.partition("\\")
+    return base.strip(), inst.strip()
+
+
+def _quiere_puerto_fijo(opciones: Optional[Dict[str, Any]]) -> bool:
+    """
+    True si el usuario fijó un puerto estático a su instancia con nombre.
+
+    Por defecto NO se manda el puerto junto a la instancia, porque lo habitual
+    es el puerto dinámico. Quien haya seguido el consejo de fijar el 1433 puede
+    activarlo con `opciones = {"puerto_fijo": "si"}`.
+    """
+    if not opciones:
+        return False
+    v = str(opciones.get("puerto_fijo", "")).strip().lower()
+    return v in ("1", "si", "sí", "true", "yes", "on")
+
+
+def drivers_odbc_instalados() -> List[str]:
+    """
+    Drivers ODBC de SQL Server presentes en el sistema, del mejor al peor.
+
+    Se apoya en `pyodbc`, que es lo que ve de verdad el driver por debajo. Si
+    `pyodbc` no está (Linux sin ODBC, por ejemplo), devuelve lista vacía y el
+    llamador cae a un valor razonable.
+    """
+    try:
+        import pyodbc  # noqa: PLC0415
+        todos = list(pyodbc.drivers())
+    except Exception:  # noqa: BLE001
+        return []
+
+    def preferencia(nombre: str) -> tuple:
+        # ODBC Driver N (mayor N primero) > Native Client > "SQL Server".
+        m = re.match(r"^ODBC Driver (\d+) for SQL Server$", nombre.strip(), re.I)
+        if m:
+            return (0, -int(m.group(1)), nombre)
+        if "native client" in nombre.lower():
+            return (1, 0, nombre)
+        return (2, 0, nombre)
+
+    return sorted(
+        {d for d in todos if "sql server" in d.lower()}, key=preferencia
+    )
+
+
+def driver_odbc_por_defecto() -> str:
+    """
+    El mejor driver ODBC instalado, o el 17 como último recurso.
+
+    El 17 sigue siendo el fallback porque es el más extendido, pero solo se usa
+    cuando NO se pudo mirar qué hay instalado. Antes era el valor fijo, y en un
+    equipo con otro driver la conexión moría con un error que no señalaba al
+    driver por ningún lado.
+    """
+    instalados = drivers_odbc_instalados()
+    return instalados[0] if instalados else "ODBC Driver 17 for SQL Server"
+
+
+# ====================================================================== #
 # Marcas de tiempo: todo se guarda en UTC, de forma determinista
 # ====================================================================== #
 def a_utc(valor: Any) -> Optional[datetime]:
@@ -303,8 +384,6 @@ class SqlDriver(DbDriver):
         Con `ocultar_password=True` sustituye la contraseña por '***': se usa
         para logs y para devolverla por la API sin filtrar credenciales.
         """
-        from urllib.parse import quote_plus
-
         cfg = MOTORES[self.motor]
         prefijo = cfg["prefijo"]
 
@@ -312,10 +391,45 @@ class SqlDriver(DbDriver):
         if self.motor == "sqlite":
             return f"{prefijo}:///{self.base_datos}"
 
-        pwd = "***" if ocultar_password else quote_plus(self._password)
-        usuario = quote_plus(self.usuario) if self.usuario else ""
-        credenciales = f"{usuario}:{pwd}@" if usuario else ""
-        url = f"{prefijo}://{credenciales}{self.host}:{self.puerto}/{self.base_datos}"
+        # ---- Host, con soporte de INSTANCIAS CON NOMBRE ---------------- #
+        #
+        # Un SQL Server puede tener varias instancias en la misma máquina:
+        # `SQLEXPRESS`, `WINCC`, `TEW_SQLEXPRESS`... y se escriben
+        # `HOST\INSTANCIA`. Es el caso normal en un PC de planta, donde otro
+        # producto (WinCC, por ejemplo) ya instaló la suya.
+        #
+        # Dos cosas que hay que hacer bien, y que antes no se hacían:
+        #
+        #  1. **La barra invertida hay que codificarla** (`%5C`). Sin eso la URL
+        #     queda mal formada y el error que sale no menciona la barra por
+        #     ningún lado.
+        #
+        #  2. **No se le pone puerto.** Las instancias con nombre NO escuchan
+        #     en el 1433: al arrancar toman un puerto DINÁMICO que cambia cada
+        #     vez. El cliente lo averigua preguntándole a SQL Browser por UDP
+        #     1434, y para eso hay que pasarle el nombre de instancia SIN
+        #     puerto. Si se manda `host\instancia:1433`, el driver intenta ese
+        #     puerto literal y falla aunque la instancia esté perfectamente
+        #     levantada.
+        #
+        # Si alguien fijó un puerto estático a su instancia (que es lo que
+        # recomienda la pantalla de diagnóstico), puede forzarlo poniendo
+        # `opciones["puerto_fijo"] = "si"`: entonces sí se manda el puerto.
+        # Se construye con `URL.create`, NO concatenando texto. El motivo es
+        # concreto: si la barra se codifica a mano como `%5C`, SQLAlchemy la
+        # deja literal al releer la cadena y el driver acaba buscando un
+        # servidor llamado `localhost%5CTEW_SQLEXPRESS`. `URL.create` la
+        # escapa y la desescapa de forma coherente, y de paso resuelve las
+        # contraseñas con `@`, `#` o `/`, que también rompían la URL escrita a
+        # mano.
+        host_limpio, instancia = _host_e_instancia(self.host)
+        servidor = f"{host_limpio}\\{instancia}" if instancia else host_limpio
+
+        # Puerto: se omite con instancia con nombre (lo resuelve SQL Browser)
+        # salvo que se haya fijado uno estático.
+        puerto: Optional[int] = self.puerto
+        if instancia and not _quiere_puerto_fijo(self.opciones):
+            puerto = None
 
         # SQL Server necesita que se indique el driver ODBC instalado, y
         # ADEMAS cualquier otra opcion de la cadena ODBC.
@@ -338,14 +452,29 @@ class SqlDriver(DbDriver):
         # Encrypt, Trusted_Connection, TrustedConnection, MARS_Connection,
         # ApplicationIntent... son parametros de la cadena ODBC y el driver
         # ignora los que no conoce.
+        extras: Dict[str, str] = {}
         if self.motor == "mssql":
-            extras = dict(self.opciones or {})
-            extras.setdefault("driver", "ODBC Driver 17 for SQL Server")
-            url += "?" + "&".join(
-                f"{k}={quote_plus(str(v))}" for k, v in extras.items()
-            )
+            extras = {k: str(v) for k, v in (self.opciones or {}).items()}
+            # `puerto_fijo` es una marca NUESTRA para decidir si se manda el
+            # puerto junto a una instancia con nombre. No es un parámetro ODBC,
+            # así que no debe viajar en la cadena de conexión.
+            extras.pop("puerto_fijo", None)
+            # El driver por defecto es el MEJOR QUE HAYA INSTALADO, no uno
+            # fijo. Antes se asumía "ODBC Driver 17": en un equipo con solo el
+            # 13 (o solo el 18) la conexión fallaba con "Data source name not
+            # found", que no da ninguna pista de que el problema sea el driver.
+            extras.setdefault("driver", driver_odbc_por_defecto())
 
-        return url
+        u = URL.create(
+            prefijo,
+            username=self.usuario or None,
+            password=self._password or None,
+            host=servidor or None,
+            port=puerto,
+            database=self.base_datos or None,
+            query=extras,
+        )
+        return u.render_as_string(hide_password=ocultar_password)
 
     # ------------------------------------------------------------------ #
     # Ciclo de vida

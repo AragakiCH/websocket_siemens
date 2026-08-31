@@ -125,7 +125,7 @@ async def adquirir(
     )
     aud = _audit(request)
     if aud and r.get("concedido"):
-        aud.registrar("lock.adquirido", quien, recurso)
+        aud.registrar("lock.adquirido", quien, recurso, sesion=sesion)
     return r
 
 
@@ -161,7 +161,7 @@ async def liberar(
     r = await _locks(request).liberar(recurso, quien)
     aud = _audit(request)
     if aud and r.get("ok"):
-        aud.registrar("lock.liberado", quien, recurso)
+        aud.registrar("lock.liberado", quien, recurso, sesion=sesion)
     return r
 
 
@@ -189,7 +189,7 @@ async def forzar(
     aud = _audit(request)
     if aud:
         aud.registrar("lock.forzado", quien, recurso,
-                      {"se_lo_quito_a": r.get("anterior", "")})
+                      {"se_lo_quito_a": r.get("anterior", "")}, sesion=sesion)
     return r
 
 
@@ -220,11 +220,17 @@ async def leer_auditoria(
     request: Request,
     limite: int = Query(default=200, ge=1, le=2000),
     usuario: str = Query(default=""),
+    usuario_id: Optional[int] = Query(
+        default=None,
+        description="Id numérico de la tabla `usuarios`. Encuentra TODO lo "
+                    "que hizo esa persona aunque se haya renombrado por el "
+                    "camino — el nombre cambia, el id no."),
     accion: str = Query(default="", description="Prefijo, ej. `plc.`"),
 ) -> dict:
     aud = _audit(request)
     if aud is None:
         raise HTTPException(503, "La auditoría no está activa.")
-    eventos = aud.leer(limite=limite, usuario=usuario, accion=accion)
+    eventos = aud.leer(limite=limite, usuario=usuario, accion=accion,
+                       usuario_id=usuario_id)
     return {"ok": True, "num": len(eventos), "eventos": eventos,
             "fichero": str(aud.ruta)}

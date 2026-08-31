@@ -90,6 +90,8 @@ class Auditoria:
         recurso: str = "",
         detalle: Optional[Dict[str, Any]] = None,
         resultado: str = "ok",
+        usuario_id: Optional[int] = None,
+        sesion: Any = None,
     ) -> None:
         """
         Encola un evento. NUNCA lanza ni bloquea.
@@ -98,10 +100,30 @@ class Auditoria:
                   "usuario.desactivado", "lock.forzado").
         `usuario`: quién. Cadena vacía = sesión anónima (auth desactivada).
         `recurso`: sobre qué (id del PLC, del proyecto, nombre de usuario...).
+        `usuario_id`: el id NUMÉRICO de la tabla `usuarios`.
+        `sesion`: atajo — si se pasa, de ahí se sacan `usuario` y `usuario_id`.
+
+        **Por qué se guarda también el id y no solo el nombre.** El nombre es
+        editable: si mañana `hugo` se renombra a `hugo.aragaki`, o su cuenta se
+        borra, el histórico se queda con un nombre que ya no lleva a ninguna
+        parte. El `id` es la clave real de la tabla y no cambia nunca, así que
+        es lo único que permite reconstruir después quién hizo qué — que es
+        justo para lo que existe una auditoría.
+
+        Se guardan LOS DOS a propósito: el nombre para poder leer el registro
+        sin consultar la base, y el id para poder cruzarlo con certeza.
         """
+        # Si viene la sesión, mandan sus datos: es la fuente autorizada.
+        if sesion is not None:
+            usuario = getattr(sesion, "usuario", "") or usuario
+            usuario_id = getattr(sesion, "usuario_id", None) or usuario_id
+
         evento = {
             "ts": _ahora_iso(),
             "usuario": usuario or "anónimo",
+            # Se omite cuando no hay (sesión anónima), en vez de escribir un 0
+            # que parecería un id real.
+            **({"usuario_id": int(usuario_id)} if usuario_id else {}),
             "accion": accion,
             "recurso": recurso,
             "resultado": resultado,
@@ -152,7 +174,7 @@ class Auditoria:
     # Lectura
     # ------------------------------------------------------------------ #
     def leer(self, limite: int = 200, usuario: str = "",
-             accion: str = "") -> List[dict]:
+             accion: str = "", usuario_id: Optional[int] = None) -> List[dict]:
         """
         Últimos eventos, del más reciente al más antiguo.
 
@@ -177,6 +199,10 @@ class Auditoria:
                         # siguen siendo válidas. Justo por esto se usa JSONL.
                         continue
                     if usuario and ev.get("usuario") != usuario:
+                        continue
+                    # Filtrar por id encuentra TODO lo que hizo esa
+                    # persona, aunque se haya renombrado por el camino.
+                    if usuario_id is not None and ev.get("usuario_id") != usuario_id:
                         continue
                     if accion and not str(ev.get("accion", "")).startswith(accion):
                         continue

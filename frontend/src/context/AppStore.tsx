@@ -70,6 +70,10 @@ interface AppStore {
   permisos: Permisos | null;
   /** Vuelve a preguntar al servidor quién soy (tras entrar o salir). */
   refrescarSesion: () => Promise<void>;
+  /** True si el backend exige sesión (`PLC_AUTH_REQUERIDA`). */
+  authRequerida: boolean;
+  /** True mientras se resuelve quién soy, al arrancar. */
+  comprobandoSesion: boolean;
   cerrarSesion: () => Promise<void>;
   /** Quién más está mirando ahora mismo. */
   presentes: {usuario: string;categoria: string;}[];
@@ -125,6 +129,13 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   );
   const [sesion, setSesion] = useState<UsuarioSesion | null>(null);
   const [permisos, setPermisos] = useState<Permisos | null>(null);
+  // ¿El backend exige sesión? Si no, la aplicación se comporta como
+  // siempre y las rutas no bloquean nada.
+  const [authRequerida, setAuthRequerida] = useState(false);
+  // True mientras se pregunta al servidor quién soy. Sin esta bandera, al
+  // recargar la página con una sesión válida las rutas protegidas rebotan
+  // al login durante el instante en que `sesion` todavía es null.
+  const [comprobandoSesion, setComprobandoSesion] = useState(true);
   const [presentes, setPresentes] = useState<{usuario: string;categoria: string;}[]>([]);
   // La última pantalla abierta se recuerda por navegador: al recargar vuelves
   // a donde estabas, no al principio.
@@ -209,6 +220,9 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
       const d = await fetchMe();
       setSesion(d.autenticado ? d.sesion ?? null : null);
       setPermisos(d.permisos ?? null);
+      if (typeof d.auth_requerida === 'boolean') {
+        setAuthRequerida(d.auth_requerida);
+      }
     } catch {
       setSesion(null);
       setPermisos(null);
@@ -223,7 +237,7 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
 
   // Al arrancar: ¿hay una sesión guardada de antes que siga siendo válida?
   useEffect(() => {
-    void refrescarSesion();
+    void refrescarSesion().finally(() => setComprobandoSesion(false));
   }, [refrescarSesion]);
 
   // El token puede caducar o ser revocado (un supervisor desactiva la cuenta).
@@ -422,6 +436,8 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     permisos,
     refrescarSesion,
     cerrarSesion,
+    authRequerida,
+    comprobandoSesion,
     presentes,
     projectId,
     projectVersion,

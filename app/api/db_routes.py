@@ -152,7 +152,7 @@ async def _avisar(request: Request, recurso: str, sesion=None,
     aud = getattr(request.app.state, "auditoria", None)
     if aud is not None:
         aud.registrar(f"bd.{recurso}.{accion or 'cambio'}",
-                      usuario_de(sesion), recurso)
+                      recurso=recurso, sesion=sesion)
 
 
 # ====================================================================== #

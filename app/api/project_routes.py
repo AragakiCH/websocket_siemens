@@ -96,7 +96,7 @@ def _auditar(request: Request, accion: str, sesion: Optional[Sesion],
              recurso: str, detalle: Optional[dict] = None) -> None:
     aud = getattr(request.app.state, "auditoria", None)
     if aud is not None:
-        aud.registrar(accion, usuario_de(sesion), recurso, detalle)
+        aud.registrar(accion, recurso=recurso, detalle=detalle, sesion=sesion)
 
 
 def _ahora_iso() -> str:

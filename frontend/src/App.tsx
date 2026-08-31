@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AppStoreProvider } from './context/AppStore';
 import { Login } from './pages/Login';
 import { Actividad } from './pages/Actividad';
+import { RutaProtegida } from './components/auth/RutaProtegida';
 import { MainMenu } from './pages/MainMenu';
 import { Configuracion } from './pages/Configuracion';
 import { Designer } from './pages/Designer';
@@ -50,25 +51,31 @@ export function App() {
               <Route
                 path="/menu"
                 element={
-                <Page>
-                    <MainMenu />
-                  </Page>
+                <RutaProtegida>
+                    <Page>
+                      <MainMenu />
+                    </Page>
+                  </RutaProtegida>
                 } />
 
               <Route
                 path="/config"
                 element={
-                <Page>
-                    <Configuracion />
-                  </Page>
+                <RutaProtegida>
+                    <Page>
+                      <Configuracion />
+                    </Page>
+                  </RutaProtegida>
                 } />
               
               <Route
                 path="/designer"
                 element={
-                <Page>
-                    <Designer />
-                  </Page>
+                <RutaProtegida>
+                    <Page>
+                      <Designer />
+                    </Page>
+                  </RutaProtegida>
                 } />
 
               {/* Actividad: quién está trabajando y qué se ha hecho. El
@@ -78,9 +85,11 @@ export function App() {
               <Route
                 path="/actividad"
                 element={
-                <Page>
-                    <Actividad />
-                  </Page>
+                <RutaProtegida rolMinimo="Administradores">
+                    <Page>
+                      <Actividad />
+                    </Page>
+                  </RutaProtegida>
                 } />
 
                 <Route

@@ -247,23 +247,58 @@ def revisar(motor: str = "mssql", host: str = "localhost",
                 DESCARGAS["sqlserver"],
             ))
         elif instancias and not abierto:
-            # Instalado pero sin responder. Casi siempre TCP/IP apagado, que
-            # es como se instala por defecto — no es un fallo de nadie.
-            faltantes.append(_falta(
-                f"Encender el acceso por red de SQL Server (puerto {puerto})",
-                f"SQL Server SÍ está instalado (instancia(s): "
-                f"{', '.join(instancias)}), pero nada responde en "
-                f"{host}:{puerto}. De fábrica viene con el protocolo TCP/IP "
-                f"desactivado y solo acepta conexiones locales por memoria "
-                f"compartida.",
-                "Abre «SQL Server Configuration Manager» → Configuración de "
-                "red de SQL Server → Protocolos de <instancia> → TCP/IP → "
-                "Habilitado = Sí. En la pestaña «Direcciones IP», deja "
-                f"«IPAll → Puerto TCP» = {puerto}. Reinicia el servicio "
-                "«SQL Server (<instancia>)». Si el equipo tiene cortafuegos, "
-                f"abre también el puerto {puerto}.",
-                "",
-            ))
+            # Instalado pero sin responder. Hay DOS causas muy distintas, y
+            # confundirlas hace perder una tarde entera:
+            #
+            #   (a) El host apunta a la instancia POR DEFECTO (`localhost` a
+            #       secas) pero en el equipo solo hay instancias CON NOMBRE.
+            #       Entonces no falta encender nada: falta escribir bien el
+            #       host. Es el caso más común en un PC de planta, donde otro
+            #       producto (WinCC, TIA) ya instaló las suyas.
+            #
+            #   (b) El host es correcto pero TCP/IP está apagado.
+            #
+            # Antes se daba siempre el consejo (b), que en el caso (a) manda a
+            # la gente a reconfigurar la red de una instancia ajena para
+            # arreglar un problema que no tenía.
+            pide_instancia_defecto = "\\" not in (host or "") and "/" not in (host or "")
+
+            if pide_instancia_defecto:
+                lista = ", ".join(f"{host}\\{i}" for i in instancias)
+                faltantes.append(_falta(
+                    "Indicar la instancia de SQL Server en el campo «Host»",
+                    f"En este equipo NO hay instancia por defecto: solo hay "
+                    f"instancias CON NOMBRE ({', '.join(instancias)}). Por eso "
+                    f"nada responde en {host}:{puerto} — ese puerto es el de la "
+                    f"instancia por defecto, que aquí no existe. Una instancia "
+                    f"con nombre usa un puerto distinto en cada arranque, y el "
+                    f"servicio «SQL Server Browser» es quien le dice al cliente "
+                    f"cuál es.",
+                    f"En el campo «Host» escribe la instancia completa, por "
+                    f"ejemplo: {lista}. El campo «Puerto» se ignora en ese "
+                    f"caso. Comprueba además que el servicio «SQL Server "
+                    f"Browser» esté iniciado y que la instancia tenga TCP/IP "
+                    f"habilitado (Configuration Manager → Protocolos de "
+                    f"<instancia> → TCP/IP → Habilitado = Sí).",
+                    "",
+                ))
+            else:
+                instancia = (host or "").replace("/", "\\").partition("\\")[2]
+                faltantes.append(_falta(
+                    f"Encender el acceso por red de la instancia «{instancia}»",
+                    f"La instancia existe, pero no acepta conexiones por red. "
+                    f"De fábrica SQL Server viene con el protocolo TCP/IP "
+                    f"desactivado y solo admite conexiones locales por memoria "
+                    f"compartida — por eso SSMS entra y esta aplicación no.",
+                    f"Abre «SQL Server Configuration Manager» → Configuración "
+                    f"de red de SQL Server → Protocolos de {instancia} → TCP/IP "
+                    f"→ Habilitado = Sí. Reinicia el servicio «SQL Server "
+                    f"({instancia})». Con el nombre de instancia en el host NO "
+                    f"hace falta fijar ningún puerto: lo resuelve SQL Server "
+                    f"Browser. Si el equipo tiene cortafuegos, abre el puerto "
+                    f"UDP 1434 (el de Browser).",
+                    "",
+                ))
     else:
         if not abierto:
             enlace = DESCARGAS.get("mysql" if motor == "mysql" else "postgresql", "")

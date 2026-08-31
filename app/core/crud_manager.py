@@ -503,15 +503,61 @@ class CrudManager:
         return {"ok": True, "recurso": recurso_nombre, "fila": r.filas[0]}
 
     # ================================================================== #
+    # Autoría: quién hizo cada escritura
+    # ================================================================== #
+    # Columna que enlaza una fila con la persona que la creó o la tocó.
+    # La tienen `alarmas` (quién la reconoció), `recetas` y
+    # `receta_registros` (quién la editó).
+    COLUMNA_AUTOR = "usuario_id"
+
+    @staticmethod
+    def _sellar_autor(
+        recurso, datos: Dict[str, Any], usuario_id: Optional[int]
+    ) -> Dict[str, Any]:
+        """
+        Rellena `usuario_id` con el de la SESIÓN y descarta el que venga del
+        cliente.
+
+        **Esto es una barrera de seguridad, no una comodidad.** Antes el
+        cuerpo de la petición traía `usuario_id` y se insertaba tal cual: un
+        operario podía reconocer una alarma poniendo `usuario_id: 1` y el
+        histórico diría que la reconoció el supervisor. Firmar una acción con
+        la identidad de otro es exactamente lo que una trazabilidad de planta
+        tiene que impedir.
+
+        La regla es simple: **la identidad no se pide, se deduce del token**.
+        El cliente ya no tiene voz en esto; lo que mande en ese campo se
+        ignora en silencio (no se rechaza la petición: la vista puede seguir
+        mandándolo por costumbre sin que nada se rompa).
+
+        Si el recurso no tiene esa columna, no se toca nada. Si no hay sesión
+        (instalación sin autenticación), tampoco: la columna admite NULL y
+        eso es más honesto que inventarse un autor.
+        """
+        columnas = getattr(recurso, "columnas", None) or {}
+        if CrudManager.COLUMNA_AUTOR not in columnas:
+            return datos
+
+        salida = dict(datos or {})
+        # Fuera lo que haya mandado el cliente, siempre.
+        salida.pop(CrudManager.COLUMNA_AUTOR, None)
+        if usuario_id:
+            salida[CrudManager.COLUMNA_AUTOR] = int(usuario_id)
+        return salida
+
+    # ================================================================== #
     # Crear
     # ================================================================== #
     async def crear(self, recurso_nombre: str, datos: Dict[str, Any],
-                    db_id: Optional[str] = None) -> dict:
+                    db_id: Optional[str] = None,
+                    usuario_id: Optional[int] = None) -> dict:
         recurso = self._recurso(recurso_nombre)
         if recurso.solo_lectura:
             raise ErrorCrud(
                 f"'{recurso_nombre}' es de solo lectura: la escribe el "
                 f"historizador a partir de los datos del PLC.", 405)
+
+        datos = self._sellar_autor(recurso, datos, usuario_id)
 
         driver = await self._driver(db_id)
         tabla = self._tabla(recurso)
@@ -575,10 +621,13 @@ class CrudManager:
     # ================================================================== #
     async def actualizar(self, recurso_nombre: str, id_: int,
                          datos: Dict[str, Any],
-                         db_id: Optional[str] = None) -> dict:
+                         db_id: Optional[str] = None,
+                         usuario_id: Optional[int] = None) -> dict:
         recurso = self._recurso(recurso_nombre)
         if recurso.solo_lectura:
             raise ErrorCrud(f"'{recurso_nombre}' es de solo lectura.", 405)
+
+        datos = self._sellar_autor(recurso, datos, usuario_id)
 
         driver = await self._driver(db_id)
         tabla = self._tabla(recurso)

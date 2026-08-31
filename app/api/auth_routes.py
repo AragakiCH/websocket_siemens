@@ -9,9 +9,25 @@ Endpoints de identidad, y las dependencias que aplican los roles.
   POST   /auth/logout       -> cierra la sesión actual
   GET    /auth/me           -> quién soy y qué puedo hacer
   GET    /auth/estado       -> si hay cuentas y si se exige login (público)
-  GET    /auth/usuarios     -> listar cuentas            [Administradores]
-  PATCH  /auth/usuarios/{u} -> cambiar rol/estado/clave  [Supervisor]
   GET    /auth/conectados   -> quién está trabajando ahora
+
+CRUD de la pantalla de gestión de usuarios:
+
+  GET    /auth/usuarios         -> listado simple            [Administradores]
+  GET    /auth/usuarios/buscar  -> filtros, orden, paginado  [Administradores]
+  GET    /auth/usuarios/{u}     -> leer una cuenta           [Administradores]
+  POST   /auth/usuarios         -> crear                     [Supervisor]
+  PATCH  /auth/usuarios/{u}     -> editar (todo opcional)    [Supervisor]
+  DELETE /auth/usuarios/{u}     -> borrar                    [Supervisor]
+
+Las tres mutaciones llevan salvaguardas que devuelven **409** antes de dejar el
+sistema sin acceso: no puedes desactivarte, degradarte ni borrarte a ti mismo,
+y no se puede tocar al último Supervisor activo. Sin eso, el único arreglo
+sería entrar a la base con SQL a mano.
+
+**Ojo con el orden de las rutas.** `/auth/usuarios/buscar` va declarada ANTES
+que `/auth/usuarios/{usuario}`; si fuera al revés, FastAPI casaría "buscar"
+como si fuera un nombre de usuario y el endpoint de búsqueda no existiría.
 
 **Lo importante: los permisos se aplican AQUÍ, en el backend.** Esconder un
 botón en la vista no es seguridad: cualquiera puede llamar al endpoint con
@@ -197,12 +213,30 @@ class NuevoUsuario(Credenciales):
 
 
 class CambioUsuario(BaseModel):
-    """Cuerpo de PATCH /auth/usuarios/{usuario}. Todo opcional."""
+    """
+    Cuerpo de PATCH /auth/usuarios/{usuario}.
 
+    Todos los campos son opcionales: se cambia SOLO lo que se manda. Un campo
+    ausente (`None`) se deja como está; no es lo mismo que mandarlo vacío
+    (`email: ""` sí borra el correo).
+    """
+
+    nuevo_usuario: Optional[str] = Field(
+        default=None,
+        description="Renombrar la cuenta (3-80 caracteres, único). Cierra su "
+                    "sesión: el token apunta al nombre anterior.",
+        examples=["hugo.aragaki"],
+    )
+    email: Optional[str] = Field(
+        default=None,
+        description="Correo. Cadena vacía lo borra (la columna acepta NULL).",
+        examples=["hugo@psi.pe"],
+    )
     categoria: Optional[str] = Field(default=None, description=" | ".join(ROLES))
     estado: Optional[str] = Field(default=None, description=" | ".join(ESTADOS))
     password: Optional[str] = Field(
-        default=None, description="Nueva contraseña (mínimo 8 caracteres)."
+        default=None, description="Nueva contraseña (mínimo 8 caracteres). "
+                                  "Cierra sus sesiones abiertas."
     )
 
 
@@ -362,9 +396,11 @@ async def registro(
             # La base queda en la auditoría: con varias, "se creó la cuenta"
             # sin decir dónde no responde la pregunta que uno se hace cuando
             # esa cuenta luego "no existe".
-            aud.registrar("usuario.creado", usuario_de(sesion), usuario.usuario,
-                          {"categoria": usuario.categoria,
-                           "db_id": auth._db_id(cuerpo.db_id)})
+            aud.registrar("usuario.creado", recurso=usuario.usuario,
+                          detalle={"categoria": usuario.categoria,
+                                   "id_creado": usuario.id,
+                                   "db_id": auth._db_id(cuerpo.db_id)},
+                          sesion=sesion)
         destino = auth._db_id(cuerpo.db_id)
         return {"ok": True, "usuario": usuario.publico(), "db_id": destino,
                 "mensaje": f"Cuenta '{usuario.usuario}' creada en '{destino}'."}
@@ -465,48 +501,234 @@ async def listar_usuarios(
         raise HTTPException(exc.codigo, exc.mensaje)
 
 
-@router.patch(
-    "/auth/usuarios/{usuario}",
-    tags=["Autenticación"],
-    summary="Cambiar rol, estado o contraseña de una cuenta",
-    dependencies=[Depends(exigir_rol("Supervisor"))],
-    description="Desactivar una cuenta cierra sus sesiones **al instante**, "
-                "no cuando caduquen: si se desactiva a alguien, suele haber "
-                "un motivo para que salga ya.",
+@router.get(
+    "/auth/usuarios/buscar",
+    tags=["Gestión de usuarios"],
+    summary="Buscar cuentas (con filtros, orden y paginación)",
+    dependencies=[Depends(exigir_rol("Administradores"))],
+    description="""
+El listado que consume la tabla de la pantalla de gestión.
+
+* `texto` busca a la vez en **nombre y correo**: quien escribe "juan" no está
+  pensando en qué columna vive lo que busca.
+* `categoria` y `estado` filtran por valor exacto.
+* `orden` solo acepta nombres de una **lista blanca** (`usuario`, `categoria`,
+  `estado`, `creado_en`, `ultimo_acceso`, `id`): el nombre de una columna no se
+  puede bindear como parámetro, así que aceptar texto libre aquí sería
+  inyección SQL.
+* `total` viene **sin paginar**, para poder pintar «20 de 137» y saber si hay
+  página siguiente.
+
+Nunca devuelve hashes de contraseña.
+""",
+    responses={200: {"content": {"application/json": {"example": {
+        "ok": True, "db_id": "local", "total": 3, "limite": 100,
+        "desplazamiento": 0,
+        "roles": ["Supervisor", "Administradores", "Usuarios", "Invitado"],
+        "estados": ["Activo", "Inactivo"],
+        "usuarios": [{
+            "id": 1, "usuario": "hugo", "email": "hugo@psi.pe",
+            "categoria": "Supervisor", "estado": "Activo",
+            "creado_en": "2026-08-25T19:09:23Z",
+            "ultimo_acceso": "2026-08-26T08:14:02Z",
+        }],
+    }}}}},
 )
-async def modificar_usuario(
+async def buscar_usuarios(
     request: Request,
-    usuario: str,
-    cuerpo: CambioUsuario = Body(...),
+    texto: str = Query(default="", description="Busca en nombre y correo."),
+    categoria: str = Query(default="", description="Filtro exacto por rol."),
+    estado: str = Query(default="", description="`Activo` | `Inactivo`."),
+    orden: str = Query(default="usuario"),
+    descendente: bool = Query(default=False),
+    limite: int = Query(default=100, ge=1, le=500),
+    desplazamiento: int = Query(default=0, ge=0),
     sesion: Optional[Sesion] = Depends(sesion_actual),
 ) -> dict:
-    auth = _auth(request)
     db_id = sesion.db_id if sesion else None
-    hechos = []
     try:
-        if cuerpo.categoria is not None:
-            await auth.cambiar_categoria(usuario, cuerpo.categoria, db_id)
-            hechos.append(f"categoría → {cuerpo.categoria}")
-        if cuerpo.estado is not None:
-            await auth.cambiar_estado(usuario, cuerpo.estado, db_id)
-            hechos.append(f"estado → {cuerpo.estado}")
-        if cuerpo.password is not None:
-            await auth.cambiar_password(usuario, cuerpo.password, db_id)
-            await auth.cerrar_sesiones_de(usuario)
-            hechos.append("contraseña cambiada (sesiones cerradas)")
+        datos = await _auth(request).buscar(
+            texto=texto, categoria=categoria, estado=estado, orden=orden,
+            descendente=descendente, limite=limite,
+            desplazamiento=desplazamiento, db_id=db_id,
+        )
+        return {"ok": True, "db_id": _auth(request)._db_id(db_id), **datos}
+    except ErrorAuth as exc:
+        raise HTTPException(exc.codigo, exc.mensaje)
+
+
+@router.get(
+    "/auth/usuarios/{usuario}",
+    tags=["Gestión de usuarios"],
+    summary="Leer una cuenta",
+    dependencies=[Depends(exigir_rol("Administradores"))],
+    description="Añade `conectado`: si esa persona tiene sesión abierta ahora "
+                "mismo. La vista lo usa para avisar antes de desactivarla o "
+                "cambiarle el rol.",
+    responses={404: {"description": "No existe esa cuenta."}},
+)
+async def leer_usuario(
+    request: Request, usuario: str,
+    sesion: Optional[Sesion] = Depends(sesion_actual),
+) -> dict:
+    db_id = sesion.db_id if sesion else None
+    try:
+        return {"ok": True, "usuario": await _auth(request).obtener(usuario, db_id)}
+    except ErrorAuth as exc:
+        raise HTTPException(exc.codigo, exc.mensaje)
+
+
+@router.post(
+    "/auth/usuarios",
+    tags=["Gestión de usuarios"],
+    summary="Crear una cuenta",
+    dependencies=[Depends(exigir_rol("Supervisor"))],
+    description="Alta desde la pantalla de gestión.\n\n"
+                "Es distinto de `POST /auth/registro`, que además cubre el "
+                "arranque del sistema (la primera cuenta, sin sesión, forzada "
+                "a Supervisor). Este exige **Supervisor** siempre y respeta la "
+                "categoría que se pida.\n\n"
+                "La contraseña se guarda **hasheada** (PBKDF2-SHA256 con salt "
+                "propio); nunca se almacena en claro.",
+    responses={
+        409: {"description": "Ese nombre de usuario ya existe."},
+        400: {"description": "Datos inválidos (longitudes, rol o estado)."},
+    },
+)
+async def crear_usuario(
+    request: Request,
+    cuerpo: NuevoUsuario = Body(..., examples=[{
+        "usuario": "operador01", "password": "Planta2026!",
+        "email": "operador01@psi.pe", "categoria": "Usuarios",
+        "estado": "Activo",
+    }]),
+    sesion: Optional[Sesion] = Depends(sesion_actual),
+) -> dict:
+    db_id = sesion.db_id if sesion else None
+    try:
+        creado = await _auth(request).crear_usuario(
+            usuario=cuerpo.usuario, password=cuerpo.password,
+            email=cuerpo.email, categoria=cuerpo.categoria,
+            estado=cuerpo.estado, db_id=db_id,
+        )
     except ErrorAuth as exc:
         raise HTTPException(exc.codigo, exc.mensaje)
 
     aud = getattr(request.app.state, "auditoria", None)
-    if aud is not None and hechos:
-        # Cambiar el rol o desactivar a alguien es de lo más sensible que se
-        # puede hacer aquí: siempre queda registrado.
-        aud.registrar("usuario.modificado", "", usuario, {"cambios": hechos})
+    if aud is not None:
+        aud.registrar("usuario.creado", recurso=creado["usuario"],
+                      detalle={"categoria": creado["categoria"],
+                               "id_creado": creado.get("id")},
+                      sesion=sesion)
+    return {"ok": True, "usuario": creado,
+            "mensaje": f"Cuenta '{creado['usuario']}' creada."}
 
-    if not hechos:
-        return {"ok": False, "mensaje": "No se indicó ningún cambio."}
-    return {"ok": True, "usuario": usuario, "cambios": hechos,
-            "mensaje": f"{usuario}: {', '.join(hechos)}."}
+
+@router.patch(
+    "/auth/usuarios/{usuario}",
+    tags=["Gestión de usuarios"],
+    summary="Editar una cuenta",
+    dependencies=[Depends(exigir_rol("Supervisor"))],
+    description="""
+Todos los campos son **opcionales**: se cambia solo lo que se manda.
+
+**Efectos sobre la sesión de esa persona**
+
+| Cambio | Qué le pasa a su sesión |
+|---|---|
+| Categoría (rol) | Se aplica **en caliente**: sigue dentro, con los permisos nuevos |
+| Estado → Inactivo | Se cierra **al instante** |
+| Contraseña | Se cierra (la anterior ya no vale) |
+| Renombrado | Se cierra (la sesión apunta al nombre viejo) |
+
+**Salvaguardas.** Devuelven **409** en vez de dejarte sin acceso:
+
+* No puedes **desactivarte** ni **degradarte** a ti mismo.
+* No se puede tocar al **último Supervisor activo** (ni desactivarlo, ni
+  bajarle el rol). Sin esto, nadie podría volver a gestionar cuentas y habría
+  que arreglarlo con SQL a mano.
+""",
+    responses={
+        404: {"description": "No existe esa cuenta."},
+        409: {"description": "Dejaría el sistema sin Supervisor, o te dejaría "
+                             "fuera a ti mismo."},
+    },
+)
+async def modificar_usuario(
+    request: Request,
+    usuario: str,
+    cuerpo: CambioUsuario = Body(..., examples=[
+        {"categoria": "Administradores"},
+        {"estado": "Inactivo"},
+        {"email": "nuevo@psi.pe", "categoria": "Usuarios"},
+        {"password": "OtraClaveFuerte2026"},
+        {"nuevo_usuario": "hugo.aragaki"},
+    ]),
+    sesion: Optional[Sesion] = Depends(sesion_actual),
+) -> dict:
+    db_id = sesion.db_id if sesion else None
+    try:
+        r = await _auth(request).actualizar(
+            usuario=usuario,
+            nuevo_usuario=cuerpo.nuevo_usuario,
+            email=cuerpo.email,
+            categoria=cuerpo.categoria,
+            estado=cuerpo.estado,
+            password=cuerpo.password,
+            db_id=db_id,
+            actor=usuario_de(sesion),
+        )
+    except ErrorAuth as exc:
+        raise HTTPException(exc.codigo, exc.mensaje)
+
+    aud = getattr(request.app.state, "auditoria", None)
+    if aud is not None and r.get("cambios"):
+        # Cambiar el rol o desactivar a alguien es de lo más sensible que se
+        # puede hacer aquí: siempre queda registrado, y con quién lo hizo.
+        aud.registrar("usuario.modificado", recurso=usuario,
+                      detalle={"cambios": r["cambios"]}, sesion=sesion)
+    return r
+
+
+@router.delete(
+    "/auth/usuarios/{usuario}",
+    tags=["Gestión de usuarios"],
+    summary="Borrar una cuenta",
+    dependencies=[Depends(exigir_rol("Supervisor"))],
+    description="""
+Borra la fila de verdad (`DELETE`), no la marca como inactiva.
+
+**Es seguro para el histórico**: `alarmas.usuario_id` tiene
+`ON DELETE SET NULL`, así que las alarmas que esa persona reconoció siguen ahí
+— se pierde el "quién", no el evento.
+
+Aun así, **desactivar suele ser mejor que borrar**: conserva la trazabilidad y
+se puede deshacer. La vista debería ofrecer primero «Desactivar» y dejar el
+borrado como acción secundaria con confirmación.
+
+Mismas salvaguardas que el PATCH: no puedes borrarte a ti mismo ni borrar al
+último Supervisor activo.
+""",
+    responses={
+        404: {"description": "No existe esa cuenta."},
+        409: {"description": "Es tu propia cuenta, o el último Supervisor."},
+    },
+)
+async def borrar_usuario(
+    request: Request, usuario: str,
+    sesion: Optional[Sesion] = Depends(sesion_actual),
+) -> dict:
+    db_id = sesion.db_id if sesion else None
+    try:
+        r = await _auth(request).borrar_usuario(
+            usuario, db_id, actor=usuario_de(sesion))
+    except ErrorAuth as exc:
+        raise HTTPException(exc.codigo, exc.mensaje)
+
+    aud = getattr(request.app.state, "auditoria", None)
+    if aud is not None:
+        aud.registrar("usuario.borrado", recurso=usuario, sesion=sesion)
+    return r
 
 
 @router.get(

@@ -116,11 +116,54 @@ def _es_local(host: str) -> bool:
     return (host or "").strip().lower() in _LOCALES
 
 
+def _instancia_de(host: str) -> str:
+    """Nombre de instancia si el host viene como `HOST\\INSTANCIA`, o ''."""
+    h = (host or "").strip().replace("\\\\", "\\").replace("/", "\\")
+    return h.partition("\\")[2].strip() if "\\" in h else ""
+
+
+# Instancias que pertenecen a otros productos y que NO conviene reconfigurar.
+# Cambiarle la red a la instancia de WinCC puede dejar sin base a un SCADA en
+# marcha; eso es mucho peor que el problema que se estaba intentando arreglar.
+_INSTANCIAS_AJENAS = {
+    "wincc": "WinCC de Siemens",
+    "winccflex": "WinCC flexible de Siemens",
+    "sqlexpress_wincc": "WinCC de Siemens",
+    "tew_sqlexpress": "TIA / WinCC de Siemens",
+}
+
+
+def aviso_instancia_ajena(host: str) -> str:
+    """
+    Advertencia si la instancia parece ser de otro producto.
+
+    Devuelve '' si no lo es. Se usa para no recomendar alegremente tocar la
+    configuración de red de una instancia que sostiene otro sistema.
+    """
+    inst = _instancia_de(host).lower()
+    producto = _INSTANCIAS_AJENAS.get(inst)
+    if not producto:
+        return ""
+    return (
+        f"OJO: la instancia '{_instancia_de(host)}' parece pertenecer a "
+        f"{producto}. Cambiarle la configuración de red puede afectar a ese "
+        f"sistema. Si está en producción, mejor instala una instancia propia "
+        f"para Psi Core en vez de reconfigurar esta."
+    )
+
+
 def _pista_servidor(motor: str, host: str, puerto: Optional[int]) -> str:
     """Qué mirar cuando nada responde. Cambia si el motor es local o remoto."""
     etiqueta = _ETIQUETA.get(motor, motor)
-    if _es_local(host):
+    instancia = _instancia_de(host)
+
+    if _es_local(host) or (instancia and _es_local(host.split("\\")[0])):
         servicio = _SERVICIO_LOCAL.get(motor, etiqueta)
+        # El servicio de una instancia CON NOMBRE no se llama MSSQLSERVER, sino
+        # «SQL Server (NOMBRE)». Decirle a alguien que busque un servicio que
+        # no existe en su lista es mandarlo a buscar la nada.
+        if motor == "mssql" and instancia:
+            servicio = f"SQL Server ({instancia})"
         base = (
             f"No se puede saber desde aquí si {etiqueta} está instalado; solo "
             f"que nada contesta. Comprueba, en este orden: que el servicio "
@@ -137,6 +180,25 @@ def _pista_servidor(motor: str, host: str, puerto: Optional[int]) -> str:
                 "en SQL Server Configuration Manager y exige reiniciar el "
                 "servicio."
             )
+            if instancia:
+                # Una instancia CON NOMBRE no usa el 1433: toma un puerto
+                # dinámico en cada arranque. Decirle a alguien "abre el 1433"
+                # sin explicar esto le hace perder una tarde.
+                base += (
+                    f" Además, '{instancia}' es una instancia CON NOMBRE: esas "
+                    f"no escuchan en el {puerto or 1433}, toman un puerto "
+                    f"distinto en cada arranque. Tienes dos salidas: (a) dejar "
+                    f"el host como 'HOST\\{instancia}' SIN puerto y arrancar "
+                    f"el servicio 'SQL Server Browser', que es quien le dice "
+                    f"al cliente qué puerto usar; o (b) fijarle un puerto "
+                    f"estático en Configuration Manager → TCP/IP → Direcciones "
+                    f"IP → IPAll, VACIANDO «Puertos TCP dinámicos» y poniendo "
+                    f"«Puerto TCP» = {puerto or 1433}. El paso de vaciar el "
+                    f"puerto dinámico es el que casi todo el mundo se salta."
+                )
+            aviso = aviso_instancia_ajena(host)
+            if aviso:
+                base += " " + aviso
         return base
     return (
         f"Nada responde en {_destino(host, puerto)}. Comprueba que la máquina "

@@ -155,14 +155,23 @@ async def escenario(tmp: Path) -> None:
         check("GET /auth/estado responde sin login", r.status_code == 200)
         check("informa que no hay usuarios", r.json()["hay_usuarios"] is False)
 
+        # El esquema ya NO se crea desde POST /db: eso se mudó a
+        # POST /db/provision, que además puede crear la base y su usuario.
+        # `POST /db` se limitó a dar de alta la conexión, que es lo suyo.
+        r = await c.post("/db/provision", json={
+            "motor": "sqlite", "base_datos": str(db), "crear_esquema": True})
+        prov = r.json() if r.status_code == 200 else {}
+        check("se puede provisionar la BD sin cuentas (modo arranque)",
+              r.status_code == 200 and prov.get("ok") is True,
+              "" if r.status_code == 200 else f"HTTP {r.status_code}")
+
         r = await c.post("/db", json={
-            "db_id": "local", "motor": "sqlite",
-            "base_datos": str(db), "crear_esquema": True})
-        creadas = r.json().get("esquema", {}).get("tablas_creadas", [])
-        check("se puede configurar la BD sin cuentas (modo arranque)",
-              r.status_code == 200 and r.json()["ok"])
-        check("esquema creado", set(creadas) >= {"usuarios", "plc_prg", "alarmas"},
-              str(creadas))
+            "db_id": "local", "motor": "sqlite", "base_datos": str(db)})
+        check("la conexión se da de alta", r.status_code == 200 and r.json()["ok"])
+
+        tablas = set((await c.get("/db/local/tablas")).json().get("tablas", []))
+        check("el esquema tiene las tres tablas del HMI",
+              {"usuarios", "plc_prg", "alarmas"} <= tablas, str(sorted(tablas)))
 
         # ---- 2. Primer usuario --------------------------------------- #
         titulo("2 · Primera cuenta")
