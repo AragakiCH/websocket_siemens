@@ -14,7 +14,6 @@ import {
   DropletsIcon,
   GitCommitVerticalIcon,
   RadioIcon,
-  LineChartIcon,
   ImageIcon,
   type LucideIcon } from
 'lucide-react';
@@ -214,16 +213,16 @@ const builtInCatalog: CatalogItem[] = [
   // muestra una lectura
   accepts: NUMERICOS
 },
-{
-  kind: 'chart',
-  label: 'Gráfico',
-  icon: LineChartIcon,
-  defaultWidth: 240,
-  defaultHeight: 160,
-  category: 'Datos',
-  // una serie temporal necesita magnitudes
-  accepts: NUMERICOS
-},
+// FUERA DEL CATÁLOGO: el widget 'chart'.
+//
+// Nunca graficó nada. Dibujaba una onda seno calculada a partir de `frac`
+// (ver MiniChart en WidgetRenderer), o sea decoración con pinta de gráfico.
+// Lo reemplaza «Tendencia» (custom:trend), que sí dibuja variables reales
+// contra el tiempo y admite varias a la vez.
+//
+// El `case "chart"` del renderizador SE QUEDA a propósito: un diseño guardado
+// de antes puede tener uno colocado, y quitarlo dejaría un hueco vacío sin
+// explicación. Ya no se puede agregar, pero los que existan se siguen viendo.
 {
   kind: 'image',
   label: 'Imagen',
@@ -248,6 +247,19 @@ const builtInCatalog: CatalogItem[] = [
 const ACCEPTS_TSX: Record<string, DataType[]> = {
   // Un motor se representa en marcha o detenido.
   'custom:motor-hidraulico': BOOLEANO,
+  // Los dos de navegación no leen variables del PLC: su estado es qué vista
+  // está abierta, no un valor de proceso.
+  'custom:sidebar-navegacion': NINGUNO,
+  'custom:pantalla-screen': NINGUNO,
+  // La Tendencia no usa el campo «Variable asociada»: lleva su propia lista
+  // de series en el Inspector, porque necesita varias a la vez.
+  'custom:trend': NINGUNO,
+  // El Contenedor solo agrupa y mueve. No representa ningún valor, así
+  // que ofrecerle «Variable asociada» sería ofrecer algo que no hace nada.
+  'custom:contenedor': NINGUNO,
+  // Es un display de una magnitud: enteros y decimales. Un bool o un
+  // string se pintarían igual, pero «ON km/h» no significa nada.
+  'custom:valor-unidad': NUMERICOS,
 };
 
 // Catálogo completo = built-in + custom TSX + custom ZIP (HTML).

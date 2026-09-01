@@ -5,7 +5,9 @@ import { HmiWidget } from "../../models/widget";
 import { PlcVariable } from "../../models/plc";
 import { formatValue, valueFraction, isTruthy } from "../../utils/format";
 import { customByKind, zipByKind } from "./custom/registry";
+import { estiloDeParte } from "./partes";
 import { HtmlWidgetRenderer } from "./HtmlWidgetRenderer";
+import { leerConfigImagen } from "./inspectores";
 
 interface Props {
   widget: HmiWidget;
@@ -19,11 +21,27 @@ export function WidgetRenderer({ widget, variable }: Props) {
   const frac = valueFraction(variable);
   const on = isTruthy(variable);
   const label = variable ? formatValue(variable) : widget.text;
+  // Estilo de cada parte: la base del `style` de siempre con lo que se haya
+  // ajustado por parte encima. Un widget sin ajustes se ve exactamente igual
+  // que antes, así que ningún diseño guardado cambia de aspecto.
+  const pTexto = estiloDeParte(widget, "label");
+  const pCaja = estiloDeParte(widget, "box");
+  const pIcono = estiloDeParte(widget, "icon");
+  const pBoton = estiloDeParte(widget, "boton");
+  const pValor = estiloDeParte(widget, "valor");
+
   const textStyle: React.CSSProperties = {
-    fontSize: style.fontSize,
-    fontWeight: style.bold ? 700 : 500,
-    textAlign: style.align,
-    color: style.color,
+    fontSize: pTexto.fontSize,
+    fontWeight: pTexto.bold ? 700 : 500,
+    textAlign: pTexto.align,
+    color: pTexto.color,
+  };
+
+  /** Tipografía del número de los indicadores (tanque, medidores). */
+  const valorStyle: React.CSSProperties = {
+    fontSize: pValor.fontSize,
+    fontWeight: pValor.bold ? 700 : 500,
+    color: pValor.color,
   };
 
   const content = () => {
@@ -46,7 +64,12 @@ export function WidgetRenderer({ widget, variable }: Props) {
           <div
             className="flex h-full w-full items-center px-2"
             style={{
-              justifyContent: alignJustify(style.align),
+              justifyContent: alignJustify(pTexto.align ?? style.align),
+              background: pCaja.background,
+              borderRadius: pCaja.borderRadius,
+              border: pCaja.borderWidth
+                ? `${pCaja.borderWidth}px solid ${pCaja.borderColor}`
+                : undefined,
             }}
           >
             <span style={textStyle} className="truncate">
@@ -60,12 +83,16 @@ export function WidgetRenderer({ widget, variable }: Props) {
           <div
             className="flex h-full w-full items-center justify-center shadow-sm"
             style={{
-              background: style.color,
-              color: "#fff",
-              fontSize: style.fontSize,
-              fontWeight: style.bold ? 700 : 600,
-              borderRadius: style.borderRadius,
-              justifyContent: alignJustify(style.align),
+              // El fondo del botón sale de la parte «Botón». Por defecto
+              // hereda `style.color`, que es lo que usaba antes.
+              background: pBoton.background && pBoton.background !== "transparent"
+                ? pBoton.background
+                : style.color,
+              color: pBoton.color ?? "#fff",
+              fontSize: pBoton.fontSize,
+              fontWeight: pBoton.bold ? 700 : 600,
+              borderRadius: pBoton.borderRadius,
+              justifyContent: alignJustify(pBoton.align ?? style.align),
               paddingLeft: 12,
               paddingRight: 12,
             }}
@@ -94,11 +121,20 @@ export function WidgetRenderer({ widget, variable }: Props) {
 
       case "tank":
         return (
-          <div className="relative h-full w-full overflow-hidden bg-white/70">
+          <div
+            className="relative h-full w-full overflow-hidden"
+            style={{
+              background: pCaja.background !== "transparent" ? pCaja.background : "rgba(255,255,255,0.7)",
+              borderRadius: pCaja.borderRadius,
+              border: pCaja.borderWidth
+                ? `${pCaja.borderWidth}px solid ${pCaja.borderColor}`
+                : undefined,
+            }}
+          >
             <motion.div
               className="absolute bottom-0 left-0 w-full"
               style={{
-                background: style.color,
+                background: pIcono.color,
               }}
               animate={{
                 height: `${frac * 100}%`,
@@ -111,7 +147,7 @@ export function WidgetRenderer({ widget, variable }: Props) {
             />
 
             <div className="absolute inset-0 flex items-end justify-center pb-2">
-              <span className="rounded bg-white/80 px-1.5 py-0.5 text-xs font-bold text-navy">
+              <span className="rounded bg-white/80 px-1.5 py-0.5" style={valorStyle}>
                 {label}
               </span>
             </div>
@@ -120,16 +156,25 @@ export function WidgetRenderer({ widget, variable }: Props) {
 
       case "led":
         return (
-          <div className="flex h-full w-full items-center justify-center">
+          <div
+            className="flex h-full w-full items-center justify-center"
+            style={{
+              background: pCaja.background,
+              borderRadius: pCaja.borderRadius,
+              border: pCaja.borderWidth
+                ? `${pCaja.borderWidth}px solid ${pCaja.borderColor}`
+                : undefined,
+            }}
+          >
             <motion.div
               className="h-2/3 w-2/3 rounded-full"
               animate={{
                 boxShadow: on
-                  ? `0 0 22px ${style.color}`
+                  ? `0 0 22px ${pIcono.color}`
                   : "0 0 0 rgba(0,0,0,0)",
               }}
               style={{
-                background: on ? style.color : "#94a3b8",
+                background: on ? pIcono.color : "#94a3b8",
               }}
             />
           </div>
@@ -160,7 +205,12 @@ export function WidgetRenderer({ widget, variable }: Props) {
         );
 
       case "gaugeCircular":
-        return <CircularGauge frac={frac} color={style.color} label={label} />;
+        return (
+          <CircularGauge
+            frac={frac}
+            color={pIcono.color ?? style.color}
+            label={label}
+            valorStyle={valorStyle} />);
       case "gaugeLinear":
         return (
           <div className="flex h-full w-full flex-col justify-center gap-1 px-2">
@@ -168,14 +218,14 @@ export function WidgetRenderer({ widget, variable }: Props) {
               <motion.div
                 className="absolute left-0 top-0 h-full rounded-full"
                 style={{
-                  background: style.color,
+                  background: pIcono.color,
                 }}
                 animate={{
                   width: `${frac * 100}%`,
                 }}
               />
             </div>
-            <span className="text-center text-xs font-bold text-navy">
+            <span className="text-center" style={valorStyle}>
               {label}
             </span>
           </div>
@@ -290,14 +340,41 @@ export function WidgetRenderer({ widget, variable }: Props) {
           </div>
         );
 
+      // OJO: 'chart' ya NO está en el catálogo — no se puede agregar.
+      // Nunca graficó nada real (MiniChart dibuja una onda seno a partir de
+      // `frac`); lo reemplaza «Tendencia» (custom:trend). Este caso sigue
+      // aquí solo para que un diseño guardado de antes no muestre un hueco
+      // vacío donde había algo.
       case "chart":
         return <MiniChart color={style.color} frac={frac} />;
-      case "image":
+      // La imagen viaja dentro del propio diseño, como data URI en
+      // `config.src` (la sube el panel del Inspector, que la reduce antes de
+      // guardarla). Así se ve igual en la Vista Previa y en cualquier equipo
+      // sin copiar archivos sueltos a mano.
+      case "image": {
+        const img = leerConfigImagen(widget.config);
+        // Sin imagen todavía: el hueco de siempre, que es lo que le dice al
+        // que diseña que el widget está ahí y aún le falta algo.
+        if (!img.src) {
+          return (
+            <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400 dark:bg-navy-slate/40">
+              <span className="text-xs">Imagen</span>
+            </div>
+          );
+        }
         return (
-          <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400">
-            <span className="text-xs">Imagen</span>
-          </div>
+          <img
+            src={img.src}
+            alt={img.nombre || widget.text || "Imagen"}
+            draggable={false}
+            // `block` quita la línea base que el navegador reserva debajo de
+            // una <img> en línea: sin ella queda una franja de fondo abajo
+            // que parece que la imagen está mal centrada.
+            className="block h-full w-full select-none"
+            style={{ objectFit: img.ajuste }}
+          />
         );
+      }
 
       default:
         return null;
@@ -338,10 +415,13 @@ function CircularGauge({
   frac,
   color,
   label,
+  valorStyle,
 }: {
   frac: number;
   color: string;
   label: string;
+  /** Tipografía del número del centro, de la parte «Valor». */
+  valorStyle?: React.CSSProperties;
 }) {
   const r = 42;
   const c = 2 * Math.PI * r;
@@ -376,7 +456,7 @@ function CircularGauge({
           }}
         />
       </svg>
-      <span className="absolute text-sm font-bold text-navy">{label}</span>
+      <span className="absolute" style={valorStyle}>{label}</span>
     </div>
   );
 }

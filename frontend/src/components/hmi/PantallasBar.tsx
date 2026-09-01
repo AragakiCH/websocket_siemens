@@ -262,6 +262,30 @@ export function PantallasBar({ puedeEditar }: Props) {
               );
             })}
           </AnimatePresence>
+
+          {/* ── Nueva pantalla ──────────────────────────────
+              Vive DENTRO de la tira, pegado a la última pestaña, y no en
+              el bloque de acciones de la derecha. Es donde se busca: la
+              pestaña nueva va a salir justo ahí, así que el botón que la
+              crea señala el hueco que va a ocupar. Al otro lado de la
+              barra había que cruzar la pantalla entera para volver.
+
+              Solo el icono: al lado de pestañas con nombre, una palabra
+              más se leería como otra pestaña. */}
+          {puedeCrear &&
+          <button
+            type="button"
+            onClick={nuevaPantalla}
+            disabled={ocupado}
+            title={t('screens.new')}
+            aria-label={t('screens.new')}
+            className="flex h-[32px] w-[32px] shrink-0 items-center justify-center self-center rounded-lg text-slate-400 outline-none transition hover:bg-white hover:text-siemens focus-visible:ring-2 focus-visible:ring-siemens/40 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-navy-soft">
+              {ocupado ?
+            <Loader2Icon className="h-4 w-4 animate-spin" /> :
+            <PlusIcon className="h-4 w-4" />
+            }
+            </button>
+          }
         </div>
 
         {/* ── Acciones ─────────────────────────────────────── */}
@@ -276,19 +300,6 @@ export function PantallasBar({ puedeEditar }: Props) {
             >
               <CopyIcon className="h-3.5 w-3.5" />
               <span className="hidden lg:inline">{t('screens.duplicate')}</span>
-            </button>
-            <button
-              type="button"
-              onClick={nuevaPantalla}
-              disabled={ocupado}
-              className="flex h-[32px] items-center gap-1.5 rounded-lg bg-siemens px-2.5 text-xs font-semibold text-white outline-none transition hover:bg-siemens-600 focus-visible:ring-2 focus-visible:ring-siemens/50 disabled:opacity-50"
-            >
-              {ocupado ? (
-                <Loader2Icon className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <PlusIcon className="h-3.5 w-3.5" />
-              )}
-              {t('screens.new')}
             </button>
           </div>
         )}

@@ -9,13 +9,26 @@ import {
   LayoutDashboardIcon,
   WorkflowIcon,
   BellIcon,
-  BookOpenIcon } from
+  BookOpenIcon,
+  LayersIcon,
+  MenuIcon,
+  PlayIcon,
+  UsersIcon } from
 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { HmiWidget, WidgetKind, defaultStyle } from '../models/widget';
 import { catalogByKind } from '../components/hmi/widgetCatalog';
+import { customByKind } from '../components/hmi/custom/registry';
 import { WidgetSidebar } from '../components/hmi/WidgetSidebar';
 import { CanvasWidget } from '../components/hmi/CanvasWidget';
+import {
+  esContenedor,
+  contenedorBajo,
+  hijosDe,
+  moverBloque,
+  reasignarPadre,
+  soltarHijos } from
+'../components/hmi/grupo';
 import { PropertyInspector } from '../components/hmi/PropertyInspector';
 import { UPDATE_RATE_OPTIONS } from '../models/plc';
 import {
@@ -30,6 +43,14 @@ import { FlowEditor } from '../components/flows/FlowEditor';
 import { AlarmsEditor } from '../components/alarms/AlarmsEditor';
 import { RecipesEditor } from '../components/recipes/RecipesEditor';
 import { PantallasBar } from '../components/hmi/PantallasBar';
+import {
+  useVistaActiva,
+  useSecciones,
+  setVistaActiva,
+  esWidgetDeNavegacion,
+  GRUPO_POR_DEFECTO,
+  VISTA_TODAS } from
+'../components/hmi/custom/navegacion/store';
 
 type DesignerTab = 'designer' | 'flows' | 'alarms' | 'recipes';
 
@@ -40,6 +61,25 @@ const CANVAS_MIN = 200;
 const CANVAS_MAX = 4000;
 const clampCanvas = (n: number) =>
 Math.max(CANVAS_MIN, Math.min(CANVAS_MAX, Math.round(n || 0)));
+
+/** Fila de estado dentro del menú: icono + texto, sin ruido. */
+function FilaMenu({
+  icono,
+  texto,
+  titulo
+
+
+
+}: {icono: React.ReactNode;texto: string;titulo?: string;}) {
+  return (
+    <p
+      title={titulo}
+      className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+      <span className="shrink-0">{icono}</span>
+      <span className="min-w-0 truncate">{texto}</span>
+    </p>);
+
+}
 
 export function Designer() {
   const navigate = useNavigate();
@@ -61,6 +101,29 @@ export function Designer() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<DesignerTab>('designer');
+
+  // Vista abierta en la navegación del lienzo. Solo se usa para atenuar los
+  // widgets de otras vistas; no cambia nada de lo que se guarda.
+  const vistaActiva = useVistaActiva(GRUPO_POR_DEFECTO);
+  const secciones = useSecciones(GRUPO_POR_DEFECTO);
+
+  // Con esto en `true` el lienzo enseña SOLO la sección abierta, igual que la
+  // Vista Previa. Es lo que se espera al pulsar una sección, y sin ello el
+  // atenuado pasaba desapercibido y parecía que la navegación no hacía nada.
+  // Se puede apagar para ver todo junto y mover widgets entre secciones.
+  const [aislarSeccion, setAislarSeccion] = useState(true);
+
+  // Menú de la barra. Guarda lo que se consulta de vez en cuando (medidas,
+  // estado, limpiar) para que la barra quede con lo que se usa de verdad:
+  // las secciones, el play y este botón.
+  const [menuAbierto, setMenuAbierto] = useState(false);
+
+  // Id del widget que se esta arrastrando ahora mismo, o null.
+  //
+  // Solo sirve para resaltar el contenedor de destino mientras arrastras.
+  // Sin esa pista, meter algo en un grupo es a ciegas: sueltas y a ver que
+  // paso. Con ella se ve el marco encenderse antes de soltar.
+  const [arrastrando, setArrastrando] = useState<string | null>(null);
 
   // Fase 4: el "lápiz". Solo una persona edita a la vez; el resto ve los
   // cambios en vivo en modo lectura. Se pide al entrar y se suelta al salir.
@@ -205,7 +268,115 @@ export function Designer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listo, firmaActual, projectId, lock.puedeEditar]);
 
+  // Lo que se esconde no puede desaparecer sin dejar rastro: si no puedes
+  // editar o hay un conflicto de guardado, el botón del menú lo marca con un
+  // punto ámbar aunque esté cerrado.
+  const hayAviso = !!errorGuardado || (!lock.cargando && !lock.puedeEditar);
+
+  // ── Teclado del lienzo ────────────────────────────────────────
+  //
+  // Suprimir / Retroceso borran el widget seleccionado, y Escape lo
+  // deselecciona. Es lo que espera cualquiera que haya usado un editor.
+  //
+  // La guarda de los campos de texto es imprescindible: sin ella, borrar una
+  // letra del nombre en el Inspector borraría el widget entero.
+  useEffect(() => {
+    if (activeTab !== 'designer') return;
+
+    const alPulsar = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const etiqueta = el?.tagName;
+      if (
+      etiqueta === 'INPUT' ||
+      etiqueta === 'TEXTAREA' ||
+      etiqueta === 'SELECT' ||
+      el?.isContentEditable)
+      return;
+
+      if (e.key === 'Escape') {
+        setSelectedId(null);
+        return;
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (!selectedId) return;
+        e.preventDefault(); // Retroceso navegaría atrás en algunos navegadores
+        deleteWidget(selectedId);
+      }
+    };
+
+    window.addEventListener('keydown', alPulsar);
+    return () => window.removeEventListener('keydown', alPulsar);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedId, puedeEditar]);
+
+  // ── Meter en el lienzo lo que se haya quedado fuera ───────────
+  //
+  // Estirar un widget ya no deja salirse, pero puede haber diseños guardados
+  // de antes, o alguien pudo achicar el lienzo con widgets ya colocados. Al
+  // cargar y al cambiar las medidas se recolocan los que sobresalen.
+  useEffect(() => {
+    if (!listo || !puedeEditar) return;
+    setWidgets((prev) => {
+      let cambio = false;
+      const dentro = prev.map((w) => {
+        const width = Math.min(w.width, canvasW);
+        const height = Math.min(w.height, canvasH);
+        const x = Math.max(0, Math.min(w.x, canvasW - width));
+        const y = Math.max(0, Math.min(w.y, canvasH - height));
+        if (width === w.width && height === w.height && x === w.x && y === w.y) return w;
+        cambio = true;
+        return { ...w, x, y, width, height };
+      });
+      // Devolver el mismo array si nada cambió: si no, este efecto se
+      // dispararía a sí mismo en bucle.
+      return cambio ? dentro : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listo, canvasW, canvasH, puedeEditar]);
+
+  // Escape cierra el menú. Es lo que espera cualquiera con un desplegable
+  // abierto, y evita quedarse atrapado si el clic-fuera falla.
+  useEffect(() => {
+    if (!menuAbierto) return;
+    const alPulsar = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuAbierto(false);
+    };
+    window.addEventListener('keydown', alPulsar);
+    return () => window.removeEventListener('keydown', alPulsar);
+  }, [menuAbierto]);
+
   const selected = widgets.find((w) => w.id === selectedId) ?? null;
+
+  // ── Grupos ────────────────────────────────────────────────────
+  //
+  // Contenedor sobre el que caeria ahora mismo lo que se arrastra. Se
+  // recalcula solo mientras hay arrastre; el resto del tiempo es null y no
+  // cuesta nada. `widgets` ya cambia en cada movimiento, asi que esto se
+  // mantiene al dia sin ningun listener extra.
+  const destinoGrupo = useMemo(() => {
+    if (!arrastrando) return null;
+    const w = widgets.find((x) => x.id === arrastrando);
+    return w ? contenedorBajo(widgets, w) : null;
+  }, [arrastrando, widgets]);
+
+  /**
+   * Coletilla de la etiqueta del widget seleccionado.
+   *
+   * Es donde se ve el parentesco. Un contenedor dice cuantos lleva dentro y
+   * un widget agrupado dice de quien depende, que es justo la duda que
+   * aparece al mover algo y ver que se mueve otra cosa con el.
+   */
+  const insigniaDe = (w: HmiWidget): string | undefined => {
+    if (esContenedor(w.kind)) {
+      const n = hijosDe(widgets, w.id).length;
+      return n ? `${n} dentro` : 'vacío';
+    }
+    if (w.padre) {
+      const p = widgets.find((x) => x.id === w.padre);
+      if (p) return `en ${p.name}`;
+    }
+    return undefined;
+  };
 
   const createWidget = useCallback(
     (kind: WidgetKind, x: number, y: number): HmiWidget | null => {
@@ -232,10 +403,27 @@ export function Designer() {
         style,
         visible: true,
         enabled: true,
-        variableId: null
+        variableId: null,
+        // LO QUE SUELTAS PERTENECE A LA SECCIÓN ABIERTA.
+        //
+        // Antes todo nacía "en todas" y había que ir al Inspector a asignarle
+        // la sección a mano; el que no lo supiera veía sus widgets repetidos
+        // en las tres secciones y la navegación parecía rota. Ahora se hereda
+        // la sección en la que estás, que es lo que hace cualquier editor por
+        // capas, y quien quiera un widget fijo lo cambia a "En todas".
+        //
+        // El menú y el panel de sección quedan fuera: si el menú se metiera
+        // en una sección, desaparecería al salir de ella.
+        vista: esWidgetDeNavegacion(kind) ? VISTA_TODAS : vistaActiva,
+        // Ajustes iniciales del tipo, si los declara. El Menú Lateral nace
+        // así con sus tres secciones de ejemplo en vez de con una caja vacía
+        // que no dice qué hacer con ella.
+        config: customByKind(kind)?.defaultConfig
+          ? { ...customByKind(kind)!.defaultConfig }
+          : undefined
       };
     },
-    []
+    [vistaActiva]
   );
 
   const handleDrop = (e: React.DragEvent) => {
@@ -257,7 +445,30 @@ export function Designer() {
     );
     const w = createWidget(kind, x, y);
     if (!w) return;
-    setWidgets((prev) => [...prev, w]);
+
+    setWidgets((prev) => {
+      // Si cae encima de un contenedor, entra en el grupo desde el primer
+      // momento. Obligar a soltarlo y arrastrarlo otra vez para agruparlo
+      // seria un paso de mas que nadie adivina.
+      const nuevo = { ...w, padre: contenedorBajo(prev, w) ?? undefined };
+      if (!esContenedor(nuevo.kind)) return [...prev, nuevo];
+
+      // UN CONTENEDOR SE COLOCA DETRAS DEL RESTO.
+      //
+      // El orden del array es el orden de pintado, y los widgets van en
+      // absoluto: el ultimo tapa a los anteriores. Un contenedor soltado al
+      // final cubriria los widgets que quieres meter dentro y ya no podrias
+      // ni seleccionarlos.
+      //
+      // Se mete al final del bloque de contenedores, no al principio del
+      // todo: asi queda detras de los widgets normales pero DELANTE de los
+      // contenedores anteriores, que es lo que hace falta para poder anidar
+      // un contenedor dentro de otro y seguir viendolo.
+      const i = prev.findIndex((x) => !esContenedor(x.kind));
+      return i < 0 ?
+      [...prev, nuevo] :
+      [...prev.slice(0, i), nuevo, ...prev.slice(i)];
+    });
     setSelectedId(w.id);
   };
 
@@ -277,7 +488,10 @@ export function Designer() {
 
   const deleteWidget = (id: string) => {
     if (!puedeEditar) return;
-    setWidgets((prev) => prev.filter((w) => w.id !== id));
+    // Borrar un contenedor NO borra lo que lleva dentro: se sueltan y se
+    // quedan donde estan. Ver soltarHijos() en grupo.ts — no hay deshacer
+    // en este editor y un borrado en cadena por una tecla seria brutal.
+    setWidgets((prev) => soltarHijos(prev, id).filter((w) => w.id !== id));
     setSelectedId(null);
     // El PUT con debounce ya lo reflejaría, pero un borrado conviene
     // propagarlo de inmediato: es la operación que más molesta ver con
@@ -373,129 +587,207 @@ export function Designer() {
           </div>
         </div>
 
-        {activeTab === 'designer' && (
-        <div className="flex items-center gap-3">
-          {/* --- Medidas del lienzo (px) --- */}
-          {/* --- Medidas del lienzo (px) --- */}
-          <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 dark:border-navy-slate dark:bg-navy">
-            <span className="text-[11px] font-medium text-slate-400">Lienzo</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={wInput}
-              onChange={(e) => setWInput(e.target.value.replace(/[^0-9]/g, ''))}
-              onBlur={commitW}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-              }}
-              className="w-16 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-center text-xs text-navy outline-none focus:border-siemens dark:border-navy-slate dark:bg-navy-soft dark:text-slate-100"
-              title="Ancho (px)" />
-            <span className="text-xs text-slate-400">×</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={hInput}
-              onChange={(e) => setHInput(e.target.value.replace(/[^0-9]/g, ''))}
-              onBlur={commitH}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-              }}
-              className="w-16 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-center text-xs text-navy outline-none focus:border-siemens dark:border-navy-slate dark:bg-navy-soft dark:text-slate-100"
-              title="Alto (px)" />
-            <span className="text-[11px] text-slate-400">px</span>
+        {activeTab === 'designer' &&
+        <div className="flex items-center gap-2">
+
+          {/* ── SECCIONES ───────────────────────────────────────
+              Se queda FUERA del menú a propósito: es un control de trabajo,
+              se pulsa cada dos por tres mientras editas. Lo que se guardó
+              dentro es estado y ajustes, que se miran de vez en cuando. */}
+          {secciones.length > 0 &&
+          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-navy-slate dark:bg-navy">
+            <LayersIcon className="ml-1.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+            {secciones.map((s) =>
+            <button
+              key={s.id}
+              onClick={() => setVistaActiva(GRUPO_POR_DEFECTO, s.id)}
+              title={`Editar la sección «${s.label || s.id}»`}
+              className={`rounded-md px-2 py-1 text-xs font-semibold transition ${
+              vistaActiva === s.id ?
+              'bg-white text-navy shadow-sm dark:bg-navy-slate dark:text-slate-100' :
+              'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`
+              }>
+              {s.label || s.id}
+            </button>
+            )}
+            <div className="mx-0.5 h-4 w-px bg-slate-200 dark:bg-navy-slate" />
+            <button
+              onClick={() => setAislarSeccion((v) => !v)}
+              title={
+              aislarSeccion ?
+              'Viendo solo la sección abierta. Púlsalo para ver todas a la vez y poder mover widgets entre ellas.' :
+              'Viendo todas las secciones. Púlsalo para aislar la abierta.'
+              }
+              className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition ${
+              aislarSeccion ?
+              'text-siemens hover:bg-siemens-50 dark:hover:bg-siemens/15' :
+              'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`
+              }>
+              {aislarSeccion ?
+              <EyeIcon className="h-3.5 w-3.5" /> :
+              <LayersIcon className="h-3.5 w-3.5" />}
+              {aislarSeccion ? 'Solo esta' : 'Todas'}
+            </button>
           </div>
-
-          <span className="flex items-center gap-1.5 rounded-full bg-state-ok/10 px-2.5 py-1 text-xs font-semibold text-state-ok">
-            <ActivityIcon className="h-3.5 w-3.5" />
-            {t('designer.live')} · {rateLabel}
-          </span>
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 dark:bg-navy dark:text-slate-400">
-            {widgets.length} {t('designer.widgets')}
-          </span>
-
-          {/* MULTIUSUARIO: quién más está mirando esta pantalla ahora mismo.
-              Saber que hay alguien más editando evita el "¿por qué se me
-              movió esto solo?". */}
-          {presentes.length > 1 &&
-          <span
-            title={presentes.map((p) => `${p.usuario} (${p.categoria})`).join('\n')}
-            className="rounded-full bg-siemens/10 px-2.5 py-1 text-xs font-medium text-siemens-700 dark:text-siemens-100">
-            {presentes.length} conectados
-          </span>
           }
 
-          {/* ---- FASE 4: estado del "lápiz" ----
-              Es la información más importante de esta barra. Si alguien no
-              puede editar tiene que saber POR QUÉ y QUÉ HACER, no descubrirlo
-              porque el lienzo no responde. */}
-          {activeTab === 'designer' && !lock.cargando &&
-          <>
-              {lock.puedeEditar ?
-            <span
-              title="Tienes el control de edición. Se libera al salir de esta pantalla."
-              className="flex items-center gap-1.5 rounded-full bg-state-ok/10 px-2.5 py-1 text-xs font-semibold text-state-ok">
-                  <MousePointer2Icon className="h-3.5 w-3.5" />
-                  Editando
-                </span> :
-
-            <span className="flex items-center gap-2 rounded-full bg-state-warn/15 px-2.5 py-1 text-xs font-semibold text-state-warn">
-                  <EyeIcon className="h-3.5 w-3.5" />
-                  {lock.titular ?
-              `Solo lectura · edita ${lock.titular.usuario}` :
-              'Solo lectura'}
-                  {/* La toma de control solo tiene sentido ofrecerla a quien
-                      puede usarla. El backend lo verifica igualmente. */}
-                  {permisos?.gestionar_usuarios &&
-              <button
-                onClick={() => void lock.tomarControl()}
-                title="Quitarle el control de edición (queda registrado en la auditoría)"
-                className="rounded bg-state-warn/20 px-1.5 py-0.5 text-[11px] font-bold hover:bg-state-warn/30">
-                      Tomar control
-                    </button>
-              }
-                  {!lock.titular &&
-              <button
-                onClick={() => void lock.reintentar()}
-                className="rounded bg-state-warn/20 px-1.5 py-0.5 text-[11px] font-bold hover:bg-state-warn/30">
-                      Reintentar
-                    </button>
-              }
-                </span>
-            }
-            </>
-          }
-
-          {/* Conflicto de versión: otro usuario guardó mientras editabas. No se
-              pisa su trabajo; se avisa y se deja decidir. */}
-          {errorGuardado &&
-          <span
-            title={errorGuardado}
-            className="max-w-xs truncate rounded-full bg-state-warn/15 px-2.5 py-1 text-xs font-semibold text-state-warn">
-            {errorGuardado}
-          </span>
-          }
-
-          {/* --- Vista previa (pestaña nueva) --- */}
+          {/* ── Vista previa: solo el play ─────────────────────── */}
           <button
             onClick={openPreview}
-            className="flex items-center gap-1.5 rounded-lg bg-siemens px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-siemens-600">
-            <EyeIcon className="h-3.5 w-3.5" />
-            Vista previa
+            title="Vista previa en una pestaña nueva"
+            aria-label="Vista previa"
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-siemens text-white outline-none transition hover:bg-siemens-600 focus-visible:ring-2 focus-visible:ring-siemens/50">
+            <PlayIcon className="h-4 w-4" />
           </button>
 
-          {widgets.length > 0 &&
-          <button
-            onClick={() => {
-              setWidgets([]);
-              setSelectedId(null);
-            }}
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-red-50 hover:text-state-error dark:hover:bg-state-error/10">
-              <Trash2Icon className="h-3.5 w-3.5" />
-              {t('designer.clear')}
+          {/* ── Menú ───────────────────────────────────────────── */}
+          <div className="relative">
+            <button
+              onClick={() => setMenuAbierto((v) => !v)}
+              title="Lienzo, estado y acciones"
+              aria-label="Menú del diseñador"
+              aria-expanded={menuAbierto}
+              className={`relative flex h-8 w-8 items-center justify-center rounded-lg outline-none transition focus-visible:ring-2 focus-visible:ring-siemens/40 ${
+              menuAbierto ?
+              'bg-slate-100 text-navy dark:bg-navy-slate dark:text-slate-100' :
+              'text-slate-500 hover:bg-slate-100 dark:hover:bg-navy-slate/40'}`
+              }>
+              <MenuIcon className="h-4 w-4" />
+              {/* Punto de aviso: lo que se esconde no puede desaparecer sin
+                  dejar rastro. Si no puedes editar o hay un conflicto de
+                  guardado, el botón lo delata con el menú cerrado. */}
+              {hayAviso &&
+              <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-state-warn ring-2 ring-white dark:ring-navy-soft" />
+              }
             </button>
-          }
+
+            {menuAbierto &&
+            <>
+              {/* Capa invisible para cerrar al pulsar fuera. */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setMenuAbierto(false)} />
+
+              <div className="absolute right-0 top-full z-50 mt-1.5 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-navy-slate dark:bg-navy-soft">
+
+                {/* Lienzo */}
+                <div className="border-b border-slate-100 px-3 py-2.5 dark:border-navy-slate">
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Lienzo
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={wInput}
+                      onChange={(e) => setWInput(e.target.value.replace(/[^0-9]/g, ''))}
+                      onBlur={commitW}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                      }}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+                      title="Ancho (px)" />
+                    <span className="text-xs text-slate-400">×</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={hInput}
+                      onChange={(e) => setHInput(e.target.value.replace(/[^0-9]/g, ''))}
+                      onBlur={commitH}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                      }}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+                      title="Alto (px)" />
+                    <span className="text-[11px] text-slate-400">px</span>
+                  </div>
+                </div>
+
+                {/* Estado */}
+                <div className="space-y-1.5 border-b border-slate-100 px-3 py-2.5 dark:border-navy-slate">
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Estado
+                  </p>
+
+                  <FilaMenu
+                    icono={<ActivityIcon className="h-3.5 w-3.5 text-state-ok" />}
+                    texto={`${t('designer.live')} · ${rateLabel}`} />
+
+                  <FilaMenu
+                    icono={<LayoutDashboardIcon className="h-3.5 w-3.5 text-slate-400" />}
+                    texto={`${widgets.length} ${t('designer.widgets')}`} />
+
+                  {presentes.length > 1 &&
+                  <FilaMenu
+                    icono={<UsersIcon className="h-3.5 w-3.5 text-siemens" />}
+                    texto={`${presentes.length} conectados`}
+                    titulo={presentes.map((pp) => `${pp.usuario} (${pp.categoria})`).join('\n')} />
+                  }
+
+                  {!lock.cargando && (lock.puedeEditar ?
+                  <FilaMenu
+                    icono={<MousePointer2Icon className="h-3.5 w-3.5 text-state-ok" />}
+                    texto="Editando"
+                    titulo="Tienes el control de edición. Se libera al salir de esta pantalla." /> :
+
+                  <div className="rounded-lg bg-state-warn/15 px-2 py-1.5">
+                    <p className="flex items-center gap-1.5 text-xs font-semibold text-state-warn">
+                      <EyeIcon className="h-3.5 w-3.5 shrink-0" />
+                      {lock.titular ?
+                      `Solo lectura · edita ${lock.titular.usuario}` :
+                      'Solo lectura'}
+                    </p>
+                    <div className="mt-1.5 flex gap-1.5">
+                      {/* La toma de control solo tiene sentido ofrecerla a
+                          quien puede usarla. El backend lo verifica igual. */}
+                      {permisos?.gestionar_usuarios &&
+                      <button
+                        onClick={() => void lock.tomarControl()}
+                        title="Quitarle el control de edición (queda registrado en la auditoría)"
+                        className="rounded bg-state-warn/20 px-1.5 py-0.5 text-[11px] font-bold text-state-warn hover:bg-state-warn/30">
+                        Tomar control
+                      </button>
+                      }
+                      {!lock.titular &&
+                      <button
+                        onClick={() => void lock.reintentar()}
+                        className="rounded bg-state-warn/20 px-1.5 py-0.5 text-[11px] font-bold text-state-warn hover:bg-state-warn/30">
+                        Reintentar
+                      </button>
+                      }
+                    </div>
+                  </div>
+                  )}
+
+                  {/* Conflicto de versión: otro usuario guardó mientras
+                      editabas. No se pisa su trabajo; se avisa y se deja
+                      decidir. */}
+                  {errorGuardado &&
+                  <p className="rounded-lg bg-state-warn/15 px-2 py-1.5 text-[11px] leading-relaxed text-state-warn">
+                    {errorGuardado}
+                  </p>
+                  }
+                </div>
+
+                {/* Acciones */}
+                {widgets.length > 0 &&
+                <button
+                  onClick={() => {
+                    setWidgets([]);
+                    setSelectedId(null);
+                    setMenuAbierto(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-xs font-medium text-slate-500 transition hover:bg-red-50 hover:text-state-error dark:hover:bg-state-error/10">
+                  <Trash2Icon className="h-3.5 w-3.5" />
+                  {t('designer.clear')}
+                </button>
+                }
+              </div>
+            </>
+            }
+          </div>
         </div>
-        )}
+        }
       </header>
 
       {/* ═══ Contenido según pestaña activa ═══ */}
@@ -532,9 +824,28 @@ export function Designer() {
                 <p className="text-xs">{t('designer.designHint')}</p>
               </div>
             }
-            {widgets.map((w) =>
-            <CanvasWidget
+            {widgets.map((w) => {
+            // En el Diseñador NO se oculta lo de otras vistas: se atenúa.
+            // Si se ocultara habría que ir cambiando de sección para poder
+            // tocar cada widget, y mover algo entre vistas sería un
+            // suplicio. Atenuado se sigue viendo dónde está todo y se puede
+            // seleccionar y arrastrar con normalidad.
+            // "En todas" (vista vacía) se ve siempre; el resto solo si es
+            // la sección abierta. Sin navegación montada, todo se ve.
+            const suya = !(w.vista ?? '').trim() || !vistaActiva || w.vista === vistaActiva;
+
+            // Con "Solo esta" se oculta de verdad, como en la Vista Previa:
+            // es la única forma de ver una sección vacía y entender que la
+            // navegación SÍ está funcionando. Con "Todas" se atenúa, para
+            // poder arrastrar widgets de una sección a otra.
+            if (!suya && aislarSeccion) return null;
+
+            return (
+            <div
               key={w.id}
+              style={{ opacity: suya ? 1 : 0.28, transition: 'opacity 0.15s' }}
+              title={suya ? undefined : `Pertenece a la sección «${w.vista}»`}>
+            <CanvasWidget
               widget={w}
               variable={
               w.variableId ?
@@ -543,10 +854,31 @@ export function Designer() {
               }
               selected={w.id === selectedId}
               onSelect={setSelectedId}
-              onMove={(id, x, y) => patchWidget(id, { x, y })}
+              // Mover pasa SIEMPRE por moverBloque, tambien un widget
+              // suelto: para el es un bloque de uno, y asi no hay dos
+              // caminos distintos que puedan acabar comportandose distinto.
+              onMove={(id, x, y) => {
+                if (!puedeEditar) return;
+                setWidgets((prev) =>
+                moverBloque(prev, id, x, y, canvasW, canvasH)
+                );
+              }}
+              onMoveStart={setArrastrando}
+              onMoveEnd={(id) => {
+                setArrastrando(null);
+                if (!puedeEditar) return;
+                // Al soltar se decide si entro o salio de un contenedor.
+                // Solo aqui: hacerlo durante el arrastre haria que un widget
+                // entrara y saliera de un grupo al pasar por encima.
+                setWidgets((prev) => reasignarPadre(prev, id));
+              }}
               onResize={(id, width, height) => patchWidget(id, { width, height })}
+              insignia={insigniaDe(w)}
+              resaltado={destinoGrupo === w.id}
               canvasRef={canvasRef} />
-            )}
+            </div>
+            );
+            })}
           </div>
         </main>
 

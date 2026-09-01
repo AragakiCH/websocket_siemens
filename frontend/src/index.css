@@ -22,21 +22,6 @@ body {
 html.dark body {
   background-color: #0f172a;
 }
-/* Controles NATIVOS en modo oscuro.
-   Los <select>, sus listas desplegables, los date pickers y las barras de
-   scroll por defecto los dibuja el sistema operativo, no el CSS. Sin declarar
-   `color-scheme` el navegador asume "claro" y los pinta con fondo blanco,
-   aunque la app esté en oscuro: por eso las opciones de un desplegable se
-   veian lavadas e ilegibles.
-   Va atado a la clase `.dark` que ya alterna el tema, no a la preferencia del
-   sistema, porque la app tiene su propio interruptor en Configuracion. */
-:root {
-  color-scheme: light;
-}
-html.dark {
-  color-scheme: dark;
-}
-
 /* Siemens-inspired design tokens */
 :root {
   --siemens-petrol: #009999;
@@ -99,4 +84,19 @@ html.dark .input-field {
 }
 html.dark .input-field:focus {
   border-color: #009999;
+}
+
+/* Iconos SVG pegados por el usuario (secciones del Menú Lateral).
+ *
+ * El markup se inyecta dentro de un <span> con el tamaño ya decidido, y el
+ * <svg> de dentro tiene que llenarlo. No se puede hacer con estilos en línea:
+ * el estilo va en el span y esto hay que aplicarlo a su hijo, que llega como
+ * HTML crudo y no se puede tocar desde React.
+ *
+ * `display:block` quita la línea base que el navegador reserva bajo un svg en
+ * línea, que descuadraba el icono respecto al texto del botón. */
+.icono-svg > svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }

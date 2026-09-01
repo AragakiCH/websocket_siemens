@@ -26,6 +26,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MonitorIcon, ChevronDownIcon, Loader2Icon } from 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { WidgetRenderer } from '../components/hmi/WidgetRenderer';
+import { useVistaActiva, GRUPO_POR_DEFECTO } from '../components/hmi/custom/navegacion/store';
+
 import {
   cargarProyecto,
   listarProyectos,
@@ -46,6 +48,11 @@ function pantallaDeLaUrl(): string {
 
 export function Preview() {
   const { variables, isDark } = useAppStore();
+
+  // Vista abierta en la navegación. Al pulsar un botón del Menú Lateral
+  // cambia, y este componente se vuelve a dibujar mostrando solo los widgets
+  // de esa sección.
+  const vistaActiva = useVistaActiva(GRUPO_POR_DEFECTO);
 
   const inicial = useMemo(() => pantallaDeLaUrl() || getUltimaPantalla(), []);
   const [pantallaId, setPantallaId] = useState<string>(inicial);
@@ -201,6 +208,19 @@ export function Preview() {
           >
             {design.widgets
               .filter((w) => w.visible !== false)
+              // Navegación: aquí SÍ se ocultan los de otras vistas. Es lo que
+              // ve el operador, y ver a la vez el contenido de las tres
+              // secciones amontonado no tendría ningún sentido.
+              //
+              // `vistaActiva` no se usa dentro, pero tenerlo como dependencia
+              // es lo que hace que este bloque se vuelva a dibujar cuando se
+              // pulsa un botón del menú.
+              .filter((w) => {
+                const v = (w.vista ?? '').trim();
+                if (!v) return true;          // "En todas"
+                if (!vistaActiva) return true; // aún sin navegación montada
+                return v === vistaActiva;
+              })
               .map((w) => (
                 <div
                   key={w.id}

@@ -10,6 +10,24 @@ interface Props {
   onMove: (id: string, x: number, y: number) => void;
   onResize: (id: string, w: number, h: number) => void;
   canvasRef: React.RefObject<HTMLDivElement>;
+
+  /**
+   * Avisos de arrastre, para los grupos.
+   *
+   * `onMove` no vale para esto: se dispara decenas de veces por segundo y
+   * no distingue "empezo" de "sigue". El Disenador necesita el principio
+   * para resaltar el contenedor de destino, y el final para decidir si el
+   * widget entro o salio de el, que es una cuenta que solo tiene sentido
+   * hacer una vez, al soltar.
+   */
+  onMoveStart?: (id: string) => void;
+  onMoveEnd?: (id: string) => void;
+
+  /** Texto extra en la etiqueta al seleccionar: «3 dentro», «en Grupo». */
+  insignia?: string;
+
+  /** Este es el contenedor donde caeria lo que se esta arrastrando. */
+  resaltado?: boolean;
 }
 // A positioned, draggable, selectable widget on the canvas.
 export function CanvasWidget({
@@ -19,7 +37,11 @@ export function CanvasWidget({
   onSelect,
   onMove,
   onResize,
-  canvasRef
+  canvasRef,
+  onMoveStart,
+  onMoveEnd,
+  insignia,
+  resaltado
 }: Props) {
   const drag = useRef<{
     startX: number;
@@ -33,9 +55,16 @@ export function CanvasWidget({
     origW: number;
     origH: number;
   } | null>(null);
+
+  // Un clic simple tambien pasa por pointerdown/pointerup. Sin esta marca,
+  // seleccionar un widget contaria como arrastre y dispararia el recalculo
+  // de a que contenedor pertenece, ademas de parpadear el resaltado.
+  const movido = useRef(false);
+
   const handlePointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
     onSelect(widget.id);
+    movido.current = false;
     drag.current = {
       startX: e.clientX,
       startY: e.clientY,
@@ -54,12 +83,20 @@ export function CanvasWidget({
     const maxY = bounds ? bounds.height - widget.height : 99999;
     const nx = Math.max(0, Math.min(maxX, drag.current.origX + dx));
     const ny = Math.max(0, Math.min(maxY, drag.current.origY + dy));
+    if (!movido.current) {
+      movido.current = true;
+      onMoveStart?.(widget.id);
+    }
     onMove(widget.id, Math.round(nx), Math.round(ny));
   };
   const handlePointerUp = () => {
     drag.current = null;
     window.removeEventListener('pointermove', handlePointerMove);
     window.removeEventListener('pointerup', handlePointerUp);
+    if (movido.current) {
+      movido.current = false;
+      onMoveEnd?.(widget.id);
+    }
   };
   const handleResizeDown = (e: React.PointerEvent) => {
     e.stopPropagation();
@@ -76,10 +113,24 @@ export function CanvasWidget({
     if (!resize.current) return;
     const dw = e.clientX - resize.current.startX;
     const dh = e.clientY - resize.current.startY;
+
+    // TOPE CONTRA EL BORDE DEL LIENZO.
+    //
+    // Arrastrar ya estaba limitado, pero estirar no: se podía dejar un widget
+    // más alto que el lienzo y sobresalía por abajo. El HMI real tiene la
+    // resolución del panel, así que lo que se sale del lienzo simplemente no
+    // existe en la pantalla del operador.
+    //
+    // El tope se mide desde la esquina superior izquierda del widget, que es
+    // la que no se mueve al estirar por la esquina de abajo a la derecha.
+    const bounds = canvasRef.current?.getBoundingClientRect();
+    const maxW = bounds ? Math.max(32, bounds.width - widget.x) : 99999;
+    const maxH = bounds ? Math.max(24, bounds.height - widget.y) : 99999;
+
     onResize(
       widget.id,
-      Math.max(32, Math.round(resize.current.origW + dw)),
-      Math.max(24, Math.round(resize.current.origH + dh))
+      Math.min(maxW, Math.max(32, Math.round(resize.current.origW + dw))),
+      Math.min(maxH, Math.max(24, Math.round(resize.current.origH + dh)))
     );
   };
   const handleResizeUp = () => {
@@ -96,7 +147,13 @@ export function CanvasWidget({
         top: widget.y,
         width: widget.width,
         height: widget.height,
-        position: 'absolute'
+        position: 'absolute',
+        // Resaltado del contenedor de destino. Va en `boxShadow` y no en
+        // `outline` porque el outline ya lo usa la seleccion, y un
+        // contenedor puede estar resaltado y seleccionado a la vez.
+        boxShadow: resaltado
+          ? '0 0 0 2px #009999, 0 0 0 7px rgba(0,153,153,0.18)'
+          : undefined
       }}
       className={`group cursor-move touch-none select-none rounded-sm outline-offset-2 transition-shadow ${selected ? 'outline outline-2 outline-siemens' : 'outline-none hover:outline hover:outline-1 hover:outline-siemens/40'}`}>
       
@@ -106,6 +163,7 @@ export function CanvasWidget({
       <>
           <span className="pointer-events-none absolute -top-6 left-0 rounded bg-siemens px-1.5 py-0.5 text-[10px] font-semibold text-white">
             {widget.name}
+            {insignia && <span className="opacity-70"> · {insignia}</span>}
           </span>
           <div
           onPointerDown={handleResizeDown}
