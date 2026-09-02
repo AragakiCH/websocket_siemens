@@ -87,9 +87,27 @@ if not exist dist\PsiCore\PsiCore.exe goto :error
 
 echo [4/5] Empaquetando la version portable (ZIP)...
 if exist dist\PsiCore_portable.zip del /q dist\PsiCore_portable.zip
-powershell -NoProfile -Command ^
-  "Compress-Archive -Path 'dist\PsiCore\*' -DestinationPath 'dist\PsiCore_portable.zip' -Force"
-if errorlevel 1 echo    (aviso: no se pudo crear el ZIP, se continua)
+
+REM  Compress-Archive escribe sus errores en el flujo de errores de PowerShell
+REM  pero NO devuelve un codigo de salida distinto de cero, asi que el
+REM  'if errorlevel 1' de antes nunca saltaba: se volcaba media pantalla de
+REM  excepciones en rojo y justo despues el script decia que todo iba bien.
+REM
+REM  El fallo tipico es que Psi Core siga abierto de una prueba anterior:
+REM  Windows mantiene bloqueado _internal\base_library.zip y no se puede leer.
+REM  Con try/catch y 'exit 1' el aviso sale limpio y explicando que hacer.
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "try { Compress-Archive -Path 'dist\PsiCore\*' -DestinationPath 'dist\PsiCore_portable.zip' -Force -ErrorAction Stop; exit 0 }" ^
+  "catch { Write-Host ('   ' + $_.Exception.Message); exit 1 }"
+if errorlevel 1 (
+    echo.
+    echo    *** No se pudo crear el ZIP portable. El .exe y el instalador SI
+    echo    *** se han generado, asi que esto no bloquea nada.
+    echo    *** Causa casi segura: Psi Core esta abierto y Windows tiene sus
+    echo    *** ficheros bloqueados. Cierralo y vuelve a ejecutar el build,
+    echo    *** o comprueba con:   tasklist ^| findstr PsiCore
+    echo.
+)
 
 echo [5/5] Generando el instalador...
 REM Fuente unica de la version: el fichero VERSION de la raiz. Se la pasamos

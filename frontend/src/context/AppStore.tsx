@@ -301,13 +301,31 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     setWidgets(loadDesign(projectId)?.widgets ?? []);
 
     void (async () => {
-      const p = await cargarProyecto(projectId);
-      if (!vivo) return;
-      if (p) {
-        setWidgets(p.widgets);
-        setProjectVersion(p.version);
+      try {
+        const p = await cargarProyecto(projectId);
+        if (!vivo) return;
+        if (p) {
+          setWidgets(p.widgets);
+          setProjectVersion(p.version);
+        } else {
+          // La pantalla ya no existe en el servidor: mejor vacía que con los
+          // restos de su caché, que es lo que hacía antes.
+          setWidgets([]);
+        }
+      } catch (e) {
+        // `cargarProyecto` ahora propaga los errores del servidor (401, 403,
+        // 5xx) en vez de tragárselos y devolver la caché. Aquí hay que
+        // capturarlos SÍ O SÍ: sin este catch, un 401 dejaría
+        // `setPantallaCargada` sin ejecutar y el Diseñador se quedaría
+        // "Cargando…" para siempre, sin decir por qué.
+        //
+        // De un 401 ya se encarga `fetchAuth`, que limpia el token y emite
+        // `hmi:sesion-caducada` para volver al login.
+        if (!vivo) return;
+        console.warn('[proyecto] no se pudo abrir «%s»:', projectId, e);
+      } finally {
+        if (vivo) setPantallaCargada(projectId);
       }
-      setPantallaCargada(projectId);
     })();
 
     return () => {
@@ -368,8 +386,15 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
           setWidgets((prev) => prev.filter((w) => w.id !== cambio.widget));
         } else {
           // Cambio grande (PUT, proyecto nuevo): se recarga entero.
-          const p = await cargarProyecto(projectId);
-          if (p) setWidgets(p.widgets);
+          // Con try/catch porque esto corre dentro de un manejador de evento:
+          // una promesa rechazada aquí no la recoge nadie y se pierde en la
+          // consola como "unhandled rejection".
+          try {
+            const p = await cargarProyecto(projectId);
+            if (p) setWidgets(p.widgets);
+          } catch (e) {
+            console.warn('[proyecto] no se pudo recargar tras un cambio:', e);
+          }
         }
         setProjectVersion(msg.version);
       }

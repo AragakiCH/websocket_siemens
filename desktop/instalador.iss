@@ -463,10 +463,10 @@ begin
     '; Generado por el instalador de Psi Core {#MiVersion}.' + #13#10 +
     '; Se puede editar a mano; los cambios se aplican al reiniciar.' + #13#10 +
     '; Valores de modo:  autonomo | servidor | visor' + #13#10 +
-    #13#10 +
+    '' + #13#10 +
     '[psi]' + #13#10 +
     'modo = ' + Modo + #13#10 +
-    #13#10 +
+    '' + #13#10 +
     '[servidor]' + #13#10 +
     '; Solo se usa en modo visor: donde esta el servidor.' + #13#10 +
     'host = ' + Trim(PaginaServidor.Values[0]) + #13#10 +

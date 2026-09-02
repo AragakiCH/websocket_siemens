@@ -34,6 +34,13 @@ export interface Proyecto extends SavedDesign {
   version: number;
   actualizado_en: string;
   actualizado_por: string;
+  /**
+   * `true` si esto salió de la caché local porque el servidor no respondía,
+   * no del servidor. La vista DEBE avisarlo: puede estar desfasado, y un HMI
+   * que enseña valores viejos sin decirlo es más peligroso que uno que no
+   * enseña nada.
+   */
+  desdeCache?: boolean;
 }
 
 /** Clave de la caché local. Se mantiene el nombre histórico. */
@@ -237,8 +244,27 @@ export async function duplicarPantalla(
 /**
  * Descarga un proyecto y refresca la caché local.
  *
- * Si el servidor no responde, se cae a la caché: es preferible mostrar el
+ * SI EL SERVIDOR NO RESPONDE se cae a la caché: es preferible mostrar el
  * último diseño conocido que una pantalla vacía delante de un operario.
+ *
+ * PERO SOLO EN ESE CASO, y la distinción importa mucho. Antes se caía a la
+ * caché ante CUALQUIER excepción, y `fetchAuth` también lanza cuando el
+ * servidor contesta perfectamente con un 401. El resultado era el peor
+ * escenario posible: abrir la vista previa en un navegador sin sesión
+ * iniciada mostraba, sin un solo aviso, un diseño guardado en otra sesión —
+ * con widgets que ya no existían y sin los que sí. Recargar no lo arreglaba,
+ * porque `localStorage` sobrevive a Ctrl+R, así que parecía un fallo del
+ * programa imposible de quitar.
+ *
+ * Ahora se separan tres situaciones:
+ *
+ *   sin `status`   El fetch ni salió: no hay red o el servidor está caído.
+ *                  La caché SÍ es un sustituto razonable -> se usa, marcada.
+ *   401 / 403      El servidor está perfectamente y dice que no hay sesión.
+ *                  La caché no sustituye a una sesión -> se propaga el error
+ *                  y la aplicación pide credenciales.
+ *   404            Esa pantalla ya no existe. Mostrar su caché sería enseñar
+ *                  algo borrado -> se limpia la caché y se devuelve null.
  */
 export async function cargarProyecto(
   projectId: string = PROYECTO_POR_DEFECTO
@@ -260,7 +286,33 @@ export async function cargarProyecto(
     );
     return proyecto;
   } catch (e) {
-    console.warn('[proyecto] no se pudo cargar del servidor:', e);
+    const status = (e as { status?: number })?.status;
+
+    // El servidor contestó. Sea lo que sea, la caché NO es la respuesta.
+    if (status === 401 || status === 403) {
+      console.warn(
+        '[proyecto] el servidor pide sesión (%d). No se usa la caché: ' +
+          'mostraría un diseño de otra sesión.',
+        status
+      );
+      throw e; // que la aplicación lleve al login
+    }
+
+    if (status === 404) {
+      // La pantalla se borró. Su caché es basura y hay que quitarla, o
+      // reaparecería en cada arranque como un fantasma.
+      olvidarCache(projectId);
+      console.warn('[proyecto] «%s» ya no existe en el servidor.', projectId);
+      return null;
+    }
+
+    if (typeof status === 'number') {
+      console.warn('[proyecto] el servidor respondió %d.', status);
+      throw e;
+    }
+
+    // Sin `status`: el fetch ni llegó a salir. Aquí la caché sí vale.
+    console.warn('[proyecto] servidor inalcanzable, se usa la caché local:', e);
     const local = loadDesign(projectId);
     return local
       ? {
@@ -269,9 +321,20 @@ export async function cargarProyecto(
           version: 0, // 0 = desconocida; al guardar habrá que refrescar
           actualizado_en: '',
           actualizado_por: '',
+          desdeCache: true, // la vista lo avisa; ver Preview.tsx
           ...local,
         }
       : null;
+  }
+}
+
+/** Borra la caché local de una pantalla. */
+export function olvidarCache(projectId: string): void {
+  try {
+    localStorage.removeItem(claveCache(projectId));
+    if (projectId === PROYECTO_POR_DEFECTO) localStorage.removeItem(DESIGN_KEY);
+  } catch {
+    /* sin storage: no hay nada que olvidar */
   }
 }
 

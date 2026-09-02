@@ -23,7 +23,12 @@
 //     RealPLCService abre su WebSocket y el snapshot llega solo.
 // =========================================================================
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { MonitorIcon, ChevronDownIcon, Loader2Icon } from 'lucide-react';
+import {
+  MonitorIcon,
+  ChevronDownIcon,
+  Loader2Icon,
+  AlertTriangleIcon,
+} from 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { WidgetRenderer } from '../components/hmi/WidgetRenderer';
 import { useVistaActiva, GRUPO_POR_DEFECTO } from '../components/hmi/custom/navegacion/store';
@@ -62,6 +67,15 @@ export function Preview() {
   );
   const [cargando, setCargando] = useState(true);
 
+  // `true` mientras lo pintado venga de la caché del navegador y no del
+  // servidor. Empieza en true porque el primer render ES la caché: hasta que
+  // el servidor conteste, no se puede afirmar que esté en vivo.
+  const [desfasado, setDesfasado] = useState(true);
+
+  // Sesión caducada o ausente. Antes esto acababa mostrando en silencio un
+  // diseño viejo de la caché; ahora se dice, porque son cosas distintas.
+  const [sinSesion, setSinSesion] = useState(false);
+
   // ── Catálogo de pantallas para el selector ──────────────────────
   useEffect(() => {
     let vivo = true;
@@ -81,9 +95,32 @@ export function Preview() {
   // ── Carga del diseño ────────────────────────────────────────────
   const cargar = useCallback(async (id: string) => {
     setCargando(true);
-    const p = await cargarProyecto(id);
-    if (p) setDesign({ widgets: p.widgets, canvas: p.canvas });
-    setCargando(false);
+    try {
+      const p = await cargarProyecto(id);
+      setSinSesion(false);
+      if (p) {
+        setDesign({ widgets: p.widgets, canvas: p.canvas });
+        setDesfasado(p.desdeCache === true);
+      } else {
+        // null = la pantalla ya no existe en el servidor. Antes se quedaba
+        // lo que hubiera pintado, que es como enseñar algo ya borrado.
+        setDesign(null);
+        setDesfasado(false);
+      }
+    } catch (e) {
+      const status = (e as { status?: number })?.status;
+      if (status === 401 || status === 403) {
+        // Es el caso que producía los "widgets fantasma": el servidor está
+        // bien y pide sesión. NO se pinta la caché — sería el diseño de otra
+        // sesión, y no habría forma de saberlo mirando la pantalla.
+        setSinSesion(true);
+        setDesign(null);
+      } else {
+        setDesfasado(true);
+      }
+    } finally {
+      setCargando(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -174,15 +211,50 @@ export function Preview() {
             <Loader2Icon className="h-3.5 w-3.5 animate-spin text-slate-400" />
           )}
 
-          <span className="ml-auto text-[11px] text-slate-400">
-            Vista de operación · datos en vivo
-          </span>
+          {/* Lo que se ve NO viene del servidor. Decirlo no es un adorno:
+              sin este aviso, una pantalla en caché es indistinguible de una
+              en vivo, y alguien puede tomar una decisión mirando un diseño
+              que ya no existe. */}
+          {desfasado ? (
+            <span
+              className="ml-auto flex items-center gap-1.5 rounded-md bg-amber-500/15 px-2 py-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400"
+              title="No se pudo contactar con el servidor. Se muestra la última
+                     copia guardada en este navegador, que puede estar desfasada."
+            >
+              <AlertTriangleIcon className="h-3.5 w-3.5" />
+              Sin conexión · copia local
+            </span>
+          ) : (
+            <span className="ml-auto text-[11px] text-slate-400">
+              Vista de operación · datos en vivo
+            </span>
+          )}
         </div>
       )}
 
       {/* ── El lienzo ─────────────────────────────────────────────── */}
       <div className="mp-scroll mp-scroll-dark flex min-h-0 flex-1 items-center justify-center overflow-auto p-6">
-        {!design || design.widgets.length === 0 ? (
+        {sinSesion ? (
+          <div className="max-w-md text-center text-sm text-slate-500 dark:text-slate-400">
+            <p className="font-semibold text-slate-700 dark:text-slate-200">
+              Esta pestaña no tiene sesión iniciada
+            </p>
+            <p className="mt-2 text-xs leading-relaxed">
+              La sesión vive en el navegador que la abrió. Si estabas usando
+              la aplicación de escritorio y has copiado esta dirección a otro
+              navegador, aquí eres otra persona distinta para el servidor.
+            </p>
+            <p className="mt-2 text-xs leading-relaxed">
+              Entra desde este mismo navegador y vuelve a abrir la vista.
+            </p>
+            <a
+              href="/"
+              className="mt-4 inline-block rounded-lg bg-siemens px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+            >
+              Ir al inicio de sesión
+            </a>
+          </div>
+        ) : !design || design.widgets.length === 0 ? (
           <div className="max-w-sm text-center text-sm text-slate-500 dark:text-slate-400">
             {cargando ? (
               <span className="flex items-center justify-center gap-2">
