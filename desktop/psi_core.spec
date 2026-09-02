@@ -26,6 +26,15 @@ a = Analysis(
         # Los .sql del esquema: sirven para crear la base a mano si alguien
         # prefiere hacerlo desde SSMS en vez de desde la aplicación.
         (os.path.join(raiz, "sql"), "sql"),
+        # La versión: la lee app/main.py y debe coincidir con la que
+        # el instalador escribió en el registro.
+        (os.path.join(raiz, "VERSION"), "."),
+        # La documentación: NO es decorativa aquí. El asistente de IA la
+        # indexa al arrancar (RAG) para responder sobre el propio proyecto.
+        # Sin ella, en el .exe el asistente arranca con 0 fragmentos y
+        # responde de memoria, que es justo lo que el RAG existe para evitar.
+        (os.path.join(raiz, "docs"), "docs"),
+        (os.path.join(raiz, "README.md"), "."),
     ],
     hiddenimports=[
         "app.main",

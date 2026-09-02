@@ -226,9 +226,26 @@ class MotorRag:
     """Une las tres fuentes y arma el contexto que se le pasa al modelo."""
 
     def __init__(self, raiz: Optional[str] = None) -> None:
-        self.raiz = Path(raiz or Path(__file__).resolve().parents[2])
+        self.raiz = Path(raiz) if raiz else self._raiz_recursos()
         self.recuperador = Recuperador()
         self.ficheros_indexados: List[str] = []
+
+    @staticmethod
+    def _raiz_recursos() -> Path:
+        """
+        Carpeta donde buscar `docs/` y `README.md`.
+
+        Empaquetado con PyInstaller los recursos van dentro del bundle, no
+        junto al .exe: hay que preguntarle a `sys._MEIPASS` dónde los
+        descomprimió. Sin esto, el asistente arrancaría sin documentación en
+        la versión instalada y solo funcionaría desde el código fuente.
+        """
+        import sys
+        if getattr(sys, "frozen", False):
+            base = getattr(sys, "_MEIPASS", None)
+            if base:
+                return Path(base)
+        return Path(__file__).resolve().parents[2]
 
     # ------------------------------------------------------------------ #
     # 1) Corpus estático

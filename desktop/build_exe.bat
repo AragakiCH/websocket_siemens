@@ -42,10 +42,14 @@ powershell -NoProfile -Command ^
 if errorlevel 1 echo    (aviso: no se pudo crear el ZIP, se continua)
 
 echo [5/5] Generando el instalador...
+REM Fuente unica de la version: el fichero VERSION de la raiz. Se la pasamos
+REM al compilador para que el instalador y la aplicacion no se descuadren.
+set "PSI_VERSION=1.1.0"
+if exist VERSION set /p PSI_VERSION=<VERSION
 set "ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
 if not exist "%ISCC%" set "ISCC=%ProgramFiles%\Inno Setup 6\ISCC.exe"
 if exist "%ISCC%" (
-    "%ISCC%" desktop\instalador.iss
+    "%ISCC%" /DMiVersion=%PSI_VERSION% desktop\instalador.iss
     if errorlevel 1 goto :error
 ) else (
     echo.

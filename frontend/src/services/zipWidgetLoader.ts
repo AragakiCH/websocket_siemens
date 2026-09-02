@@ -270,8 +270,35 @@ export async function parseWidgetZip(file: File): Promise<ZipWidget> {
   return { meta, html, css, js };
 }
 
-// ---- Persistencia en localStorage ------------------------------------- //
+// ---- Persistencia ------------------------------------------------------ //
+//
+// La fuente de verdad es el SERVIDOR (`/widgets`), no `localStorage`.
+//
+// Antes vivían solo en `localStorage` y eso se rompía de tres formas:
+//   1. Al cerrar la aplicación de escritorio el widget aparecía vacío: el
+//      diseño venía del servidor (por eso la caja seguía ahí) pero la
+//      definición se había perdido con el almacenamiento del navegador.
+//   2. La vista previa abierta en otro navegador salía vacía: otro navegador
+//      es otro `localStorage`, y ahí esa definición nunca existió.
+//   3. Con varios usuarios, el widget que importaba uno era invisible para
+//      los demás.
+//
+// `localStorage` se conserva como CACHÉ, por dos motivos: el catálogo se lee
+// de forma SÍNCRONA en varios sitios (registry, widgetCatalog, sidebar) y
+// convertirlos a async sería un refactor grande; y además permite que el
+// diseñador siga dibujando si el servidor tarda o se cae un momento.
 
+/** Convierte la respuesta del servidor al formato que usa el frontend. */
+function desdeServidor(w: any): ZipWidget {
+  return {
+    meta: { ...(w.meta ?? {}), kind: w.kind, label: w.nombre ?? w.kind },
+    html: w.html ?? '',
+    css: w.css ?? '',
+    js: w.js ?? '',
+  } as ZipWidget;
+}
+
+/** Lee la caché local. Síncrono a propósito (ver comentario de arriba). */
 export function loadZipWidgets(): ZipWidget[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -283,25 +310,81 @@ export function loadZipWidgets(): ZipWidget[] {
 }
 
 export function saveZipWidgets(widgets: ZipWidget[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets));
+  } catch {
+    // Cuota llena: no es fatal, el servidor sigue teniendo la verdad.
+  }
 }
 
-export function addZipWidget(widget: ZipWidget): ZipWidget[] {
-  const existing = loadZipWidgets();
-  // Si ya existe uno con el mismo kind, lo reemplaza (actualización)
-  const filtered = existing.filter(
-    (w) => w.meta.kind !== widget.meta.kind
+/**
+ * Trae los widgets del servidor y refresca la caché.
+ *
+ * Se llama al arrancar el Diseñador y la Vista previa. Si el servidor no
+ * responde se deja la caché como está: es mejor dibujar con lo último
+ * conocido que quedarse en blanco.
+ */
+export async function sincronizarWidgets(): Promise<ZipWidget[]> {
+  try {
+    const r = await fetch('/widgets?con_contenido=true');
+    if (!r.ok) throw new Error(String(r.status));
+    const data = await r.json();
+    const widgets: ZipWidget[] = (data.widgets ?? []).map(desdeServidor);
+    saveZipWidgets(widgets);
+    return widgets;
+  } catch {
+    return loadZipWidgets();
+  }
+}
+
+/**
+ * Guarda un widget importado. Escribe PRIMERO en el servidor: si esa parte
+ * falla hay que avisar al usuario, porque si no creería que quedó guardado
+ * y volvería a perderlo al cerrar — que es justo el fallo que esto arregla.
+ */
+export async function addZipWidget(widget: ZipWidget): Promise<ZipWidget[]> {
+  const kind = widget.meta.kind;
+  const r = await fetch(`/widgets/${encodeURIComponent(kind)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      nombre: widget.meta.label ?? kind,
+      html: widget.html,
+      css: widget.css ?? '',
+      js: widget.js ?? '',
+      meta: widget.meta,
+    }),
+  });
+
+  if (!r.ok) {
+    let detalle = `Error ${r.status}`;
+    try {
+      detalle = (await r.json()).detail ?? detalle;
+    } catch {
+      /* respuesta sin JSON */
+    }
+    throw new Error(`No se pudo guardar en el servidor: ${detalle}`);
+  }
+
+  const actuales = loadZipWidgets().filter((w) => w.meta.kind !== kind);
+  actuales.push(widget);
+  saveZipWidgets(actuales);
+  return actuales;
+}
+
+export async function removeZipWidget(kind: string): Promise<ZipWidget[]> {
+  const limpio = kind.replace(/^custom:/, '');
+  try {
+    await fetch(`/widgets/${encodeURIComponent(limpio)}`, { method: 'DELETE' });
+  } catch {
+    // Si el servidor no responde se quita igualmente de la caché; la próxima
+    // sincronización lo devolverá y quedará claro que no se borró de verdad.
+  }
+  const actuales = loadZipWidgets().filter(
+    (w) => w.meta.kind !== limpio && w.meta.kind !== kind
   );
-  filtered.push(widget);
-  saveZipWidgets(filtered);
-  return filtered;
-}
-
-export function removeZipWidget(kind: string): ZipWidget[] {
-  const existing = loadZipWidgets();
-  const filtered = existing.filter((w) => w.meta.kind !== kind);
-  saveZipWidgets(filtered);
-  return filtered;
+  saveZipWidgets(actuales);
+  return actuales;
 }
 
 // ---- Fullkind helper -------------------------------------------------- //

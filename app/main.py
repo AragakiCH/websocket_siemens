@@ -27,15 +27,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import (ai_routes, auth_routes, crud_routes, db_routes,
-                     sistema_routes,
-                     export_routes, historian_routes, lock_routes,
-                     project_routes, rest_routes, websocket_routes)
+from app.api import (ai_routes, auth_routes, crud_routes, db_routes, 
+                     export_routes, historian_routes, lock_routes, 
+                     project_routes, rest_routes, sistema_routes, 
+                     websocket_routes, widget_routes)
 from app.config.settings import get_settings
 from app.core.connection_manager import ConnectionManager
 from app.core.crud_manager import CrudManager
 from app.core.db_manager import DbManager
 from app.db.historian import Historizador
+from app.db.widget_store import WidgetStore
 from app.export.grabador import Grabador
 from app.ai.agent import Agente
 from app.core.auditoria import Auditoria
@@ -82,6 +83,9 @@ async def lifespan(app: FastAPI):
     plc_manager = PlcManager(manager, settings)
     db_manager = DbManager()
     crud_manager = CrudManager(db_manager, settings)
+    # Widgets personalizados: la definición vive en el servidor, no en
+    # el localStorage del navegador (ver app/db/widget_store.py).
+    widget_store = WidgetStore()
     # El historizador escucha el MISMO flujo de tags que el WebSocket:
     # no abre una segunda sesión OPC UA ni añade carga al PLC.
     historizador = Historizador(db_manager, db_manager.store)
@@ -110,6 +114,7 @@ async def lifespan(app: FastAPI):
     app.state.plc_manager = plc_manager
     app.state.db_manager = db_manager
     app.state.crud_manager = crud_manager
+    app.state.widget_store = widget_store
     app.state.historizador = historizador
     app.state.grabador = grabador
     app.state.project_store = project_store
@@ -172,6 +177,27 @@ async def lifespan(app: FastAPI):
         await grabador.stop()
         await historizador.stop()
         await db_manager.stop()
+
+
+def _version_del_proyecto() -> str:
+    """
+    Versión del proyecto, leída del fichero `VERSION` de la raíz.
+
+    Es la MISMA fuente que usa el instalador (`build_exe.bat` se la pasa a
+    Inno Setup). Si cada uno llevara su número escrito a mano, tarde o
+    temprano se descuadrarían y la detección de "¿esto es una
+    actualización?" del instalador compararía contra un número falso.
+    """
+    import os
+    import sys
+
+    base = getattr(sys, "_MEIPASS", None) or os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__)))
+    try:
+        with open(os.path.join(base, "VERSION"), encoding="utf-8") as f:
+            return f.read().strip() or "0.0.0"
+    except OSError:
+        return "0.0.0"
 
 
 _DESCRIPCION_API = """
@@ -410,7 +436,7 @@ Contrato completo: `docs/API_AI.md`.
 app = FastAPI(
     title="Backend OPC UA -> WebSocket (Siemens S7-1500)",
     description=_DESCRIPCION_API,
-    version="1.1.0",
+    version=_version_del_proyecto(),
     lifespan=lifespan,
 )
 
@@ -431,6 +457,7 @@ app.include_router(rest_routes.router, tags=["REST"])
 app.include_router(websocket_routes.router, tags=["WebSocket"])
 app.include_router(db_routes.router)
 app.include_router(crud_routes.router)
+app.include_router(widget_routes.router)
 app.include_router(historian_routes.router)
 app.include_router(export_routes.router)
 app.include_router(ai_routes.router)

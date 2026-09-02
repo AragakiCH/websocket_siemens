@@ -1,22 +1,58 @@
 # ==========================================================================
-# requirements-desktop.txt
-# Solo para EMPAQUETAR Psi Core como aplicación de escritorio (.exe).
+#  Psi Core · dependencias para EMPAQUETAR la aplicación de escritorio
+# ==========================================================================
+#  No hacen falta para desarrollar ni para correr el backend: son las
+#  herramientas del build y los conectores que deben quedar DENTRO del .exe.
 #
-# No hace falta para desarrollar ni para correr el backend: son las
-# herramientas del build. Se instala encima de requirements.txt:
-#
-#     pip install -r requirements.txt
-#     pip install -r requirements-desktop.txt
-#     desktop\build_exe.bat
+#      pip install -r requirements.txt
+#      pip install -r requirements-desktop.txt
+#      desktop\build_exe.bat
 # ==========================================================================
 
-# La ventana nativa. En Windows usa Edge WebView2, que ya viene con Windows
-# 10 y 11: no hay que empaquetar ningún motor de navegador.
-pywebview==5.3.2
 
-# El empaquetador. Genera dist\PsiCore\ a partir de desktop/psi_core.spec.
-pyinstaller==6.11.1
+# --------------------------------------------------------------------------
+#  La aplicación de escritorio
+# --------------------------------------------------------------------------
+pywebview==5.3.2             # Ventana nativa. En Windows usa Edge WebView2,
+                             # que ya viene con Windows 10 y 11: no hay que
+                             # empaquetar ningún motor de navegador.
 
-# El instalador NO es un paquete de pip: es Inno Setup 6, que se instala
-# aparte desde https://jrsoftware.org/isdl.php. `build_exe.bat` lo detecta y,
-# si no está, genera solo el ZIP portable.
+
+# --------------------------------------------------------------------------
+#  El empaquetador
+# --------------------------------------------------------------------------
+pyinstaller==6.11.1          # Genera dist\PsiCore\ desde desktop/psi_core.spec
+
+
+# --------------------------------------------------------------------------
+#  Conectores de base de datos que deben viajar en el .exe
+# --------------------------------------------------------------------------
+#  Esto no es opcional aquí, y es la diferencia entre un .exe completo y uno
+#  a medias: `desktop/psi_core.spec` declara estos módulos en `hiddenimports`
+#  porque el código los importa por CADENA (según el motor que elija el
+#  usuario), no con un `import` literal que PyInstaller pueda ver.
+#
+#  Si no están instalados al construir, PyInstaller solo emite un aviso y
+#  sigue. El .exe se genera igual, pero al elegir PostgreSQL o MySQL en la
+#  aplicación fallaría con "Falta el paquete", y el usuario final no tiene
+#  forma de instalarlo dentro de un ejecutable.
+#
+#  Se instalan aquí, y no en requirements.txt, para no arrastrar compiladores
+#  en las máquinas donde solo se desarrolla contra SQL Server.
+asyncpg==0.30.0              # PostgreSQL / TimescaleDB
+aiomysql==0.2.0              # MySQL / MariaDB
+
+
+# --------------------------------------------------------------------------
+#  Lo que NO se instala con pip
+# --------------------------------------------------------------------------
+#  * Inno Setup 6 — genera el instalador .exe.
+#    https://jrsoftware.org/isdl.php
+#    `build_exe.bat` lo detecta solo; si no está, crea solo el ZIP portable.
+#
+#  * Node.js 18+ — para compilar el frontend React (paso 2 del build).
+#    https://nodejs.org
+#
+#  * ODBC Driver 18 for SQL Server — en la máquina que EJECUTA la aplicación,
+#    no en la que la empaqueta. La app lo detecta y lo explica en la pantalla
+#    de acceso si falta.

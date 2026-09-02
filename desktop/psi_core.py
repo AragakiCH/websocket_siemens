@@ -275,9 +275,32 @@ def abrir_ventana(puerto: int) -> bool:
             min_size=(1024, 700),
             confirm_close=False,
         )
+        # ── private_mode=False: ESTO NO ES OPCIONAL ──────────────────────
+        # pywebview arranca en modo privado POR DEFECTO, y eso significa que
+        # WebView2 tira todo el almacenamiento del navegador al cerrar la
+        # ventana: localStorage, sessionStorage, cookies. Con el valor por
+        # defecto, cada arranque de la aplicación empieza en blanco.
+        #
+        # Se notaba en cosas como un widget importado de un ZIP que aparecía
+        # vacío al reabrir: el diseño venía del servidor (y por eso seguía la
+        # caja en su sitio), pero la definición del widget vivía solo en
+        # localStorage y se había borrado.
+        #
+        # `storage_path` fija DÓNDE se guarda: en la carpeta de datos de la
+        # aplicación, junto al resto de la configuración del usuario. Así se
+        # respalda y se borra con todo lo demás, en vez de quedar suelto en un
+        # temporal del sistema.
+        try:
+            from app.config.rutas import resolver_carpeta_datos
+            perfil = resolver_carpeta_datos() / "navegador"
+            perfil.mkdir(parents=True, exist_ok=True)
+            almacen = str(perfil)
+        except Exception:  # noqa: BLE001
+            almacen = None    # pywebview usará su ruta por defecto
+
         # `gui=None` deja que pywebview elija el motor del sistema. En Windows
         # es WebView2 (Edge); si no estuviera, lanza y se cae al navegador.
-        webview.start()
+        webview.start(private_mode=False, storage_path=almacen)
         return True
     except Exception as exc:  # noqa: BLE001
         print(f"[ventana] No se pudo abrir la ventana nativa: {exc}")

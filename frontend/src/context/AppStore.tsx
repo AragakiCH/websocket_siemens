@@ -17,6 +17,7 @@ import {
 '../models/plc';
 import { HmiWidget, WidgetKind, BuiltInWidgetKind } from '../models/widget';
 import { RealPLCService as MockPLCService } from '../services/RealPLCService';
+import { sincronizarWidgets } from '../services/zipWidgetLoader';
 import { createTranslator, widgetLabel as widgetLabelFn, TFn } from '../i18n';
 import { customByKind, zipByKind } from '../components/hmi/custom/registry';
 import {
@@ -236,6 +237,14 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   }, []);
 
   // Al arrancar: ¿hay una sesión guardada de antes que siga siendo válida?
+  // Los widgets personalizados viven en el SERVIDOR (ver widget_store.py).
+  // Se traen una vez al arrancar y se dejan en la caché local, que es lo que
+  // leen de forma síncrona el catálogo, el registry y el lienzo. Sin esto,
+  // un widget importado desde otra máquina o en otra sesión no aparecería.
+  useEffect(() => {
+    void sincronizarWidgets();
+  }, []);
+
   useEffect(() => {
     void refrescarSesion().finally(() => setComprobandoSesion(false));
   }, [refrescarSesion]);
