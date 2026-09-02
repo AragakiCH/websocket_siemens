@@ -107,11 +107,26 @@ window.WIDGET = {
     background: transparent;
     font-family: Arial, sans-serif;
   }
+  /* EL BODY VA TRANSPARENTE, SIEMPRE.
+   *
+   * Aquí había 'background: var(--w-bg)', o sea el fondo del widget pintado
+   * DOS VECES: una por el contenedor de WidgetRenderer (que lo hace para
+   * todos los widgets, ZIP o no) y otra aquí dentro del iframe.
+   *
+   * Además no era ni consistente: '--w-bg' lo pone el bridge por
+   * postMessage, y en un ZIP SIN widget.js el sandbox va sin
+   * 'allow-scripts', así que el bridge no llega a ejecutarse y el body se
+   * quedaba transparente. El mismo widget se pintaba distinto según llevara
+   * .js o no, que es la clase de diferencia que vuelve loco a cualquiera.
+   *
+   * Ahora lo pinta el contenedor y punto. '--w-bg' sigue disponible como
+   * variable para quien la quiera usar en su propio CSS, que es lo que
+   * promete la documentación del ZIP. */
   body {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--w-bg);
+    background: transparent;
   }
   :root {
     --w-color: #009999;
@@ -184,6 +199,29 @@ ${userScript}
         pointerEvents: 'none',
         display: 'block',
         background: 'transparent',
+
+        // ESTA LÍNEA ES LA QUE QUITA EL FONDO BLANCO. No es cosmética.
+        //
+        // Un iframe solo se dibuja transparente si el `color-scheme` del
+        // documento de dentro COINCIDE con el del elemento que lo contiene.
+        // Si no coinciden, el navegador le pinta un lienzo opaco debajo — y
+        // opaco significa blanco.
+        //
+        // Y aquí no coincidían: la app declara `html.dark { color-scheme:
+        // dark }` en index.css, el iframe hereda ese `dark` del contenedor,
+        // pero el documento del ZIP no declara nada y sale `light`. Distintos
+        // -> lienzo blanco, y se ve por donde el dibujo del ZIP no llega a
+        // cubrir (las franjas que deja un SVG con preserveAspectRatio="meet").
+        //
+        // Se fuerza `light` en el elemento porque el documento del ZIP es
+        // siempre `light` — no declara nada — así que así coinciden en los dos
+        // temas de la app. Poner 'dark' NO vale: haría coincidir en oscuro y
+        // romper en claro.
+        //
+        // Solo pasa con los ZIP porque son los únicos que van en iframe. Los
+        // widgets del catálogo se dibujan en el mismo documento y por eso
+        // nunca tuvieron este problema.
+        colorScheme: 'light',
       }}
       title={zipWidget.meta.label}
     />
