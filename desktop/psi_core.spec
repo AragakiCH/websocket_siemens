@@ -1,7 +1,22 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Spec de PyInstaller para PSI CORE (aplicación de escritorio).
+# Spec de PyInstaller para PSI CORE.
 #
 #   dist/PsiCore/PsiCore.exe   backend + React + ventana nativa, en una carpeta
+#
+# UN SOLO EJECUTABLE CON TRES MODOS, no tres ejecutables. El modo se lee de
+# `psi_core.ini` (lo escribe el instalador) o de la línea de órdenes:
+#
+#   autonomo   backend en 127.0.0.1 + ventana. Un puesto que no comparte nada.
+#   servidor   backend en 0.0.0.0 + ventana. El equipo que guarda las
+#              pantallas, los widgets y el histórico de todos.
+#   visor      solo la ventana, apuntando al servidor. No arranca backend.
+#
+# Se hizo así, y no con un .exe por modo, por dos razones. La primera es de
+# tamaño: Python, las librerías y el build de React pesan igual en los tres,
+# y en specs separados se duplicarían (unos 300 MB en vez de 100). La segunda
+# importa más: con un único artefacto es imposible que el servidor y un visor
+# acaben con versiones distintas del frontend, que es un fallo silencioso y
+# muy difícil de ver desde fuera.
 #
 # Se genera en modo CARPETA (`onefile=False`) a propósito. Un solo .exe se
 # descomprime entero en %TEMP% en cada arranque: tarda entre cinco y quince

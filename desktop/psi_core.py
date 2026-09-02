@@ -39,11 +39,33 @@ DÓNDE QUEDAN LOS DATOS
     NO junto al .exe: esa carpeta se reemplaza al actualizar y se borra al
     desinstalar, y con ella se irían los PLCs, las pantallas y las cuentas.
 
-Ejecutar en desarrollo:  python desktop/psi_core.py
+LOS TRES MODOS
+
+    Un mismo .exe se comporta de tres formas según `psi_core.ini` (que
+    escribe el instalador) o según un argumento de la línea de órdenes:
+
+        autonomo   Backend en 127.0.0.1 + ventana. Un puesto aislado. Es el
+                   comportamiento de siempre y el valor por defecto.
+        servidor   Backend en 0.0.0.0 + ventana. El equipo que guarda las
+                   pantallas, los widgets, las conexiones y el histórico DE
+                   TODOS. Sigue siendo un puesto usable.
+        visor      Solo la ventana, apuntando al servidor. No arranca backend
+                   ni habla con los PLCs.
+
+    POR QUÉ HACE FALTA ESTA DISTINCIÓN. En modo autónomo cada equipo levanta
+    su propio backend y guarda en su propio ProgramData. Eso está bien para un
+    puesto único, pero con varias personas produce un fallo desconcertante:
+    los widgets y las pantallas que configura una NO existen para las demás,
+    porque el servidor de cada una es su propio PC. Y no se manifiesta como un
+    error, sino como un widget en blanco — parece un fallo del programa y es
+    una consecuencia de la arquitectura.
+
+Ejecutar en desarrollo:  python desktop/psi_core.py [--servidor|--visor HOST]
 Empaquetado:             dist/PsiCore.exe  (ver build_exe.bat)
 """
 from __future__ import annotations
 
+import configparser
 import os
 import socket
 import sys
@@ -55,6 +77,31 @@ import urllib.request
 TITULO = "Psi Core — HMI"
 PUERTO_PREFERIDO = 8000
 ANCHO, ALTO = 1400, 900
+
+CONFIG_NOMBRE = "psi_core.ini"
+MODOS = ("autonomo", "servidor", "visor")
+
+CONFIG_DEFECTO = """; ====================================================================
+;  Psi Core · modo de funcionamiento de ESTE equipo
+; ====================================================================
+;  autonomo  Este equipo es un HMI completo y aislado. Guarda sus propias
+;            pantallas y widgets, y no los comparte con nadie.
+;
+;  servidor  Este equipo GUARDA TODO y sirve a los demás. Es el único que
+;            debe estar en este modo.
+;
+;  visor     Este equipo solo muestra lo que hay en el servidor. Rellena
+;            'host' con la IP que el servidor enseña al arrancar.
+; ====================================================================
+
+[psi]
+modo = autonomo
+
+[servidor]
+; Solo se usa en modo 'visor': dónde está el servidor.
+host = 127.0.0.1
+puerto = 8000
+"""
 
 
 # ====================================================================== #
@@ -215,9 +262,128 @@ def esperar_backend(puerto: int, segundos: float = 40.0) -> bool:
 
 
 # ====================================================================== #
+# Modo de funcionamiento
+# ====================================================================== #
+def _ruta_config() -> str:
+    """El .ini vive junto al .exe: es configuración de la INSTALACIÓN."""
+    if getattr(sys, "frozen", False):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, CONFIG_NOMBRE)
+
+
+def _ips_locales():
+    """
+    IPs de este equipo en la red local, para dictárselas a quien monta un
+    visor. Sin esto, el mensaje "usa la IP de esta máquina" obliga a abrir una
+    consola, ejecutar ipconfig y acertar entre varias interfaces.
+
+    El truco del socket UDP no envía ni un byte: solo pregunta al sistema qué
+    interfaz usaría para salir, que es la que ven los demás equipos.
+
+    (Está duplicado en `servidor.py` a propósito: ese script es un punto de
+    entrada independiente que no importa nada de aquí, y compartir veinte
+    líneas no compensa acoplarlos.)
+    """
+    ips = []
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))
+            ips.append(s.getsockname()[0])
+        finally:
+            s.close()
+    except OSError:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None,
+                                       socket.AF_INET):
+            if info[4][0] not in ips:
+                ips.append(info[4][0])
+    except OSError:
+        pass
+    # 127.x no lo alcanza nadie más; 169.254.x es la que se autoasigna Windows
+    # cuando la tarjeta se queda sin DHCP: parece válida y no encamina.
+    return [ip for ip in ips
+            if not ip.startswith("127.") and not ip.startswith("169.254.")]
+
+
+def resolver_modo(argv=None):
+    """
+    Decide el modo y, si es 'visor', a dónde apuntar.
+
+    Prioridad: línea de órdenes -> variables de entorno -> psi_core.ini ->
+    'autonomo'. La línea de órdenes va primero para poder probar los tres
+    modos en un mismo equipo sin editar ficheros, que es justo lo que hace
+    falta al montar esto por primera vez.
+
+    Devuelve (modo, host_remoto, puerto_remoto).
+    """
+    argv = list(sys.argv[1:] if argv is None else argv)
+
+    ruta = _ruta_config()
+    if not os.path.isfile(ruta):
+        try:
+            with open(ruta, "w", encoding="utf-8") as f:
+                f.write(CONFIG_DEFECTO)
+        except OSError:
+            # Instalado en Archivos de programa sin permisos: se sigue con
+            # los valores por defecto en vez de no arrancar.
+            pass
+
+    cfg = configparser.ConfigParser()
+    try:
+        cfg.read(ruta, encoding="utf-8")
+    except configparser.Error:
+        pass
+
+    modo = (cfg.get("psi", "modo", fallback="autonomo") or "").strip().lower()
+    host = cfg.get("servidor", "host", fallback="127.0.0.1").strip()
+    try:
+        puerto = cfg.getint("servidor", "puerto", fallback=PUERTO_PREFERIDO)
+    except (ValueError, configparser.Error):
+        puerto = PUERTO_PREFERIDO
+
+    entorno = (os.getenv("PSI_MODO") or "").strip().lower()
+    if entorno in MODOS:
+        modo = entorno
+    destino = (os.getenv("PSI_SERVIDOR") or "").strip()
+
+    for i, arg in enumerate(argv):
+        a = arg.strip().lower()
+        if a in ("--servidor", "-s"):
+            modo = "servidor"
+        elif a in ("--autonomo", "-a"):
+            modo = "autonomo"
+        elif a in ("--visor", "-v"):
+            modo = "visor"
+            # Acepta  --visor 192.168.1.50:8000  y  --visor=192.168.1.50
+            if i + 1 < len(argv) and not argv[i + 1].startswith("-"):
+                destino = argv[i + 1].strip()
+        elif a.startswith("--visor="):
+            modo, destino = "visor", arg.split("=", 1)[1].strip()
+
+    if destino:
+        if ":" in destino:
+            h, _, p = destino.rpartition(":")
+            host = h.strip() or host
+            try:
+                puerto = int(p)
+            except ValueError:
+                pass
+        else:
+            host = destino
+
+    if modo not in MODOS:
+        modo = "autonomo"
+    return modo, host, puerto
+
+
+# ====================================================================== #
 # Backend
 # ====================================================================== #
-def arrancar_backend(puerto: int):
+def arrancar_backend(puerto: int, host: str = "127.0.0.1"):
     """
     uvicorn en un hilo daemon.
 
@@ -225,10 +391,10 @@ def arrancar_backend(puerto: int):
     va con él. Un hilo normal dejaría el .exe en memoria sin ventana — el
     clásico "lo cerré y sigue apareciendo en el Administrador de tareas".
 
-    Escucha SOLO en 127.0.0.1. Esta es la versión de escritorio: un HMI de
-    planta no debe quedar publicado en la red del taller porque alguien hizo
-    doble clic en un icono. Para varios puestos está el modo servidor
-    (`servidor.py`), donde eso es una decisión y no un accidente.
+    Por defecto escucha SOLO en 127.0.0.1, y es deliberado: un HMI de planta
+    no debe quedar publicado en la red del taller porque alguien hizo doble
+    clic en un icono. Publicarlo (`host="0.0.0.0"`, modo servidor) tiene que
+    ser una decisión explícita y no un accidente.
     """
     import uvicorn
 
@@ -237,7 +403,16 @@ def arrancar_backend(puerto: int):
     datos = resolver_carpeta_datos()
     info = describir(datos)
     print("=" * 62)
-    print(f"  Psi Core   ·   http://127.0.0.1:{puerto}")
+    if host == "0.0.0.0":
+        print("  Psi Core   ·   MODO SERVIDOR")
+        print(f"  Aquí:      http://127.0.0.1:{puerto}")
+        for ip in _ips_locales():
+            print(f"  Visores:   host = {ip}   puerto = {puerto}")
+        print("  Si los visores no conectan, abre el puerto en el firewall:")
+        print(f'    netsh advfirewall firewall add rule name="Psi Core" '
+              f"dir=in action=allow protocol=TCP localport={puerto}")
+    else:
+        print(f"  Psi Core   ·   http://127.0.0.1:{puerto}")
     print(f"  Datos:     {datos}")
     if not info["escribible"]:
         print("  *** AVISO: no se puede ESCRIBIR en esa carpeta.")
@@ -246,7 +421,7 @@ def arrancar_backend(puerto: int):
 
     from app.main import app
 
-    config = uvicorn.Config(app, host="127.0.0.1", port=puerto,
+    config = uvicorn.Config(app, host=host, port=puerto,
                             log_level="info")
     servidor = uvicorn.Server(config)
     hilo = threading.Thread(target=servidor.run, daemon=True,
@@ -258,8 +433,21 @@ def arrancar_backend(puerto: int):
 # ====================================================================== #
 # Ventana
 # ====================================================================== #
-def abrir_ventana(puerto: int) -> bool:
-    """Ventana nativa WebView2. `False` si no se pudo (falta el motor)."""
+def abrir_ventana(puerto: int, url: str = "", titulo: str = "",
+                  html: str = "") -> bool:
+    """
+    Ventana nativa WebView2. `False` si no se pudo (falta el motor).
+
+    `url`  apunta a OTRO equipo (modo visor); si falta, al backend local.
+    `html` muestra contenido propio sin servidor ninguno — es como se enseña
+           el diagnóstico cuando el visor no encuentra al servidor.
+
+    El HTML va por el parámetro `html` de pywebview y NO como una URL
+    `data:text/html,...`, que sería lo natural: Chromium —y por tanto
+    WebView2— BLOQUEA la navegación de nivel superior a URLs `data:` desde
+    2017, como defensa contra el phishing. Por esa vía la ventana saldría en
+    blanco, que es exactamente el fallo que este diagnóstico viene a evitar.
+    """
     try:
         import webview  # pywebview
     except ImportError:
@@ -267,9 +455,11 @@ def abrir_ventana(puerto: int) -> bool:
         return False
 
     try:
+        destino = ({"html": html} if html
+                   else {"url": url or f"http://127.0.0.1:{puerto}"})
         webview.create_window(
-            TITULO,
-            f"http://127.0.0.1:{puerto}",
+            titulo or TITULO,
+            **destino,
             width=ANCHO,
             height=ALTO,
             min_size=(1024, 700),
@@ -333,19 +523,103 @@ def abrir_en_navegador(puerto: int) -> None:
     webbrowser.open(url)
 
 
+def _pagina_sin_servidor(host: str, puerto: int) -> str:
+    """
+    Diagnóstico para el modo visor cuando el servidor no responde.
+
+    Sin esto, WebView2 enseña su propia página de error —en inglés, hablando
+    de DNS y de proxies— y quien está delante concluye que "el programa no
+    carga". El problema real casi siempre es uno de estos tres.
+    """
+    return f"""<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<style>
+ body{{font-family:"Segoe UI",system-ui,sans-serif;background:#0f172a;
+      color:#e2e8f0;margin:0;padding:48px;line-height:1.6}}
+ h1{{font-size:22px;margin:0 0 4px;color:#f8fafc}}
+ .sub{{color:#94a3b8;margin-bottom:28px}}
+ .caja{{background:#1e293b;border-left:3px solid #38bdf8;padding:16px 20px;
+       border-radius:6px;margin-bottom:20px}}
+ code{{background:#334155;padding:2px 7px;border-radius:4px;font-size:13px;
+      color:#7dd3fc}}
+ li{{margin-bottom:14px}}
+</style></head><body>
+<h1>No se puede contactar con el servidor</h1>
+<div class="sub">Se intentó conectar con <code>{host}:{puerto}</code></div>
+<div class="caja">Este equipo está en modo <strong>visor</strong>: no guarda
+nada por sí mismo. Las pantallas, los widgets y los datos están en el equipo
+servidor.</div>
+<p><strong>Las tres causas, por orden de frecuencia:</strong></p>
+<ol>
+<li><strong>El servidor no está arrancado.</strong> Ábrelo en el equipo que
+    hace de servidor y déjalo abierto.</li>
+<li><strong>La dirección es incorrecta.</strong> El servidor muestra su IP al
+    arrancar. Corrígela en <code>{_ruta_config()}</code></li>
+<li><strong>El firewall bloquea el puerto.</strong> En el servidor, como
+    administrador:<br><code>netsh advfirewall firewall add rule
+    name="Psi Core" dir=in action=allow protocol=TCP localport={puerto}</code></li>
+</ol>
+</body></html>"""
+
+
+def _hay_alguien(host: str, puerto: int, espera: float = 4.0) -> bool:
+    """¿Responde el servidor? Se comprueba antes de abrir la ventana."""
+    try:
+        with socket.create_connection((host, puerto), timeout=espera):
+            return True
+    except OSError:
+        return False
+
+
 def main() -> None:
     _preparar_entorno()
     _redirigir_salida()
+
+    modo, host_remoto, puerto_remoto = resolver_modo()
+
+    # ---------------------------------------------------------------- #
+    # VISOR: no se arranca backend. Solo la ventana, apuntando a otro
+    # equipo. Ni siquiera se toca la carpeta de datos local.
+    # ---------------------------------------------------------------- #
+    if modo == "visor":
+        print(f"Psi Core · MODO VISOR -> {host_remoto}:{puerto_remoto}")
+        vivo = _hay_alguien(host_remoto, puerto_remoto)
+        url = f"http://{host_remoto}:{puerto_remoto}/" if vivo else ""
+        diagnostico = "" if vivo else _pagina_sin_servidor(
+            host_remoto, puerto_remoto)
+        if not vivo:
+            print("*** El servidor no responde. Se abre el diagnóstico.")
+
+        if not abrir_ventana(0, url=url, html=diagnostico,
+                             titulo=f"{TITULO} (visor)"):
+            # Sin WebView2: si el servidor está vivo se abre en el navegador;
+            # si no, no hay nada que abrir y el motivo ya está impreso arriba.
+            if vivo:
+                import webbrowser
+                webbrowser.open(url)
+                try:
+                    while True:
+                        time.sleep(3600)
+                except KeyboardInterrupt:
+                    pass
+        print("Psi Core cerrado.")
+        return
+
+    # ---------------------------------------------------------------- #
+    # AUTÓNOMO y SERVIDOR: backend local. La única diferencia es a qué
+    # interfaz se ata, y por tanto quién puede llegar.
+    # ---------------------------------------------------------------- #
     _avisar_si_el_frontend_esta_viejo()
 
+    host_escucha = "0.0.0.0" if modo == "servidor" else "127.0.0.1"
     puerto = puerto_libre()
-    arrancar_backend(puerto)
+    arrancar_backend(puerto, host=host_escucha)
 
     if not esperar_backend(puerto):
         print("*** El backend no respondió a tiempo. Se abre igualmente: "
               "puede que solo esté tardando más de lo normal.")
 
-    if not abrir_ventana(puerto):
+    titulo = TITULO + (" (servidor)" if modo == "servidor" else "")
+    if not abrir_ventana(puerto, titulo=titulo):
         print("[ventana] Se abre en el navegador. Cierra ESTA consola para "
               "detener Psi Core.")
         abrir_en_navegador(puerto)

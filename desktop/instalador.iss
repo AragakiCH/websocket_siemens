@@ -170,6 +170,10 @@ var
   EsActualizacion: Boolean;
   CarpetaAnterior: String;
 
+  { Páginas para elegir el papel de este equipo. Ver ConfigurarPaginas(). }
+  PaginaModo: TInputOptionWizardPage;
+  PaginaServidor: TInputQueryWizardPage;
+
 { ---------------------------------------------------------------------
   Lee del registro los datos de una instalación previa.
   Inno guarda cada programa bajo su AppId + '_is1'. Se mira en las dos
@@ -342,6 +346,138 @@ begin
     DelTree(Carpeta + '\__pycache__', True, True, True);
 end;
 
+{ =====================================================================
+   EL PAPEL DE ESTE EQUIPO
+
+   Psi Core es un único .exe con tres modos. La elección se guarda en
+   psi_core.ini, junto al programa, y la lee desktop/psi_core.py.
+
+   Preguntarlo AQUÍ y no dentro del programa es deliberado. Si cada
+   equipo arranca en modo autónomo por defecto, cada uno se convierte en
+   su propio servidor con su propia carpeta de datos, y los widgets y
+   pantallas que configura una persona no aparecen para las demás. Eso
+   no da ningún error: da un widget en blanco, que parece un fallo del
+   programa y es una consecuencia de no haber decidido la topología.
+   ===================================================================== }
+
+{ Lee el modo de una instalación anterior para no perder la elección al
+  actualizar. Devuelve '' si no hay nada que leer. }
+function LeerModoAnterior(): String;
+var
+  Lineas: TArrayOfString;
+  I: Integer;
+  L: String;
+begin
+  Result := '';
+  if CarpetaAnterior = '' then
+    Exit;
+  { LoadStringsFromFile parte el fichero en líneas por sí solo. Inno no tiene
+    una función de split de cadenas, así que hacerlo a mano sobre el
+    contenido completo sería reimplementarla sin necesidad. }
+  if not LoadStringsFromFile(CarpetaAnterior + '\psi_core.ini', Lineas) then
+    Exit;
+
+  for I := 0 to GetArrayLength(Lineas) - 1 do
+  begin
+    L := Trim(Lineas[I]);
+    { Se ignoran los comentarios: el .ini que se genera lleva la palabra
+      'modo' dentro de su cabecera explicativa, y sin este filtro la
+      primera coincidencia sería un comentario y no el valor real. }
+    if (L <> '') and (L[1] <> ';') and (Pos('modo', Lowercase(L)) = 1) then
+    begin
+      Result := Trim(Copy(L, Pos('=', L) + 1, Length(L)));
+      Exit;
+    end;
+  end;
+end;
+
+procedure ConfigurarPaginas();
+var
+  Anterior: String;
+begin
+  PaginaModo := CreateInputOptionPage(wpSelectTasks,
+    'Papel de este equipo',
+    '¿Cómo se va a usar Psi Core en este ordenador?',
+    'Si sois varias personas, solo UN equipo debe ser el servidor: es el ' +
+    'que guarda las pantallas, los widgets, las conexiones y el histórico. ' +
+    'Los demás serán visores y verán exactamente lo mismo que él. Si este ' +
+    'ordenador va a trabajar solo, elige "Equipo único".',
+    True, False);
+
+  { Las etiquetas van en UNA línea a propósito: los controles de esta página
+    no ajustan el texto, y una descripción larga se cortaría a media frase.
+    La explicación va arriba, en el subtítulo. }
+  PaginaModo.Add('Equipo único — trabaja solo, no comparte nada');
+  PaginaModo.Add('Servidor — guarda los datos y se los sirve a los demás');
+  PaginaModo.Add('Visor — solo muestra lo que hay en el servidor');
+
+  PaginaServidor := CreateInputQueryPage(PaginaModo.ID,
+    'Dirección del servidor',
+    '¿Dónde está el equipo que hace de servidor?',
+    'El servidor muestra su dirección al arrancar, en la línea que dice ' +
+    '"Visores". Cópiala aquí tal cual. Si te equivocas, se puede corregir ' +
+    'después en psi_core.ini sin reinstalar.');
+  PaginaServidor.Add('Dirección IP o nombre del equipo:', False);
+  PaginaServidor.Add('Puerto:', False);
+  PaginaServidor.Values[0] := '192.168.1.100';
+  PaginaServidor.Values[1] := '8000';
+
+  { Al actualizar se respeta lo que ya había: cambiar de modo por accidente
+    en una actualización dejaría a ese equipo sin ver los datos del grupo. }
+  Anterior := Lowercase(LeerModoAnterior());
+  if Anterior = 'servidor' then
+    PaginaModo.SelectedValueIndex := 1
+  else if Anterior = 'visor' then
+    PaginaModo.SelectedValueIndex := 2
+  else
+    PaginaModo.SelectedValueIndex := 0;
+end;
+
+procedure InitializeWizard();
+begin
+  ConfigurarPaginas();
+end;
+
+{ La página de la dirección solo tiene sentido en modo visor. }
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := False;
+  if PageID = PaginaServidor.ID then
+    Result := (PaginaModo.SelectedValueIndex <> 2);
+end;
+
+{ Escribe psi_core.ini con lo elegido. }
+procedure GuardarModo();
+var
+  Ruta, Modo, Texto: String;
+begin
+  case PaginaModo.SelectedValueIndex of
+    1: Modo := 'servidor';
+    2: Modo := 'visor';
+  else
+    Modo := 'autonomo';
+  end;
+
+  Ruta := ExpandConstant('{app}\psi_core.ini');
+  Texto :=
+    '; Generado por el instalador de Psi Core {#MiVersion}.' + #13#10 +
+    '; Se puede editar a mano; los cambios se aplican al reiniciar.' + #13#10 +
+    '; Valores de modo:  autonomo | servidor | visor' + #13#10 +
+    #13#10 +
+    '[psi]' + #13#10 +
+    'modo = ' + Modo + #13#10 +
+    #13#10 +
+    '[servidor]' + #13#10 +
+    '; Solo se usa en modo visor: donde esta el servidor.' + #13#10 +
+    'host = ' + Trim(PaginaServidor.Values[0]) + #13#10 +
+    'puerto = ' + Trim(PaginaServidor.Values[1]) + #13#10;
+
+  if not SaveStringToFile(Ruta, Texto, False) then
+    MsgBox('No se pudo escribir ' + Ruta + '.' + #13#10 +
+           'Psi Core arrancara en modo "equipo unico". Para cambiarlo, ' +
+           'crea ese fichero a mano.', mbError, MB_OK);
+end;
+
 { Punto de enganche: se ejecuta justo antes de copiar los ficheros. }
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
@@ -355,14 +491,46 @@ begin
       LimpiarVersionAnterior();
     end;
   end;
+
+  { Después de copiar: si se escribiera antes, [Files] lo sobrescribiría. }
+  if CurStep = ssPostInstall then
+    GuardarModo();
 end;
 
 { ---------------------------------------------------------------------
   Mensaje final: distinto según haya sido instalación o actualización.
   --------------------------------------------------------------------- }
 function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  P: Integer;
 begin
   Result := True;
+
+  { Un visor sin dirección de servidor es un programa que no puede hacer
+    nada. Se comprueba aquí y no al arrancar: corregirlo ahora son dos
+    segundos, y descubrirlo mañana en la planta es una llamada de teléfono. }
+  if CurPageID = PaginaServidor.ID then
+  begin
+    if Trim(PaginaServidor.Values[0]) = '' then
+    begin
+      MsgBox('Falta la dirección del servidor.' + #13#10 + #13#10 +
+             'La muestra el propio servidor al arrancar, en la línea que ' +
+             'empieza por "Visores".', mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+
+    P := StrToIntDef(Trim(PaginaServidor.Values[1]), -1);
+    if (P < 1) or (P > 65535) then
+    begin
+      MsgBox('El puerto debe ser un número entre 1 y 65535.' + #13#10 +
+             'Si no lo has cambiado en el servidor, es 8000.',
+             mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+  end;
+
   if CurPageID = wpFinished then
   begin
     if EsActualizacion then

@@ -46,6 +46,20 @@ MAX_BYTES_WIDGET = 2 * 1024 * 1024        # 2 MB por widget
 
 _RE_KIND = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
+# Nombres de dispositivo RESERVADOS en Windows. Siguen siéndolo aunque se les
+# añada una extensión: `con.json` no es un fichero, es la consola. Un widget
+# llamado así fallaría al guardarse con un error incomprensible, y `nul` es
+# peor todavía — Windows acepta la escritura y descarta el contenido, así que
+# el widget se "guardaría" bien y aparecería vacío al recargar.
+#
+# Es rarísimo que alguien llame `con` a un widget, pero el coste de descartarlo
+# es una línea y el de no hacerlo es un fallo que nadie sabría diagnosticar.
+_RESERVADOS_WINDOWS = {
+    "con", "prn", "aux", "nul",
+    "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+    "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+}
+
 
 def _ahora_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -65,6 +79,12 @@ def validar_kind(kind: str) -> str:
             f"Identificador de widget inválido: '{kind}'. Solo minúsculas, "
             f"dígitos, guion y guion bajo; debe empezar por letra o dígito "
             f"(máx. 64 caracteres)."
+        )
+    if kind in _RESERVADOS_WINDOWS:
+        raise ValueError(
+            f"'{kind}' es un nombre reservado por Windows (dispositivos como "
+            f"CON, NUL o COM1) y no puede usarse como nombre de fichero. "
+            f"Renombra el widget, por ejemplo a '{kind}-1'."
         )
     return kind
 
