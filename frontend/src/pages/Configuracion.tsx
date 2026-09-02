@@ -653,6 +653,20 @@ export function Configuracion() {
 
   const marcadasDelSel = (grupoSel?.vars ?? []).filter((v) => v.selected);
 
+  /**
+   * Lo que se enseña en «Lectura en vivo», ya filtrado por el buscador.
+   *
+   * Comparte el buscador con la tabla a propósito: son dos vistas de lo
+   * mismo, una para marcar y otra para comprobar el valor. Con buscadores
+   * separados habría que escribir dos veces lo mismo, y con 206 tags eso
+   * se nota. Escribes «bVar1» y las dos se quedan en esas.
+   */
+  const vivoFiltrado = useMemo(() => {
+    const q = buscaVar.trim().toLowerCase();
+    return q ? marcadasDelSel.filter((v) => v.name.toLowerCase().includes(q)) : marcadasDelSel;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grupoSel, buscaVar]);
+
   // Marcar o quitar de golpe lo que se está viendo. Usa el MISMO
   // `toggleVariable` de siempre, una vez por variable: no hay un camino
   // nuevo, solo se ahorra el clic repetido.
@@ -841,7 +855,15 @@ export function Configuracion() {
                    del elegido, y ficha del enlace. Antes se apilaban TODOS
                    los grupos de variables de TODOS los PLCs, y con dos
                    controladores la página ya no cabía en pantalla. */
-                <div className="grid gap-4 xl:grid-cols-[minmax(240px,280px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(240px,280px)_minmax(0,1fr)_minmax(240px,300px)]">
+                /* `items-start`: CADA COLUMNA MIDE LO SUYO.
+                   Una rejilla estira por defecto todas las columnas a la
+                   más alta. Aquí la más alta es la de la derecha (Enlace +
+                   Lectura en vivo), así que la tarjeta de variables se
+                   estiraba a ~790 px: o le sobraba medio panel vacío
+                   debajo de la tabla, o la tabla se estiraba hasta ahí.
+                   Las dos cosas se ven mal, y las dos salían de este
+                   estirado, no de la tabla. */
+                <div className="grid items-start gap-4 xl:grid-cols-[minmax(240px,280px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(240px,280px)_minmax(0,1fr)_minmax(240px,300px)]">
 
                   {/* ── Lista de controladores ── */}
                   <div className="space-y-4">
@@ -933,6 +955,11 @@ export function Configuracion() {
                           </button>
                         </div>
 
+                        {/* Mismo tope que «Lectura en vivo» (26rem), a
+                            propósito: las dos son listas largas que se
+                            desplazan por dentro, y con el mismo alto las dos
+                            columnas quedan a la par en vez de una el doble
+                            de larga que la otra. */}
                         <div className="mp-scroll mp-scroll-dark max-h-[26rem] overflow-auto">
                           <table className="w-full min-w-[440px] text-left text-sm">
                             <thead className="sticky top-0 z-10">
@@ -1057,11 +1084,22 @@ export function Configuracion() {
                                 </h3>
                               </span>
                               <span className="text-[11px] tabular-nums text-slate-400">
-                                {marcadasDelSel.length}
+                                {vivoFiltrado.length === marcadasDelSel.length
+                                  ? marcadasDelSel.length
+                                  : `${vivoFiltrado.length} / ${marcadasDelSel.length}`}
                               </span>
                             </div>
+                            {/* TOPE DE ALTURA Y SCROLL PROPIO.
+                                Antes pintaba las 206 seguidas sin tope: la
+                                tarjeta crecía metros, y como las dos columnas
+                                de la fila se estiran a la más alta, la tabla
+                                de la izquierda se quedaba con medio metro de
+                                hueco vacío debajo. Con el tope, el panel se
+                                desplaza por dentro y la fila vuelve a medir
+                                lo que mide la tabla. */}
+                            <div className="mp-scroll mp-scroll-dark max-h-[26rem] overflow-y-auto">
                             <div className="grid grid-cols-2 gap-px bg-slate-100 dark:bg-navy-slate/60">
-                              {marcadasDelSel.map((v) => (
+                              {vivoFiltrado.map((v) => (
                                 <div
                                   key={v.id}
                                   className="bg-white px-3 py-2.5 dark:bg-navy-soft"
@@ -1074,6 +1112,13 @@ export function Configuracion() {
                                   </p>
                                 </div>
                               ))}
+                            </div>
+
+                            {vivoFiltrado.length === 0 && (
+                              <p className="px-4 py-6 text-center text-[11px] text-slate-400">
+                                Ninguna variable marcada coincide con «{buscaVar}».
+                              </p>
+                            )}
                             </div>
                           </Tarjeta>
                         )}

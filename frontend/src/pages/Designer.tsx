@@ -13,6 +13,10 @@ import {
   LayersIcon,
   MenuIcon,
   PlayIcon,
+  ChevronDownIcon,
+  ChevronsUpIcon,
+  ChevronUpIcon,
+  ChevronsDownIcon,
   UsersIcon } from
 'lucide-react';
 import { useAppStore } from '../context/AppStore';
@@ -27,7 +31,10 @@ import {
   hijosDe,
   moverBloque,
   reasignarPadre,
-  soltarHijos } from
+  soltarHijos,
+  reordenar,
+  puedeReordenar,
+  type AccionOrden } from
 '../components/hmi/grupo';
 import { PropertyInspector } from '../components/hmi/PropertyInspector';
 import { UPDATE_RATE_OPTIONS } from '../models/plc';
@@ -124,6 +131,16 @@ export function Designer() {
   // Sin esa pista, meter algo en un grupo es a ciegas: sueltas y a ver que
   // paso. Con ella se ve el marco encenderse antes de soltar.
   const [arrastrando, setArrastrando] = useState<string | null>(null);
+
+  // Desplegable del selector de sección.
+  const [selectorAbierto, setSelectorAbierto] = useState(false);
+
+  // Menú del clic derecho: qué widget y en qué punto de la pantalla.
+  const [menuOrden, setMenuOrden] = useState<{
+    id: string;
+    x: number;
+    y: number;
+  } | null>(null);
 
   // Fase 4: el "lápiz". Solo una persona edita a la vez; el resto ve los
   // cambios en vivo en modo lectura. Se pide al entrar y se suelta al salir.
@@ -337,13 +354,16 @@ export function Designer() {
   // Escape cierra el menú. Es lo que espera cualquiera con un desplegable
   // abierto, y evita quedarse atrapado si el clic-fuera falla.
   useEffect(() => {
-    if (!menuAbierto) return;
+    if (!menuAbierto && !selectorAbierto && !menuOrden) return;
     const alPulsar = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuAbierto(false);
+      if (e.key !== 'Escape') return;
+      setMenuAbierto(false);
+      setSelectorAbierto(false);
+      setMenuOrden(null);
     };
     window.addEventListener('keydown', alPulsar);
     return () => window.removeEventListener('keydown', alPulsar);
-  }, [menuAbierto]);
+  }, [menuAbierto, selectorAbierto, menuOrden]);
 
   const selected = widgets.find((w) => w.id === selectedId) ?? null;
 
@@ -366,6 +386,13 @@ export function Designer() {
    * un widget agrupado dice de quien depende, que es justo la duda que
    * aparece al mover algo y ver que se mueve otra cosa con el.
    */
+  /** Aplica una acción de orden al widget del menú y lo cierra. */
+  const aplicarOrden = (id: string, accion: AccionOrden) => {
+    setMenuOrden(null);
+    if (!puedeEditar) return;
+    setWidgets((prev) => reordenar(prev, id, accion));
+  };
+
   const insigniaDe = (w: HmiWidget): string | undefined => {
     if (esContenedor(w.kind)) {
       const n = hijosDe(widgets, w.id).length;
@@ -596,20 +623,82 @@ export function Designer() {
               dentro es estado y ajustes, que se miran de vez en cuando. */}
           {secciones.length > 0 &&
           <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-navy-slate dark:bg-navy">
-            <LayersIcon className="ml-1.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-            {secciones.map((s) =>
-            <button
-              key={s.id}
-              onClick={() => setVistaActiva(GRUPO_POR_DEFECTO, s.id)}
-              title={`Editar la sección «${s.label || s.id}»`}
-              className={`rounded-md px-2 py-1 text-xs font-semibold transition ${
-              vistaActiva === s.id ?
-              'bg-white text-navy shadow-sm dark:bg-navy-slate dark:text-slate-100' :
-              'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`
-              }>
-              {s.label || s.id}
-            </button>
-            )}
+
+            {/* SELECTOR DE SECCIÓN: DESPLEGABLE, NO UNA FILA DE BOTONES.
+                Antes cada sección era un botón en la barra. Con tres cabía;
+                con doce, la barra se comía la pantalla y acababa empujando al
+                play y al menú fuera de sitio. Y el ancho cambiaba cada vez que
+                renombrabas una sección, así que los botones bailaban.
+                Un desplegable ocupa lo mismo con 3 que con 30. */}
+            <div className="relative">
+              <button
+                onClick={() => setSelectorAbierto((v) => !v)}
+                title="Elegir la sección que estás editando"
+                aria-expanded={selectorAbierto}
+                className={`flex items-center gap-1.5 rounded-md py-1 pl-2 pr-1.5 text-xs font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-siemens/40 ${
+                selectorAbierto ?
+                'bg-white text-navy shadow-sm dark:bg-navy-slate dark:text-slate-100' :
+                'text-navy hover:bg-white dark:text-slate-100 dark:hover:bg-navy-slate'}`
+                }>
+                <LayersIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                {/* Ancho fijo: sin él, la barra entera se ensancha y se encoge
+                    al cambiar de sección y el resto de botones se mueven. */}
+                <span className="max-w-[130px] truncate">
+                  {secciones.find((s) => s.id === vistaActiva)?.label || 'Sin sección'}
+                </span>
+                <span className="rounded bg-slate-200/70 px-1 text-[10px] tabular-nums text-slate-500 dark:bg-navy-slate/70 dark:text-slate-400">
+                  {Math.max(1, secciones.findIndex((s) => s.id === vistaActiva) + 1)}/{secciones.length}
+                </span>
+                <ChevronDownIcon
+                  className={`h-3 w-3 shrink-0 text-slate-400 transition-transform ${selectorAbierto ? 'rotate-180' : ''}`} />
+              </button>
+
+              {selectorAbierto &&
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setSelectorAbierto(false)} />
+
+                <div className="absolute left-0 top-full z-50 mt-1.5 max-h-[320px] w-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-navy-slate dark:bg-navy-soft">
+                  {secciones.map((s) => {
+                    // Cuántos widgets viven en cada sección. Con muchas
+                    // secciones es el dato que buscas: dice cuál está vacía y
+                    // cuál te olvidaste de rellenar, sin ir abriéndolas una a
+                    // una.
+                    const cuantos = widgets.filter((w) => (w.vista ?? '') === s.id).length;
+                    const activa = vistaActiva === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => {
+                          setVistaActiva(GRUPO_POR_DEFECTO, s.id);
+                          setSelectorAbierto(false);
+                        }}
+                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition ${
+                        activa ?
+                        'bg-siemens-50 font-semibold text-siemens dark:bg-siemens/15 dark:text-siemens-200' :
+                        'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-navy-slate/50'}`
+                        }>
+                        <span className="min-w-0 flex-1 truncate">{s.label || s.id}</span>
+                        <span className="shrink-0 text-[10px] tabular-nums text-slate-400">
+                          {cuantos}
+                        </span>
+                      </button>);
+
+                  })}
+
+                  {/* Los widgets fijos no son una sección y no se pueden
+                      "abrir", pero saber cuántos hay explica por qué algunos
+                      no desaparecen nunca al cambiar de sección. */}
+                  <div className="mt-1 flex items-center gap-2 border-t border-slate-100 px-3 pb-0.5 pt-1.5 text-[10px] text-slate-400 dark:border-navy-slate">
+                    <span className="min-w-0 flex-1">En todas las secciones</span>
+                    <span className="tabular-nums">
+                      {widgets.filter((w) => !(w.vista ?? '').trim()).length}
+                    </span>
+                  </div>
+                </div>
+              </>
+              }
+            </div>
+
             <div className="mx-0.5 h-4 w-px bg-slate-200 dark:bg-navy-slate" />
             <button
               onClick={() => setAislarSeccion((v) => !v)}
@@ -873,6 +962,7 @@ export function Designer() {
                 setWidgets((prev) => reasignarPadre(prev, id));
               }}
               onResize={(id, width, height) => patchWidget(id, { width, height })}
+              onContextMenu={(id, x, y) => setMenuOrden({ id, x, y })}
               insignia={insigniaDe(w)}
               resaltado={destinoGrupo === w.id}
               canvasRef={canvasRef} />
@@ -881,6 +971,85 @@ export function Designer() {
             })}
           </div>
         </main>
+
+        {/* ── MENÚ DEL CLIC DERECHO: ORDEN ─────────────────────
+            Va aquí, fuera del lienzo, y con `position: fixed`. Dentro del
+            lienzo lo recortaría el `overflow:auto` del contenedor en
+            cuanto el widget estuviera cerca de un borde, que es justo
+            donde más falta hace subir o bajar algo. */}
+        {menuOrden && (() => {
+          const w = widgets.find((x) => x.id === menuOrden.id);
+          if (!w) return null;
+
+          const acciones: {
+            accion: AccionOrden;
+            label: string;
+            Icono: typeof ChevronsUpIcon;
+          }[] = [
+          { accion: 'frente', label: 'Traer al frente', Icono: ChevronsUpIcon },
+          { accion: 'adelante', label: 'Traer adelante', Icono: ChevronUpIcon },
+          { accion: 'atras', label: 'Enviar atrás', Icono: ChevronDownIcon },
+          { accion: 'fondo', label: 'Enviar al fondo', Icono: ChevronsDownIcon }];
+
+          // Que no se salga por el borde. Un menú medio fuera de pantalla
+          // con la última opción cortada es peor que no tenerlo.
+          const ANCHO = 200;
+          const ALTO = 190;
+          const x = Math.min(menuOrden.x, window.innerWidth - ANCHO - 8);
+          const y = Math.min(menuOrden.y, window.innerHeight - ALTO - 8);
+
+          return (
+            <>
+              <div
+                className="fixed inset-0 z-[60]"
+                onPointerDown={() => setMenuOrden(null)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setMenuOrden(null);
+                }} />
+
+              <div
+                style={{ left: x, top: y, width: ANCHO }}
+                className="fixed z-[61] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-navy-slate dark:bg-navy-soft">
+
+                <div className="border-b border-slate-100 px-3 pb-1.5 pt-1 dark:border-navy-slate">
+                  <p className="truncate text-[11px] font-semibold text-navy dark:text-slate-100">
+                    {w.name}
+                  </p>
+                  {/* En qué posición está de la pila. Sin esto no se sabe si
+                      «traer adelante» va a hacer algo. */}
+                  <p className="text-[10px] text-slate-400">
+                    Capa {widgets.findIndex((x) => x.id === w.id) + 1} de {widgets.length}
+                  </p>
+                </div>
+
+                {acciones.map(({ accion, label, Icono }) => {
+                  // Deshabilitado cuando ya está en ese extremo: pulsarlo y
+                  // que no pase nada haría dudar de si funciona.
+                  const puede = puedeEditar && puedeReordenar(widgets, w.id, accion);
+                  return (
+                    <button
+                      key={accion}
+                      disabled={!puede}
+                      onClick={() => aplicarOrden(w.id, accion)}
+                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-navy-slate/50">
+                      <Icono className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                      {label}
+                    </button>);
+
+                })}
+
+                {/* Un contenedor arrastra a los suyos: conviene decirlo antes
+                    de pulsar, no después de ver moverse cinco widgets. */}
+                {esContenedor(w.kind) && hijosDe(widgets, w.id).length > 0 &&
+                <p className="border-t border-slate-100 px-3 pb-0.5 pt-1.5 text-[10px] leading-relaxed text-slate-400 dark:border-navy-slate">
+                  Se mueve con sus {hijosDe(widgets, w.id).length} widgets dentro.
+                </p>
+                }
+              </div>
+            </>);
+
+        })()}
 
         <PropertyInspector
           widget={selected}
