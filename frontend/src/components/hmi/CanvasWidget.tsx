@@ -28,6 +28,10 @@ interface Props {
 
   /** Este es el contenedor donde caeria lo que se esta arrastrando. */
   resaltado?: boolean;
+
+  /** Clic derecho encima: abre el menú de orden. Llega ya con el widget
+   *  seleccionado y con las coordenadas de pantalla del cursor. */
+  onContextMenu?: (id: string, x: number, y: number) => void;
 }
 // A positioned, draggable, selectable widget on the canvas.
 export function CanvasWidget({
@@ -41,7 +45,8 @@ export function CanvasWidget({
   onMoveStart,
   onMoveEnd,
   insignia,
-  resaltado
+  resaltado,
+  onContextMenu
 }: Props) {
   const drag = useRef<{
     startX: number;
@@ -64,6 +69,12 @@ export function CanvasWidget({
   const handlePointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
     onSelect(widget.id);
+
+    // Solo el botón IZQUIERDO arrastra. Sin esto, abrir el menú con el
+    // derecho empezaba un arrastre invisible: movías el ratón para elegir
+    // una opción y el widget se iba detrás del cursor.
+    if (e.button !== 0) return;
+
     movido.current = false;
     drag.current = {
       startX: e.clientX,
@@ -142,6 +153,14 @@ export function CanvasWidget({
   return (
     <div
       onPointerDown={handlePointerDown}
+      onContextMenu={(e) => {
+        if (!onContextMenu) return;
+        // Fuera el menú del navegador: aquí el clic derecho es del editor.
+        e.preventDefault();
+        e.stopPropagation();
+        onSelect(widget.id);
+        onContextMenu(widget.id, e.clientX, e.clientY);
+      }}
       style={{
         left: widget.x,
         top: widget.y,
