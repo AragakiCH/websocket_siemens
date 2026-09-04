@@ -22,6 +22,17 @@ export interface CustomWidgetDef {
    */
   inspector?: (ctx: InspectorCtx) => ReactNode;
 
+  /**
+   * Fuera de la paleta, pero se sigue dibujando.
+   *
+   * Para un widget retirado: no se puede agregar uno nuevo, y los que ya
+   * estén colocados en un diseño guardado se siguen viendo igual. Quitarlo
+   * del registry de golpe dejaría un hueco vacío sin explicación en cada
+   * proyecto que lo tuviera. Es el mismo criterio con el que se retiró el
+   * widget «chart» del catálogo.
+   */
+  oculto?: boolean;
+
   /** Valores de `config` con los que nace el widget al soltarlo. */
   defaultConfig?: Record<string, any>;
 }

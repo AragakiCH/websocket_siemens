@@ -278,7 +278,9 @@ export function getWidgetCatalog(): CatalogItem[] {
   }));
   return [
     ...builtInCatalog,
-    ...customWidgets.map((w) => ({
+    // Los retirados no se ofrecen, pero siguen dibujándose donde ya
+    // estaban: ver `oculto` en custom/types.ts.
+    ...customWidgets.filter((w) => !w.oculto).map((w) => ({
       kind: w.kind as WidgetKind,
       label: w.label,
       icon: w.icon,

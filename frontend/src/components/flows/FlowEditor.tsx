@@ -1,10 +1,18 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   PlusIcon,
   ZoomInIcon,
   ZoomOutIcon,
   MaximizeIcon,
   Trash2Icon,
+  DatabaseIcon,
+  ActivityIcon,
+  PlayIcon,
+  SquareIcon,
+  PanelLeftIcon,
+  PanelLeftCloseIcon,
+  type LucideIcon,
 } from 'lucide-react';
 import { FlowNodeData, FlowConnection, NodeType, NODE_CATALOG, COLOR_DOT } from './types';
 import { FlowNode, EstadoGrupo } from './FlowNode';
@@ -12,6 +20,183 @@ import { FlowConfigPanel } from './FlowConfigPanel';
 import { ConfirmarBorrado } from './ConfirmarBorrado';
 import { useEstadoHistorian } from './useEstadoHistorian';
 import { detenerGrupo } from './api';
+
+
+// ─── Paleta de nodos (solo presentación) ───────────────────────
+//
+// El catálogo de tipos y sus `defaultConfig` siguen viviendo en types.ts.
+// Aquí solo está lo que hace falta para DIBUJARLO: qué icono le toca a cada
+// uno y una línea que diga para qué sirve, que es la pregunta que se hace
+// cualquiera la primera vez que abre el editor.
+
+/**
+ * Tipo MIME propio del arrastre.
+ *
+ * Uno inventado y no 'text/plain' a proposito: asi el lienzo distingue un
+ * nodo de la paleta de cualquier otra cosa que se pueda soltar encima (un
+ * archivo del escritorio, texto de otra pestana) y no intenta crear un nodo
+ * con lo que sea que venga.
+ */
+const MIME_NODO = 'application/x-psicore-nodo';
+
+/**
+ * Ancho de la paleta, en pixeles y no en una clase de Tailwind.
+ *
+ * La animacion tiene que interpolar HASTA un numero, asi que el ancho deja
+ * de poder vivir solo en `w-52`. Se declara aqui una vez y lo usan los dos:
+ * el contenido lo fija para no deformarse, y la animacion lo usa de destino.
+ */
+const ANCHO_PALETA = 208;
+
+const ICONO: Record<string, LucideIcon> = {
+  Database: DatabaseIcon,
+  Activity: ActivityIcon,
+  Play: PlayIcon,
+  Square: SquareIcon,
+};
+
+const DESCRIPCION: Record<NodeType, string> = {
+  connection: 'Apunta a una base de datos',
+  historian: 'Graba tags en una tabla',
+  start: 'Arranca la grabación',
+  stop: 'Detiene la grabación',
+};
+
+// Las categorías salen del propio catálogo; esto solo les pone título y
+// decide en qué orden se leen.
+const GRUPOS: { categoria: 'bd' | 'historian'; titulo: string }[] = [
+  { categoria: 'bd', titulo: 'Conexión' },
+  { categoria: 'historian', titulo: 'Historizador' },
+];
+
+/**
+ * Paleta fija de la izquierda.
+ *
+ * Antes esto era un desplegable detrás del botón «+ Nodo»: para saber qué
+ * nodos existían había que abrirlo, y al soltar uno se cerraba solo, así que
+ * armar un flujo de cuatro nodos eran cuatro aperturas del mismo menú. En un
+ * editor de flujos la paleta es justo lo que más se mira, así que se queda a
+ * la vista con las dos categorías desplegadas.
+ *
+ * Llama al MISMO `addNode` de siempre: no hay un camino nuevo para crear
+ * nodos, solo se dejó de esconder el que ya había.
+ */
+function PaletaNodos({
+  onAdd,
+  onCerrar,
+  onArrastreInicio,
+  onArrastreFin,
+}: {
+  onAdd: (type: NodeType) => void;
+  onCerrar: () => void;
+  onArrastreInicio: (type: NodeType) => void;
+  onArrastreFin: () => void;
+}) {
+  // Quien tenga puesto "reducir movimiento" en su sistema no quiere ver
+  // nada deslizarse: se le cambia de golpe, que es lo que pidio.
+  const sinMovimiento = useReducedMotion();
+
+  return (
+    <motion.aside
+      initial={{ width: 0, opacity: 0 }}
+      animate={{ width: ANCHO_PALETA, opacity: 1 }}
+      exit={{ width: 0, opacity: 0 }}
+      transition={
+        sinMovimiento
+          ? { duration: 0 }
+          // Curva de salida rapida: arranca suelto y frena al final, que es
+          // como se mueve un panel de verdad. Y 0.22 s a proposito: por
+          // debajo se ve seco y por encima se siente lento cuando lo abres y
+          // lo cierras varias veces seguidas.
+          : { duration: 0.22, ease: [0.32, 0.72, 0, 1] }
+      }
+      // `overflow-hidden` es lo que hace que esto parezca un panel que se
+      // desliza: el contenido mantiene su ancho y se va quedando fuera del
+      // marco, en vez de aplastarse contra el borde mientras se cierra.
+      className="shrink-0 overflow-hidden border-r border-slate-200 bg-white dark:border-navy-slate dark:bg-navy-soft"
+    >
+    <div
+      className="flex h-full flex-col overflow-y-auto overscroll-contain"
+      style={{ width: ANCHO_PALETA }}
+    >
+      <div className="flex items-start justify-between gap-2 border-b border-slate-200 px-3 py-2.5 dark:border-navy-slate">
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Nodos
+          </p>
+          <p className="mt-0.5 text-[10.5px] leading-snug text-slate-400">
+            Arrastra uno al lienzo
+          </p>
+        </div>
+        <button
+          onClick={onCerrar}
+          title="Ocultar la paleta"
+          aria-label="Ocultar la paleta"
+          className="-mr-1 shrink-0 rounded-md p-1 text-slate-400 outline-none transition hover:bg-slate-100 hover:text-slate-600 focus-visible:ring-2 focus-visible:ring-siemens/40 dark:hover:bg-navy-slate/50 dark:hover:text-slate-300"
+        >
+          <PanelLeftCloseIcon className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-4 p-2.5">
+        {GRUPOS.map((g) => {
+          const delGrupo = NODE_CATALOG.filter((c) => c.category === g.categoria);
+          if (delGrupo.length === 0) return null;
+          return (
+            <div key={g.categoria}>
+              <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {g.titulo}
+              </p>
+              <div className="flex flex-col gap-1">
+                {delGrupo.map((cat) => {
+                  const Icono = ICONO[cat.icon] ?? DatabaseIcon;
+                  return (
+                    <button
+                      key={cat.type}
+                      draggable
+                      onDragStart={(e) => {
+                        // El tipo viaja en el dataTransfer, que es lo unico
+                        // que sobrevive hasta el `drop`. El aviso al editor
+                        // es aparte porque durante el `dragover` el navegador
+                        // NO deja leer el dataTransfer (lo tapa por
+                        // seguridad), y sin saber que se arrastra no se
+                        // podria pintar la pista de "suelta aqui".
+                        e.dataTransfer.setData(MIME_NODO, cat.type);
+                        e.dataTransfer.effectAllowed = 'copy';
+                        onArrastreInicio(cat.type);
+                      }}
+                      onDragEnd={onArrastreFin}
+                      onClick={() => onAdd(cat.type)}
+                      title={`Arrastra «${cat.label}» al lienzo, o pulsa para soltarlo en el centro`}
+                      className="flex cursor-grab items-start gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-left outline-none transition hover:border-siemens/40 hover:bg-siemens-50/60 focus-visible:ring-2 focus-visible:ring-siemens/40 active:cursor-grabbing dark:border-navy-slate dark:bg-navy dark:hover:border-siemens/40 dark:hover:bg-siemens/10"
+                    >
+                      <span
+                        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
+                          COLOR_DOT[cat.color] ?? 'bg-slate-400'
+                        }`}
+                      >
+                        <Icono className="h-3.5 w-3.5 text-white" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs font-semibold text-navy dark:text-slate-100">
+                          {cat.label}
+                        </span>
+                        <span className="block text-[10.5px] leading-tight text-slate-400">
+                          {DESCRIPCION[cat.type]}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+    </motion.aside>
+  );
+}
 
 let _nodeCounter = 1;
 
@@ -50,8 +235,15 @@ export function FlowEditor() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-  const [showAddMenu, setShowAddMenu] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; target: Selection } | null>(null);
+
+  // Paleta plegada o no. Se pliega para ganar lienzo en un flujo grande.
+  const [paletaAbierta, setPaletaAbierta] = useState(true);
+
+  // Tipo que se esta arrastrando ahora mismo desde la paleta, o null. Solo
+  // sirve para pintar la pista de "suelta aqui": el dato de verdad viaja en
+  // el dataTransfer, que es lo unico que llega intacto al `drop`.
+  const [arrastreTipo, setArrastreTipo] = useState<NodeType | null>(null);
 
   // Linking: drag from output port to input port
   const [linking, setLinking] = useState<{ fromId: string; mouse: { x: number; y: number } } | null>(null);
@@ -59,6 +251,12 @@ export function FlowEditor() {
   linkingRef.current = linking;
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // El LIENZO, que ya no empieza donde empieza el contenedor: la paleta se
+  // le puso delante. Todo lo que traduce pixeles de pantalla a coordenadas
+  // del lienzo (el cable que se esta tendiendo, el nodo que se suelta) tiene
+  // que medir contra este, o sale desplazado justo el ancho de la paleta.
+  const lienzoRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { saveFlowState(nodes, connections); }, [nodes, connections]);
 
@@ -118,18 +316,24 @@ export function FlowEditor() {
   }, [gruposActivosEn]);
 
   // ── CRUD ──────────────────────────────────────────────────────
-  const addNode = useCallback((type: NodeType) => {
+  /**
+   * Crea un nodo. `posicion` es donde se solto, en coordenadas del lienzo.
+   *
+   * Sin ella cae donde caia siempre, en un punto al azar de la zona de
+   * arriba a la izquierda: es lo que sigue pasando al PULSAR un nodo de la
+   * paleta en vez de arrastrarlo.
+   */
+  const addNode = useCallback((type: NodeType, posicion?: { x: number; y: number }) => {
     const cat = NODE_CATALOG.find((c) => c.type === type)!;
     const id = `${type}_${Date.now()}_${_nodeCounter++}`;
     setNodes((prev) => [...prev, {
       id, type,
       label: `${cat.label} ${_nodeCounter - 1}`,
-      position: { x: 200 + Math.random() * 200, y: 120 + Math.random() * 150 },
+      position: posicion ?? { x: 200 + Math.random() * 200, y: 120 + Math.random() * 150 },
       config: { ...cat.defaultConfig },
       status: 'idle',
     }]);
     setSelection({ kind: 'node', id });
-    setShowAddMenu(false);
   }, []);
 
   const borrarNodoDirecto = useCallback((id: string) => {
@@ -222,7 +426,7 @@ export function FlowEditor() {
       setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
     }
     if (linkingRef.current) {
-      const rect = containerRef.current?.getBoundingClientRect();
+      const rect = lienzoRef.current?.getBoundingClientRect();
       if (rect) {
         setLinking((prev) =>
           prev ? { ...prev, mouse: { x: (e.clientX - rect.left - pan.x) / zoom, y: (e.clientY - rect.top - pan.y) / zoom } } : null
@@ -242,6 +446,41 @@ export function FlowEditor() {
   };
 
   const resetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+
+  // ── Soltar un nodo de la paleta ───────────────────────────────
+  //
+  // Se usa el arrastre nativo del navegador (draggable + dataTransfer) y no
+  // los eventos de puntero que ya maneja el editor. Son dos gestos distintos
+  // que empiezan igual —apretar y mover— y mezclarlos obligaria a adivinar
+  // cual es cual en cada pointerdown. Ademas el arrastre nativo trae gratis
+  // el fantasma del elemento y el cursor de "copiar".
+
+  /** Sin esto el navegador rechaza el soltar y nunca dispara `onDrop`. */
+  const sobreLienzo = (e: React.DragEvent) => {
+    if (!arrastreTipo) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const soltarEnLienzo = (e: React.DragEvent) => {
+    e.preventDefault();
+    setArrastreTipo(null);
+
+    const tipo = e.dataTransfer.getData(MIME_NODO) as NodeType;
+    if (!NODE_CATALOG.some((c) => c.type === tipo)) return;
+
+    const rect = lienzoRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    // Pantalla -> lienzo: se deshace el desplazamiento y luego el zoom, en
+    // ese orden, porque el CSS los aplica al reves (`translate` y despues
+    // `scale`). Y se descuenta media anchura del nodo para que quede bajo el
+    // cursor y no colgando de su esquina.
+    const x = (e.clientX - rect.left - pan.x) / zoom - 90;
+    const y = (e.clientY - rect.top - pan.y) / zoom - 24;
+
+    addNode(tipo, { x: Math.round(x), y: Math.round(y) });
+  };
 
   // ── Port positions ────────────────────────────────────────────
   const getPortPos = (id: string, port: 'input' | 'output') => {
@@ -300,6 +539,25 @@ export function FlowEditor() {
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
     >
+      {/* La paleta va DENTRO del flex de la raiz, antes del lienzo: asi el
+          lienzo (`flex-1`) se encoge lo justo y el pan y el zoom siguen
+          midiendo contra su propio ancho, sin cuentas nuevas. */}
+      {/* `AnimatePresence` es lo que permite animar la SALIDA: sin el, React
+          desmonta la paleta en cuanto `paletaAbierta` pasa a false y no queda
+          nada en pantalla que animar. `initial={false}` evita que se despliegue
+          sola al entrar a la pestana, que se veria como un tiron. */}
+      <AnimatePresence initial={false}>
+        {paletaAbierta && (
+          <PaletaNodos
+            key="paleta"
+            onAdd={addNode}
+            onCerrar={() => setPaletaAbierta(false)}
+            onArrastreInicio={setArrastreTipo}
+            onArrastreFin={() => setArrastreTipo(null)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* El zoom con la rueda vive AQUI, en el lienzo, no en la raiz.
           Estaba en el contenedor de fuera, que envuelve tambien al panel de
           configuracion de la derecha: rodar la rueda para recorrer un
@@ -312,8 +570,11 @@ export function FlowEditor() {
           (`data-canvas`), y tenerlo arriba es lo que permite seguir
           arrastrando aunque el cursor se salga por encima del panel. */}
       <div
+        ref={lienzoRef}
         className="relative flex-1 overflow-hidden bg-slate-50 dark:bg-navy"
         onWheel={handleWheel}
+        onDragOver={sobreLienzo}
+        onDrop={soltarEnLienzo}
       >
 
         {/* ── Layer 0: Background dots (pan target) ── */}
@@ -414,35 +675,22 @@ export function FlowEditor() {
 
         {/* Toolbar */}
         <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/90 px-2 py-1.5 shadow-sm backdrop-blur dark:border-navy-slate dark:bg-navy-soft/90" style={{ zIndex: 30 }}>
-          <div className="relative">
-            <button
-              onClick={() => setShowAddMenu(!showAddMenu)}
-              className="flex items-center gap-1 rounded-md bg-siemens px-2 py-1 text-xs font-semibold text-white transition hover:bg-siemens-600"
-            >
-              <PlusIcon className="h-3.5 w-3.5" />
-              Nodo
-            </button>
-            {showAddMenu && (
-              <div className="absolute left-0 top-full mt-1 w-48 rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-navy-slate dark:bg-navy-soft">
-                <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Base de Datos</p>
-                {NODE_CATALOG.filter((c) => c.category === 'bd').map((cat) => (
-                  <button key={cat.type} onClick={() => addNode(cat.type)}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-slate-700 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-navy-slate/40">
-                    <span className="h-2 w-2 rounded-full bg-siemens" />{cat.label}
-                  </button>
-                ))}
-                <div className="my-1 border-t border-slate-100 dark:border-navy-slate" />
-                <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Historizador</p>
-                {NODE_CATALOG.filter((c) => c.category === 'historian').map((cat) => (
-                  <button key={cat.type} onClick={() => addNode(cat.type)}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-slate-700 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-navy-slate/40">
-                    <span className={`h-2 w-2 rounded-full ${COLOR_DOT[cat.color] ?? 'bg-slate-400'}`} />{cat.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="mx-1 h-4 w-px bg-slate-200 dark:bg-navy-slate" />
+          {/* Solo aparece con la paleta plegada: abierta ya tiene su propio
+              boton de cerrar en la cabecera, y dos controles para lo mismo a
+              dos centimetros uno del otro sobran. */}
+          {!paletaAbierta && (
+            <>
+              <button
+                onClick={() => setPaletaAbierta(true)}
+                title="Mostrar la paleta de nodos"
+                aria-label="Mostrar la paleta de nodos"
+                className="rounded p-1 text-slate-500 transition hover:bg-slate-100 dark:hover:bg-navy-slate/40"
+              >
+                <PanelLeftIcon className="h-3.5 w-3.5" />
+              </button>
+              <div className="mx-1 h-4 w-px bg-slate-200 dark:bg-navy-slate" />
+            </>
+          )}
           <button onClick={() => setZoom((z) => Math.min(2, z + 0.15))} className="rounded p-1 text-slate-500 transition hover:bg-slate-100 dark:hover:bg-navy-slate/40" title="Zoom in">
             <ZoomInIcon className="h-3.5 w-3.5" />
           </button>
@@ -469,12 +717,27 @@ export function FlowEditor() {
           <span>{connections.length} conexiones</span>
         </div>
 
+        {/* Pista mientras se arrastra. El borde marca DONDE se puede soltar,
+            que con la paleta al lado no es evidente, y el rotulo dice que se
+            va a crear. `pointer-events-none` es obligatorio: cualquier cosa
+            que capture el puntero encima del lienzo se come el `drop`. */}
+        {arrastreTipo && (
+          <div
+            className="pointer-events-none absolute inset-2 flex items-start justify-center rounded-xl border-2 border-dashed border-siemens/50 bg-siemens/5"
+            style={{ zIndex: 25 }}
+          >
+            <span className="mt-4 rounded-full bg-siemens px-3 py-1 text-[11px] font-semibold text-white shadow-sm">
+              Suelta para colocar «{NODE_CATALOG.find((c) => c.type === arrastreTipo)?.label}»
+            </span>
+          </div>
+        )}
+
         {/* Empty state */}
         {nodes.length === 0 && (
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-slate-400" style={{ zIndex: 1 }}>
             <PlusIcon className="mb-3 h-10 w-10 opacity-40" />
             <p className="text-sm font-medium">Agrega un nodo para empezar</p>
-            <p className="text-xs">Usa el botón &quot;+ Nodo&quot;</p>
+            <p className="text-xs">Arrástralo desde la paleta de la izquierda</p>
           </div>
         )}
 

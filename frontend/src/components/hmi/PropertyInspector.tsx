@@ -312,6 +312,12 @@ export function PropertyInspector({
   // El propio menú y el panel de sección no eligen sección: van fijos.
   const esNavegacion = esWidgetDeNavegacion(widget.kind);
 
+  // Su sección ya no está en el menú: se borró con el widget dentro. Hay que
+  // decirlo, porque desde la navegación ya no hay manera de llegar a él.
+  const huerfana =
+    !!(widget.vista ?? '').trim() &&
+    !seccionesNav.some((s) => s.id === widget.vista);
+
   const defParte = partes.find((p) => p.id === parteSel) ?? partes[0];
   const estiloActual = estiloDeParte(widget, defParte.id);
 
@@ -372,7 +378,12 @@ export function PropertyInspector({
 
           Aparece solo si hay un Menú Lateral con secciones declaradas: sin
           navegación montada este campo no significaría nada. */}
-      {seccionesNav.length > 0 && !esNavegacion &&
+      {/* La condición incluye `huerfana`: un widget cuya sección ya no
+          existe tiene que poder arreglarse desde aquí, y eso pasa
+          justamente en pantallas donde puede no quedar ningún menú. Sin
+          ese caso, el panel desaparecía y el widget se quedaba atrapado
+          con un id que no lleva a ninguna parte. */}
+      {(seccionesNav.length > 0 || huerfana) && !esNavegacion &&
       <Section title="Sección">
         <div className="flex flex-wrap gap-1">
           <BotonSeccion
@@ -390,9 +401,21 @@ export function PropertyInspector({
             {s.label || s.id}
           </BotonSeccion>
           )}
+          {huerfana &&
+          <BotonSeccion
+            activo
+            onClick={() => onChange({ vista: VISTA_TODAS })}
+            titulo="Esta sección ya no existe en el menú. Pulsa para devolverlo a «En todas».">
+            {widget.vista} · huérfana
+          </BotonSeccion>
+          }
         </div>
         <p className="text-[11px] leading-relaxed text-slate-400">
-          {widget.vista ?
+          {huerfana ?
+          'La sección «' + widget.vista + '» ya no está en el menú, así que ' +
+          'este widget no se puede abrir desde la navegación. Elige otra o ' +
+          'ponlo en «En todas».' :
+          widget.vista ?
           'Solo aparece cuando esa sección está abierta.' :
           'Aparece en todas las secciones. Útil para un logo o una barra de estado.'}
         </p>

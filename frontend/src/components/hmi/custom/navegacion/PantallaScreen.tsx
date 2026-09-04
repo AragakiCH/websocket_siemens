@@ -182,6 +182,12 @@ export const pantallaScreen: CustomWidgetDef = {
   // OJO: el `kind` se queda como está. Cambiarlo dejaría huérfano cualquier
   // widget ya colocado en un lienzo guardado.
   label: 'Panel de Sección',
+  // RETIRADO. Enmarcaba la vista abierta y ponía su nombre encima, pero
+  // no hacía nada más: los widgets se muestran y se esconden solos según
+  // su sección, con marco o sin él. Un widget que hay que colocar para
+  // que la navegación «se vea completa» y que no cambia nada confunde más
+  // de lo que ayuda. Los que ya estén puestos se siguen dibujando.
+  oculto: true,
   category: 'Básicos',
   icon: LayoutTemplateIcon,
   defaultWidth: 420,

@@ -22,11 +22,20 @@
 //   * Los valores, de `useAppStore().variables`: al montar este contexto el
 //     RealPLCService abre su WebSocket y el snapshot llega solo.
 // =========================================================================
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { MonitorIcon, ChevronDownIcon, Loader2Icon } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import {
+  MonitorIcon,
+  ChevronDownIcon,
+  Loader2Icon } from
+'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { WidgetRenderer } from '../components/hmi/WidgetRenderer';
-import { useVistaActiva, GRUPO_POR_DEFECTO } from '../components/hmi/custom/navegacion/store';
+import {
+  useVistaActiva,
+  setVistaActiva,
+  setPantalla,
+  GRUPO_POR_DEFECTO } from
+'../components/hmi/custom/navegacion/store';
 
 import {
   cargarProyecto,
@@ -57,10 +66,19 @@ export function Preview() {
   const inicial = useMemo(() => pantallaDeLaUrl() || getUltimaPantalla(), []);
   const [pantallaId, setPantallaId] = useState<string>(inicial);
   const [pantallas, setPantallas] = useState<ResumenPantalla[]>([]);
+
+
   const [design, setDesign] = useState<SavedDesign | null>(() =>
     loadDesign(inicial)
   );
   const [cargando, setCargando] = useState(true);
+
+  // La navegación se guarda por pantalla: sin esto, las pestañas de arriba
+  // compartirían una sola, y la pantalla 2 heredaría la sección abierta en
+  // la 1. En `useLayoutEffect` para que ese estado intermedio no se pinte.
+  useLayoutEffect(() => {
+    setPantalla(pantallaId);
+  }, [pantallaId]);
 
   // ── Catálogo de pantallas para el selector ──────────────────────
   useEffect(() => {
@@ -88,11 +106,15 @@ export function Preview() {
 
   useEffect(() => {
     // Se pinta la caché al instante y se reconcilia con el servidor: cambiar
-    // de pantalla en el selector no debe dejar un hueco en blanco.
+    // de pantalla no debe dejar un hueco en blanco mientras llega el fetch.
     setDesign(loadDesign(pantallaId));
     void cargar(pantallaId);
-    // La URL sigue a la selección, para que recargar o compartir el enlace
-    // devuelva la misma pantalla.
+  }, [pantallaId, cargar]);
+
+  // La URL sigue al SELECTOR, no a la navegación del menú: es el punto de
+  // entrada («ábreme el HMI por aquí»), y que cambiara en cada clic del
+  // operador llenaría el historial de pasos que nadie pidió.
+  useEffect(() => {
     try {
       const url = new URL(window.location.href);
       url.searchParams.set('pantalla', pantallaId);
@@ -100,7 +122,7 @@ export function Preview() {
     } catch {
       /* history bloqueado: no es crítico */
     }
-  }, [pantallaId, cargar]);
+  }, [pantallaId]);
 
   // ── Cambios de otros, en vivo ───────────────────────────────────
   //
@@ -110,7 +132,8 @@ export function Preview() {
   useEffect(() => {
     const alEvento = (ev: Event) => {
       const msg = (ev as CustomEvent).detail;
-      if (msg?.type !== 'project.updated' || msg.project_id !== pantallaId) return;
+      if (msg?.type !== 'project.updated') return;
+      if (msg.project_id !== pantallaId) return;
       void cargar(pantallaId);
     };
     window.addEventListener('hmi:ws', alEvento as EventListener);
@@ -135,7 +158,9 @@ export function Preview() {
   }, [pantallaId]);
 
   const nombreActual =
-    pantallas.find((p) => p.project_id === pantallaId)?.nombre ?? pantallaId;
+    pantallas.find((p) => p.project_id === pantallaId)?.nombre ??
+    pantallaId;
+
   const hayVarias = pantallas.length > 1;
 
   return (
@@ -149,8 +174,17 @@ export function Preview() {
           <MonitorIcon className="h-4 w-4 shrink-0 text-siemens" />
           <div className="relative">
             <select
+              // Enseña lo que se está viendo DE VERDAD, que puede venir del
+              // menú y no de aquí. Decir una cosa y dibujar otra fue
+              // exactamente el fallo del Panel de Sección en la Vista Previa.
               value={pantallaId}
-              onChange={(e) => setPantallaId(e.target.value)}
+              onChange={(e) => {
+                setPantallaId(e.target.value);
+                // Sin esto el menú seguiría mandando y la elección del
+                // selector no se vería nunca: dos mandos peleando por el
+                // mismo hueco. Elegir a mano gana.
+                setVistaActiva(GRUPO_POR_DEFECTO, '');
+              }}
               aria-label="Pantalla que se está viendo"
               className="cursor-pointer appearance-none rounded-lg border border-slate-200 bg-white py-1.5 pl-3 pr-8 text-xs font-semibold text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
             >
