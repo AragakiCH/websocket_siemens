@@ -42,6 +42,14 @@ pyinstaller==6.11.1          # Genera dist\PsiCore\ desde desktop/psi_core.spec
 asyncpg==0.30.0              # PostgreSQL / TimescaleDB
 aiomysql==0.2.0              # MySQL / MariaDB
 
+# Base de datos de zonas horarias. Windows NO la trae, y sin ella
+# `ZoneInfo("America/Lima")` falla. No revienta nada —settings.zona_horaria()
+# se cae a UTC con un aviso en el log— y ese es justo el problema: el .exe
+# sale funcionando y enseñando todas las horas desfasadas, sin un solo error
+# a la vista. El .spec ya la declara como hidden import; si no está
+# instalada, PyInstaller la da por perdida y sigue.
+tzdata==2025.2
+
 
 # --------------------------------------------------------------------------
 #  Lo que NO se instala con pip
