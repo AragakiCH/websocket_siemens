@@ -17,6 +17,30 @@ echo [1/5] Dependencias de empaquetado...
 pip install pyinstaller pywebview >nul
 if errorlevel 1 goto :error
 
+REM  Paquetes que el .spec declara como hidden import y que, si faltan,
+REM  PyInstaller da por perdidos con un ERROR de una linea en mitad de 400
+REM  lineas de log... y sigue adelante. El .exe sale, arranca, y falla
+REM  DESPUES, en el equipo del cliente:
+REM
+REM    tzdata    Windows no trae base de datos de zonas horarias. Sin ella,
+REM              settings.zona_horaria() se cae a UTC con un aviso en el log
+REM              y TODAS las horas salen desfasadas. Nada se rompe, que es lo
+REM              peor que puede pasar.
+REM    aiomysql  La pantalla de conexion ofrece MySQL. Sin el paquete, elegirlo
+REM    asyncpg   o PostgreSQL da un error de driver al conectar, no antes.
+REM
+REM  Aqui solo se AVISA: instalarlos a la fuerza cambiaria el entorno de quien
+REM  compila sin pedirselo. El aviso sale al principio y con la orden exacta.
+python -c "import importlib.util,sys; f=[m for m in ('tzdata','aiomysql','asyncpg') if importlib.util.find_spec(m) is None]; sys.exit(0) if not f else (print('   *** FALTAN en este venv: '+', '.join(f)), sys.exit(1))"
+if errorlevel 1 (
+    echo    *** El .exe se generara igualmente, pero sin eso:
+    echo    ***   - tzdata    todas las horas saldran en UTC, sin avisar
+    echo    ***   - aiomysql  MySQL fallara al conectar
+    echo    ***   - asyncpg   PostgreSQL fallara al conectar
+    echo    *** Para incluirlos:  pip install -r requirements-desktop.txt
+    echo.
+)
+
 echo [2/5] Compilando el frontend React...
 REM  El 'set' de abajo NO puede ir dentro de un bloque entre parentesis:
 REM  cmd.exe expande %errorlevel% al PARSEAR el bloque entero, no al ejecutar

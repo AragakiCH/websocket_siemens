@@ -131,6 +131,60 @@ def matar(proceso: Optional[subprocess.Popen], etiqueta: str) -> None:
             pass
 
 
+def comprobar_entorno() -> bool:
+    """
+    ¿Este Python puede importar el backend? Si no, decirlo AQUÍ.
+
+    Sin esta comprobación, arrancar con el venv sin activar produce lo peor
+    de dos mundos: uvicorn revienta con sesenta líneas de traceback dentro de
+    un subproceso —prefijadas con [backend], mezcladas con la salida de
+    Vite— y acto seguido el frontend arranca perfectamente y empieza a
+    escupir cientos de `ECONNREFUSED` que sepultan la única línea que
+    importaba. Quien lo lee acaba buscando un problema de red o de puertos,
+    cuando lo que pasa es que falta un `venv\Scripts\activate`.
+
+    Se comprueba con `find_spec`, que NO ejecuta el módulo: es rápido y no
+    puede fallar por un error del propio backend, que sería otro problema
+    distinto y merece su traceback de siempre.
+    """
+    import importlib.util
+
+    faltan = [m for m in ("fastapi", "uvicorn", "sqlalchemy", "pydantic")
+              if importlib.util.find_spec(m) is None]
+    if not faltan:
+        return True
+
+    en_venv = sys.prefix != sys.base_prefix
+
+    _log("", "")
+    _log("El backend no puede arrancar: faltan dependencias.", ROJO)
+    _log(f"  Sin instalar: {', '.join(faltan)}", ROJO)
+    _log(f"  Python en uso: {sys.executable}", GRIS)
+    _log("", "")
+    if not en_venv:
+        # La causa habitual, con diferencia. El aviso va antes que el
+        # `pip install`, porque instalar aquí ensuciaría el Python global
+        # y el problema volvería mañana.
+        _log("Este Python NO es el del entorno virtual del proyecto.", AMARILLO)
+        _log("Actívalo y vuelve a lanzarlo:", AMARILLO)
+        if ES_WINDOWS:
+            _log("    venv\\Scripts\\activate", VERDE)
+        else:
+            _log("    source venv/bin/activate", VERDE)
+        _log(f"    python tools/dev.py", VERDE)
+        _log("", "")
+        _log("O sin activarlo, usando su intérprete directamente:", GRIS)
+        if ES_WINDOWS:
+            _log("    venv\\Scripts\\python.exe tools\\dev.py", GRIS)
+        else:
+            _log("    venv/bin/python tools/dev.py", GRIS)
+    else:
+        _log("Estás en el entorno virtual, pero le faltan paquetes:", AMARILLO)
+        _log("    pip install -r requirements.txt", VERDE)
+    _log("", "")
+    return False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Arranca backend y frontend juntos en una sola terminal."
@@ -142,6 +196,11 @@ def main() -> int:
     parser.add_argument("--solo-backend", action="store_true",
                         help="No arrancar Vite (úsalo si ya hiciste npm run build).")
     args = parser.parse_args()
+
+    # Antes de arrancar nada. Levantar Vite contra un backend que no va a
+    # existir solo sirve para tapar el motivo con ruido.
+    if not comprobar_entorno():
+        return 1
 
     procesos: List[tuple[subprocess.Popen, str]] = []
 
