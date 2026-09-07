@@ -35,11 +35,13 @@ import {
   PlugZapIcon,
   PlusIcon,
   RefreshCwIcon,
+  TablePropertiesIcon,
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
 import { ConnectionForm } from '../flows/bd/ConnectionForm';
 import {
+  actualizarEsquema,
   borrarConexion,
   cargarConexiones,
   guardarConexion,
@@ -90,6 +92,7 @@ export function PanelBasesDatos({
 
   // Estado por fila: qué se está probando y qué se está confirmando borrar.
   const [probando, setProbando] = useState('');
+  const [migrando, setMigrando] = useState('');
   const [resultado, setResultado] = useState<Record<string, string>>({});
   const [diagFila, setDiagFila] = useState<Record<string, Diagnostico | undefined>>({});
   const [confirmar, setConfirmar] = useState('');
@@ -154,6 +157,28 @@ export function PanelBasesDatos({
       setDiagFila((x) => ({ ...x, [dbId]: e?.diagnostico }));
     } finally {
       setProbando('');
+      await recargar();
+    }
+  };
+
+  /**
+   * Crear o poner al día las tablas del HMI en esta conexión.
+   *
+   * El resultado se enseña en la misma línea que usa "Probar", porque es la
+   * misma pregunta: ¿esta base está lista para trabajar? La diferencia es que
+   * "Probar" contesta si RESPONDE y esto contesta si tiene la ESTRUCTURA.
+   */
+  const migrar = async (dbId: string) => {
+    setMigrando(dbId);
+    try {
+      const r = await actualizarEsquema(dbId);
+      setResultado((x) => ({ ...x, [dbId]: r?.mensaje ?? 'Esquema al día.' }));
+      setDiagFila((x) => ({ ...x, [dbId]: undefined }));
+    } catch (e: any) {
+      setResultado((x) => ({ ...x, [dbId]: e?.message ?? 'Falló.' }));
+      setDiagFila((x) => ({ ...x, [dbId]: e?.diagnostico }));
+    } finally {
+      setMigrando('');
       await recargar();
     }
   };
@@ -357,6 +382,19 @@ export function PanelBasesDatos({
                               <Loader2Icon className="h-4 w-4 animate-spin" />
                             ) : (
                               <PlugZapIcon className="h-4 w-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => void migrar(c.db_id)}
+                            disabled={migrando === c.db_id}
+                            title="Crear o actualizar las tablas del HMI (usuarios, alarmas, recetas). No borra nada."
+                            aria-label={`Actualizar el esquema de ${c.db_id}`}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 outline-none transition hover:bg-siemens/10 hover:text-siemens focus-visible:ring-2 focus-visible:ring-siemens/40 disabled:opacity-50"
+                          >
+                            {migrando === c.db_id ? (
+                              <Loader2Icon className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <TablePropertiesIcon className="h-4 w-4" />
                             )}
                           </button>
                           <button

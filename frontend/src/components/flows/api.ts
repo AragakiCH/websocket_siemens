@@ -290,6 +290,29 @@ export function provisionarBase(cfg: Record<string, any>): Promise<{
 }
 
 /** Borra la conexión Y todas sus consultas guardadas. */
+/**
+ * Crea o pone al día las tablas del HMI en una conexión ya dada de alta.
+ *
+ * Hace las dos cosas porque hacen falta las dos: `CREATE TABLE IF NOT EXISTS`
+ * deja intacta una tabla que ya está, así que una columna añadida al esquema
+ * —como `usuario_id`, la firma de quién hizo cada cambio— nunca llegaría sola
+ * a una base que ya está en producción. Sin esto, el backend nuevo escribiría
+ * en la base vieja sin registrar autor y sin quejarse: funcionaría, y la
+ * trazabilidad estaría vacía el día que se necesite.
+ *
+ * No borra columnas, no cambia tipos y no toca las filas: es repetible.
+ * Exige rol Administradores.
+ */
+export function actualizarEsquema(dbId: string): Promise<{
+  ok: boolean;
+  mensaje: string;
+  tablas?: string[];
+  columnas?: { tabla: string; añadidas: string[]; ya_estaban: string[]; avisos: string[] }[];
+  fallos?: string[];
+}> {
+  return apiPost(`/db/${encodeURIComponent(dbId)}/esquema`);
+}
+
 export function borrarConexion(dbId: string): Promise<any> {
   return apiDelete(`/db/${encodeURIComponent(dbId)}`);
 }

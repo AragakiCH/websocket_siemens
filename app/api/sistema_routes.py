@@ -39,7 +39,7 @@ import sys
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
@@ -171,11 +171,19 @@ async def descargar_backup() -> StreamingResponse:
                 "de datos, las sesiones y los PLCs conectados viven en "
                 "memoria; cambiarles el disco por debajo dejaría el proceso a "
                 "medio camino entre dos configuraciones.",
-    dependencies=[Depends(exigir_rol("Supervisor"))],
 )
 async def restaurar_backup(
     request: Request,
     archivo: UploadFile = File(..., description="El .zip descargado antes."),
+    # La sesión se recibe como PARÁMETRO y no en `dependencies=[...]`.
+    #
+    # Comprobar el permiso se comprueba igual de las dos formas, pero en la
+    # lista `dependencies` el resultado se descarta y aquí hace falta: esta es
+    # la operación más destructiva de todo el programa —sustituye cuentas,
+    # conexiones y pantallas de golpe— y hasta ahora se registraba en la
+    # auditoría con el usuario en blanco. Es decir: quedaba constancia de que
+    # alguien había reemplazado la configuración entera, pero no de quién.
+    sesion: Optional[Sesion] = Depends(exigir_rol("Supervisor")),
 ) -> Dict[str, Any]:
     contenido = await archivo.read()
     if len(contenido) > MAX_ZIP:
@@ -228,11 +236,21 @@ async def restaurar_backup(
 
     aud = getattr(request.app.state, "auditoria", None)
     if aud is not None:
-        aud.registrar("sistema.restaurado", "", str(destino),
-                      {"ficheros": restaurados, "respaldo": str(respaldo)})
+        # `sesion=` rellena solo el usuario y su id desde el token, igual que
+        # en el resto del CRUD: el cliente no elige con qué nombre se firma.
+        aud.registrar("sistema.restaurado", recurso=str(destino),
+                      detalle={"ficheros": restaurados,
+                               "respaldo": str(respaldo),
+                               "archivo": archivo.filename or "",
+                               "bytes": len(contenido)},
+                      sesion=sesion)
 
-    logger.warning("Configuración restaurada (%d ficheros). Respaldo en %s",
-                   restaurados, respaldo)
+    # `usuario_de` devuelve '' cuando no hay sesión, que pasa de verdad en dos
+    # casos legítimos: con `auth_requerida=false`, y en el arranque en frío
+    # mientras todavía no existe ninguna cuenta. Se escribe 'anónimo' para que
+    # el registro no quede con un hueco que parezca un fallo del programa.
+    logger.warning("Configuración restaurada por %s (%d ficheros). Respaldo en %s",
+                   usuario_de(sesion) or "anónimo", restaurados, respaldo)
     return {
         "ok": True,
         "ficheros": restaurados,

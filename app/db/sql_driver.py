@@ -34,6 +34,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import text
+from sqlalchemy.engine import URL
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from app.db.db_driver import DbDriver, ResultadoConsulta
@@ -171,6 +172,86 @@ def _prefijo_seguro(prefijo: str) -> str:
 
 
 # ====================================================================== #
+# SQL Server: instancias con nombre y driver ODBC
+# ====================================================================== #
+def _host_e_instancia(host: str) -> Tuple[str, str]:
+    """
+    Separa `HOST\\INSTANCIA` en sus dos partes.
+
+    Acepta las tres formas en las que la gente lo escribe de verdad:
+    `localhost\\SQLEXPRESS`, `localhost\\\\SQLEXPRESS` (pegado desde una cadena
+    de conexión con la barra escapada) y `localhost/SQLEXPRESS` (por costumbre
+    de escribir rutas con barra normal).
+
+    Devuelve `(host, "")` si no hay instancia.
+    """
+    h = (host or "").strip()
+    if not h:
+        return "", ""
+    # Normaliza la barra doble y la barra normal a una sola invertida.
+    normal = h.replace("\\\\", "\\").replace("/", "\\")
+    if "\\" not in normal:
+        return h, ""
+    base, _, inst = normal.partition("\\")
+    return base.strip(), inst.strip()
+
+
+def _quiere_puerto_fijo(opciones: Optional[Dict[str, Any]]) -> bool:
+    """
+    True si el usuario fijó un puerto estático a su instancia con nombre.
+
+    Por defecto NO se manda el puerto junto a la instancia, porque lo habitual
+    es el puerto dinámico. Quien haya seguido el consejo de fijar el 1433 puede
+    activarlo con `opciones = {"puerto_fijo": "si"}`.
+    """
+    if not opciones:
+        return False
+    v = str(opciones.get("puerto_fijo", "")).strip().lower()
+    return v in ("1", "si", "sí", "true", "yes", "on")
+
+
+def drivers_odbc_instalados() -> List[str]:
+    """
+    Drivers ODBC de SQL Server presentes en el sistema, del mejor al peor.
+
+    Se apoya en `pyodbc`, que es lo que ve de verdad el driver por debajo. Si
+    `pyodbc` no está (Linux sin ODBC, por ejemplo), devuelve lista vacía y el
+    llamador cae a un valor razonable.
+    """
+    try:
+        import pyodbc  # noqa: PLC0415
+        todos = list(pyodbc.drivers())
+    except Exception:  # noqa: BLE001
+        return []
+
+    def preferencia(nombre: str) -> tuple:
+        # ODBC Driver N (mayor N primero) > Native Client > "SQL Server".
+        m = re.match(r"^ODBC Driver (\d+) for SQL Server$", nombre.strip(), re.I)
+        if m:
+            return (0, -int(m.group(1)), nombre)
+        if "native client" in nombre.lower():
+            return (1, 0, nombre)
+        return (2, 0, nombre)
+
+    return sorted(
+        {d for d in todos if "sql server" in d.lower()}, key=preferencia
+    )
+
+
+def driver_odbc_por_defecto() -> str:
+    """
+    El mejor driver ODBC instalado, o el 17 como último recurso.
+
+    El 17 sigue siendo el fallback porque es el más extendido, pero solo se usa
+    cuando NO se pudo mirar qué hay instalado. Antes era el valor fijo, y en un
+    equipo con otro driver la conexión moría con un error que no señalaba al
+    driver por ningún lado.
+    """
+    instalados = drivers_odbc_instalados()
+    return instalados[0] if instalados else "ODBC Driver 17 for SQL Server"
+
+
+# ====================================================================== #
 # Marcas de tiempo: todo se guarda en UTC, de forma determinista
 # ====================================================================== #
 def a_utc(valor: Any) -> Optional[datetime]:
@@ -259,6 +340,38 @@ def _serializable(valor: Any) -> Any:
 
 
 # ====================================================================== #
+# Tipos del esquema del HMI, por motor
+# ====================================================================== #
+def tipos_motor(motor: str) -> Dict[str, str]:
+    """
+    Equivalencias de tipo para el esquema del HMI en cada motor.
+
+    Existe como función suelta —y no dentro de `ddl_esquema_hmi()`— porque
+    hay DOS sitios que necesitan los mismos tipos: el DDL que crea las tablas
+    desde cero, y las migraciones que añaden una columna a una tabla que ya
+    existe en producción. Con dos copias, la primera columna nueva que se
+    añadiera quedaría BIGINT en una base recién creada e INTEGER en una
+    migrada, y la FK fallaría solo en la segunda.
+    """
+    if motor == "postgresql":
+        return {"pk": "BIGSERIAL PRIMARY KEY", "fk": "BIGINT",
+                "ts": "TIMESTAMPTZ", "texto": "TEXT",
+                "real": "DOUBLE PRECISION", "entero": "INTEGER"}
+    if motor == "mysql":
+        return {"pk": "BIGINT AUTO_INCREMENT PRIMARY KEY", "fk": "BIGINT",
+                "ts": "DATETIME(3)", "texto": "TEXT",
+                "real": "DOUBLE PRECISION", "entero": "INT"}
+    if motor == "mssql":
+        return {"pk": "BIGINT IDENTITY(1,1) PRIMARY KEY", "fk": "BIGINT",
+                "ts": "DATETIME2", "texto": "NVARCHAR(MAX)",
+                "real": "FLOAT", "entero": "INT"}
+    return {"pk": "INTEGER PRIMARY KEY AUTOINCREMENT", "fk": "INTEGER",
+            "ts": "TEXT", "texto": "TEXT",
+            "real": "DOUBLE PRECISION", "entero": "INTEGER"}
+
+
+
+# ====================================================================== #
 # Driver
 # ====================================================================== #
 class SqlDriver(DbDriver):
@@ -303,8 +416,6 @@ class SqlDriver(DbDriver):
         Con `ocultar_password=True` sustituye la contraseña por '***': se usa
         para logs y para devolverla por la API sin filtrar credenciales.
         """
-        from urllib.parse import quote_plus
-
         cfg = MOTORES[self.motor]
         prefijo = cfg["prefijo"]
 
@@ -312,10 +423,45 @@ class SqlDriver(DbDriver):
         if self.motor == "sqlite":
             return f"{prefijo}:///{self.base_datos}"
 
-        pwd = "***" if ocultar_password else quote_plus(self._password)
-        usuario = quote_plus(self.usuario) if self.usuario else ""
-        credenciales = f"{usuario}:{pwd}@" if usuario else ""
-        url = f"{prefijo}://{credenciales}{self.host}:{self.puerto}/{self.base_datos}"
+        # ---- Host, con soporte de INSTANCIAS CON NOMBRE ---------------- #
+        #
+        # Un SQL Server puede tener varias instancias en la misma máquina:
+        # `SQLEXPRESS`, `WINCC`, `TEW_SQLEXPRESS`... y se escriben
+        # `HOST\INSTANCIA`. Es el caso normal en un PC de planta, donde otro
+        # producto (WinCC, por ejemplo) ya instaló la suya.
+        #
+        # Dos cosas que hay que hacer bien, y que antes no se hacían:
+        #
+        #  1. **La barra invertida hay que codificarla** (`%5C`). Sin eso la URL
+        #     queda mal formada y el error que sale no menciona la barra por
+        #     ningún lado.
+        #
+        #  2. **No se le pone puerto.** Las instancias con nombre NO escuchan
+        #     en el 1433: al arrancar toman un puerto DINÁMICO que cambia cada
+        #     vez. El cliente lo averigua preguntándole a SQL Browser por UDP
+        #     1434, y para eso hay que pasarle el nombre de instancia SIN
+        #     puerto. Si se manda `host\instancia:1433`, el driver intenta ese
+        #     puerto literal y falla aunque la instancia esté perfectamente
+        #     levantada.
+        #
+        # Si alguien fijó un puerto estático a su instancia (que es lo que
+        # recomienda la pantalla de diagnóstico), puede forzarlo poniendo
+        # `opciones["puerto_fijo"] = "si"`: entonces sí se manda el puerto.
+        # Se construye con `URL.create`, NO concatenando texto. El motivo es
+        # concreto: si la barra se codifica a mano como `%5C`, SQLAlchemy la
+        # deja literal al releer la cadena y el driver acaba buscando un
+        # servidor llamado `localhost%5CTEW_SQLEXPRESS`. `URL.create` la
+        # escapa y la desescapa de forma coherente, y de paso resuelve las
+        # contraseñas con `@`, `#` o `/`, que también rompían la URL escrita a
+        # mano.
+        host_limpio, instancia = _host_e_instancia(self.host)
+        servidor = f"{host_limpio}\\{instancia}" if instancia else host_limpio
+
+        # Puerto: se omite con instancia con nombre (lo resuelve SQL Browser)
+        # salvo que se haya fijado uno estático.
+        puerto: Optional[int] = self.puerto
+        if instancia and not _quiere_puerto_fijo(self.opciones):
+            puerto = None
 
         # SQL Server necesita que se indique el driver ODBC instalado, y
         # ADEMAS cualquier otra opcion de la cadena ODBC.
@@ -338,14 +484,29 @@ class SqlDriver(DbDriver):
         # Encrypt, Trusted_Connection, TrustedConnection, MARS_Connection,
         # ApplicationIntent... son parametros de la cadena ODBC y el driver
         # ignora los que no conoce.
+        extras: Dict[str, str] = {}
         if self.motor == "mssql":
-            extras = dict(self.opciones or {})
-            extras.setdefault("driver", "ODBC Driver 17 for SQL Server")
-            url += "?" + "&".join(
-                f"{k}={quote_plus(str(v))}" for k, v in extras.items()
-            )
+            extras = {k: str(v) for k, v in (self.opciones or {}).items()}
+            # `puerto_fijo` es una marca NUESTRA para decidir si se manda el
+            # puerto junto a una instancia con nombre. No es un parámetro ODBC,
+            # así que no debe viajar en la cadena de conexión.
+            extras.pop("puerto_fijo", None)
+            # El driver por defecto es el MEJOR QUE HAYA INSTALADO, no uno
+            # fijo. Antes se asumía "ODBC Driver 17": en un equipo con solo el
+            # 13 (o solo el 18) la conexión fallaba con "Data source name not
+            # found", que no da ninguna pista de que el problema sea el driver.
+            extras.setdefault("driver", driver_odbc_por_defecto())
 
-        return url
+        u = URL.create(
+            prefijo,
+            username=self.usuario or None,
+            password=self._password or None,
+            host=servidor or None,
+            port=puerto,
+            database=self.base_datos or None,
+            query=extras,
+        )
+        return u.render_as_string(hide_password=ocultar_password)
 
     # ------------------------------------------------------------------ #
     # Ciclo de vida
@@ -724,34 +885,18 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
 
         m = self.motor
         # --- Tipos que cambian entre motores ---------------------------- #
-        if m == "postgresql":
-            pk = "BIGSERIAL PRIMARY KEY"
-            fk_tipo = "BIGINT"
-            ts = "TIMESTAMPTZ"
-            texto = "TEXT"
-            real = "DOUBLE PRECISION"
-            entero = "INTEGER"
-        elif m == "mysql":
-            pk = "BIGINT AUTO_INCREMENT PRIMARY KEY"
-            fk_tipo = "BIGINT"
-            ts = "DATETIME(3)"
-            texto = "TEXT"
-            real = "DOUBLE PRECISION"
-            entero = "INT"
-        elif m == "mssql":
-            pk = "BIGINT IDENTITY(1,1) PRIMARY KEY"
-            fk_tipo = "BIGINT"
-            ts = "DATETIME2"
-            texto = "NVARCHAR(MAX)"
-            real = "FLOAT"
-            entero = "INT"
-        else:  # sqlite
-            pk = "INTEGER PRIMARY KEY AUTOINCREMENT"
-            fk_tipo = "INTEGER"
-            ts = "TEXT"
-            texto = "TEXT"
-            real = "DOUBLE PRECISION"
-            entero = "INTEGER"
+        # Salen de `tipos_motor()` y no de un if/elif aquí dentro: las
+        # migraciones (`app/db/migraciones.py`) necesitan EXACTAMENTE los
+        # mismos tipos para añadir una columna a una tabla que ya existe, y
+        # dos copias de esta tabla de equivalencias se separarían a la
+        # primera columna nueva.
+        t = tipos_motor(m)
+        pk = t["pk"]
+        fk_tipo = t["fk"]
+        ts = t["ts"]
+        texto = t["texto"]
+        real = t["real"]
+        entero = t["entero"]
 
         # ---------------------------------------------------------------- #
         # usuarios
@@ -820,9 +965,19 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
         #   Name -> nombre · Alarm text -> texto · Alarm class -> clase
         #   Trigger tag -> tag · Trigger bit -> bit_disparo
         #   HMI acknowledgment tag -> tag_reconocimiento
+        fk_def_usr = (
+            f"CONSTRAINT fk_{p}alarmas_def_usuario FOREIGN KEY (usuario_id) "
+            f"REFERENCES {t_usuarios} (id)"
+        )
         alarmas_def = (
             f"CREATE TABLE {t_alarmas_def} ("
             f"id {pk}, "
+            # Quién configuró la regla. Lo sella el servidor desde el TOKEN,
+            # nunca el cliente: ver `CrudManager._sellar_autor()`. NULLable
+            # porque una instalación sin login (`auth_requerida=false`)
+            # escribe igual, y decir "no se sabe" es más honesto que
+            # atribuirle la regla a alguien.
+            f"usuario_id {fk_tipo}, "
             f"nombre VARCHAR(120) NOT NULL, "
             f"texto VARCHAR(500) NOT NULL, "
             # Critical | Error | Warning | Maintenance | Information
@@ -848,7 +1003,8 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
             f"area VARCHAR(80), "
             f"activo {entero} NOT NULL DEFAULT 1, "
             f"creado_en {ts}, "
-            f"actualizado_en {ts})"
+            f"actualizado_en {ts}, "
+            f"{fk_def_usr})"
         )
 
         # ---------------------------------------------------------------- #
@@ -1001,11 +1157,21 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
             f"CONSTRAINT fk_{p}receta_elementos_plc FOREIGN KEY (plc_prg_id) "
             f"REFERENCES {t_plc} (id)"
         )
+        fk_ele_usr = (
+            f"CONSTRAINT fk_{p}receta_elementos_usuario FOREIGN KEY (usuario_id) "
+            f"REFERENCES {t_usuarios} (id)"
+        )
         receta_elementos = (
             f"CREATE TABLE {t_rec_elem} ("
             f"id {pk}, "
             f"receta_id {fk_tipo} NOT NULL, "
             f"plc_prg_id {fk_tipo}, "
+            # Quién tocó este elemento por última vez. Es la columna que
+            # importa de verdad de las tres que se añaden: `valor_minimo` y
+            # `valor_maximo` son la última barrera antes de escribir en una
+            # máquina, y quién los movió es una pregunta que se hace SIEMPRE
+            # después de un lote que salió mal.
+            f"usuario_id {fk_tipo}, "
             f"nombre VARCHAR(160) NOT NULL, "
             f"nombre_visible VARCHAR(160), "
             # Tag del PLC al que se escribe. Mismo formato que en plc_prg.
@@ -1032,7 +1198,7 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
             f"activo {entero} NOT NULL DEFAULT 1, "
             f"creado_en {ts}, "
             f"actualizado_en {ts}, "
-            f"{fk_ele_rec}, {fk_ele_plc})"
+            f"{fk_ele_rec}, {fk_ele_plc}, {fk_ele_usr})"
         )
 
         # --- Data records: la CABECERA de cada mezcla concreta ----------- #
@@ -1073,6 +1239,10 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
             f"FOREIGN KEY (receta_elemento_id) "
             f"REFERENCES {t_rec_elem} (id)"
         )
+        fk_val_usr = (
+            f"CONSTRAINT fk_{p}receta_valores_usuario FOREIGN KEY (usuario_id) "
+            f"REFERENCES {t_usuarios} (id)"
+        )
         receta_valores = (
             f"CREATE TABLE {t_rec_val} ("
             f"id {pk}, "
@@ -1080,7 +1250,12 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
             f"receta_elemento_id {fk_tipo} NOT NULL, "
             f"valor_num {real}, "
             f"valor_texto VARCHAR(500), "
-            f"{fk_val_reg}, {fk_val_ele})"
+            # Quién escribió ESTA celda. El registro ya guarda quién editó la
+            # mezcla, pero una mezcla la tocan varias personas: sin esto, el
+            # último que guardó cualquier cosa se lleva la firma de todas las
+            # celdas, incluidas las que no cambió.
+            f"usuario_id {fk_tipo}, "
+            f"{fk_val_reg}, {fk_val_ele}, {fk_val_usr})"
         )
 
         tablas = [

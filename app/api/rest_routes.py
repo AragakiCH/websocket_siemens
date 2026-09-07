@@ -39,7 +39,7 @@ def _auditar(request: Request, accion: str, sesion, recurso: str,
     es exactamente lo que la auditoria existe para evitar."""
     aud = getattr(request.app.state, "auditoria", None)
     if aud is not None:
-        aud.registrar(accion, usuario_de(sesion), recurso, detalle)
+        aud.registrar(accion, recurso=recurso, detalle=detalle, sesion=sesion)
 
 
 class NuevoPlc(BaseModel):

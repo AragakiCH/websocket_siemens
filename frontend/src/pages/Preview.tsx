@@ -21,21 +21,45 @@
 //     diseño conocido que una pantalla en blanco delante de un operario.
 //   * Los valores, de `useAppStore().variables`: al montar este contexto el
 //     RealPLCService abre su WebSocket y el snapshot llega solo.
+//
+// -------------------------------------------------------------------------
+// NOTA DE FUSIÓN (main + diego_vidarte)
+// -------------------------------------------------------------------------
+// Las dos ramas tocaron este fichero a la vez, pero NO para lo mismo, así
+// que aquí están las dos cosas enteras y no la mitad de cada una:
+//
+//   · de `main`   la honestidad sobre el ORIGEN de lo que se pinta: distinguir
+//                 "esto viene del servidor" de "esto es una copia local
+//                 desfasada" y de "no hay sesión". Antes los tres casos se
+//                 veían idénticos, y ese era el fallo de los widgets fantasma.
+//   · de `diego_vidarte` la navegación POR PANTALLA: cada pantalla recuerda su
+//                 propia sección abierta, y elegir en el selector manda sobre
+//                 lo que estuviera abierto en el menú lateral.
+//
+// Donde sí chocaban de verdad —la función `cargar()` y la sincronización de
+// la URL— se ha elegido a conciencia, y está anotado en cada sitio.
 // =========================================================================
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
   MonitorIcon,
   ChevronDownIcon,
-  Loader2Icon } from
-'lucide-react';
+  Loader2Icon,
+  AlertTriangleIcon,
+} from 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { WidgetRenderer } from '../components/hmi/WidgetRenderer';
 import {
   useVistaActiva,
   setVistaActiva,
   setPantalla,
-  GRUPO_POR_DEFECTO } from
-'../components/hmi/custom/navegacion/store';
+  GRUPO_POR_DEFECTO,
+} from '../components/hmi/custom/navegacion/store';
 
 import {
   cargarProyecto,
@@ -66,13 +90,21 @@ export function Preview() {
   const inicial = useMemo(() => pantallaDeLaUrl() || getUltimaPantalla(), []);
   const [pantallaId, setPantallaId] = useState<string>(inicial);
   const [pantallas, setPantallas] = useState<ResumenPantalla[]>([]);
-
-
   const [design, setDesign] = useState<SavedDesign | null>(() =>
     loadDesign(inicial)
   );
   const [cargando, setCargando] = useState(true);
 
+  // `true` mientras lo pintado venga de la caché del navegador y no del
+  // servidor. Empieza en true porque el primer render ES la caché: hasta que
+  // el servidor conteste, no se puede afirmar que esté en vivo.
+  const [desfasado, setDesfasado] = useState(true);
+
+  // Sesión caducada o ausente. Antes esto acababa mostrando en silencio un
+  // diseño viejo de la caché; ahora se dice, porque son cosas distintas.
+  const [sinSesion, setSinSesion] = useState(false);
+
+  // ── Navegación por pantalla ─────────────────────────────────────
   // La navegación se guarda por pantalla: sin esto, las pestañas de arriba
   // compartirían una sola, y la pantalla 2 heredaría la sección abierta en
   // la 1. En `useLayoutEffect` para que ese estado intermedio no se pinte.
@@ -97,11 +129,41 @@ export function Preview() {
   }, []);
 
   // ── Carga del diseño ────────────────────────────────────────────
+  //
+  // FUSIÓN: se conserva la versión de `main`, no la de `diego_vidarte`.
+  // La otra era `const p = await cargarProyecto(id); if (p) setDesign(...)`,
+  // que es más corta pero se traga dos casos importantes: un `null` (la
+  // pantalla ya no existe en el servidor) dejaba pintado lo anterior, y una
+  // excepción reventaba sin dejar rastro. Esta distingue los tres finales
+  // posibles, que es de donde salen los avisos de abajo.
   const cargar = useCallback(async (id: string) => {
     setCargando(true);
-    const p = await cargarProyecto(id);
-    if (p) setDesign({ widgets: p.widgets, canvas: p.canvas });
-    setCargando(false);
+    try {
+      const p = await cargarProyecto(id);
+      setSinSesion(false);
+      if (p) {
+        setDesign({ widgets: p.widgets, canvas: p.canvas });
+        setDesfasado(p.desdeCache === true);
+      } else {
+        // null = la pantalla ya no existe en el servidor. Antes se quedaba
+        // lo que hubiera pintado, que es como enseñar algo ya borrado.
+        setDesign(null);
+        setDesfasado(false);
+      }
+    } catch (e) {
+      const status = (e as { status?: number })?.status;
+      if (status === 401 || status === 403) {
+        // Es el caso que producía los "widgets fantasma": el servidor está
+        // bien y pide sesión. NO se pinta la caché — sería el diseño de otra
+        // sesión, y no habría forma de saberlo mirando la pantalla.
+        setSinSesion(true);
+        setDesign(null);
+      } else {
+        setDesfasado(true);
+      }
+    } finally {
+      setCargando(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -111,7 +173,14 @@ export function Preview() {
     void cargar(pantallaId);
   }, [pantallaId, cargar]);
 
-  // La URL sigue al SELECTOR, no a la navegación del menú: es el punto de
+  // ── La URL sigue al selector ────────────────────────────────────
+  //
+  // FUSIÓN: efecto propio, como en `diego_vidarte`, en vez de ir pegado al
+  // de carga como estaba en `main`. Separarlos importa por la lista de
+  // dependencias: junto a `cargar` se reescribía el historial también cuando
+  // cambiaba la identidad del callback, no solo al cambiar de pantalla.
+  //
+  // Y sigue al SELECTOR, no a la navegación del menú: la URL es el punto de
   // entrada («ábreme el HMI por aquí»), y que cambiara en cada clic del
   // operador llenaría el historial de pasos que nadie pidió.
   useEffect(() => {
@@ -132,8 +201,7 @@ export function Preview() {
   useEffect(() => {
     const alEvento = (ev: Event) => {
       const msg = (ev as CustomEvent).detail;
-      if (msg?.type !== 'project.updated') return;
-      if (msg.project_id !== pantallaId) return;
+      if (msg?.type !== 'project.updated' || msg.project_id !== pantallaId) return;
       void cargar(pantallaId);
     };
     window.addEventListener('hmi:ws', alEvento as EventListener);
@@ -158,9 +226,7 @@ export function Preview() {
   }, [pantallaId]);
 
   const nombreActual =
-    pantallas.find((p) => p.project_id === pantallaId)?.nombre ??
-    pantallaId;
-
+    pantallas.find((p) => p.project_id === pantallaId)?.nombre ?? pantallaId;
   const hayVarias = pantallas.length > 1;
 
   return (
@@ -208,15 +274,50 @@ export function Preview() {
             <Loader2Icon className="h-3.5 w-3.5 animate-spin text-slate-400" />
           )}
 
-          <span className="ml-auto text-[11px] text-slate-400">
-            Vista de operación · datos en vivo
-          </span>
+          {/* Lo que se ve NO viene del servidor. Decirlo no es un adorno:
+              sin este aviso, una pantalla en caché es indistinguible de una
+              en vivo, y alguien puede tomar una decisión mirando un diseño
+              que ya no existe. */}
+          {desfasado ? (
+            <span
+              className="ml-auto flex items-center gap-1.5 rounded-md bg-amber-500/15 px-2 py-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400"
+              title="No se pudo contactar con el servidor. Se muestra la última
+                     copia guardada en este navegador, que puede estar desfasada."
+            >
+              <AlertTriangleIcon className="h-3.5 w-3.5" />
+              Sin conexión · copia local
+            </span>
+          ) : (
+            <span className="ml-auto text-[11px] text-slate-400">
+              Vista de operación · datos en vivo
+            </span>
+          )}
         </div>
       )}
 
       {/* ── El lienzo ─────────────────────────────────────────────── */}
       <div className="mp-scroll mp-scroll-dark flex min-h-0 flex-1 items-center justify-center overflow-auto p-6">
-        {!design || design.widgets.length === 0 ? (
+        {sinSesion ? (
+          <div className="max-w-md text-center text-sm text-slate-500 dark:text-slate-400">
+            <p className="font-semibold text-slate-700 dark:text-slate-200">
+              Esta pestaña no tiene sesión iniciada
+            </p>
+            <p className="mt-2 text-xs leading-relaxed">
+              La sesión vive en el navegador que la abrió. Si estabas usando
+              la aplicación de escritorio y has copiado esta dirección a otro
+              navegador, aquí eres otra persona distinta para el servidor.
+            </p>
+            <p className="mt-2 text-xs leading-relaxed">
+              Entra desde este mismo navegador y vuelve a abrir la vista.
+            </p>
+            <a
+              href="/"
+              className="mt-4 inline-block rounded-lg bg-siemens px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+            >
+              Ir al inicio de sesión
+            </a>
+          </div>
+        ) : !design || design.widgets.length === 0 ? (
           <div className="max-w-sm text-center text-sm text-slate-500 dark:text-slate-400">
             {cargando ? (
               <span className="flex items-center justify-center gap-2">

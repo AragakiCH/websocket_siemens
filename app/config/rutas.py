@@ -144,7 +144,24 @@ def migrar_si_hace_falta(destino: Path) -> Optional[Dict[str, Any]]:
     Devuelve un resumen de lo migrado, o `None` si no hubo nada que hacer.
     NUNCA sobrescribe: si el destino ya tiene datos, no se toca nada. Una
     migración que pisa lo actual con lo viejo es peor que no migrar.
+
+    SE PUEDE APAGAR CON `PLC_MIGRAR_DATOS=false`, y hace falta poder
+    -------------------------------------------------------------------
+    La migración se dispara con que el destino esté VACÍO, que es justo el
+    estado de una carpeta temporal recién creada. Consecuencia real, vista
+    en `tools/probar_alarmas.py`: un script de pruebas que apuntaba a un
+    `PLC_DATOS_DIR` temporal —precisamente para NO tocar nada del usuario—
+    acababa copiándose allí la configuración de producción entera, con
+    `conexiones.json`, la clave de cifrado `.clave` y las contraseñas de las
+    bases de datos. Y dejaba en la carpeta buena un aviso diciendo que los
+    datos se habían mudado a un directorio temporal que se iba a borrar.
+
+    Nada se perdía (esto COPIA, no mueve), pero copiar credenciales a un
+    sitio que nadie pidió es exactamente lo que un modo aislado tiene que
+    impedir. Cualquier ejecución que quiera partir de cero pone la variable.
     """
+    if os.getenv("PLC_MIGRAR_DATOS", "").strip().lower() in ("false", "0", "no"):
+        return None
     if _tiene_datos(destino):
         return None
 

@@ -176,6 +176,24 @@ class Settings(BaseSettings):
     auth_tabla_prefijo: str = Field(default="")
 
     # ------------------------------------------------------------------ #
+    # Motor de alarmas
+    # ------------------------------------------------------------------ #
+    # Evalúa las reglas de `alarmas_def` contra los valores que llegan del
+    # PLC y escribe los eventos en `alarmas`. Se cuelga del mismo flujo que
+    # el historizador: no abre una segunda sesión OPC UA.
+    alarmas_enabled: bool = Field(
+        default=True,
+        description="Activar el motor de alarmas. Ponlo en false para "
+                    "silenciar la evaluación sin borrar ninguna regla: las "
+                    "definiciones se conservan y se siguen pudiendo editar.",
+    )
+    # Conexión donde viven `alarmas_def` y `alarmas`. Vacío = la de por
+    # defecto del CRUD, que es lo correcto en una instalación con una sola
+    # base. Se separa por si el histórico y las alarmas van a servidores
+    # distintos, cosa que pasa cuando el histórico es muy grande.
+    alarmas_db_id: Optional[str] = Field(default=None)
+
+    # ------------------------------------------------------------------ #
     # Zona horaria de VISUALIZACIÓN
     # ------------------------------------------------------------------ #
     # Los datos SIEMPRE se guardan en UTC (el SourceTimestamp de OPC UA es UTC

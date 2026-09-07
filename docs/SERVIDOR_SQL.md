@@ -296,6 +296,73 @@ formato.
 
 ---
 
+## SQL Server en Windows con instancias CON NOMBRE
+
+Lo anterior asume un SQL Server en contenedor, que siempre es la instancia por
+defecto en el 1433. En un **PC de planta con Windows** la situación normal es
+otra: ya hay una o varias instancias **con nombre** que instaló otro producto
+(`SQLEXPRESS`, `WINCC`, `TEW_SQLEXPRESS`…).
+
+Se reconocen porque se escriben `HOST\INSTANCIA`, y se comportan distinto:
+
+> **Una instancia con nombre NO escucha en el 1433.** Al arrancar toma un
+> puerto **dinámico**, que cambia en cada reinicio del servicio. El cliente lo
+> averigua preguntándole a **SQL Server Browser** por UDP 1434.
+
+Por eso "nada responde en localhost:1433" puede salir con el servicio
+perfectamente levantado.
+
+### Dos formas de conectar, y cuándo usar cada una
+
+**(a) Por nombre de instancia — la recomendada**
+
+En el campo *Host* escribe `localhost\TEW_SQLEXPRESS` y **deja el puerto como
+está**: se ignora. Requisitos:
+
+- El servicio **SQL Server Browser** debe estar iniciado (viene parado de
+  fábrica; se arranca desde `services.msc`).
+- TCP/IP habilitado en esa instancia.
+
+Es la mejor opción cuando hay **varias instancias**, porque el 1433 solo lo
+puede ocupar una.
+
+**(b) Fijando un puerto estático**
+
+En SQL Server Configuration Manager → Configuración de red → Protocolos de
+`<instancia>` → TCP/IP → pestaña *Direcciones IP* → baja hasta **IPAll**:
+
+1. **Vacía «Puertos TCP dinámicos»** (déjalo en blanco). ← *el paso que casi
+   todo el mundo se salta; sin esto sigue sin escuchar en el 1433*
+2. Pon **«Puerto TCP» = 1433**.
+3. Reinicia el servicio `SQL Server (<instancia>)`.
+
+Después, en el HMI, marca la opción `puerto_fijo` para que se mande el puerto
+junto al nombre de instancia:
+
+```json
+{ "host": "localhost\\TEW_SQLEXPRESS", "puerto": 1433,
+  "opciones": { "puerto_fijo": "si", "TrustServerCertificate": "yes" } }
+```
+
+### No reconfigures una instancia que no es tuya
+
+Si la instancia se llama `WINCC` o `TEW_SQLEXPRESS`, casi seguro pertenece a
+**WinCC / TIA de Siemens**. Cambiarle la configuración de red puede afectar a
+ese sistema, que probablemente esté en producción. El diagnóstico avisa cuando
+lo detecta.
+
+Lo correcto en ese caso es **instalar una instancia propia** para Psi Core
+(SQL Server Express es gratuito) en vez de tocar la ajena.
+
+### El driver ODBC
+
+El HMI usa el **mejor driver instalado**, no uno fijo. Si solo tienes el
+*ODBC Driver 13*, funciona; pero es de 2016 y tiene limitaciones con TLS
+moderno. Merece la pena instalar el **18** (o el 17): son 5 MB y los instala
+Microsoft.
+
+---
+
 ## Errores frecuentes
 
 | Error | Causa | Solución |
@@ -308,6 +375,8 @@ formato.
 | `Cannot open database "HMI_PSI"` | La BD no existe | Paso 2: falta el `CREATE DATABASE` |
 | `Invalid object name 'plc_prg'` | Falta el esquema | Paso 3: ejecutar el `.sql` |
 | Conexión agota el tiempo | Puerto 1434 cerrado | Abrirlo en el firewall del servidor |
+| `Nada responde en localhost:1433` **y la instancia tiene nombre** | Las instancias con nombre usan puerto dinámico | Usar `HOST\INSTANCIA` sin puerto + SQL Server Browser, o fijar puerto estático (ver arriba) |
+| No aparece el servicio `SQL Server (MSSQLSERVER)` | Es una instancia con nombre | El servicio se llama `SQL Server (<INSTANCIA>)` |
 
 Diagnóstico rápido desde el propio contenedor:
 

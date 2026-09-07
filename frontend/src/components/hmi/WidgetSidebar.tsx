@@ -39,7 +39,9 @@ export function WidgetSidebar() {
     e.target.value = '';
     try {
       const widget = await parseWidgetZip(file);
-      addZipWidget(widget);
+      // Se espera al guardado: si el servidor lo rechaza hay que decirlo,
+      // no dejar creer que quedó guardado (se perdería al cerrar).
+      await addZipWidget(widget);
       refreshCatalog();
       showToast(`"${widget.meta.label}" cargado`, true);
     } catch (err: any) {
@@ -47,8 +49,8 @@ export function WidgetSidebar() {
     }
   }, [refreshCatalog]);
 
-  const handleRemoveZip = useCallback((kind: string, label: string) => {
-    removeZipWidget(kind);
+  const handleRemoveZip = useCallback(async (kind: string, label: string) => {
+    await removeZipWidget(kind);
     refreshCatalog();
     showToast(`"${label}" eliminado`, true);
   }, [refreshCatalog]);

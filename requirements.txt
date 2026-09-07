@@ -1,68 +1,110 @@
 # ==========================================================================
-# Dependencias del servicio backend OPC UA -> WebSocket
-# Python 3.10 - 3.13. Instalar con:
-#   pip install -r requirements.txt
+#  Psi Core · dependencias del backend
+# ==========================================================================
+#  Instalación:
+#      python -m venv venv
+#      venv\Scripts\activate            (Windows)
+#      pip install -r requirements.txt
 #
-# NOTA sobre las versiones: los pines anteriores (fastapi 0.111 / pydantic
-# 2.7.4) NO se pueden instalar en Python 3.13, porque `pydantic-core 2.18.4`
-# no publica wheel para cp313 y pip intenta compilarlo con Rust. Estos pines
-# son los primeros que traen wheel para 3.13 manteniendo la misma API.
-# `asyncua` sigue en 1.1.5: es la version con la que se probo el proyecto.
+#  Para EMPAQUETAR la aplicación de escritorio (.exe), además:
+#      pip install -r requirements-desktop.txt
+#
+#  Regla que se sigue aquí: **todo lo que el código importa está declarado**,
+#  aunque pip ya lo instale como dependencia de otro paquete. Depender de una
+#  dependencia transitiva funciona hasta el día en que el paquete de arriba
+#  cambia su árbol, y entonces la aplicación se rompe sin que nadie haya
+#  tocado nada.
 # ==========================================================================
 
-fastapi==0.115.12         # Framework web asíncrono (REST + WebSocket)
-uvicorn[standard]==0.34.0 # Servidor ASGI para correr FastAPI
-asyncua==1.1.5            # Cliente OPC UA asíncrono (async/await)
-pydantic==2.10.6          # Validación de datos / modelos de configuración
-pydantic-settings==2.8.1  # Carga de settings desde variables de entorno
-PyYAML==6.0.2             # Lectura opcional del filtro de DBs (tags_filter.yaml)
-
-# Subida de ficheros (UploadFile). Lo necesita POST /sistema/datos/restaurar
-# para recibir el .zip de la copia de seguridad. FastAPI NO lo trae de serie:
-# sin el, ese endpoint falla al definirse y no arranca la aplicacion entera.
-python-multipart==0.0.20
 
 # --------------------------------------------------------------------------
-# Bosch Rexroth ctrlX CORE
+#  Servidor web y API
 # --------------------------------------------------------------------------
-# El ctrlX exige un canal seguro con certificado de cliente. `cryptography`
-# genera el par cert/key autofirmado la primera vez. asyncua ya la trae como
-# dependencia, pero se fija aquí porque el RexrothDriver la usa directamente.
-cryptography>=42.0.0
+fastapi==0.115.12            # Framework de la API + generación del OpenAPI
+uvicorn[standard]==0.34.0    # Servidor ASGI. El extra [standard] trae
+                             # websockets, httptools y uvloop.
+python-multipart==0.0.20     # Formularios multipart (subida de ficheros)
 
-# ==========================================================================
-# Bases de datos para los widgets de datos del HMI
-# ==========================================================================
-SQLAlchemy[asyncio]==2.0.51  # ORM/core async: un solo driver para todos los SQL
-aiosqlite==0.20.0            # SQLite (sin servidor; ideal para pruebas)
-# cryptography ya está arriba: se reutiliza para cifrar las contraseñas de BD.
+# `websockets` llega dentro de uvicorn[standard], pero tools/ver_estado.py y
+# tools/probar_multiusuario.py lo importan directamente, así que se declara.
+websockets>=12.0
 
-# SQL Server: es el motor del despliegue actual (contenedor `hmi_sql`, base
-# HMI_PSI), asi que ya no es opcional. Ver docs/DESPLIEGUE_HMI_PSI.md.
-# OJO: arrastra `pyodbc`, que es un binding nativo -> ADEMAS hay que instalar
-# el "ODBC Driver 18 for SQL Server" en el sistema operativo. pip no lo trae.
-aioodbc==0.5.0               # SQL Server (requiere ODBC Driver 17/18 en el sistema)
 
-# --- Motores opcionales: instalar SOLO el que se vaya a usar --------------
-# asyncpg==0.29.0            # PostgreSQL / TimescaleDB
+# --------------------------------------------------------------------------
+#  Configuración y validación
+# --------------------------------------------------------------------------
+pydantic==2.10.6             # Modelos y validación de los cuerpos JSON
+pydantic-settings==2.8.1     # Carga de settings desde .env (prefijo PLC_)
+PyYAML==6.0.2                # Lectura del filtro opcional de DBs (tags_filter)
+
+
+# --------------------------------------------------------------------------
+#  Comunicación con los PLCs
+# --------------------------------------------------------------------------
+asyncua==1.1.5               # Cliente OPC UA asíncrono. Sirve para las dos
+                             # marcas: Siemens S7-1500 y Bosch Rexroth ctrlX.
+
+
+# --------------------------------------------------------------------------
+#  Seguridad
+# --------------------------------------------------------------------------
+cryptography>=42.0.0         # Dos usos distintos:
+                             #  1) Fernet, para cifrar las contraseñas de las
+                             #     conexiones a BD en datos/conexiones.json
+                             #  2) el certificado de cliente que exige el
+                             #     ctrlX de Rexroth para la sesión OPC UA
+                             # (El hash de contraseñas de usuario NO usa esto:
+                             #  es PBKDF2 de la stdlib, en auth_manager.)
+
+
+# --------------------------------------------------------------------------
+#  Bases de datos
+# --------------------------------------------------------------------------
+SQLAlchemy[asyncio]==2.0.51  # Un solo driver para los cuatro motores: lo
+                             # único que cambia es la URL de conexión.
+aiosqlite==0.20.0            # SQLite — sin servidor, para pruebas locales
+
+# --- SQL Server (el motor de producción de este proyecto) -----------------
+aioodbc==0.5.0               # Adaptador async
+pyodbc>=5.0                  # Se importa DIRECTAMENTE en sql_driver.py,
+                             # db_routes.py y db/entorno.py (para listar los
+                             # drivers ODBC instalados y diagnosticar). Llega
+                             # como dependencia de aioodbc, pero se declara
+                             # porque el código lo usa por su cuenta.
+                             # OJO: además hace falta el "ODBC Driver 18 for
+                             # SQL Server" de Microsoft, que NO es un paquete
+                             # de pip. En Linux, también unixodbc.
+
+# --- Otros motores: descomenta el que vayas a usar ------------------------
+# Están soportados por el código y declarados en desktop/psi_core.spec, pero
+# no se instalan por defecto para no arrastrar compiladores sin necesidad.
+# asyncpg==0.30.0            # PostgreSQL (y TimescaleDB)
 # aiomysql==0.2.0            # MySQL / MariaDB
 
-# ==========================================================================
-# Exportación a Excel (.xlsx) de grabaciones e histórico
-# ==========================================================================
-openpyxl==3.1.5              # Generación de ficheros Excel con formato y gráficos
 
-# ==========================================================================
-# Asistente de IA (Ollama Cloud o cualquier API compatible con OpenAI)
-# ==========================================================================
-httpx>=0.27                  # Cliente HTTP async (ya lo usa FastAPI/Starlette)
+# --------------------------------------------------------------------------
+#  Exportación e informes
+# --------------------------------------------------------------------------
+openpyxl==3.1.5              # Genera los .xlsx con formato, gráficos y
+                             # estadísticas (grabaciones e histórico)
+
+
+# --------------------------------------------------------------------------
+#  Asistente de IA
+# --------------------------------------------------------------------------
+httpx>=0.27                  # Cliente HTTP async. Dos usos:
+                             #  1) hablar con Ollama Cloud (o cualquier API
+                             #     compatible con OpenAI)
+                             #  2) ASGITransport, para que el agente ejecute
+                             #     las herramientas contra la propia app sin
+                             #     salir por la red
 # El RAG usa BM25 implementado en Python puro: sin dependencias adicionales.
 
-# ==========================================================================
-# Zona horaria en Windows
-# ==========================================================================
-# Linux trae la base de datos de zonas horarias del sistema; Windows NO. Sin
-# esto, `ZoneInfo("America/Lima")` —que es lo que usa PLC_TIMEZONE para poner
-# la hora en alarmas e histórico— falla con ZoneInfoNotFoundError en cuanto la
-# aplicación se instala en un PC de planta.
-tzdata==2025.2
+
+# --------------------------------------------------------------------------
+#  Zona horaria
+# --------------------------------------------------------------------------
+tzdata==2025.2               # Windows no trae base de datos de zonas
+                             # horarias: sin esto, ZoneInfo("America/Lima")
+                             # falla y las marcas de tiempo locales del
+                             # histórico se quedan en UTC.

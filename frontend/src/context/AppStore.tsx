@@ -17,6 +17,7 @@ import {
 '../models/plc';
 import { HmiWidget, WidgetKind, BuiltInWidgetKind } from '../models/widget';
 import { RealPLCService as MockPLCService } from '../services/RealPLCService';
+import { sincronizarWidgets } from '../services/zipWidgetLoader';
 import { createTranslator, widgetLabel as widgetLabelFn, TFn } from '../i18n';
 import { customByKind, zipByKind } from '../components/hmi/custom/registry';
 import {
@@ -70,6 +71,10 @@ interface AppStore {
   permisos: Permisos | null;
   /** Vuelve a preguntar al servidor quién soy (tras entrar o salir). */
   refrescarSesion: () => Promise<void>;
+  /** True si el backend exige sesión (`PLC_AUTH_REQUERIDA`). */
+  authRequerida: boolean;
+  /** True mientras se resuelve quién soy, al arrancar. */
+  comprobandoSesion: boolean;
   cerrarSesion: () => Promise<void>;
   /** Quién más está mirando ahora mismo. */
   presentes: {usuario: string;categoria: string;}[];
@@ -125,6 +130,13 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   );
   const [sesion, setSesion] = useState<UsuarioSesion | null>(null);
   const [permisos, setPermisos] = useState<Permisos | null>(null);
+  // ¿El backend exige sesión? Si no, la aplicación se comporta como
+  // siempre y las rutas no bloquean nada.
+  const [authRequerida, setAuthRequerida] = useState(false);
+  // True mientras se pregunta al servidor quién soy. Sin esta bandera, al
+  // recargar la página con una sesión válida las rutas protegidas rebotan
+  // al login durante el instante en que `sesion` todavía es null.
+  const [comprobandoSesion, setComprobandoSesion] = useState(true);
   const [presentes, setPresentes] = useState<{usuario: string;categoria: string;}[]>([]);
   // La última pantalla abierta se recuerda por navegador: al recargar vuelves
   // a donde estabas, no al principio.
@@ -209,6 +221,9 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
       const d = await fetchMe();
       setSesion(d.autenticado ? d.sesion ?? null : null);
       setPermisos(d.permisos ?? null);
+      if (typeof d.auth_requerida === 'boolean') {
+        setAuthRequerida(d.auth_requerida);
+      }
     } catch {
       setSesion(null);
       setPermisos(null);
@@ -222,8 +237,16 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   }, []);
 
   // Al arrancar: ¿hay una sesión guardada de antes que siga siendo válida?
+  // Los widgets personalizados viven en el SERVIDOR (ver widget_store.py).
+  // Se traen una vez al arrancar y se dejan en la caché local, que es lo que
+  // leen de forma síncrona el catálogo, el registry y el lienzo. Sin esto,
+  // un widget importado desde otra máquina o en otra sesión no aparecería.
   useEffect(() => {
-    void refrescarSesion();
+    void sincronizarWidgets();
+  }, []);
+
+  useEffect(() => {
+    void refrescarSesion().finally(() => setComprobandoSesion(false));
   }, [refrescarSesion]);
 
   // El token puede caducar o ser revocado (un supervisor desactiva la cuenta).
@@ -278,13 +301,31 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     setWidgets(loadDesign(projectId)?.widgets ?? []);
 
     void (async () => {
-      const p = await cargarProyecto(projectId);
-      if (!vivo) return;
-      if (p) {
-        setWidgets(p.widgets);
-        setProjectVersion(p.version);
+      try {
+        const p = await cargarProyecto(projectId);
+        if (!vivo) return;
+        if (p) {
+          setWidgets(p.widgets);
+          setProjectVersion(p.version);
+        } else {
+          // La pantalla ya no existe en el servidor: mejor vacía que con los
+          // restos de su caché, que es lo que hacía antes.
+          setWidgets([]);
+        }
+      } catch (e) {
+        // `cargarProyecto` ahora propaga los errores del servidor (401, 403,
+        // 5xx) en vez de tragárselos y devolver la caché. Aquí hay que
+        // capturarlos SÍ O SÍ: sin este catch, un 401 dejaría
+        // `setPantallaCargada` sin ejecutar y el Diseñador se quedaría
+        // "Cargando…" para siempre, sin decir por qué.
+        //
+        // De un 401 ya se encarga `fetchAuth`, que limpia el token y emite
+        // `hmi:sesion-caducada` para volver al login.
+        if (!vivo) return;
+        console.warn('[proyecto] no se pudo abrir «%s»:', projectId, e);
+      } finally {
+        if (vivo) setPantallaCargada(projectId);
       }
-      setPantallaCargada(projectId);
     })();
 
     return () => {
@@ -345,8 +386,15 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
           setWidgets((prev) => prev.filter((w) => w.id !== cambio.widget));
         } else {
           // Cambio grande (PUT, proyecto nuevo): se recarga entero.
-          const p = await cargarProyecto(projectId);
-          if (p) setWidgets(p.widgets);
+          // Con try/catch porque esto corre dentro de un manejador de evento:
+          // una promesa rechazada aquí no la recoge nadie y se pierde en la
+          // consola como "unhandled rejection".
+          try {
+            const p = await cargarProyecto(projectId);
+            if (p) setWidgets(p.widgets);
+          } catch (e) {
+            console.warn('[proyecto] no se pudo recargar tras un cambio:', e);
+          }
         }
         setProjectVersion(msg.version);
       }
@@ -422,6 +470,8 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     permisos,
     refrescarSesion,
     cerrarSesion,
+    authRequerida,
+    comprobandoSesion,
     presentes,
     projectId,
     projectVersion,

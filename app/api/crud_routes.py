@@ -321,11 +321,15 @@ async def crear(
     }),
 ) -> dict:
     try:
+        # El `usuario_id` sale de la SESIÓN, no del cuerpo: es la firma de
+        # quién hizo la acción, y firmarla el propio cliente no valdría nada.
         resultado = await _crud(request).crear(
-            recurso, cuerpo.model_dump(), db_id)
+            recurso, cuerpo.model_dump(), db_id,
+            usuario_id=sesion.usuario_id if sesion else None)
     except ErrorCrud as exc:
         raise _error(exc)
-    await _avisar(request, sesion, recurso, "creado")
+    await _avisar(request, sesion, recurso, "creado",
+                  resultado.get("id"))
     return resultado
 
 
@@ -337,7 +341,13 @@ async def crear(
                 "como estaban. Se aplican las mismas validaciones de negocio "
                 "que al crear.\n\n"
                 "Caso típico en alarmas: reconocer una alarma enviando "
-                "`{\"estado\": \"reconocida\", \"usuario_id\": 3}`.",
+                "`{\"estado\": \"reconocida\"}`.\n\n"
+                "**`usuario_id` no se manda.** Lo pone el servidor a partir "
+                "de tu sesión, y se ignora si viene en el cuerpo: firmar una "
+                "acción con la identidad de otro es justo lo que la "
+                "trazabilidad debe impedir. En las tablas que tienen esa "
+                "columna (`alarmas`, `recetas`, `receta_registros`) queda "
+                "registrado quién la tocó de verdad.",
     responses={404: {"description": "No existe ese id."}},
 )
 async def actualizar(
@@ -377,10 +387,11 @@ async def actualizar(
 ) -> dict:
     try:
         resultado = await _crud(request).actualizar(
-            recurso, id_, cuerpo.model_dump(), db_id)
+            recurso, id_, cuerpo.model_dump(), db_id,
+            usuario_id=sesion.usuario_id if sesion else None)
     except ErrorCrud as exc:
         raise _error(exc)
-    await _avisar(request, sesion, recurso, "actualizado")
+    await _avisar(request, sesion, recurso, "actualizado", id_)
     return resultado
 
 
@@ -407,12 +418,13 @@ async def borrar(
         resultado = await _crud(request).borrar(recurso, id_, db_id)
     except ErrorCrud as exc:
         raise _error(exc)
-    await _avisar(request, sesion, recurso, "borrado")
+    await _avisar(request, sesion, recurso, "borrado", id_)
     return resultado
 
 
 # ====================================================================== #
-async def _avisar(request: Request, sesion, recurso: str, accion: str) -> None:
+async def _avisar(request: Request, sesion, recurso: str, accion: str,
+                  id_: int | None = None) -> None:
     """
     Difunde `config.updated` para que todas las pantallas se refresquen.
 
@@ -424,3 +436,12 @@ async def _avisar(request: Request, sesion, recurso: str, accion: str) -> None:
             recurso, usuario_de(sesion), accion)
     except Exception:  # noqa: BLE001
         pass
+
+    # Y a la auditoría, con el id numérico de quien lo hizo. Una alarma
+    # reconocida o una receta borrada tienen que poder atribuirse después, y
+    # el nombre no basta: es editable, el id no.
+    aud = getattr(request.app.state, "auditoria", None)
+    if aud is not None:
+        aud.registrar(f"crud.{recurso}.{accion}", recurso=recurso,
+                      detalle={"id": id_} if id_ is not None else None,
+                      sesion=sesion)

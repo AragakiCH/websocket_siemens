@@ -563,6 +563,365 @@ class AuthManager:
         )
         return [self._a_usuario(f).publico() for f in r.filas]
 
+    # ================================================================== #
+    # CRUD de usuarios (para la pantalla de gestión)
+    # ================================================================== #
+    # `listar()` de arriba se mantiene tal cual porque lo usan la pantalla de
+    # Actividad y varios sitios más. Lo de aquí abajo es el CRUD completo:
+    # buscar, leer uno, crear, editar, renombrar y borrar.
+
+    # Columnas por las que se puede ordenar. Es una LISTA BLANCA, no un
+    # parámetro libre: el nombre de una columna no se puede bindear, así que
+    # aceptar texto del usuario aquí sería inyección SQL directa.
+    ORDENABLES = {
+        "usuario": "usuario",
+        "categoria": "categoria",
+        "estado": "estado",
+        "creado_en": "creado_en",
+        "ultimo_acceso": "ultimo_acceso",
+        "id": "id",
+    }
+
+    async def buscar(
+        self,
+        texto: str = "",
+        categoria: str = "",
+        estado: str = "",
+        orden: str = "usuario",
+        descendente: bool = False,
+        limite: int = 100,
+        desplazamiento: int = 0,
+        db_id: Optional[str] = None,
+    ) -> dict:
+        """
+        Listado con búsqueda, filtros, orden y paginación.
+
+        Devuelve `{usuarios, total, limite, desplazamiento}`. El `total` es el
+        de la búsqueda SIN paginar: es lo que necesita la vista para pintar
+        "mostrando 20 de 137" y decidir si hay página siguiente.
+
+        Todo lo que viene del usuario va BINDEADO (`:texto`, `:cat`...). Lo
+        único que se concatena es el nombre de la columna de orden, y solo
+        después de pasar por la lista blanca `ORDENABLES`.
+        """
+        driver = await self._driver(db_id)
+
+        condiciones: List[str] = []
+        params: Dict[str, Any] = {}
+
+        if texto and texto.strip():
+            # Busca en nombre y correo a la vez: quien busca "juan" no está
+            # pensando en qué columna vive lo que escribe.
+            condiciones.append("(LOWER(usuario) LIKE :texto OR "
+                               "LOWER(COALESCE(email, '')) LIKE :texto)")
+            params["texto"] = f"%{texto.strip().lower()}%"
+        if categoria:
+            if categoria not in ROLES:
+                raise ErrorAuth(
+                    f"Categoría inválida. Opciones: {', '.join(ROLES)}.", 400)
+            condiciones.append("categoria = :cat")
+            params["cat"] = categoria
+        if estado:
+            if estado not in ESTADOS:
+                raise ErrorAuth(
+                    f"Estado inválido. Opciones: {', '.join(ESTADOS)}.", 400)
+            condiciones.append("estado = :est")
+            params["est"] = estado
+
+        where = (" WHERE " + " AND ".join(condiciones)) if condiciones else ""
+
+        # Total sin paginar, para que la vista sepa cuántos hay en realidad.
+        r_total = await driver.query(
+            f"SELECT COUNT(*) AS n FROM {self.tabla}{where}", params, limite=1)
+        total = int(r_total.filas[0]["n"]) if r_total.filas else 0
+
+        col = self.ORDENABLES.get((orden or "usuario").lower(), "usuario")
+        dir_ = "DESC" if descendente else "ASC"
+
+        limite = max(1, min(int(limite or 100), 500))
+        desplazamiento = max(0, int(desplazamiento or 0))
+
+        # La paginación NO es igual en los cuatro motores, y esto es de las
+        # cosas que más sorprenden al portar una consulta:
+        #
+        #   SQL Server  ->  OFFSET n ROWS FETCH NEXT m ROWS ONLY   (SQL:2008)
+        #   Los demás   ->  LIMIT m OFFSET n
+        #
+        # SQLite, MySQL y PostgreSQL NO entienden la forma de SQL Server
+        # (SQLite responde literalmente `near "OFFSET": syntax error`), y SQL
+        # Server no entiende `LIMIT`. Ambas exigen `ORDER BY`, que aquí
+        # siempre está.
+        #
+        # Los dos números son enteros ya saneados arriba (`max`/`min` sobre
+        # `int`), así que interpolarlos es seguro: no hay forma de colar texto.
+        if driver.motor == "mssql":
+            paginado = f"OFFSET {desplazamiento} ROWS FETCH NEXT {limite} ROWS ONLY"
+        else:
+            paginado = f"LIMIT {limite} OFFSET {desplazamiento}"
+
+        sql = (
+            f"SELECT id, usuario, email, categoria, estado, creado_en, "
+            f"ultimo_acceso FROM {self.tabla}{where} "
+            f"ORDER BY {col} {dir_} {paginado}"
+        )
+        r = await driver.query(sql, params, limite=limite)
+
+        return {
+            "usuarios": [self._a_usuario(f).publico() for f in r.filas],
+            "total": total,
+            "limite": limite,
+            "desplazamiento": desplazamiento,
+            "roles": ROLES,
+            "estados": ESTADOS,
+        }
+
+    async def obtener(self, usuario: str,
+                      db_id: Optional[str] = None) -> dict:
+        """Una cuenta concreta, sin el hash. 404 si no existe."""
+        fila = await self._fila_usuario(usuario, db_id)
+        if fila is None:
+            raise ErrorAuth(f"No existe el usuario '{usuario}'.", 404)
+        datos = self._a_usuario(fila).publico()
+        # Dato útil para la vista: si tiene sesión abierta ahora mismo, avisar
+        # antes de desactivarlo o cambiarle el rol.
+        datos["conectado"] = any(
+            s.usuario == datos["usuario"] for s in self._sesiones.values()
+        )
+        return datos
+
+    async def contar_supervisores_activos(
+        self, excluyendo: str = "", db_id: Optional[str] = None
+    ) -> int:
+        """
+        Cuántos Supervisores ACTIVOS hay, sin contar a `excluyendo`.
+
+        Es la comprobación que evita el peor error posible de esta pantalla:
+        quedarse sin ningún administrador. Sin esto, un Supervisor puede
+        desactivarse, degradarse o borrarse y dejar el sistema sin nadie que
+        pueda gestionar cuentas — y la única salida sería SQL a mano.
+        """
+        driver = await self._driver(db_id)
+        sql = (f"SELECT COUNT(*) AS n FROM {self.tabla} "
+               f"WHERE categoria = :c AND estado = :e")
+        params: Dict[str, Any] = {"c": "Supervisor", "e": ESTADO_ACTIVO}
+        if excluyendo:
+            sql += " AND usuario <> :x"
+            params["x"] = excluyendo
+        r = await driver.query(sql, params, limite=1)
+        return int(r.filas[0]["n"]) if r.filas else 0
+
+    async def _proteger_ultimo_supervisor(
+        self, usuario: str, db_id: Optional[str], accion: str
+    ) -> None:
+        """Lanza si `usuario` es el último Supervisor activo que queda."""
+        fila = await self._fila_usuario(usuario, db_id)
+        if fila is None:
+            return
+        datos = self._a_usuario(fila)
+        if datos.categoria != "Supervisor" or datos.estado != ESTADO_ACTIVO:
+            return
+        if await self.contar_supervisores_activos(usuario, db_id) == 0:
+            raise ErrorAuth(
+                f"'{usuario}' es el ÚNICO Supervisor activo. Si {accion}, "
+                f"nadie podría volver a gestionar cuentas y habría que "
+                f"arreglarlo con SQL a mano. Crea o activa otro Supervisor "
+                f"antes.",
+                409,
+            )
+
+    async def crear_usuario(
+        self,
+        usuario: str,
+        password: str,
+        email: str = "",
+        categoria: str = ROL_POR_DEFECTO,
+        estado: str = ESTADO_ACTIVO,
+        db_id: Optional[str] = None,
+    ) -> dict:
+        """
+        Alta desde la pantalla de gestión.
+
+        Se apoya en `registrar()`, que ya valida longitudes, unicidad y hashea
+        la contraseña. La diferencia está en quién puede llamarlo: `registrar()`
+        cubre además el arranque del sistema (primera cuenta sin sesión), y
+        esto es siempre una acción de Supervisor.
+        """
+        creado = await self.registrar(
+            usuario=usuario, password=password, email=email,
+            categoria=categoria, estado=estado, db_id=db_id,
+        )
+        return creado.publico()
+
+    async def actualizar(
+        self,
+        usuario: str,
+        nuevo_usuario: Optional[str] = None,
+        email: Optional[str] = None,
+        categoria: Optional[str] = None,
+        estado: Optional[str] = None,
+        password: Optional[str] = None,
+        db_id: Optional[str] = None,
+        actor: str = "",
+    ) -> dict:
+        """
+        Edición completa de una cuenta. Todos los campos son opcionales.
+
+        `actor` es quien hace el cambio: sirve para impedir que alguien se
+        degrade o se desactive a sí mismo, que es la forma más rápida de
+        quedarse fuera sin querer.
+
+        Devuelve la lista de cambios aplicados, para la auditoría y para poder
+        decirle a la vista qué pasó exactamente.
+        """
+        driver = await self._driver(db_id)
+        fila = await self._fila_usuario(usuario, db_id)
+        if fila is None:
+            raise ErrorAuth(f"No existe el usuario '{usuario}'.", 404)
+        actual = self._a_usuario(fila)
+
+        cambios: List[str] = []
+        sets: List[str] = []
+        params: Dict[str, Any] = {"u": usuario}
+
+        # ---- Renombrar ------------------------------------------------ #
+        renombrado = ""
+        if nuevo_usuario is not None:
+            nu = nuevo_usuario.strip()
+            if nu and nu != usuario:
+                if len(nu) < 3 or len(nu) > 80:
+                    raise ErrorAuth(
+                        "El usuario debe tener entre 3 y 80 caracteres.", 400)
+                if await self._fila_usuario(nu, db_id) is not None:
+                    raise ErrorAuth(f"El usuario '{nu}' ya existe.", 409)
+                sets.append("usuario = :nu")
+                params["nu"] = nu
+                cambios.append(f"nombre → {nu}")
+                renombrado = nu
+
+        # ---- Email ---------------------------------------------------- #
+        if email is not None:
+            mail = email.strip()
+            if mail and len(mail) > 160:
+                raise ErrorAuth("El email no puede pasar de 160 caracteres.", 400)
+            if mail and ("@" not in mail or "." not in mail.split("@")[-1]):
+                raise ErrorAuth(f"El email '{mail}' no parece válido.", 400)
+            sets.append("email = :em")
+            # Cadena vacía -> NULL: la columna acepta NULL y así se distingue
+            # "no tiene correo" de "tiene un correo vacío".
+            params["em"] = mail or None
+            if mail != (actual.email or ""):
+                cambios.append(f"email → {mail or '(vacío)'}")
+
+        # ---- Categoría (rol) ------------------------------------------ #
+        if categoria is not None and categoria != actual.categoria:
+            if categoria not in ROLES:
+                raise ErrorAuth(
+                    f"Categoría inválida. Opciones: {', '.join(ROLES)}.", 400)
+            if actor and actor == usuario and categoria != "Supervisor":
+                raise ErrorAuth(
+                    "No puedes quitarte a ti mismo la categoría de Supervisor: "
+                    "perderías el acceso a esta pantalla en el acto. Pídeselo "
+                    "a otro Supervisor.", 409)
+            if categoria != "Supervisor":
+                await self._proteger_ultimo_supervisor(
+                    usuario, db_id, "le cambias la categoría")
+            sets.append("categoria = :cat")
+            params["cat"] = categoria
+            cambios.append(f"categoría → {categoria}")
+
+        # ---- Estado --------------------------------------------------- #
+        desactivar = False
+        if estado is not None and estado != actual.estado:
+            if estado not in ESTADOS:
+                raise ErrorAuth(
+                    f"Estado inválido. Opciones: {', '.join(ESTADOS)}.", 400)
+            if actor and actor == usuario and estado != ESTADO_ACTIVO:
+                raise ErrorAuth(
+                    "No puedes desactivar tu propia cuenta: te cerraría la "
+                    "sesión al instante y no podrías volver a entrar.", 409)
+            if estado != ESTADO_ACTIVO:
+                await self._proteger_ultimo_supervisor(
+                    usuario, db_id, "lo desactivas")
+                desactivar = True
+            sets.append("estado = :est")
+            params["est"] = estado
+            cambios.append(f"estado → {estado}")
+
+        # ---- Contraseña ----------------------------------------------- #
+        if password is not None:
+            if len(password) < 8:
+                raise ErrorAuth(
+                    "La contraseña debe tener al menos 8 caracteres.", 400)
+            sets.append("password_hash = :pw")
+            sets.append("algoritmo = :alg")
+            params["pw"] = hash_password(password)
+            params["alg"] = ALGORITMO
+            cambios.append("contraseña cambiada")
+
+        if not sets:
+            return {"ok": True, "usuario": usuario, "cambios": [],
+                    "mensaje": "No se indicó ningún cambio."}
+
+        await driver._ejecutar_interno(
+            f"UPDATE {self.tabla} SET {', '.join(sets)} WHERE usuario = :u",
+            params,
+        )
+
+        # ---- Efectos sobre las sesiones abiertas ---------------------- #
+        nombre_final = renombrado or usuario
+        if desactivar or password is not None or renombrado:
+            # Desactivar, cambiar la contraseña o renombrar invalidan la
+            # sesión: en los tres casos, seguir dentro con el estado anterior
+            # sería incorrecto.
+            await self.cerrar_sesiones_de(usuario)
+        elif categoria is not None:
+            # Un cambio de rol SÍ puede aplicarse en caliente: la persona
+            # sigue siendo quien era, solo cambia lo que puede hacer.
+            async with self._lock:
+                for s in self._sesiones.values():
+                    if s.usuario == usuario:
+                        s.categoria = categoria
+
+        logger.info("Usuario '%s' modificado (%s).", usuario, ", ".join(cambios))
+        return {"ok": True, "usuario": nombre_final, "anterior": usuario,
+                "cambios": cambios,
+                "mensaje": f"{nombre_final}: {', '.join(cambios)}."}
+
+    async def borrar_usuario(
+        self, usuario: str, db_id: Optional[str] = None, actor: str = ""
+    ) -> dict:
+        """
+        Borra una cuenta de verdad (DELETE, no marcarla como inactiva).
+
+        Es seguro para el histórico: `alarmas.usuario_id` tiene
+        `ON DELETE SET NULL`, así que las alarmas que esa persona reconoció
+        siguen ahí — se pierde el "quién", no el evento.
+
+        Aun así, casi siempre es mejor **desactivar** que borrar: conserva la
+        trazabilidad y se puede revertir. Por eso la vista debería ofrecer
+        primero «Desactivar».
+        """
+        if actor and actor == usuario:
+            raise ErrorAuth(
+                "No puedes borrar tu propia cuenta. Pídeselo a otro Supervisor.",
+                409)
+
+        fila = await self._fila_usuario(usuario, db_id)
+        if fila is None:
+            raise ErrorAuth(f"No existe el usuario '{usuario}'.", 404)
+
+        await self._proteger_ultimo_supervisor(usuario, db_id, "lo borras")
+
+        driver = await self._driver(db_id)
+        await driver._ejecutar_interno(
+            f"DELETE FROM {self.tabla} WHERE usuario = :u", {"u": usuario})
+        await self.cerrar_sesiones_de(usuario)
+
+        logger.info("Usuario '%s' eliminado por '%s'.", usuario, actor or "-")
+        return {"ok": True, "usuario": usuario,
+                "mensaje": f"Cuenta '{usuario}' eliminada. Las alarmas que "
+                           f"reconoció se conservan, sin el nombre."}
+
     async def cambiar_estado(
         self, usuario: str, estado: str, db_id: Optional[str] = None
     ) -> dict:
