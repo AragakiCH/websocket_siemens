@@ -1,7 +1,7 @@
 -- ==========================================================================
 --  Esquema del HMI · SQL Server
 -- ==========================================================================
---  GENERADO AUTOMÁTICAMENTE por tools/generar_sql.py el 2026-08-27.
+--  GENERADO AUTOMÁTICAMENTE por tools/generar_sql.py el 2026-09-07.
 --  No lo edites a mano: cambia `ddl_esquema_hmi()` en app/db/sql_driver.py
 --  y vuelve a generarlo. Así el script y el backend nunca se desincronizan.
 --
@@ -63,6 +63,7 @@ GO
 -- ---- Tabla: alarmas_def -----------------------------------------
 IF OBJECT_ID('alarmas_def', 'U') IS NULL CREATE TABLE alarmas_def (
     id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    usuario_id BIGINT,
     nombre VARCHAR(120) NOT NULL,
     texto VARCHAR(500) NOT NULL,
     clase VARCHAR(20) NOT NULL DEFAULT 'Error',
@@ -76,7 +77,8 @@ IF OBJECT_ID('alarmas_def', 'U') IS NULL CREATE TABLE alarmas_def (
     area VARCHAR(80),
     activo INT NOT NULL DEFAULT 1,
     creado_en DATETIME2,
-    actualizado_en DATETIME2
+    actualizado_en DATETIME2,
+    CONSTRAINT fk_alarmas_def_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
 )
 
 GO
@@ -131,6 +133,7 @@ IF OBJECT_ID('receta_elementos', 'U') IS NULL CREATE TABLE receta_elementos (
     id BIGINT IDENTITY(1,1) PRIMARY KEY,
     receta_id BIGINT NOT NULL,
     plc_prg_id BIGINT,
+    usuario_id BIGINT,
     nombre VARCHAR(160) NOT NULL,
     nombre_visible VARCHAR(160),
     tag VARCHAR(400),
@@ -149,7 +152,8 @@ IF OBJECT_ID('receta_elementos', 'U') IS NULL CREATE TABLE receta_elementos (
     creado_en DATETIME2,
     actualizado_en DATETIME2,
     CONSTRAINT fk_receta_elementos_receta FOREIGN KEY (receta_id) REFERENCES recetas (id),
-    CONSTRAINT fk_receta_elementos_plc FOREIGN KEY (plc_prg_id) REFERENCES plc_prg (id)
+    CONSTRAINT fk_receta_elementos_plc FOREIGN KEY (plc_prg_id) REFERENCES plc_prg (id),
+    CONSTRAINT fk_receta_elementos_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
 )
 
 GO
@@ -180,8 +184,10 @@ IF OBJECT_ID('receta_valores', 'U') IS NULL CREATE TABLE receta_valores (
     receta_elemento_id BIGINT NOT NULL,
     valor_num FLOAT,
     valor_texto VARCHAR(500),
+    usuario_id BIGINT,
     CONSTRAINT fk_receta_valores_registro FOREIGN KEY (receta_registro_id) REFERENCES receta_registros (id),
-    CONSTRAINT fk_receta_valores_elemento FOREIGN KEY (receta_elemento_id) REFERENCES receta_elementos (id)
+    CONSTRAINT fk_receta_valores_elemento FOREIGN KEY (receta_elemento_id) REFERENCES receta_elementos (id),
+    CONSTRAINT fk_receta_valores_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
 )
 
 GO

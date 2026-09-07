@@ -77,6 +77,7 @@ def arrancar_servidor(tmp: Path) -> subprocess.Popen:
         # CLAVE: sin esto el backend escribiría en la carpeta `datos/` de
         # tu instalación real y pisaría tus conexiones y proyectos.
         "PLC_DATOS_DIR": str(tmp / "datos"),
+        "PLC_MIGRAR_DATOS": "false",
         # El asistente de IA indexa toda la documentación al arrancar y puede
         # tardar bastante. No pinta nada en esta prueba, así que se apaga: sin
         # esto el arranque se va a decenas de segundos y parece que se colgó.

@@ -44,6 +44,11 @@ export default defineConfig({
       // que en la consola se ve como "el backend no tiene ese endpoint"
       // cuando en realidad la petición nunca salió de aquí.
       '/crud': BACKEND,
+      // Alarmas EN EJECUCIÓN: pendientes, histórico y reconocimiento. Es
+      // distinto de '/crud/alarmas', que es la tabla en crudo. Sin esta
+      // línea el banner del operador no vería nunca una alarma: Vite
+      // devolvería el index.html y el fetch fallaría al parsearlo.
+      '/alarmas': BACKEND,
       // Carpeta de datos de la aplicación instalada (ver §11) y copia zip.
       '/sistema': BACKEND,
       // Exportaciones (CSV/XLSX) y el asistente de IA.

@@ -58,7 +58,7 @@ def arrancar(tmp: Path) -> subprocess.Popen:
     env.update({
         "PLC_AUTOSTART_PLCS": "false", "PLC_DISCOVERY_ENABLED": "false",
         "PLC_AUTH_REQUERIDA": "true", "PLC_AI_ENABLED": "false",
-        "PLC_DATOS_DIR": str(tmp / "datos"), "PYTHONPATH": str(RAIZ),
+        "PLC_DATOS_DIR": str(tmp / "datos"), "PLC_MIGRAR_DATOS": "false", "PYTHONPATH": str(RAIZ),
         "PYTHONIOENCODING": "utf-8",
     })
     log = open(tmp / "s.log", "w", encoding="utf-8")

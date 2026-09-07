@@ -1,7 +1,7 @@
 -- ==========================================================================
 --  Esquema del HMI · MySQL / MariaDB
 -- ==========================================================================
---  GENERADO AUTOMÁTICAMENTE por tools/generar_sql.py el 2026-08-27.
+--  GENERADO AUTOMÁTICAMENTE por tools/generar_sql.py el 2026-09-07.
 --  No lo edites a mano: cambia `ddl_esquema_hmi()` en app/db/sql_driver.py
 --  y vuelve a generarlo. Así el script y el backend nunca se desincronizan.
 --
@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS plc_prg (
 -- ---- Tabla: alarmas_def -----------------------------------------
 CREATE TABLE IF NOT EXISTS alarmas_def (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id BIGINT,
     nombre VARCHAR(120) NOT NULL,
     texto VARCHAR(500) NOT NULL,
     clase VARCHAR(20) NOT NULL DEFAULT 'Error',
@@ -74,7 +75,8 @@ CREATE TABLE IF NOT EXISTS alarmas_def (
     area VARCHAR(80),
     activo INT NOT NULL DEFAULT 1,
     creado_en DATETIME(3),
-    actualizado_en DATETIME(3)
+    actualizado_en DATETIME(3),
+    CONSTRAINT fk_alarmas_def_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
 )
 ;
 
@@ -126,6 +128,7 @@ CREATE TABLE IF NOT EXISTS receta_elementos (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     receta_id BIGINT NOT NULL,
     plc_prg_id BIGINT,
+    usuario_id BIGINT,
     nombre VARCHAR(160) NOT NULL,
     nombre_visible VARCHAR(160),
     tag VARCHAR(400),
@@ -144,7 +147,8 @@ CREATE TABLE IF NOT EXISTS receta_elementos (
     creado_en DATETIME(3),
     actualizado_en DATETIME(3),
     CONSTRAINT fk_receta_elementos_receta FOREIGN KEY (receta_id) REFERENCES recetas (id),
-    CONSTRAINT fk_receta_elementos_plc FOREIGN KEY (plc_prg_id) REFERENCES plc_prg (id)
+    CONSTRAINT fk_receta_elementos_plc FOREIGN KEY (plc_prg_id) REFERENCES plc_prg (id),
+    CONSTRAINT fk_receta_elementos_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
 )
 ;
 
@@ -173,8 +177,10 @@ CREATE TABLE IF NOT EXISTS receta_valores (
     receta_elemento_id BIGINT NOT NULL,
     valor_num DOUBLE PRECISION,
     valor_texto VARCHAR(500),
+    usuario_id BIGINT,
     CONSTRAINT fk_receta_valores_registro FOREIGN KEY (receta_registro_id) REFERENCES receta_registros (id),
-    CONSTRAINT fk_receta_valores_elemento FOREIGN KEY (receta_elemento_id) REFERENCES receta_elementos (id)
+    CONSTRAINT fk_receta_valores_elemento FOREIGN KEY (receta_elemento_id) REFERENCES receta_elementos (id),
+    CONSTRAINT fk_receta_valores_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
 )
 ;
 

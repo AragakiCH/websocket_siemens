@@ -27,11 +27,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import (ai_routes, auth_routes, crud_routes, db_routes, 
-                     export_routes, historian_routes, lock_routes, 
-                     project_routes, rest_routes, sistema_routes, 
+from app.api import (ai_routes, alarm_routes, auth_routes, crud_routes,
+                     db_routes, export_routes, historian_routes, lock_routes,
+                     project_routes, rest_routes, sistema_routes,
                      websocket_routes, widget_routes)
 from app.config.settings import get_settings
+from app.core.alarm_engine import MotorAlarmas
 from app.core.connection_manager import ConnectionManager
 from app.core.crud_manager import CrudManager
 from app.core.db_manager import DbManager
@@ -154,6 +155,25 @@ async def lifespan(app: FastAPI):
     await historizador.start(manager)
     await grabador.start(manager)
 
+    # Motor de alarmas. DESPUÉS de `db_manager.start()`: lo primero que hace
+    # es leer las reglas de `alarmas_def`, y sin los pools abiertos arrancaría
+    # siempre con cero reglas.
+    #
+    # Va detrás del historizador a propósito. Los dos escuchan el mismo flujo
+    # y los observadores se llaman en orden de registro: así una muestra queda
+    # encolada para el histórico ANTES de que su alarma se evalúe, y el valor
+    # que disparó la alarma está garantizado en el histórico. Al revés podría
+    # existir un evento cuyo valor no aparece en la curva, que es justo lo
+    # primero que se va a mirar al investigarlo.
+    if settings.alarmas_enabled:
+        motor_alarmas = MotorAlarmas(crud_manager, settings)
+        app.state.motor_alarmas = motor_alarmas
+        await motor_alarmas.start(manager)
+    else:
+        motor_alarmas = None
+        app.state.motor_alarmas = None
+        logger.info("Motor de alarmas desactivado (PLC_ALARMAS_ENABLED=false).")
+
     # El asistente de IA se monta al final: su catálogo de herramientas se
     # deriva del OpenAPI, y el RAG lee el estado del resto de componentes.
     if settings.ai_enabled:
@@ -175,6 +195,11 @@ async def lifespan(app: FastAPI):
         # Orden importante: primero el historizador (vuelca su buffer
         # pendiente), y solo después se cierran los pools de la BD.
         await grabador.stop()
+        # El motor antes que la BD, por lo mismo: en su cola pueden quedar
+        # eventos de los últimos milisegundos, y son precisamente los del
+        # momento del apagado.
+        if motor_alarmas is not None:
+            await motor_alarmas.stop()
         await historizador.stop()
         await db_manager.stop()
 
@@ -459,6 +484,7 @@ app.include_router(db_routes.router)
 app.include_router(crud_routes.router)
 app.include_router(widget_routes.router)
 app.include_router(historian_routes.router)
+app.include_router(alarm_routes.router)
 app.include_router(export_routes.router)
 app.include_router(ai_routes.router)
 app.include_router(sistema_routes.router)

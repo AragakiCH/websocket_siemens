@@ -27,7 +27,7 @@ tmp = Path(tempfile.mkdtemp(prefix="crud_"))
 env = os.environ.copy(); env.update(
     PLC_AUTOSTART_PLCS="false", PLC_DISCOVERY_ENABLED="false",
     PLC_AUTH_REQUERIDA="true", PLC_AI_ENABLED="false",
-    PLC_DATOS_DIR=str(tmp/"datos"), PYTHONPATH=str(Path(__file__).resolve().parent.parent))
+    PLC_DATOS_DIR=str(tmp/"datos"), PLC_MIGRAR_DATOS="false", PYTHONPATH=str(Path(__file__).resolve().parent.parent))
 p = subprocess.Popen([sys.executable,"-m","uvicorn","app.main:app","--port","8095",
     "--host","127.0.0.1","--log-level","error"], cwd=str(tmp), env=env,
     stdout=open(tmp/"s.log","w"), stderr=subprocess.STDOUT)

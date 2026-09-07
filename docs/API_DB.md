@@ -142,6 +142,7 @@ Respuesta:
 | `GET /db` | Listar conexiones con su estado. **Nunca** devuelve contraseñas |
 | `DELETE /db/{db_id}` | Borrar (elimina también **todas** sus consultas) |
 | `POST /db/{db_id}/test` | `SELECT 1` + latencia. Reabre el pool si se cayó → sirve de "reconectar" |
+| `POST /db/{db_id}/esquema` | Crea las tablas del HMI **y añade a las que ya existan las columnas que falten**. Idempotente: no borra columnas, no cambia tipos, no toca las filas. Rol Administradores |
 | `GET /db/{db_id}/tablas` | Tablas y vistas, para el selector del diseñador |
 | `GET /db/{db_id}/columnas?tabla=X` | Columnas con su tipo |
 
