@@ -22,7 +22,7 @@
 // el propio menú desaparecería y te quedarías sin forma de volver. El
 // Inspector lo avisa.
 // =========================================================================
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PanelLeftIcon } from 'lucide-react';
 import type { CustomWidgetDef, RenderCtx, InspectorCtx } from '../types';
 import {
@@ -33,6 +33,8 @@ import {
   publicarSecciones,
   esNivel,
   soloSecciones,
+  arbolDe,
+  ancestrosDe,
   type Seccion } from
 './store';
 import { EditorEstructura, CampoGrupo, AvisoVistaPropia } from './inspector';
@@ -97,6 +99,77 @@ function Sidebar({ widget, style }: RenderCtx) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg.grupo, cfg.secciones]);
 
+  // ── Plegado ───────────────────────────────────────────────
+  //
+  // Qué ramas están CERRADAS, no cuáles abiertas: así una entrada recién
+  // creada nace desplegada, que es lo que espera quien la acaba de crear.
+  //
+  // No se guarda con el diseño a propósito: es estado de runtime, igual que
+  // la vista activa. Al abrir la Vista Previa el menú empieza limpio.
+  const [cerradas, setCerradas] = useState<Set<string>>(new Set());
+
+  const alternar = (id: string) =>
+  setCerradas((prev) => {
+    const s = new Set(prev);
+    if (s.has(id)) s.delete(id);
+    else s.add(id);
+    return s;
+  });
+
+  const filas = useMemo(() => arbolDe(cfg.secciones), [cfg.secciones]);
+
+  /**
+   * Al CAMBIAR de sección se abre la rama que lleva hasta ella.
+   *
+   * Sin esto puedes navegar a un subproceso con su rama plegada: la pantalla
+   * cambia y el menú no enseña dónde estás, que es justo su trabajo.
+   *
+   * Y va al cambiar, NO permanentemente. Mantenerla abierta a la fuerza
+   * mientras estuvieras dentro impedía plegar esa rama —el botón estaba y no
+   * hacía nada—, y en un menú largo plegar lo que ya miraste es media razón
+   * de tener el plegado. Es lo que hace cualquier explorador de archivos:
+   * te revela el elemento, y después lo cierras si quieres.
+   */
+  useEffect(() => {
+    if (!activa) return;
+    const linaje = ancestrosDe(cfg.secciones, activa);
+    if (linaje.length === 0) return;
+    setCerradas((prev) => {
+      if (!linaje.some((id) => prev.has(id))) return prev; // ya estaba abierta
+      const s = new Set(prev);
+      for (const id of linaje) s.delete(id);
+      return s;
+    });
+    // Solo al cambiar de vista: con `cfg.secciones` en las dependencias, la
+    // rama se volvería a abrir sola en cuanto se editara cualquier cosa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activa]);
+
+  const estaCerrada = (id: string) => cerradas.has(id);
+
+  /**
+   * Lo que se dibuja: el árbol menos lo que cuelga de una rama plegada.
+   *
+   * Se recorre de arriba abajo llevando la profundidad a partir de la cual
+   * todo está escondido. Basta con eso porque el árbol viene en orden de
+   * padres antes que hijos: cuando se cierra una rama, todo lo que sigue con
+   * más profundidad es suyo.
+   */
+  const visibles = useMemo(() => {
+    const salida: typeof filas = [];
+    let ocultarDesde = Infinity;
+    for (const fila of filas) {
+      if (fila.profundidad > ocultarDesde) continue;
+      ocultarDesde = Infinity;
+      salida.push(fila);
+      if (fila.tieneHijos && estaCerrada(fila.seccion.id)) {
+        ocultarDesde = fila.profundidad;
+      }
+    }
+    return salida;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filas, cerradas]);
+
   const tamBoton = pBoton.fontSize ?? 13;
 
   return (
@@ -137,12 +210,34 @@ function Sidebar({ widget, style }: RenderCtx) {
             Sin secciones. Agrégalas en el Inspector, a la derecha.
           </p> :
 
-        cfg.secciones.map((s, i) => {
+        visibles.map(({ seccion: s, profundidad, tieneHijos }, i) => {
+          // Sangría por profundidad, IGUAL para encabezados y secciones.
+          //
+          // Antes las secciones llevaban 16 px extra —herencia de cuando una
+          // sección siempre iba dentro de un encabezado— y eso hacía que una
+          // sección de la raíz se viera metida dentro del encabezado que
+          // tuviera encima, aunque no colgara de él. La sangría mentía sobre
+          // la jerarquía, que es lo único que la sangría tiene que decir.
+          //
+          // 8 px de base y 13 por nivel: se lee la jerarquía sin comerse el
+          // ancho útil en un menú de tres niveles dentro de un panel
+          // estrecho.
+          const sangria = 8 + profundidad * 13;
+          const cerrada = tieneHijos && estaCerrada(s.id);
+
           // ── Encabezado de nivel ─────────────────────────────
           if (esNivel(s)) {
             return (
               <div
                 key={s.id}
+                onClick={(e) => {
+                  // Un encabezado no navega, pero con hijos SÍ pliega. Es la
+                  // única forma de que un menú de once entradas se lea de un
+                  // vistazo sin desplazarse.
+                  if (!tieneHijos) return;
+                  e.stopPropagation();
+                  alternar(s.id);
+                }}
                 style={{
                   // Aire ARRIBA y no abajo, y ninguno en el primero: es lo
                   // que separa un grupo del anterior. Repartido a los dos
@@ -153,7 +248,12 @@ function Sidebar({ widget, style }: RenderCtx) {
                   // secciones metidas hacia dentro. Es lo único que dice qué
                   // cuelga de qué; sin ello el menú se lee como una lista
                   // plana con mayúsculas sueltas por medio.
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
                   padding: '4px 8px',
+                  paddingLeft: sangria,
+                  cursor: tieneHijos ? 'pointer' : 'default',
                   marginTop: i === 0 ? 0 : 10,
                   fontSize: Math.max(9, tamBoton - 4),
                   fontWeight: pNivel.bold === false ? 600 : 700,
@@ -180,15 +280,61 @@ function Sidebar({ widget, style }: RenderCtx) {
                   textOverflow: 'ellipsis'
                 }}>
 
-                  {s.label || s.id}
+                  {/* El hueco de la flecha se reserva SIEMPRE, tenga hijos o
+                    no. Si apareciera y desapareciera, el rótulo bailaría de
+                    sitio entre una fila y la de al lado y la columna por la
+                    que se lee el menú dejaría de ser recta. */}
+                  <span
+                  style={{
+                    width: 10,
+                    flexShrink: 0,
+                    display: 'inline-flex',
+                    justifyContent: 'center',
+                    visibility: tieneHijos ? 'visible' : 'hidden',
+                    transition: 'transform 0.15s',
+                    transform: cerrada ? 'rotate(-90deg)' : 'none',
+                    fontSize: '0.8em',
+                    lineHeight: 1
+                  }}>
+                    ▾
+                  </span>
+                  <span
+                  style={{
+                    minWidth: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {s.label || s.id}
+                  </span>
                 </div>);
 
           }
 
           // ── Sección ─────────────────────────────────────────
           const esActiva = s.id === activa;
+
+          // Fondo del botón activo: el que se haya puesto en la parte
+          // «Secciones», y si no, el color del widget.
+          const fondoActivo =
+          pBoton.background && pBoton.background !== 'transparent' ?
+          pBoton.background :
+          style.color;
+
+          // EL TEXTO ACTIVO NO PUEDE SER DEL COLOR DE SU PROPIO FONDO.
+          //
+          // `pBoton.color` hereda `style.color` cuando nadie tocó la parte, y
+          // ese es EXACTAMENTE el color que acaba de usarse como fondo: la
+          // sección abierta salía con el rótulo invisible, teal sobre teal.
+          // Un menú recién soltado se veía roto sin que nada estuviera mal
+          // configurado.
+          //
+          // Solo se descarta si coinciden; un color elegido a mano se
+          // respeta siempre.
+          const mismoColor =
+          (pBoton.color ?? '').toLowerCase() === String(fondoActivo).toLowerCase();
+
           const colorTexto = esActiva ?
-          pBoton.color ?? '#fff' :
+          !pBoton.color || mismoColor ? '#fff' : pBoton.color :
           'rgba(100,116,139,1)';
 
           return (
@@ -212,7 +358,11 @@ function Sidebar({ widget, style }: RenderCtx) {
                 // dentro es el contenido, no la caja. Así el fondo de la
                 // sección activa cruza el menú de lado a lado, que es lo que
                 // la hace visible de un vistazo desde lejos.
-                padding: '8px 10px 8px 24px',
+                // La sangría va en el CONTENIDO, no en la caja: el botón
+                // sigue ocupando todo el ancho, así el fondo de la sección
+                // activa cruza el menú de lado a lado y se ve desde lejos.
+                padding: '8px 10px',
+                paddingLeft: sangria,
                 marginBottom: 2,
                 border: 'none',
                 cursor: 'pointer',
@@ -223,17 +373,46 @@ function Sidebar({ widget, style }: RenderCtx) {
                 // El color de la parte «Secciones» es el del botón activo;
                 // los inactivos van en gris para que se distingan solos.
                 color: colorTexto,
-                background: esActiva ?
-                pBoton.background && pBoton.background !== 'transparent' ?
-                pBoton.background :
-                style.color :
-                'transparent',
+                background: esActiva ? fondoActivo : 'transparent',
                 borderRadius: pBoton.borderRadius ?? 8,
                 transition: 'background 0.15s, color 0.15s',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis'
               }}>
+
+              {/* Desplegar/plegar. Es un <span> con su propio onClick y no
+                  un <button>: dentro de otro botón, un botón anidado no es
+                  HTML válido y el navegador rompe el árbol.
+
+                  Se para la propagación para que abrir la rama NO navegue:
+                  son dos intenciones distintas y toca poder hacer una sin la
+                  otra. Pulsar el rótulo sí navega. */}
+              <span
+                role={tieneHijos ? 'button' : undefined}
+                tabIndex={-1}
+                onClick={(e) => {
+                  if (!tieneHijos) return;
+                  e.stopPropagation();
+                  alternar(s.id);
+                }}
+                title={tieneHijos ? (cerrada ? 'Desplegar' : 'Plegar') : undefined}
+                style={{
+                  width: 10,
+                  flexShrink: 0,
+                  display: 'inline-flex',
+                  justifyContent: 'center',
+                  // Reservado siempre: ver el comentario del encabezado.
+                  visibility: tieneHijos ? 'visible' : 'hidden',
+                  cursor: 'pointer',
+                  transition: 'transform 0.15s',
+                  transform: cerrada ? 'rotate(-90deg)' : 'none',
+                  fontSize: '0.75em',
+                  lineHeight: 1,
+                  opacity: 0.75
+                }}>
+                ▾
+              </span>
 
               {/* Icono, si la sección tiene uno.
                   ANTES AQUÍ HABÍA UNA BARRITA de 3 px que se pintaba siempre.

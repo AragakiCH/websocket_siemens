@@ -21,8 +21,31 @@
 //     diseño conocido que una pantalla en blanco delante de un operario.
 //   * Los valores, de `useAppStore().variables`: al montar este contexto el
 //     RealPLCService abre su WebSocket y el snapshot llega solo.
+//
+// -------------------------------------------------------------------------
+// NOTA DE FUSIÓN (main + diego_vidarte)
+// -------------------------------------------------------------------------
+// Las dos ramas tocaron este fichero a la vez, pero NO para lo mismo, así
+// que aquí están las dos cosas enteras y no la mitad de cada una:
+//
+//   · de `main`   la honestidad sobre el ORIGEN de lo que se pinta: distinguir
+//                 "esto viene del servidor" de "esto es una copia local
+//                 desfasada" y de "no hay sesión". Antes los tres casos se
+//                 veían idénticos, y ese era el fallo de los widgets fantasma.
+//   · de `diego_vidarte` la navegación POR PANTALLA: cada pantalla recuerda su
+//                 propia sección abierta, y elegir en el selector manda sobre
+//                 lo que estuviera abierto en el menú lateral.
+//
+// Donde sí chocaban de verdad —la función `cargar()` y la sincronización de
+// la URL— se ha elegido a conciencia, y está anotado en cada sitio.
 // =========================================================================
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
   MonitorIcon,
   ChevronDownIcon,
@@ -31,7 +54,12 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { WidgetRenderer } from '../components/hmi/WidgetRenderer';
-import { useVistaActiva, GRUPO_POR_DEFECTO } from '../components/hmi/custom/navegacion/store';
+import {
+  useVistaActiva,
+  setVistaActiva,
+  setPantalla,
+  GRUPO_POR_DEFECTO,
+} from '../components/hmi/custom/navegacion/store';
 
 import {
   cargarProyecto,
@@ -76,6 +104,14 @@ export function Preview() {
   // diseño viejo de la caché; ahora se dice, porque son cosas distintas.
   const [sinSesion, setSinSesion] = useState(false);
 
+  // ── Navegación por pantalla ─────────────────────────────────────
+  // La navegación se guarda por pantalla: sin esto, las pestañas de arriba
+  // compartirían una sola, y la pantalla 2 heredaría la sección abierta en
+  // la 1. En `useLayoutEffect` para que ese estado intermedio no se pinte.
+  useLayoutEffect(() => {
+    setPantalla(pantallaId);
+  }, [pantallaId]);
+
   // ── Catálogo de pantallas para el selector ──────────────────────
   useEffect(() => {
     let vivo = true;
@@ -93,6 +129,13 @@ export function Preview() {
   }, []);
 
   // ── Carga del diseño ────────────────────────────────────────────
+  //
+  // FUSIÓN: se conserva la versión de `main`, no la de `diego_vidarte`.
+  // La otra era `const p = await cargarProyecto(id); if (p) setDesign(...)`,
+  // que es más corta pero se traga dos casos importantes: un `null` (la
+  // pantalla ya no existe en el servidor) dejaba pintado lo anterior, y una
+  // excepción reventaba sin dejar rastro. Esta distingue los tres finales
+  // posibles, que es de donde salen los avisos de abajo.
   const cargar = useCallback(async (id: string) => {
     setCargando(true);
     try {
@@ -125,11 +168,22 @@ export function Preview() {
 
   useEffect(() => {
     // Se pinta la caché al instante y se reconcilia con el servidor: cambiar
-    // de pantalla en el selector no debe dejar un hueco en blanco.
+    // de pantalla no debe dejar un hueco en blanco mientras llega el fetch.
     setDesign(loadDesign(pantallaId));
     void cargar(pantallaId);
-    // La URL sigue a la selección, para que recargar o compartir el enlace
-    // devuelva la misma pantalla.
+  }, [pantallaId, cargar]);
+
+  // ── La URL sigue al selector ────────────────────────────────────
+  //
+  // FUSIÓN: efecto propio, como en `diego_vidarte`, en vez de ir pegado al
+  // de carga como estaba en `main`. Separarlos importa por la lista de
+  // dependencias: junto a `cargar` se reescribía el historial también cuando
+  // cambiaba la identidad del callback, no solo al cambiar de pantalla.
+  //
+  // Y sigue al SELECTOR, no a la navegación del menú: la URL es el punto de
+  // entrada («ábreme el HMI por aquí»), y que cambiara en cada clic del
+  // operador llenaría el historial de pasos que nadie pidió.
+  useEffect(() => {
     try {
       const url = new URL(window.location.href);
       url.searchParams.set('pantalla', pantallaId);
@@ -137,7 +191,7 @@ export function Preview() {
     } catch {
       /* history bloqueado: no es crítico */
     }
-  }, [pantallaId, cargar]);
+  }, [pantallaId]);
 
   // ── Cambios de otros, en vivo ───────────────────────────────────
   //
@@ -186,8 +240,17 @@ export function Preview() {
           <MonitorIcon className="h-4 w-4 shrink-0 text-siemens" />
           <div className="relative">
             <select
+              // Enseña lo que se está viendo DE VERDAD, que puede venir del
+              // menú y no de aquí. Decir una cosa y dibujar otra fue
+              // exactamente el fallo del Panel de Sección en la Vista Previa.
               value={pantallaId}
-              onChange={(e) => setPantallaId(e.target.value)}
+              onChange={(e) => {
+                setPantallaId(e.target.value);
+                // Sin esto el menú seguiría mandando y la elección del
+                // selector no se vería nunca: dos mandos peleando por el
+                // mismo hueco. Elegir a mano gana.
+                setVistaActiva(GRUPO_POR_DEFECTO, '');
+              }}
               aria-label="Pantalla que se está viendo"
               className="cursor-pointer appearance-none rounded-lg border border-slate-200 bg-white py-1.5 pl-3 pr-8 text-xs font-semibold text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
             >

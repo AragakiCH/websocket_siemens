@@ -196,3 +196,109 @@ export function moverBloque(
 export function soltarHijos(widgets: HmiWidget[], id: string): HmiWidget[] {
   return widgets.map((w) => (w.padre === id ? { ...w, padre: undefined } : w));
 }
+
+// ─── Orden (qué se dibuja encima de qué) ─────────────────────────
+//
+// NO HAY z-index EN NINGÚN SITIO, y es a propósito. El orden de pintado es el
+// ORDEN DEL ARRAY: el último se dibuja encima. Con un z-index por widget
+// habría dos verdades que mantener sincronizadas —el índice y el número— y en
+// cuanto se desincronizan aparecen esos bugs de "lo traigo al frente y no
+// sube". Con una sola lista, mover en el array ES cambiar el orden.
+
+export type AccionOrden = 'frente' | 'adelante' | 'atras' | 'fondo';
+
+/** Contenedor más externo del que cuelga un widget (o él mismo si va suelto). */
+function raizDe(lista: HmiWidget[], w: HmiWidget): string {
+  let actual = w;
+  const vistos = new Set<string>([w.id]);
+  while (actual.padre) {
+    const p = lista.find((x) => x.id === actual.padre);
+    if (!p || vistos.has(p.id)) break; // un ciclo en un diseño viejo no cuelga esto
+    vistos.add(p.id);
+    actual = p;
+  }
+  return actual.id;
+}
+
+/**
+ * Primer y último índice que ocupa el grupo al que pertenece `lista[k]`.
+ *
+ * Al dar un paso adelante o atrás hay que saltar al VECINO ENTERO. Si el de al
+ * lado es un contenedor con cuatro widgets dentro, avanzar una sola posición
+ * dejaría el widget metido en mitad de ese grupo: por delante de unos hijos y
+ * por detrás de otros. Visualmente sería un widget atrapado dentro de un grupo
+ * al que no pertenece.
+ */
+function limitesDeGrupo(lista: HmiWidget[], k: number): [number, number] {
+  const grupo = bloqueDe(lista, raizDe(lista, lista[k]));
+  let min = k;
+  let max = k;
+  lista.forEach((x, i) => {
+    if (!grupo.has(x.id)) return;
+    if (i < min) min = i;
+    if (i > max) max = i;
+  });
+  return [min, max];
+}
+
+/**
+ * Cambia el orden de dibujado de un widget.
+ *
+ * DOS REGLAS QUE NO SE VEN PERO SE NOTAN
+ *
+ * 1. Un contenedor viaja CON SU CONTENIDO. Traerlo al frente sin sus hijos lo
+ *    pondría delante de ellos y taparía el grupo entero con su propio marco.
+ *
+ * 2. Un hijo nunca puede quedar POR DETRÁS de su contenedor. Si el contenedor
+ *    tiene fondo, el hijo desaparecería y parecería que se ha borrado. Por eso
+ *    «enviar al fondo» dentro de un grupo lo deja justo encima del marco, que
+ *    es lo más atrás que puede estar sin desaparecer.
+ */
+export function reordenar(
+  widgets: HmiWidget[],
+  id: string,
+  accion: AccionOrden
+): HmiWidget[] {
+  const i = widgets.findIndex((w) => w.id === id);
+  if (i < 0) return widgets;
+  const w = widgets[i];
+
+  const bloque = bloqueDe(widgets, id);
+  const movidos = widgets.filter((x) => bloque.has(x.id));
+  const resto = widgets.filter((x) => !bloque.has(x.id));
+  if (resto.length === 0) return widgets; // está él solo: no hay orden que cambiar
+
+  // Dónde queda el hueco del bloque una vez sacado.
+  const hueco = widgets.slice(0, i).filter((x) => !bloque.has(x.id)).length;
+
+  let destino: number;
+  if (accion === 'frente') {
+    destino = resto.length;
+  } else if (accion === 'fondo') {
+    destino = 0;
+  } else if (accion === 'adelante') {
+    if (hueco >= resto.length) return widgets; // ya está arriba del todo
+    destino = limitesDeGrupo(resto, hueco)[1] + 1;
+  } else {
+    if (hueco === 0) return widgets; // ya está al fondo
+    destino = limitesDeGrupo(resto, hueco - 1)[0];
+  }
+
+  // Regla 2: nunca por detrás del propio contenedor.
+  if (w.padre) {
+    const iPadre = resto.findIndex((x) => x.id === w.padre);
+    if (iPadre >= 0) destino = Math.max(destino, iPadre + 1);
+  }
+
+  if (destino === hueco) return widgets; // mismo array: ni re-render ni guardado
+  return [...resto.slice(0, destino), ...movidos, ...resto.slice(destino)];
+}
+
+/** ¿Tiene sentido ofrecer esta acción, o el widget ya está en ese extremo? */
+export function puedeReordenar(
+  widgets: HmiWidget[],
+  id: string,
+  accion: AccionOrden
+): boolean {
+  return reordenar(widgets, id, accion) !== widgets;
+}
