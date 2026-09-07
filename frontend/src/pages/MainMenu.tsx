@@ -6,17 +6,29 @@ import {
   LayoutDashboardIcon,
   ArrowRightIcon,
   UsersIcon,
+  ShieldCheckIcon,
   LogOutIcon } from
 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 export function MainMenu() {
   const navigate = useNavigate();
   const { disconnect, t, permisos, presentes } = useAppStore();
-  // La tarjeta de Actividad solo se ofrece a quien puede usarla. El
+  // Las tarjetas de administración solo se ofrecen a quien puede usarlas. El
   // permiso REAL lo aplica el backend en cada endpoint; esto es comodidad,
   // no seguridad.
   const verActividad = !permisos || permisos.gestionar_bd ||
   permisos.gestionar_usuarios;
+  // Cuentas pide MÁS que Actividad: ver quién hizo qué es una cosa y poder
+  // cambiar quién entra es otra. Un Administrador entra igual, pero la
+  // pantalla se le presenta en modo consulta.
+  const verCuentas = !permisos || permisos.gestionar_usuarios;
+  // Cuántas tarjetas de administración se muestran. Hace falta el número
+  // porque con UNA hay que centrarla a mano bajo las dos fijas, y con DOS la
+  // rejilla ya cuadra sola en 2×2 y centrarla la descolocaría.
+  const extras = (verActividad ? 1 : 0) + (verCuentas ? 1 : 0);
+  const centrarSuelta = extras === 1
+    ? 'md:col-span-2 md:mx-auto md:w-[calc(50%-0.75rem)]'
+    : '';
   // Cuántas personas más están conectadas ahora mismo.
   const otros = presentes.filter(
     (p) => !p.usuario.includes('anónimo')
@@ -91,8 +103,9 @@ export function MainMenu() {
                pegada a la izquierda, desalineada de las de arriba. Ocupando
                las DOS columnas y volviendo al ancho de UNA (`50%` menos medio
                `gap-6`, que son 0.75rem) queda centrada bajo las otras dos,
-               con exactamente su mismo tamaño. */
-            className="md:col-span-2 md:mx-auto md:w-[calc(50%-0.75rem)]"
+               con exactamente su mismo tamaño. Con cuatro tarjetas no hace
+               falta: la rejilla ya cuadra en 2×2 (ver `centrarSuelta`). */
+            className={centrarSuelta}
             title="Actividad"
             description={
             otros > 1 ?
@@ -103,6 +116,19 @@ export function MainMenu() {
             icon={<UsersIcon className="h-8 w-8" />}
             onClick={() => navigate('/actividad')}
             delay={0.19}
+            open={t('menu.open')} />
+          }
+
+          {verCuentas &&
+          <MenuCard
+            className={centrarSuelta}
+            title="Cuentas"
+            description={
+            'Cree y edite las cuentas, cambie categorías y contraseñas, y ' +
+            'active o desactive el acceso.'}
+            icon={<ShieldCheckIcon className="h-8 w-8" />}
+            onClick={() => navigate('/usuarios')}
+            delay={0.26}
             open={t('menu.open')} />
           }
         </div>

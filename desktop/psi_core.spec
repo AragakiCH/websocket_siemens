@@ -50,6 +50,12 @@ a = Analysis(
         # responde de memoria, que es justo lo que el RAG existe para evitar.
         (os.path.join(raiz, "docs"), "docs"),
         (os.path.join(raiz, "README.md"), "."),
+        # El diagnóstico de SQL Server. Viaja porque el equipo donde falla la
+        # conexión es justo el equipo donde NO está el proyecto: allí solo hay
+        # un .exe instalado, y sin este script no queda forma de averiguar si
+        # el problema es el servicio parado, TCP/IP apagado, el SQL Browser o
+        # una instancia con nombre. Pesa 8 KB.
+        (os.path.join(raiz, "tools", "revisar_sqlserver.ps1"), "tools"),
     ],
     hiddenimports=[
         "app.main",
@@ -60,6 +66,26 @@ a = Analysis(
         "uvicorn.protocols.http.auto",
         "uvicorn.protocols.websockets.auto",
         "uvicorn.lifespan.on",
+        # ---------------------------------------------------------------- #
+        #  python-multipart: el que rompe el arranque entero si falta
+        # ---------------------------------------------------------------- #
+        #  `app/api/sistema_routes.py` declara `archivo: UploadFile = File(...)`
+        #  para restaurar una copia de seguridad. FastAPI comprueba que
+        #  python-multipart esté disponible importándolo POR NOMBRE dentro de
+        #  un try/except, así que PyInstaller puede no verlo y dejarlo fuera.
+        #
+        #  Y el fallo no es "la restauración no funciona": FastAPI hace esa
+        #  comprobación al DECLARAR la ruta, es decir al importar el router.
+        #  Sin el paquete, `app.main` lanza al importarse y el .exe no arranca
+        #  —ni siquiera llega a la pantalla de acceso— por una función que
+        #  quizá no se use nunca.
+        #
+        #  Se declaran los dos nombres a propósito: python-multipart instala
+        #  `multipart` (el histórico) y `python_multipart` (el actual), y qué
+        #  nombre busca FastAPI depende de su versión. Pedir los dos cuesta
+        #  nada y sobrevive a una actualización de cualquiera de los dos.
+        "multipart",
+        "python_multipart",
         # Conectores de base de datos: se importan por cadena según el motor
         # elegido, nunca con un `import` literal.
         "aioodbc",

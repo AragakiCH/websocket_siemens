@@ -67,6 +67,19 @@ DefaultGroupName={#MiNombre}
 ; programa serio. Sin esto, quitarlo es borrar una carpeta a mano.
 UninstallDisplayName={#MiNombre} {#MiVersion}
 UninstallDisplayIcon={app}\{#MiExe}
+; Icono del PROPIO instalador, que es distinto del que acaba teniendo el
+; programa instalado (ese lo lleva dentro el .exe, puesto por PyInstaller).
+; Sin esta línea el Setup que se reparte sale con el icono genérico de Inno
+; Setup: el primer contacto con Psi Core en un equipo nuevo es un fichero
+; que no parece de Psi Core, y eso es justo cuando alguien duda de si abrirlo.
+;
+; Va con `#if FileExists` porque el .ico se genera con
+; `python tools/generar_icono.py` y no está en el repositorio como binario.
+; Si alguien clona y compila sin generarlo, se prefiere un instalador con el
+; icono soso a que la compilación falle entera por un adorno.
+#if FileExists(AddBackslash(SourcePath) + "psi_core.ico")
+SetupIconFile=psi_core.ico
+#endif
 OutputDir=..\dist
 OutputBaseFilename=PsiCore_Setup_{#MiVersion}
 Compression=lzma2/max
