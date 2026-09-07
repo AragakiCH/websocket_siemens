@@ -273,6 +273,10 @@ export function Preview() {
                         ? variables.find((v) => v.id === w.variableId)
                         : undefined
                     }
+                    // Aquí el widget se OPERA: el trend escucha el arrastre
+                    // para moverse en el tiempo. En el Diseñador no, porque
+                    // allí el arrastre sirve para colocarlo.
+                    interactivo
                   />
                 </div>
               ))}

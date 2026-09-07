@@ -13,10 +13,12 @@ interface Props {
   widget: HmiWidget;
   variable?: PlcVariable;
   live?: boolean; // whether values animate (Designer preview always live)
+  /** true en la Vista previa (se opera), false/ausente en el Diseñador. */
+  interactivo?: boolean;
 }
 
 // Pure visual renderer for a single HMI widget. Reused by canvas + preview.
-export function WidgetRenderer({ widget, variable }: Props) {
+export function WidgetRenderer({ widget, variable, interactivo = false }: Props) {
   const { style } = widget;
   const frac = valueFraction(variable);
   const on = isTruthy(variable);
@@ -48,7 +50,7 @@ export function WidgetRenderer({ widget, variable }: Props) {
     // 👇 primero checa si es custom TSX, si sí lo delega al registry
     const custom = customByKind(widget.kind);
     if (custom) {
-      return custom.render({ widget, variable, style, on, frac, label });
+      return custom.render({ widget, variable, style, on, frac, label, interactivo });
     }
 
     // 👇 luego checa si es un widget HTML cargado por ZIP
