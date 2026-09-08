@@ -62,6 +62,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { AsistenteArranque } from '../components/auth/AsistenteArranque';
+import { Logo } from '../components/ui/Logo';
 import {
   fetchEstadoAuth,
   getBasePreferida,
@@ -75,28 +76,9 @@ import {
 
 // ─── Marca ───────────────────────────────────────────────────────
 //
-// Para poner el logo: deja el archivo en `frontend/public/logo.png`. Si
-// prefieres otra extensión, cámbiala acá y ya.
-//
-// El logo es un WORDMARK horizontal (~3.3:1), no un icono cuadrado. Por eso
-// se escala por ALTURA (`h-… w-auto`) y no dentro de una caja cuadrada: si se
-// mete en un cuadrado, `object-contain` lo encoge al ancho de la caja y queda
-// una estampilla diminuta con aire arriba y abajo.
-//
-// Como la imagen trae fondo blanco y letras azul marino, sobre el panel
-// oscuro se apoya en una "placa" blanca. No es un parche: es lo que hay que
-// hacer con un logo de fondo sólido sobre una superficie oscura.
-//
-// `public/logo.png` (900×170) es el `logo.jpeg` original recortado: el JPEG
-// traía el blanco METIDO DENTRO — la tinta ocupaba apenas el 52% del alto, y
-// el margen inferior (183px) era casi cuatro veces el superior (50px). Eso
-// hacía dos cosas: la placa salía altísima con las letras chiquitas, y el
-// logo quedaba visualmente descentrado hacia arriba.
-//
-// Ahora el archivo va justo a la tinta y el aire lo pone el padding de la
-// placa, que sí se puede ajustar desde acá.
-const LOGO_SRC = '/logo.png';
-const APP_NAME = 'Psi Core';
+// El logo se mudó a `components/ui/Logo.tsx` — el archivo, la placa blanca y
+// el respaldo si la imagen falta viven allí, porque la cabecera del menú
+// también lo usa y dos copias acabarían discrepando.
 
 // ─── ⚠️ ATAJO DE DESARROLLO ──────────────────────────────────────
 //
@@ -896,66 +878,6 @@ export function Login() {
 // ═══════════════════════════════════════════════════════════════
 // Piezas
 // ═══════════════════════════════════════════════════════════════
-
-/**
- * Wordmark de la aplicación, sobre una placa blanca.
- *
- * Se escala por ALTURA y el ancho sale solo (`w-auto`), que es como se trata
- * un logo horizontal: fijar el ancho lo deformaría o lo encogería.
- *
- * Si `LOGO_SRC` no existe, `onError` cambia a un wordmark dibujado con las
- * mismas proporciones, así la pantalla nunca se ve rota ni da un salto de
- * layout. En `npm run dev` un 404 devuelve el index.html de la SPA, que el
- * navegador tampoco puede decodificar como imagen: también dispara onError.
- */
-function Logo({ variante }: { variante: 'marca' | 'compacto' }) {
-  const [falló, setFalló] = useState(false);
-  const esMarca = variante === 'marca';
-
-  // Alturas. El logo recortado es 5.29:1, así que la altura decide el ancho:
-  //   h-14 (56px) -> 296px   h-16 (64px) -> 338px   h-10 (40px) -> 212px
-  // A `lg` el panel deja ~365px útiles, por eso h-16 se reserva para `xl`.
-  const alto = esMarca ? 'h-14 xl:h-16' : 'h-9 sm:h-10';
-
-  // Padding proporcional al logo (~0.3× su altura). Con el archivo ya
-  // recortado, este es el único aire que se ve: si se sube, la placa vuelve a
-  // parecer inflada como cuando el margen venía dentro del JPEG.
-  const placa = [
-    'inline-flex items-center justify-center rounded-2xl bg-white',
-    esMarca ? 'px-6 py-4 shadow-2xl ring-1 ring-white/25' : 'px-4 py-2.5 shadow-card',
-    // En claro la placa blanca se confundiría con el fondo slate-50: el borde
-    // le devuelve el contorno. En oscuro no hace falta, contrasta sola.
-    esMarca ? '' : 'ring-1 ring-slate-200 dark:ring-0',
-  ].join(' ');
-
-  if (falló) {
-    return (
-      <span className={placa} role="img" aria-label={APP_NAME}>
-        <span
-          className={`flex items-baseline gap-2 font-extrabold leading-none tracking-tight text-navy ${
-            esMarca ? 'text-4xl xl:text-[2.75rem]' : 'text-xl'
-          }`}
-        >
-          PsiCore
-          <span className="text-siemens">Ψ</span>
-        </span>
-      </span>
-    );
-  }
-
-  return (
-    <span className={placa}>
-      <img
-        src={LOGO_SRC}
-        alt={APP_NAME}
-        onError={() => setFalló(true)}
-        // w-auto: la altura manda, el ancho lo calcula el navegador con la
-        // proporción real del archivo. Sin esto el logo se aplasta.
-        className={`${alto} w-auto`}
-      />
-    </span>
-  );
-}
 
 /** Fila del panel de marca: icono + título + una línea de texto. */
 function Ventaja({

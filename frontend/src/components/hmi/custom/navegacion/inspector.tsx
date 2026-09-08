@@ -6,7 +6,7 @@
 // la vista propia tienen que decir exactamente lo mismo en los dos sitios: si
 // se explican distinto, el usuario cree que son dos cosas diferentes.
 // =========================================================================
-import { useRef, useState, type ChangeEvent } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import {
   PlusIcon,
   Trash2Icon,
@@ -27,6 +27,8 @@ import {
   moverEntreHermanos,
   quitarEntrada,
   normalizarEstructura,
+  idUnico,
+  sanearIds,
   type Seccion } from
 './store';
 
@@ -279,6 +281,50 @@ export function AvisoVistaPropia({ vista }: { vista?: string }) {
 // ─── Editor de la estructura del menú ────────────────────────────
 
 /**
+ * El id interno de una sección, que se confirma AL SALIR del campo.
+ *
+ * Mientras escribes, el texto es tuyo y no se toca. Al salir (o con Intro) se
+ * normaliza y se busca uno libre.
+ *
+ * Antes se normalizaba en cada tecla, y eso hacía dos cosas molestas: el
+ * guion que acabas de escribir desaparecía solo (`idDesdeEtiqueta` recorta
+ * los guiones del final), y si el id chocaba con otro había que decidir en
+ * mitad de la palabra. Con Escape se descarta el borrador y vuelve el id que
+ * había.
+ */
+function CampoId({
+  valor,
+  alConfirmar,
+}: {
+  valor: string;
+  alConfirmar: (bruto: string) => void;
+}) {
+  // `null` = no se está editando; se muestra el valor de verdad.
+  const [borrador, setBorrador] = useState<string | null>(null);
+
+  const confirmar = () => {
+    if (borrador === null) return;
+    setBorrador(null);
+    if (borrador !== valor) alConfirmar(borrador);
+  };
+
+  return (
+    <input
+      type="text"
+      value={borrador ?? valor}
+      onChange={(e) => setBorrador(e.target.value)}
+      onBlur={confirmar}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Escape') setBorrador(null);
+      }}
+      placeholder="inicio"
+      title="Id interno de la sección. Es lo que se guarda en cada widget."
+      className="w-full rounded border-none bg-transparent px-1 py-0.5 font-mono text-[10px] text-slate-400 outline-none focus:ring-1 focus:ring-siemens/40" />);
+
+}
+
+/**
  * Alta, baja, reordenado, renombrado e iconos del menú.
  *
  * Trabaja sobre UNA lista donde conviven encabezados y secciones, en el mismo
@@ -286,33 +332,59 @@ export function AvisoVistaPropia({ vista }: { vista?: string }) {
  * van a ras y las secciones metidas hacia dentro, igual que en el menú.
  */
 export function EditorEstructura({
-  secciones,
+  secciones: seccionesGuardadas,
   onChange,
 }: {
   secciones: Seccion[];
   onChange: (s: Seccion[]) => void;
 }) {
+  // ── AQUÍ DENTRO, DOS ENTRADAS NUNCA COMPARTEN ID ────────────────────────
+  //
+  // El id sale del rótulo, así que un menú con dos secciones llamadas igual
+  // llegaba con el id repetido — y repetir un nombre es de lo más normal.
+  // Con el id duplicado, TODO lo de abajo resuelve mal: renombrar una
+  // renombraba las dos, borrar una borraba las dos, y el menú encendía
+  // varias como activas a la vez.
+  //
+  // `sanearIds` devuelve la MISMA lista cuando no hay nada repetido, o sea
+  // que un menú sano no paga nada y no se marca como modificado. Cuando sí
+  // lo hay, se separa aquí y se persiste en cuanto toques cualquier cosa: la
+  // primera aparición conserva su id (es la que hoy se quedan los widgets) y
+  // las siguientes pasan a `-2`, `-3`…
+  const secciones = useMemo(() => sanearIds(seccionesGuardadas), [seccionesGuardadas]);
+
+  /** Todo cambio sale por aquí, así que nunca se guarda un id repetido. */
+  const emitir = (lista: Seccion[]) => onChange(sanearIds(lista));
   // Qué fila tiene el editor de icono abierto. Solo una a la vez: el panel de
   // propiedades es estrecho y con varios abiertos no se ve nada.
-  const [iconoAbierto, setIconoAbierto] = useState<string | null>(null);
+  // Por POSICIÓN y no por id: dos filas que se llamen igual tienen que poder
+  // abrir su icono por separado.
+  const [iconoAbierto, setIconoAbierto] = useState<number | null>(null);
 
   // Se trabaja SOBRE EL ÁRBOL, no sobre índices de la lista. Con
   // anidamiento, la fila de arriba puede ser el último nieto del hermano
   // anterior, y moverse ahí sería colarse dentro de un grupo ajeno.
   const filas = arbolDe(secciones);
 
-  const editar = (id: string, patch: Partial<Seccion>) =>
-  onChange(secciones.map((s) => s.id === id ? { ...s, ...patch } : s));
+  /**
+   * Cambia UNA fila, señalada por su posición.
+   *
+   * Antes iba por id (`s.id === id`), y ese era el corazón del fallo: con dos
+   * entradas compartiendo id, escribir en una escribía en las dos. Se veía
+   * como si el menú duplicara secciones solo.
+   */
+  const editar = (indice: number, patch: Partial<Seccion>) =>
+  emitir(secciones.map((s, i) => i === indice ? { ...s, ...patch } : s));
 
   // Quitar SUBE a los hijos un nivel en vez de llevárselos: borrar una rama
   // entera de un tecleo es la clase de error que arruina media hora.
-  const borrar = (id: string) => onChange(quitarEntrada(secciones, id));
+  const borrar = (id: string) => emitir(quitarEntrada(secciones, id));
 
   const mover = (id: string, delta: number) =>
-  onChange(moverEntreHermanos(secciones, id, delta));
+  emitir(moverEntreHermanos(secciones, id, delta));
 
-  const meter = (id: string) => onChange(indentar(secciones, id));
-  const sacar = (id: string) => onChange(desindentar(secciones, id));
+  const meter = (id: string) => emitir(indentar(secciones, id));
+  const sacar = (id: string) => emitir(desindentar(secciones, id));
 
   /** Id libre con ese prefijo: seccion-4, seccion-5… */
   const idLibre = (prefijo: string) => {
@@ -324,7 +396,7 @@ export function EditorEstructura({
 
   const agregarNivel = () => {
     const { id, n } = idLibre('nivel');
-    onChange([
+    emitir([
     ...normalizarEstructura(secciones),
     { id, label: `Nivel ${n}`, tipo: 'nivel', padre: '' }]);
 
@@ -357,7 +429,7 @@ export function EditorEstructura({
       tipo: 'seccion',
       padre: dentroDe ?? ultimoNivelRaiz ?? '',
     };
-    onChange([...base, nueva]);
+    emitir([...base, nueva]);
   };
 
   const cuantasSecciones = secciones.filter((s) => !esNivel(s)).length;
@@ -374,13 +446,24 @@ export function EditorEstructura({
       </div>
 
       <div className="space-y-1">
-        {filas.map(({ seccion: s, profundidad, tieneHijos }) => {
+        {filas.map(({ seccion: s, profundidad, tieneHijos, indice }) => {
           const nivel = esNivel(s);
-          const abierto = iconoAbierto === s.id;
+          const abierto = iconoAbierto === indice;
 
           return (
             <div
-              key={s.id}
+              // LA POSICIÓN, NO EL ID. Dos motivos, los dos reales:
+              //
+              //   * el id se repite si dos secciones se llaman igual, y con
+              //     llaves repetidas React duplica filas en pantalla;
+              //   * el id CAMBIA mientras escribes el nombre, y con la key
+              //     cambiando React tiraba la fila entera y creaba otra: el
+              //     <input> desaparecía a media palabra, el foco se caía al
+              //     <body>, y el siguiente Retroceso llegaba al atajo del
+              //     Diseñador y borraba el widget.
+              //
+              // La posición no hace ninguna de las dos cosas.
+              key={indice}
               // La sangría ES la jerarquía: sin ella, un menú de tres niveles
               // se lee como una lista plana y no hay forma de saber qué
               // cuelga de qué.
@@ -418,7 +501,7 @@ export function EditorEstructura({
                 {!nivel &&
                 <button
                   type="button"
-                  onClick={() => setIconoAbierto(abierto ? null : s.id)}
+                  onClick={() => setIconoAbierto(abierto ? null : indice)}
                   title={s.icono ? 'Cambiar el icono' : 'Poner un icono SVG'}
                   aria-label={`Icono de ${s.label}`}
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded border transition ${
@@ -448,10 +531,16 @@ export function EditorEstructura({
                       // los dejaría huérfanos, así que solo se recalcula cuando
                       // el id todavía era el derivado del rótulo anterior.
                       const idEraDerivado = s.id === idDesdeEtiqueta(s.label);
-                      const nuevoId = idDesdeEtiqueta(label);
-                      editar(s.id, {
+                      const base = idDesdeEtiqueta(label);
+                      // `idUnico` es lo que permite REPETIR NOMBRES. Dos
+                      // secciones «Motor» son perfectamente válidas: la
+                      // primera se queda `motor` y la segunda pasa a
+                      // `motor-2`, por dentro y sin que se vea.
+                      editar(indice, {
                         label,
-                        ...(idEraDerivado && nuevoId ? { id: nuevoId } : {})
+                        ...(idEraDerivado && base ?
+                        { id: idUnico(secciones, base, indice) } :
+                        {})
                       });
                     }}
                     placeholder={nivel ? 'GENERAL' : 'Inicio'}
@@ -464,13 +553,13 @@ export function EditorEstructura({
                   {/* El id solo importa en las secciones: es lo que se guarda
                       en cada widget. El de un nivel no lo usa nadie. */}
                   {!nivel &&
-                  <input
-                    type="text"
-                    value={s.id}
-                    onChange={(e) => editar(s.id, { id: idDesdeEtiqueta(e.target.value) })}
-                    placeholder="inicio"
-                    title="Id interno de la sección. Es lo que se guarda en cada widget."
-                    className="w-full rounded border-none bg-transparent px-1 py-0.5 font-mono text-[10px] text-slate-400 outline-none focus:ring-1 focus:ring-siemens/40" />
+                  <CampoId
+                    valor={s.id}
+                    alConfirmar={(bruto) =>
+                    editar(indice, {
+                      id: idUnico(secciones, idDesdeEtiqueta(bruto) || s.id, indice)
+                    })
+                    } />
                   }
 
                 </div>
@@ -526,7 +615,7 @@ export function EditorEstructura({
               {!nivel && abierto &&
               <EditorIcono
                 valor={s.icono ?? ''}
-                onChange={(icono) => editar(s.id, { icono })}
+                onChange={(icono) => editar(indice, { icono })}
                 onCerrar={() => setIconoAbierto(null)} />
               }
             </div>);

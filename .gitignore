@@ -24,3 +24,6 @@ nohup.out
 
 # --- Datos locales del backend (conexiones a BD + clave de cifrado) ---
 datos/
+
+# --- Archivos que deja la app de escritorio de Claude (pantallazos, etc.) ---
+Claude outputs/
