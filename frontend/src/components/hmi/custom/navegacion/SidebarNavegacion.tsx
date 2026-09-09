@@ -35,6 +35,7 @@ import {
   soloSecciones,
   arbolDe,
   ancestrosDe,
+  sanearIds,
   type Seccion } from
 './store';
 import { EditorEstructura, CampoGrupo, AvisoVistaPropia } from './inspector';
@@ -88,10 +89,24 @@ function Sidebar({ widget, style }: RenderCtx) {
   const pBoton = estiloDeParte(widget, 'boton');
   const activa = useVistaActiva(cfg.grupo);
 
+  // ── SE DIBUJA DESDE UNA LISTA SIN IDS REPETIDOS ────────────────────────
+  //
+  // El id se deriva del rótulo, así que dos secciones llamadas igual traían
+  // el mismo id. Y el id es lo que decide aquí qué está abierto
+  // (`s.id === activa`), qué cuelga de qué (`padre`) y qué llave lleva cada
+  // fila en React. Con ids repetidos se encendían varias secciones a la vez
+  // y, al plegar o desplegar, React duplicaba filas en pantalla.
+  //
+  // Esto NO guarda nada: solo dibuja coherente un menú que ya estuviera
+  // guardado con ids repetidos. El arreglo de verdad se persiste desde el
+  // inspector en cuanto se toca. Y si no hay nada repetido devuelve la misma
+  // lista, así que no cuesta ni un re-dibujado.
+  const secciones = useMemo(() => sanearIds(cfg.secciones), [cfg.secciones]);
+
   // Al Screen y al arranque solo les interesan las entradas navegables: un
   // encabezado no es un destino, así que ni cuenta como sección ni puede ser
   // la vista inicial.
-  const navegables = soloSecciones(cfg.secciones);
+  const navegables = soloSecciones(secciones);
 
   useEffect(() => {
     publicarSecciones(cfg.grupo, navegables);
@@ -116,7 +131,7 @@ function Sidebar({ widget, style }: RenderCtx) {
     return s;
   });
 
-  const filas = useMemo(() => arbolDe(cfg.secciones), [cfg.secciones]);
+  const filas = useMemo(() => arbolDe(secciones), [secciones]);
 
   /**
    * Al CAMBIAR de sección se abre la rama que lleva hasta ella.
@@ -132,7 +147,7 @@ function Sidebar({ widget, style }: RenderCtx) {
    */
   useEffect(() => {
     if (!activa) return;
-    const linaje = ancestrosDe(cfg.secciones, activa);
+    const linaje = ancestrosDe(secciones, activa);
     if (linaje.length === 0) return;
     setCerradas((prev) => {
       if (!linaje.some((id) => prev.has(id))) return prev; // ya estaba abierta
@@ -198,7 +213,7 @@ function Sidebar({ widget, style }: RenderCtx) {
           más visible. */}
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 6 }}>
-        {cfg.secciones.length === 0 ?
+        {secciones.length === 0 ?
         <p
           style={{
             padding: '10px 8px',
@@ -210,7 +225,7 @@ function Sidebar({ widget, style }: RenderCtx) {
             Sin secciones. Agrégalas en el Inspector, a la derecha.
           </p> :
 
-        visibles.map(({ seccion: s, profundidad, tieneHijos }, i) => {
+        visibles.map(({ seccion: s, profundidad, tieneHijos, indice }, i) => {
           // Sangría por profundidad, IGUAL para encabezados y secciones.
           //
           // Antes las secciones llevaban 16 px extra —herencia de cuando una
@@ -229,7 +244,10 @@ function Sidebar({ widget, style }: RenderCtx) {
           if (esNivel(s)) {
             return (
               <div
-                key={s.id}
+                // La POSICIÓN, no el id: dos entradas con el mismo nombre
+                // traen el mismo id, y con llaves repetidas React duplica
+                // filas al plegar y desplegar en vez de moverlas.
+                key={indice}
                 onClick={(e) => {
                   // Un encabezado no navega, pero con hijos SÍ pliega. Es la
                   // única forma de que un menú de once entradas se lea de un
@@ -339,7 +357,8 @@ function Sidebar({ widget, style }: RenderCtx) {
 
           return (
             <button
-              key={s.id}
+              // La POSICIÓN, no el id. Ver el comentario del encabezado.
+              key={indice}
               type="button"
               // En el lienzo del Diseñador los clics los captura CanvasWidget
               // para seleccionar y arrastrar; aquí solo llega en Vista Previa.

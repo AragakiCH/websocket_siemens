@@ -312,6 +312,30 @@ export function Designer() {
 
   // ── Teclado del lienzo ────────────────────────────────────────
   //
+  // ¿Lo último que pulsó el ratón cayó DENTRO del lienzo?
+  //
+  // La guarda de campos de texto de más abajo mira `e.target`, y eso se queda
+  // corto en un caso muy real: si el campo en el que estabas escribiendo
+  // DESAPARECE (una lista que se redibuja, un panel que se cierra), el foco se
+  // cae al <body> y la tecla siguiente llega aquí como si vinieras del lienzo.
+  //
+  // Pasó de verdad: renombrando una sección del menú lateral, el segundo
+  // Retroceso borraba el widget entero. Aquello se arregló en su sitio, pero
+  // la lección vale para cualquier panel futuro, así que el atajo se blinda
+  // también aquí: Suprimir y Retroceso solo borran si lo último que tocaste
+  // fue el lienzo.
+  const ratonEnLienzo = useRef(false);
+  useEffect(() => {
+    const alPulsarRaton = (e: PointerEvent) => {
+      const destino = e.target as Node | null;
+      ratonEnLienzo.current = !!destino && !!canvasRef.current?.contains(destino);
+    };
+    // En captura: así se entera aunque alguien pare la propagación por el
+    // camino (los widgets del lienzo lo hacen para poder seleccionarse).
+    window.addEventListener('pointerdown', alPulsarRaton, true);
+    return () => window.removeEventListener('pointerdown', alPulsarRaton, true);
+  }, []);
+
   // Suprimir / Retroceso borran el widget seleccionado, y Escape lo
   // deselecciona. Es lo que espera cualquiera que haya usado un editor.
   //
@@ -336,6 +360,8 @@ export function Designer() {
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (!selectedId) return;
+        // Venías de un panel, no del lienzo: la tecla no es para borrar nada.
+        if (!ratonEnLienzo.current) return;
         e.preventDefault(); // Retroceso navegaría atrás en algunos navegadores
         deleteWidget(selectedId);
       }
@@ -577,6 +603,9 @@ export function Designer() {
       [...prev.slice(0, i), nuevo, ...prev.slice(i)];
     });
     setSelectedId(w.id);
+    // Acabas de soltarlo AQUÍ, aunque el ratón empezara en la barra de
+    // widgets. Sin esto, Suprimir justo después de soltar no haría nada.
+    ratonEnLienzo.current = true;
   };
 
   const patchWidget = (id: string, patch: Partial<HmiWidget>) => {

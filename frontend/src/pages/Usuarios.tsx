@@ -242,7 +242,32 @@ function ColOrden({
   );
 }
 
-/** Aviso de la parte de arriba. Se va solo si es de éxito. */
+/** Lo que tarda en irse solo un aviso de éxito. */
+const AUTO_CIERRE_MS = 5000;
+
+/**
+ * Aviso FLOTANTE, centrado arriba. Se va solo si es de éxito; los de error
+ * esperan a que los cierres.
+ *
+ * POR QUÉ FLOTA Y NO VA EN LA PÁGINA
+ * Antes se insertaba en el flujo, justo encima de los filtros. Aparecer
+ * empujaba la tabla hacia abajo y desaparecer la subía de golpe, así que la
+ * fila que estabas mirando se movía sola tres segundos después de tocar un
+ * botón — y en una tabla de cuentas ahí es donde más caro sale pulsar en la
+ * fila equivocada. Flotando, el contenido no se mueve nunca.
+ *
+ * TRES DECISIONES DEL DISEÑO
+ *
+ *  · Superficie SÓLIDA con sombra, no un tinte del color de estado. Encima de
+ *    la tabla, un fondo translúcido deja ver las filas por debajo y el texto
+ *    se vuelve ilegible.
+ *  · El texto va en tinta NORMAL y el color de estado se queda en el icono.
+ *    Un párrafo entero en verde o en rojo se lee peor, y el icono ya dice de
+ *    qué tipo es sin gritar.
+ *  · Barra de tiempo abajo. Un aviso que desaparece solo sin avisar deja la
+ *    duda de si llegaste a leerlo; viéndola vaciarse, sabes cuánto queda —y
+ *    que puedes cerrarlo tú si ya lo leíste.
+ */
 function Aviso({
   tipo, texto, onCerrar,
 }: {
@@ -250,24 +275,47 @@ function Aviso({
   texto: string;
   onCerrar: () => void;
 }) {
+  const ok = tipo === 'ok';
   return (
     <motion.div
-      initial={{ opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }}
-      className={`mb-4 flex items-start gap-2.5 rounded-lg border px-3.5 py-2.5 text-xs ${
-        tipo === 'ok'
-          ? 'border-state-ok/30 bg-state-ok/5 text-state-ok'
-          : 'border-state-error/30 bg-state-error/5 text-state-error'
-      }`}
+      role="status"
+      initial={{ opacity: 0, y: -14, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -10, scale: 0.97 }}
+      transition={{ duration: 0.18 }}
+      className="pointer-events-auto relative w-[min(26rem,calc(100vw-2.5rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-navy-slate dark:bg-navy-soft"
     >
-      {tipo === 'ok'
-        ? <CheckCircle2Icon className="mt-px h-4 w-4 shrink-0" />
-        : <AlertCircleIcon className="mt-px h-4 w-4 shrink-0" />}
-      <p className="flex-1 leading-relaxed">{texto}</p>
-      <button onClick={onCerrar} aria-label="Cerrar aviso" className="shrink-0 opacity-60 hover:opacity-100">
-        <XIcon className="h-3.5 w-3.5" />
-      </button>
+      <div className="flex items-start gap-3 px-3.5 py-3">
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+            ok ? 'bg-state-ok/15 text-state-ok' : 'bg-state-error/15 text-state-error'
+          }`}
+        >
+          {ok
+            ? <CheckCircle2Icon className="h-4 w-4" />
+            : <AlertCircleIcon className="h-4 w-4" />}
+        </span>
+        <p className="flex-1 pt-1 text-xs leading-relaxed text-navy dark:text-slate-100">
+          {texto}
+        </p>
+        <button
+          onClick={onCerrar}
+          aria-label="Cerrar aviso"
+          className="-mr-1 mt-0.5 shrink-0 rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-navy dark:hover:bg-navy-slate/50 dark:hover:text-slate-100"
+        >
+          <XIcon className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {ok && (
+        <motion.span
+          aria-hidden="true"
+          className="absolute inset-x-0 bottom-0 h-0.5 origin-left bg-state-ok/70"
+          initial={{ scaleX: 1 }}
+          animate={{ scaleX: 0 }}
+          transition={{ duration: AUTO_CIERRE_MS / 1000, ease: 'linear' }}
+        />
+      )}
     </motion.div>
   );
 }
@@ -390,7 +438,7 @@ function PanelCuenta({
           estado,
         };
         const creado = await crearUsuario(nuevo);
-        onGuardado(`Cuenta «${creado.usuario}» creada como ${creado.categoria}.`);
+        onGuardado(`Cuenta ${creado.usuario} creada como ${creado.categoria}.`);
       } else {
         const cambios: CambiosUsuario = {};
         if (usuario.trim() !== original!.usuario) cambios.nuevo_usuario = usuario.trim();
@@ -405,7 +453,7 @@ function PanelCuenta({
         }
         const r = await editarUsuario(original!.usuario, cambios);
         const lista = (r.cambios ?? []).join(', ');
-        onGuardado(lista ? `«${r.usuario}»: ${lista}.` : r.mensaje);
+        onGuardado(lista ? `${r.usuario}: ${lista}.` : r.mensaje);
       }
       onCerrar();
     } catch (e) {
@@ -577,7 +625,7 @@ function ConfirmarBorrado({
     setBorrando(true);
     try {
       await borrarUsuario(cuenta.usuario);
-      onBorrado(`Cuenta «${cuenta.usuario}» borrada.`);
+      onBorrado(`Cuenta ${cuenta.usuario} borrada.`);
       onCerrar();
     } catch (e) {
       onError(mensajeError(e));
@@ -705,7 +753,7 @@ export function Usuarios() {
   // cierres, porque suelen necesitar que hagas algo.
   useEffect(() => {
     if (aviso?.tipo !== 'ok') return;
-    const t = setTimeout(() => setAviso(null), 5000);
+    const t = setTimeout(() => setAviso(null), AUTO_CIERRE_MS);
     return () => clearTimeout(t);
   }, [aviso]);
 
@@ -722,7 +770,7 @@ export function Usuarios() {
       });
       setAviso({
         tipo: 'ok',
-        texto: `«${u.usuario}» ${u.estado === 'Activo' ? 'desactivado' : 'activado'}.`,
+        texto: `${u.usuario} ${u.estado === 'Activo' ? 'desactivado' : 'activado'}.`,
       });
       void cargar();
     } catch (e) {
@@ -786,13 +834,6 @@ export function Usuarios() {
       </header>
 
       <div className="mp-scroll mp-scroll-dark flex-1 overflow-y-auto p-5">
-        <AnimatePresence>
-          {aviso && (
-            <Aviso key={aviso.texto} tipo={aviso.tipo} texto={aviso.texto}
-              onCerrar={() => setAviso(null)} />
-          )}
-        </AnimatePresence>
-
         {/* Un Administrador ve todo pero no escribe: mejor decírselo una vez
             arriba que dejar ocho botones grises sin explicación. */}
         {vetoEscritura && (
@@ -806,7 +847,11 @@ export function Usuarios() {
 
         {/* ------------------------------------------------------ filtros - */}
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[220px] flex-1">
+          {/* Ancho acotado: `flex-1` lo estiraba hasta el borde de la
+              pantalla y empujaba los dos desplegables al otro extremo, con un
+              vacío enorme en medio. Un buscador de nombres no necesita 1.500
+              píxeles. */}
+          <div className="relative w-full sm:w-72">
             <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
             <input
               value={texto}
@@ -827,14 +872,6 @@ export function Usuarios() {
             <option value="">Todos los estados</option>
             {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          {hayFiltro && (
-            <button
-              onClick={() => { setTexto(''); setFRol(''); setFEstado(''); setPagina(0); }}
-              className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 dark:hover:bg-navy-slate/40"
-            >
-              Quitar filtros
-            </button>
-          )}
         </div>
 
         {/* -------------------------------------------------------- tabla - */}
@@ -1032,6 +1069,21 @@ export function Usuarios() {
           />
         )}
       </AnimatePresence>
+
+      {/* ------------------------------------------------- avisos flotantes -
+          `fixed` para que no empuje nada, y `pointer-events-none` en la CAPA
+          para no robarle los clics a la tabla que queda debajo: solo el toast
+          en sí los recibe (`pointer-events-auto`). Centrado arriba, a la
+          altura de la fila de filtros: es donde ya está mirando quien acaba de
+          pulsar algo, y no tapa ni la cabecera ni los botones de cada fila. */}
+      <div className="pointer-events-none fixed inset-x-0 top-16 z-50 flex justify-center px-4">
+        <AnimatePresence>
+          {aviso && (
+            <Aviso key={aviso.texto} tipo={aviso.tipo} texto={aviso.texto}
+              onCerrar={() => setAviso(null)} />
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

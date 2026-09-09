@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { PowerIcon } from "lucide-react";
 import { HmiWidget } from "../../models/widget";
@@ -20,6 +20,14 @@ interface Props {
 // Pure visual renderer for a single HMI widget. Reused by canvas + preview.
 export function WidgetRenderer({ widget, variable, interactivo = false }: Props) {
   const { style } = widget;
+
+  /**
+   * Un widget ZIP tiene abierta una capa a pantalla completa (un modal).
+   *
+   * Lo dice el propio `HtmlWidgetRenderer` cuando lo detecta dentro de su
+   * iframe. Aquí interesa por una razón muy concreta: `rootStyle` de abajo.
+   */
+  const [modalZip, setModalZip] = useState(false);
   const frac = valueFraction(variable);
   const on = isTruthy(variable);
   const label = variable ? formatValue(variable) : widget.text;
@@ -56,7 +64,16 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
     // 👇 luego checa si es un widget HTML cargado por ZIP
     const zip = zipByKind(widget.kind);
     if (zip) {
-      return <HtmlWidgetRenderer zipWidget={zip} widget={widget} variable={variable} style={style} />;
+      return (
+        <HtmlWidgetRenderer
+          zipWidget={zip}
+          widget={widget}
+          variable={variable}
+          style={style}
+          interactivo={interactivo}
+          onModal={setModalZip}
+        />
+      );
     }
 
     // built-in: el switch original queda intacto
@@ -389,12 +406,31 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
   // fill, so both opt out of the container fill.
   const paintsOwnFill = widget.kind === "line" || widget.kind === "button";
   const isCircle = widget.kind === "circle";
+
+  // MIENTRAS UN WIDGET ZIP TENGA UN MODAL ABIERTO, ESTE DIV SE APARTA.
+  //
+  // `transform`, `filter` y `opacity < 1` no son solo pintura: convierten a
+  // este div en el BLOQUE CONTENEDOR de cualquier `position: fixed` que haya
+  // debajo. Y `rotate(0deg)` cuenta igual que `rotate(45deg)` — al navegador
+  // le da lo mismo que la rotación sea nula, el bloque contenedor lo crea de
+  // todos modos.
+  //
+  // Para un widget normal eso da igual. Para un ZIP que abre un modal es
+  // fatal: el iframe se pone `fixed; inset: 0` para taparlo todo, pero el
+  // "todo" pasa a ser los 140×150 del widget en vez de la ventana. El iframe
+  // acaba anclado en la esquina del widget, el `overflow: hidden` de aquí y
+  // el del lienzo lo recortan, y como su contenido va centrado, lo que queda
+  // dentro del recorte es justo la parte vacía: modal invisible y hueco del
+  // widget en blanco.
+  //
+  // Así que mientras dure el modal se quitan los tres. Es exactamente cuando
+  // no hacen falta: el widget está tapado por el modal de todas formas.
   const rootStyle: React.CSSProperties = {
-    opacity: style.opacity,
-    transform: `rotate(${style.rotation}deg)`,
-    filter: widget.enabled ? "none" : "grayscale(0.6)",
+    opacity: modalZip ? 1 : style.opacity,
+    transform: modalZip ? "none" : `rotate(${style.rotation}deg)`,
+    filter: modalZip ? "none" : widget.enabled ? "none" : "grayscale(0.6)",
     borderRadius: isCircle ? "50%" : style.borderRadius,
-    overflow: "hidden",
+    overflow: modalZip ? "visible" : "hidden",
   };
   if (!paintsOwnFill) {
     rootStyle.background = style.background;

@@ -325,6 +325,19 @@ export interface EntradaArbol {
   profundidad: number;
   /** Si tiene hijos, se le pinta la flechita de desplegar. */
   tieneHijos: boolean;
+  /**
+   * Su POSICIÓN en la lista original. Es la única identidad que no se puede
+   * repetir.
+   *
+   * El id sí se repetía, y salía caro: se deriva del rótulo, así que dos
+   * secciones llamadas igual acababan con el mismo id. Quien dibujaba usaba
+   * `key={s.id}` y React se encontraba dos filas con la misma llave — al
+   * plegar o desplegar, en vez de mover nodos, los duplicaba en pantalla.
+   *
+   * Con el índice, cada fila tiene una llave propia aunque el menú tenga
+   * nombres repetidos, que es algo perfectamente legítimo.
+   */
+  indice: number;
 }
 
 /**
@@ -360,6 +373,7 @@ export function arbolDe(lista: Seccion[]): EntradaArbol[] {
         seccion: lista[i],
         profundidad,
         tieneHijos: (hijosDe.get(id) ?? []).length > 0,
+        indice: i,
       });
       bajar(id, profundidad + 1);
     }
@@ -372,7 +386,7 @@ export function arbolDe(lista: Seccion[]): EntradaArbol[] {
   lista.forEach((s, i) => {
     if (colocados.has(i)) return;
     colocados.add(i);
-    salida.push({ seccion: s, profundidad: 0, tieneHijos: false });
+    salida.push({ seccion: s, profundidad: 0, tieneHijos: false, indice: i });
   });
 
   return salida;
@@ -396,6 +410,87 @@ export function normalizarEstructura(lista: Seccion[]): Seccion[] {
   const padres = lista.map((_, i) => padreEfectivo(lista, i));
   const conPadre = lista.map((s, i) => ({ ...s, padre: padres[i] }));
   return arbolDe(conPadre).map((e) => e.seccion);
+}
+
+// ─── Ids que no se pisan ─────────────────────────────────────────
+//
+// EL ID NO PUEDE REPETIRSE, EL NOMBRE SÍ.
+//
+// El id se saca del rótulo (`Sección 7` -> `seccion-7`), y hasta aquí bien:
+// es legible y estable. Lo que faltaba era comprobar que no lo tuviera ya
+// otra entrada. Y llamar igual a dos secciones es de lo más normal —«Motor»
+// dentro de dos líneas distintas, por ejemplo—, así que la colisión no era
+// un caso raro sino el camino corto.
+//
+// Con dos entradas compartiendo id, el menú se rompía de cuatro maneras a la
+// vez, porque el id ES la identidad en todo el módulo:
+//
+//   * `editar()` recorre con `s.id === id`, así que renombrar una renombraba
+//     TODAS las que compartieran el id — parecía que se duplicaban solas;
+//   * la sección abierta se marca con `s.id === activa`, y se encendían
+//     varias a la vez;
+//   * `padre` apunta por id, así que un subárbol colgaba de la primera que
+//     coincidiera, no de la suya;
+//   * y `key={s.id}` en React, con llaves repetidas, duplicaba filas en
+//     pantalla al plegar y desplegar.
+//
+// De ahí que la unicidad se garantice al escribir (`idUnico`) y se pueda
+// reparar lo ya guardado (`sanearIds`).
+
+/**
+ * El id libre más parecido a `propuesto`: `motor`, y si está cogido
+ * `motor-2`, `motor-3`…
+ *
+ * `exceptoIndice` es la entrada que se está editando: su propio id no cuenta
+ * como ocupado, o renombrar algo a lo que ya se llamaba le añadiría un `-2`.
+ */
+export function idUnico(
+  lista: Seccion[],
+  propuesto: string,
+  exceptoIndice = -1
+): string {
+  const cogidos = new Set(
+    lista.filter((_, i) => i !== exceptoIndice).map((s) => s.id)
+  );
+  if (!cogidos.has(propuesto)) return propuesto;
+  let n = 2;
+  while (cogidos.has(`${propuesto}-${n}`)) n++;
+  return `${propuesto}-${n}`;
+}
+
+/**
+ * Repara un menú que ya trae ids repetidos.
+ *
+ * LA PRIMERA APARICIÓN SE QUEDA CON EL ID. No es un capricho: ese id es lo
+ * que hay escrito en `HmiWidget.vista` de los widgets, y es la primera la que
+ * hoy se los queda (todo el módulo resuelve por `findIndex`). Renumerar las
+ * siguientes deja las cosas donde ya estaban y solo separa lo que estaba
+ * pegado.
+ *
+ * Devuelve la MISMA lista si no había nada repetido, para no provocar
+ * re-dibujados ni marcar el proyecto como modificado sin motivo.
+ */
+export function sanearIds(lista: Seccion[]): Seccion[] {
+  const vistos = new Set<string>();
+  let hubo = false;
+
+  const salida = lista.map((s) => {
+    if (!vistos.has(s.id)) {
+      vistos.add(s.id);
+      return s;
+    }
+    hubo = true;
+    // Se mira contra DOS sitios: los ids ya repartidos en esta pasada y los
+    // originales que vienen más adelante. Solo con los originales, tres
+    // entradas llamadas igual recibirían todas el mismo `-2`.
+    let n = 2;
+    while (vistos.has(`${s.id}-${n}`) || lista.some((o) => o.id === `${s.id}-${n}`)) n++;
+    const nuevo = `${s.id}-${n}`;
+    vistos.add(nuevo);
+    return { ...s, id: nuevo };
+  });
+
+  return hubo ? salida : lista;
 }
 
 /** Hermanos de una entrada: los que cuelgan del mismo padre, en orden. */
