@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeftIcon,
@@ -10,6 +10,7 @@ import {
   WorkflowIcon,
   BellIcon,
   BookOpenIcon,
+  FileSpreadsheetIcon,
   LayersIcon,
   MenuIcon,
   PlayIcon,
@@ -49,17 +50,22 @@ import { recursoDisenador } from '../services/lockApi';
 import { FlowEditor } from '../components/flows/FlowEditor';
 import { AlarmsEditor } from '../components/alarms/AlarmsEditor';
 import { RecipesEditor } from '../components/recipes/RecipesEditor';
+import { PanelExportar } from '../components/export/PanelExportar';
 import { PantallasBar } from '../components/hmi/PantallasBar';
 import {
   useVistaActiva,
   useSecciones,
   setVistaActiva,
+  setPantalla,
+  publicarSecciones,
+  arbolDe,
   esWidgetDeNavegacion,
+  KIND_MENU,
   GRUPO_POR_DEFECTO,
   VISTA_TODAS } from
 '../components/hmi/custom/navegacion/store';
 
-type DesignerTab = 'designer' | 'flows' | 'alarms' | 'recipes';
+type DesignerTab = 'designer' | 'flows' | 'alarms' | 'recipes' | 'export';
 
 let counter = 1;
 
@@ -111,6 +117,20 @@ export function Designer() {
 
   // Vista abierta en la navegación del lienzo. Solo se usa para atenuar los
   // widgets de otras vistas; no cambia nada de lo que se guarda.
+  // ── QUÉ PANTALLA ESTÁ MIRANDO LA NAVEGACIÓN ───────────────────
+  //
+  // Sin esto, las pestañas de arriba comparten una sola navegación: la
+  // pantalla 2 ve las secciones de la 1, y un widget soltado allí nace con
+  // la sección abierta acá.
+  //
+  // Va en `useLayoutEffect` y no en `useEffect` a propósito. Los dos corren
+  // DESPUÉS del render, así que la primera pasada de una pantalla nueva lee
+  // todavía lo de la anterior; la diferencia es que el de layout corre antes
+  // de pintar, así que ese estado intermedio no llega a verse.
+  useLayoutEffect(() => {
+    setPantalla(projectId);
+  }, [projectId]);
+
   const vistaActiva = useVistaActiva(GRUPO_POR_DEFECTO);
   const secciones = useSecciones(GRUPO_POR_DEFECTO);
 
@@ -393,6 +413,66 @@ export function Designer() {
     setWidgets((prev) => reordenar(prev, id, accion));
   };
 
+  // ── Secciones fantasma ────────────────────────────────────────
+  //
+  // Las secciones las publica el propio Menú Lateral al dibujarse. Si se
+  // borra el menú, nadie las retira y la barra sigue ofreciendo secciones de
+  // una navegación que ya no existe. Aquí se limpia cuando la pantalla se ha
+  // quedado sin ningún menú.
+  //
+  // Espera a `cargada`: durante la hidratación `widgets` todavía puede traer
+  // lo de la pantalla anterior, y limpiar con esa foto borraría secciones
+  // buenas.
+  useEffect(() => {
+    if (!cargada) return;
+    const hayMenu = widgets.some((w) => w.kind === KIND_MENU);
+    if (!hayMenu) publicarSecciones(GRUPO_POR_DEFECTO, []);
+  }, [cargada, widgets]);
+
+  // ── Secciones huérfanas ───────────────────────────────────────
+  //
+  // Un widget guarda su sección por id (`w.vista`). Si esa sección se borra
+  // del menú, el id se queda escrito y ya no hay forma de abrirla: el widget
+  // no se dibuja, no se puede seleccionar y no se puede borrar. Queda
+  // atrapado, y en la Vista Previa reaparece mezclado con todo lo demás.
+  //
+  // Se detectan aquí para poder ofrecerlas en el selector y rescatarlas.
+  const idsDeSeccion = useMemo(
+    () => new Set(secciones.map((s) => s.id)),
+    [secciones]
+  );
+
+  const huerfanas = useMemo(() => {
+    const cuenta = new Map<string, number>();
+    for (const w of widgets) {
+      const v = (w.vista ?? '').trim();
+      if (!v || idsDeSeccion.has(v)) continue;
+      cuenta.set(v, (cuenta.get(v) ?? 0) + 1);
+    }
+    return Array.from(cuenta, ([id, n]) => ({ id, n })).sort((a, b) =>
+      a.id.localeCompare(b.id)
+    );
+  }, [widgets, idsDeSeccion]);
+
+  /**
+   * Devuelve a «En todas» los widgets de una sección que ya no existe.
+   *
+   * Es la salida del atasco: pasan a verse siempre, y desde ahí se borran o
+   * se reasignan como cualquier otro. Se prefiere esto a borrarlos porque
+   * perder trabajo por un id que ya no está sería el peor final posible.
+   */
+  const rescatarHuerfana = (id: string) => {
+    if (!puedeEditar) return;
+    setWidgets((prev) =>
+      prev.map((w) =>
+        (w.vista ?? '').trim() === id ? { ...w, vista: VISTA_TODAS } : w
+      )
+    );
+    if (vistaActiva === id) {
+      setVistaActiva(GRUPO_POR_DEFECTO, secciones[0]?.id ?? VISTA_TODAS);
+    }
+  };
+
   const insigniaDe = (w: HmiWidget): string | undefined => {
     if (esContenedor(w.kind)) {
       const n = hijosDe(widgets, w.id).length;
@@ -611,6 +691,17 @@ export function Designer() {
               <BookOpenIcon className="h-3.5 w-3.5" />
               Recetas
             </button>
+            <button
+              onClick={() => setActiveTab('export')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition ${
+                activeTab === 'export'
+                  ? 'bg-white text-navy shadow-sm dark:bg-navy-slate dark:text-slate-100'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+              }`}
+            >
+              <FileSpreadsheetIcon className="h-3.5 w-3.5" />
+              Exportar
+            </button>
           </div>
         </div>
 
@@ -621,7 +712,7 @@ export function Designer() {
               Se queda FUERA del menú a propósito: es un control de trabajo,
               se pulsa cada dos por tres mientras editas. Lo que se guardó
               dentro es estado y ajustes, que se miran de vez en cuando. */}
-          {secciones.length > 0 &&
+          {(secciones.length > 0 || huerfanas.length > 0) &&
           <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-navy-slate dark:bg-navy">
 
             {/* SELECTOR DE SECCIÓN: DESPLEGABLE, NO UNA FILA DE BOTONES.
@@ -644,11 +735,20 @@ export function Designer() {
                 {/* Ancho fijo: sin él, la barra entera se ensancha y se encoge
                     al cambiar de sección y el resto de botones se mueven. */}
                 <span className="max-w-[130px] truncate">
-                  {secciones.find((s) => s.id === vistaActiva)?.label || 'Sin sección'}
+                  {secciones.find((s) => s.id === vistaActiva)?.label ||
+                    (vistaActiva ? vistaActiva : 'Sin sección')}
                 </span>
+                {/* El contador solo tiene sentido dentro del menú. Estando en
+                    una huérfana no hay «de cuántas», así que se marca. */}
+                {secciones.some((s) => s.id === vistaActiva) ?
                 <span className="rounded bg-slate-200/70 px-1 text-[10px] tabular-nums text-slate-500 dark:bg-navy-slate/70 dark:text-slate-400">
-                  {Math.max(1, secciones.findIndex((s) => s.id === vistaActiva) + 1)}/{secciones.length}
-                </span>
+                  {secciones.findIndex((s) => s.id === vistaActiva) + 1}/{secciones.length}
+                </span> :
+                vistaActiva ?
+                <span className="rounded bg-amber-500/15 px-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                  huérfana
+                </span> : null
+                }
                 <ChevronDownIcon
                   className={`h-3 w-3 shrink-0 text-slate-400 transition-transform ${selectorAbierto ? 'rotate-180' : ''}`} />
               </button>
@@ -658,7 +758,11 @@ export function Designer() {
                 <div className="fixed inset-0 z-40" onClick={() => setSelectorAbierto(false)} />
 
                 <div className="absolute left-0 top-full z-50 mt-1.5 max-h-[320px] w-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-navy-slate dark:bg-navy-soft">
-                  {secciones.map((s) => {
+                  {/* Con sangría: el selector tiene que leerse como el menú.
+                      `secciones` ya viene sin encabezados —solo lo navegable—
+                      así que un subproceso podría salir pegado a su padre y
+                      parecer que están al mismo nivel. */}
+                  {arbolDe(secciones).map(({ seccion: s, profundidad }) => {
                     // Cuántos widgets viven en cada sección. Con muchas
                     // secciones es el dato que buscas: dice cuál está vacía y
                     // cuál te olvidaste de rellenar, sin ir abriéndolas una a
@@ -672,7 +776,8 @@ export function Designer() {
                           setVistaActiva(GRUPO_POR_DEFECTO, s.id);
                           setSelectorAbierto(false);
                         }}
-                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition ${
+                        style={{ paddingLeft: 12 + profundidad * 12 }}
+                        className={`flex w-full items-center gap-2 py-1.5 pr-3 text-left text-xs transition ${
                         activa ?
                         'bg-siemens-50 font-semibold text-siemens dark:bg-siemens/15 dark:text-siemens-200' :
                         'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-navy-slate/50'}`
@@ -684,6 +789,61 @@ export function Designer() {
                       </button>);
 
                   })}
+
+                  {/* ── HUÉRFANAS ────────────────────────────────
+                      Secciones que algún widget todavía dice tener pero que
+                      ya no están en el menú, casi siempre porque se borró la
+                      sección con widgets dentro.
+
+                      Sin esto quedan atrapados: no se dibujan, así que no se
+                      pueden ni seleccionar ni borrar, y en la Vista Previa
+                      de una pantalla sin navegación reaparecen mezclados con
+                      todo lo demás. Aquí se pueden abrir para verlos, o
+                      devolverlos a «En todas» de un clic. */}
+                  {huerfanas.length > 0 &&
+                  <>
+                    <div className="mt-1 border-t border-slate-100 px-3 pb-1 pt-1.5 dark:border-navy-slate">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                        Sin sección en el menú
+                      </p>
+                      <p className="mt-0.5 text-[10px] leading-snug text-slate-400">
+                        Su sección ya no existe. Ábrela para verlos, o
+                        devuélvelos a «En todas».
+                      </p>
+                    </div>
+                    {huerfanas.map((h) =>
+                    <div
+                      key={h.id}
+                      className={`flex w-full items-center gap-1 pl-3 pr-1.5 transition ${
+                      vistaActiva === h.id ?
+                      'bg-amber-500/10' :
+                      'hover:bg-slate-50 dark:hover:bg-navy-slate/50'}`
+                      }>
+                      <button
+                        onClick={() => {
+                          setVistaActiva(GRUPO_POR_DEFECTO, h.id);
+                          setSelectorAbierto(false);
+                        }}
+                        title={`Abrir «${h.id}» para ver sus ${h.n} widget(s)`}
+                        className={`flex min-w-0 flex-1 items-center gap-2 py-1.5 text-left text-xs ${
+                        vistaActiva === h.id ?
+                        'font-semibold text-amber-700 dark:text-amber-300' :
+                        'text-slate-600 dark:text-slate-300'}`
+                        }>
+                        <span className="min-w-0 flex-1 truncate font-mono text-[11px]">{h.id}</span>
+                        <span className="shrink-0 text-[10px] tabular-nums text-slate-400">{h.n}</span>
+                      </button>
+                      <button
+                        onClick={() => rescatarHuerfana(h.id)}
+                        disabled={!puedeEditar}
+                        title={`Devolver sus ${h.n} widget(s) a «En todas», donde se ven siempre`}
+                        className="shrink-0 rounded px-1.5 py-1 text-[10px] font-semibold text-siemens outline-none transition hover:bg-siemens/10 disabled:cursor-not-allowed disabled:opacity-40">
+                        Rescatar
+                      </button>
+                    </div>
+                    )}
+                  </>
+                  }
 
                   {/* Los widgets fijos no son una sección y no se pueden
                       "abrir", pero saber cuántos hay explica por qué algunos
@@ -884,6 +1044,8 @@ export function Designer() {
         <AlarmsEditor />
       ) : activeTab === 'recipes' ? (
         <RecipesEditor />
+      ) : activeTab === 'export' ? (
+        <PanelExportar />
       ) : activeTab === 'designer' ? (
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Las pantallas del HMI. Van a ancho completo, sobre las tres

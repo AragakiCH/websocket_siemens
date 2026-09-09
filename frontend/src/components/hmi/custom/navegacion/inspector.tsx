@@ -16,8 +16,19 @@ import {
   UploadIcon,
   XIcon,
   PaletteIcon,
+  IndentIncreaseIcon,
+  IndentDecreaseIcon,
 } from 'lucide-react';
-import { esNivel, type Seccion } from './store';
+import {
+  esNivel,
+  arbolDe,
+  indentar,
+  desindentar,
+  moverEntreHermanos,
+  quitarEntrada,
+  normalizarEstructura,
+  type Seccion } from
+'./store';
 
 const INPUT =
   'w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100';
@@ -265,27 +276,6 @@ export function AvisoVistaPropia({ vista }: { vista?: string }) {
   );
 }
 
-// ─── Bloques: un nivel y lo que cuelga de él ─────────────────────
-//
-// Un "bloque" es un encabezado más las secciones que van debajo hasta el
-// siguiente encabezado. Es lo que se mueve cuando subes o bajas un nivel: si
-// el encabezado viajara solo, sus secciones se quedarían atrás y acabarían
-// bajo el nivel de al lado, que no es nunca lo que se pretendía.
-
-/** Índice (exclusivo) donde acaba el bloque que empieza en `i`. */
-function finBloque(lista: Seccion[], i: number): number {
-  let j = i + 1;
-  while (j < lista.length && !esNivel(lista[j])) j++;
-  return j;
-}
-
-/** Índice donde empieza el bloque anterior al que empieza en `i`. */
-function inicioBloqueAnterior(lista: Seccion[], i: number): number {
-  let j = i - 1;
-  while (j > 0 && !esNivel(lista[j])) j--;
-  return Math.max(0, j);
-}
-
 // ─── Editor de la estructura del menú ────────────────────────────
 
 /**
@@ -306,49 +296,23 @@ export function EditorEstructura({
   // propiedades es estrecho y con varios abiertos no se ve nada.
   const [iconoAbierto, setIconoAbierto] = useState<string | null>(null);
 
-  const editar = (i: number, patch: Partial<Seccion>) =>
-  onChange(secciones.map((s, k) => k === i ? { ...s, ...patch } : s));
+  // Se trabaja SOBRE EL ÁRBOL, no sobre índices de la lista. Con
+  // anidamiento, la fila de arriba puede ser el último nieto del hermano
+  // anterior, y moverse ahí sería colarse dentro de un grupo ajeno.
+  const filas = arbolDe(secciones);
 
-  const borrar = (i: number) => onChange(secciones.filter((_, k) => k !== i));
+  const editar = (id: string, patch: Partial<Seccion>) =>
+  onChange(secciones.map((s) => s.id === id ? { ...s, ...patch } : s));
 
-  const mover = (i: number, delta: number) => {
-    const actual = secciones[i];
+  // Quitar SUBE a los hijos un nivel en vez de llevárselos: borrar una rama
+  // entera de un tecleo es la clase de error que arruina media hora.
+  const borrar = (id: string) => onChange(quitarEntrada(secciones, id));
 
-    // Una SECCIÓN se mueve de una en una, y puede cruzar un encabezado: así
-    // es como se pasa de un nivel a otro, sin cortar ni pegar.
-    if (!esNivel(actual)) {
-      const j = i + delta;
-      if (j < 0 || j >= secciones.length) return;
-      const copia = [...secciones];
-      [copia[i], copia[j]] = [copia[j], copia[i]];
-      onChange(copia);
-      return;
-    }
+  const mover = (id: string, delta: number) =>
+  onChange(moverEntreHermanos(secciones, id, delta));
 
-    // Un NIVEL se mueve con todo su bloque, saltando el bloque vecino entero.
-    const fin = finBloque(secciones, i);
-    const bloque = secciones.slice(i, fin);
-
-    if (delta < 0) {
-      if (i === 0) return;
-      const p = inicioBloqueAnterior(secciones, i);
-      onChange([
-      ...secciones.slice(0, p),
-      ...bloque,
-      ...secciones.slice(p, i),
-      ...secciones.slice(fin)]);
-
-    } else {
-      if (fin >= secciones.length) return;
-      const fin2 = finBloque(secciones, fin);
-      onChange([
-      ...secciones.slice(0, i),
-      ...secciones.slice(fin, fin2),
-      ...bloque,
-      ...secciones.slice(fin2)]);
-
-    }
-  };
+  const meter = (id: string) => onChange(indentar(secciones, id));
+  const sacar = (id: string) => onChange(desindentar(secciones, id));
 
   /** Id libre con ese prefijo: seccion-4, seccion-5… */
   const idLibre = (prefijo: string) => {
@@ -360,26 +324,42 @@ export function EditorEstructura({
 
   const agregarNivel = () => {
     const { id, n } = idLibre('nivel');
-    onChange([...secciones, { id, label: `Nivel ${n}`, tipo: 'nivel' }]);
+    onChange([
+    ...normalizarEstructura(secciones),
+    { id, label: `Nivel ${n}`, tipo: 'nivel', padre: '' }]);
+
   };
 
   /**
-   * Agrega una sección. Con `dentroDe` la mete al final de ese nivel, que es
-   * lo que espera quien pulsa el «+» de un encabezado; sin él, al final de
-   * todo.
+   * Agrega una entrada. Con `dentroDe` la cuelga de esa otra, que es lo que
+   * espera quien pulsa el «+» de una fila.
+   *
+   * SIN `dentroDe` VA DENTRO DEL ÚLTIMO ENCABEZADO DE LA RAÍZ, no suelta.
+   * Es la regla de siempre —una sección pertenecía al último encabezado que
+   * quedara por encima— y es lo que espera quien acaba de crear un nivel y
+   * pulsa «Sección»: que caiga dentro, no al lado. Sin esto la sección nace
+   * hermana del encabezado y parece un fallo del anidamiento.
+   *
+   * Se normaliza antes de insertar: mientras los padres son implícitos
+   * dependen de dónde caiga cada encabezado, y meter una fila en medio podría
+   * cambiarle el padre a otra sin que nadie lo pidiera.
    */
-  const agregarSeccion = (dentroDe?: number) => {
+  const agregarSeccion = (dentroDe?: string) => {
+    const base = normalizarEstructura(secciones);
+    const ultimoNivelRaiz = [...base]
+      .reverse()
+      .find((s) => esNivel(s) && !s.padre)?.id;
+
     const { id, n } = idLibre('seccion');
-    const nueva: Seccion = { id, label: `Sección ${n}`, tipo: 'seccion' };
-    if (dentroDe === undefined) {
-      onChange([...secciones, nueva]);
-      return;
-    }
-    const fin = finBloque(secciones, dentroDe);
-    onChange([...secciones.slice(0, fin), nueva, ...secciones.slice(fin)]);
+    const nueva: Seccion = {
+      id,
+      label: `Sección ${n}`,
+      tipo: 'seccion',
+      padre: dentroDe ?? ultimoNivelRaiz ?? '',
+    };
+    onChange([...base, nueva]);
   };
 
-  const hayNiveles = secciones.some(esNivel);
   const cuantasSecciones = secciones.filter((s) => !esNivel(s)).length;
 
   return (
@@ -394,12 +374,17 @@ export function EditorEstructura({
       </div>
 
       <div className="space-y-1">
-        {secciones.map((s, i) => {
+        {filas.map(({ seccion: s, profundidad, tieneHijos }) => {
           const nivel = esNivel(s);
           const abierto = iconoAbierto === s.id;
 
           return (
-            <div key={s.id} className={nivel ? '' : 'pl-3'}>
+            <div
+              key={s.id}
+              // La sangría ES la jerarquía: sin ella, un menú de tres niveles
+              // se lee como una lista plana y no hay forma de saber qué
+              // cuelga de qué.
+              style={{ marginLeft: profundidad * 14 }}>
               <div
                 className={`group flex items-center gap-1 rounded-lg border p-1 ${
                 nivel ?
@@ -412,20 +397,18 @@ export function EditorEstructura({
                 <div className="flex shrink-0 flex-col">
                   <button
                     type="button"
-                    onClick={() => mover(i, -1)}
-                    disabled={i === 0}
-                    title={nivel ? 'Subir el nivel con sus secciones' : 'Subir'}
+                    onClick={() => mover(s.id, -1)}
+                    title="Subir, con todo lo que lleve dentro"
                     aria-label={`Subir ${s.label}`}
-                    className="px-1 text-[9px] leading-none text-slate-400 transition hover:text-siemens disabled:opacity-25">
+                    className="px-1 text-[9px] leading-none text-slate-400 transition hover:text-siemens">
                     ▲
                   </button>
                   <button
                     type="button"
-                    onClick={() => mover(i, 1)}
-                    disabled={i === secciones.length - 1}
-                    title={nivel ? 'Bajar el nivel con sus secciones' : 'Bajar'}
+                    onClick={() => mover(s.id, 1)}
+                    title="Bajar, con todo lo que lleve dentro"
                     aria-label={`Bajar ${s.label}`}
-                    className="px-1 text-[9px] leading-none text-slate-400 transition hover:text-siemens disabled:opacity-25">
+                    className="px-1 text-[9px] leading-none text-slate-400 transition hover:text-siemens">
                     ▼
                   </button>
                 </div>
@@ -466,7 +449,7 @@ export function EditorEstructura({
                       // el id todavía era el derivado del rótulo anterior.
                       const idEraDerivado = s.id === idDesdeEtiqueta(s.label);
                       const nuevoId = idDesdeEtiqueta(label);
-                      editar(i, {
+                      editar(s.id, {
                         label,
                         ...(idEraDerivado && nuevoId ? { id: nuevoId } : {})
                       });
@@ -484,29 +467,56 @@ export function EditorEstructura({
                   <input
                     type="text"
                     value={s.id}
-                    onChange={(e) => editar(i, { id: idDesdeEtiqueta(e.target.value) })}
+                    onChange={(e) => editar(s.id, { id: idDesdeEtiqueta(e.target.value) })}
                     placeholder="inicio"
                     title="Id interno de la sección. Es lo que se guarda en cada widget."
                     className="w-full rounded border-none bg-transparent px-1 py-0.5 font-mono text-[10px] text-slate-400 outline-none focus:ring-1 focus:ring-siemens/40" />
                   }
+
                 </div>
 
-                {/* En un nivel, «+» agrega una sección al final de ESE nivel. */}
-                {nivel &&
+                {/* Meter y sacar, como el Tab de una lista de tareas. Es la
+                    forma de anidar sin cortar y pegar: metes una entrada
+                    dentro de la que tiene justo encima. */}
+                <div className="flex shrink-0 items-center">
+                  <button
+                    type="button"
+                    onClick={() => sacar(s.id)}
+                    disabled={profundidad === 0}
+                    title="Sacar un nivel hacia afuera"
+                    aria-label={`Sacar ${s.label}`}
+                    className="rounded p-0.5 text-slate-400 transition hover:bg-siemens-50 hover:text-siemens disabled:opacity-20 disabled:hover:bg-transparent dark:hover:bg-siemens/10">
+                    <IndentDecreaseIcon className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => meter(s.id)}
+                    title="Meter dentro de la entrada de arriba"
+                    aria-label={`Meter ${s.label}`}
+                    className="rounded p-0.5 text-slate-400 transition hover:bg-siemens-50 hover:text-siemens dark:hover:bg-siemens/10">
+                    <IndentIncreaseIcon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {/* «+» cuelga una entrada nueva de ESTA. Ahora está en todas
+                    las filas, no solo en los niveles: con anidamiento,
+                    cualquier entrada puede tener hijos. */}
                 <button
                   type="button"
-                  onClick={() => agregarSeccion(i)}
-                  title={`Agregar una sección en «${s.label}»`}
-                  aria-label={`Agregar sección en ${s.label}`}
+                  onClick={() => agregarSeccion(s.id)}
+                  title={`Agregar una entrada dentro de «${s.label}»`}
+                  aria-label={`Agregar dentro de ${s.label}`}
                   className="shrink-0 rounded p-1 text-slate-400 transition hover:bg-siemens-50 hover:text-siemens dark:hover:bg-siemens/10">
-                    <PlusIcon className="h-3.5 w-3.5" />
-                  </button>
-                }
+                  <PlusIcon className="h-3.5 w-3.5" />
+                </button>
 
                 <button
                   type="button"
-                  onClick={() => borrar(i)}
-                  title={nivel ? 'Quitar el nivel (sus secciones se quedan)' : 'Quitar sección'}
+                  onClick={() => borrar(s.id)}
+                  title={
+                  tieneHijos ?
+                  'Quitar esta entrada (lo que lleva dentro sube un nivel)' :
+                  'Quitar'}
                   aria-label={`Quitar ${s.label}`}
                   className="shrink-0 rounded p-1 text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-state-error focus-visible:opacity-100 group-hover:opacity-100 dark:hover:bg-state-error/10">
                   <Trash2Icon className="h-3.5 w-3.5" />
@@ -516,7 +526,7 @@ export function EditorEstructura({
               {!nivel && abierto &&
               <EditorIcono
                 valor={s.icono ?? ''}
-                onChange={(icono) => editar(i, { icono })}
+                onChange={(icono) => editar(s.id, { icono })}
                 onCerrar={() => setIconoAbierto(null)} />
               }
             </div>);
@@ -542,11 +552,13 @@ export function EditorEstructura({
         </button>
       </div>
 
-      {!hayNiveles && secciones.length > 0 &&
+      {secciones.length > 0 &&
       <p className="mt-2 rounded-lg bg-slate-100 px-2.5 py-2 text-[11px] leading-relaxed text-slate-500 dark:bg-navy-slate/40 dark:text-slate-400">
-          Un <b>nivel</b> es un encabezado que agrupa las secciones que van
-          debajo, como «GENERAL» o «SECADOR». Las secciones que estén por encima
-          del primer nivel salen sueltas, sin encabezado.
+          Con <b>▸</b> metes una entrada dentro de la que tiene justo encima, y
+          con <b>◂</b> la sacas. Se puede anidar cuantas veces haga falta.
+          Un <b>nivel</b> es un encabezado que agrupa y no se pulsa; una{' '}
+          <b>sección</b> sí se abre. Al quitar una entrada, lo que lleve dentro
+          sube un nivel en vez de irse con ella.
         </p>
       }
     </div>);

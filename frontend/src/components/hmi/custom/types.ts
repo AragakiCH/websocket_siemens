@@ -22,6 +22,17 @@ export interface CustomWidgetDef {
    */
   inspector?: (ctx: InspectorCtx) => ReactNode;
 
+  /**
+   * Fuera de la paleta, pero se sigue dibujando.
+   *
+   * Para un widget retirado: no se puede agregar uno nuevo, y los que ya
+   * estén colocados en un diseño guardado se siguen viendo igual. Quitarlo
+   * del registry de golpe dejaría un hueco vacío sin explicación en cada
+   * proyecto que lo tuviera. Es el mismo criterio con el que se retiró el
+   * widget «chart» del catálogo.
+   */
+  oculto?: boolean;
+
   /** Valores de `config` con los que nace el widget al soltarlo. */
   defaultConfig?: Record<string, any>;
 }
@@ -42,4 +53,17 @@ export interface RenderCtx {
   on: boolean;         // ya calculado con isTruthy(variable)
   frac: number;        // ya calculado con valueFraction(variable) — 0..1
   label: string;       // ya formateado
+
+  /**
+   * ¿Se está OPERANDO el widget, o editando?
+   *
+   *   true   Vista previa: es lo que ve el operador. El widget puede escuchar
+   *          gestos (el trend usa el arrastre para moverse en el tiempo).
+   *   false  Lienzo del Diseñador. Ahí el arrastre sirve para COLOCAR el
+   *          widget: si el contenido se quedara con el puntero, no habría
+   *          forma de moverlo ni de estirarlo.
+   *
+   * Ausente = false. Los widgets que no escuchan nada pueden ignorarlo.
+   */
+  interactivo?: boolean;
 }

@@ -74,8 +74,11 @@ DEPENDENCIAS: Dict[str, Tuple[str, ...]] = {
     # dar de baja a quien lo reconoció.
     "usuarios": (
         "UPDATE {alarmas} SET usuario_id = NULL WHERE usuario_id = :id",
+        "UPDATE {alarmas_def} SET usuario_id = NULL WHERE usuario_id = :id",
         "UPDATE {recetas} SET usuario_id = NULL WHERE usuario_id = :id",
+        "UPDATE {receta_elementos} SET usuario_id = NULL WHERE usuario_id = :id",
         "UPDATE {receta_registros} SET usuario_id = NULL WHERE usuario_id = :id",
+        "UPDATE {receta_valores} SET usuario_id = NULL WHERE usuario_id = :id",
     ),
     # Quitar una regla de alarma no borra los eventos que ya provocó: el
     # historial es justo lo que se quiere conservar.
@@ -114,6 +117,7 @@ class Recurso:
         solo_lectura: bool = False,
         marca_creado: str = "",
         marca_actualizado: str = "",
+        opcionales: Optional[List[str]] = None,
     ) -> None:
         self.tabla = tabla
         # nombre -> tipo lógico: texto | numero | entero | fecha
@@ -125,6 +129,17 @@ class Recurso:
         # Columnas de fecha que rellena el servidor, no el cliente.
         self.marca_creado = marca_creado
         self.marca_actualizado = marca_actualizado
+        # Columnas que pueden NO existir todavía en la base.
+        #
+        # Se añadieron al esquema después de la primera versión, y una base
+        # en producción no las tiene hasta que se ejecute
+        # `POST /db/{db_id}/esquema`. Sin esta lista, actualizar el backend
+        # rompería la pantalla de alarmas de cualquier instalación existente:
+        # el SELECT nombra las columnas una por una y el motor respondería
+        # "Invalid column name 'usuario_id'". Con ella, el CRUD mira qué hay
+        # de verdad y se adapta — la trazabilidad aparece cuando la columna
+        # existe, y mientras tanto todo lo demás sigue funcionando.
+        self.opcionales = list(opcionales or [])
 
     def editables(self) -> List[str]:
         """Columnas que el cliente puede escribir (nunca `id` ni las marcas)."""
@@ -156,6 +171,8 @@ RECURSOS: Dict[str, Recurso] = {
         tabla="alarmas_def",
         columnas={
             "id": "entero",
+            # Quién configuró la regla. La sella el servidor desde el token.
+            "usuario_id": "entero",
             "nombre": "texto",
             "texto": "texto",
             "clase": "texto",
@@ -172,10 +189,11 @@ RECURSOS: Dict[str, Recurso] = {
             "actualizado_en": "fecha",
         },
         obligatorias=["nombre", "texto"],
-        filtros=["clase", "tag", "area", "activo", "comparador"],
+        filtros=["clase", "tag", "area", "activo", "comparador", "usuario_id"],
         orden_defecto="id",
         marca_creado="creado_en",
         marca_actualizado="actualizado_en",
+        opcionales=["usuario_id"],
     ),
     # ------------------------------------------------------------------ #
     # alarmas · los EVENTOS: qué pasó y cuándo
@@ -242,6 +260,9 @@ RECURSOS: Dict[str, Recurso] = {
             "id": "entero",
             "receta_id": "entero",
             "plc_prg_id": "entero",
+            # Quién movió los límites. `valor_minimo` y `valor_maximo` son la
+            # última barrera antes de escribir en una máquina real.
+            "usuario_id": "entero",
             "nombre": "texto",
             "nombre_visible": "texto",
             "tag": "texto",
@@ -261,10 +282,12 @@ RECURSOS: Dict[str, Recurso] = {
             "actualizado_en": "fecha",
         },
         obligatorias=["receta_id", "nombre"],
-        filtros=["receta_id", "tag", "tipo_dato", "activo", "plc_prg_id"],
+        filtros=["receta_id", "tag", "tipo_dato", "activo", "plc_prg_id",
+                 "usuario_id"],
         orden_defecto="orden",
         marca_creado="creado_en",
         marca_actualizado="actualizado_en",
+        opcionales=["usuario_id"],
     ),
     "receta_registros": Recurso(
         tabla="receta_registros",
@@ -293,12 +316,16 @@ RECURSOS: Dict[str, Recurso] = {
             "id": "entero",
             "receta_registro_id": "entero",
             "receta_elemento_id": "entero",
+            # Quién escribió ESTA celda. El registro guarda quién editó la
+            # mezcla, pero una mezcla la tocan varias personas.
+            "usuario_id": "entero",
             "valor_num": "numero",
             "valor_texto": "texto",
         },
         obligatorias=["receta_registro_id", "receta_elemento_id"],
-        filtros=["receta_registro_id", "receta_elemento_id"],
+        filtros=["receta_registro_id", "receta_elemento_id", "usuario_id"],
         orden_defecto="id",
+        opcionales=["usuario_id"],
     ),
     # Solo lectura: la escribe el historizador, no las personas.
     "plc_prg": Recurso(
@@ -331,6 +358,24 @@ class CrudManager:
     def __init__(self, db_manager, settings) -> None:
         self._db = db_manager
         self._s = settings
+        # (db_id, tabla) -> columnas que la tabla tiene DE VERDAD.
+        #
+        # Solo se consulta para los recursos con columnas opcionales, y una
+        # sola vez por tabla y conexión: es una llamada de introspección, y
+        # hacerla en cada listado añadiría un viaje a la base para responder
+        # algo que no cambia entre dos peticiones.
+        self._columnas_reales: Dict[Tuple[str, str], set] = {}
+
+    def invalidar_columnas(self) -> None:
+        """
+        Olvida lo que se sabía de la estructura de las tablas.
+
+        Lo llama el endpoint que migra el esquema: acaba de añadir columnas,
+        y sin esto el CRUD seguiría creyendo que no existen hasta reiniciar
+        el servicio — que es exactamente el momento en que alguien concluye
+        que la migración "no funcionó".
+        """
+        self._columnas_reales.clear()
 
     # ------------------------------------------------------------------ #
     def _recurso(self, nombre: str) -> Recurso:
@@ -375,6 +420,36 @@ class CrudManager:
             raise
         except Exception as exc:  # noqa: BLE001
             raise ErrorCrud(f"No se pudo abrir la conexión: {exc}", 503)
+
+    async def _columnas(self, driver, recurso: Recurso, tabla: str,
+                        db_id: str) -> List[str]:
+        """
+        Las columnas del recurso que existen en ESTA base, en orden.
+
+        Para un recurso sin columnas opcionales devuelve las declaradas sin
+        preguntar nada. Para los demás mira la tabla una vez y descarta las
+        que aún no estén: una base a la que todavía no se le ha pasado
+        `POST /db/{db_id}/esquema` sigue funcionando, sin la trazabilidad.
+
+        Si la introspección falla (permisos, tabla ausente) se asume que las
+        opcionales NO están. Es la suposición segura: como mucho se pierde
+        una columna de auditoría; al revés, el SELECT entero reventaría.
+        """
+        if not recurso.opcionales:
+            return list(recurso.columnas)
+
+        clave = (db_id, tabla)
+        reales = self._columnas_reales.get(clave)
+        if reales is None:
+            try:
+                reales = {c["nombre"].lower()
+                          for c in await driver.listar_columnas(tabla)}
+            except Exception:  # noqa: BLE001
+                reales = set()
+            self._columnas_reales[clave] = reales
+
+        return [c for c in recurso.columnas
+                if c not in recurso.opcionales or c.lower() in reales]
 
     # ------------------------------------------------------------------ #
     def _convertir(self, recurso: Recurso, campo: str, valor: Any,
@@ -451,7 +526,8 @@ class CrudManager:
         col_orden = orden if orden in recurso.columnas else recurso.orden_defecto
         direccion = "DESC" if descendente else "ASC"
 
-        columnas = ", ".join(recurso.columnas)
+        columnas = ", ".join(
+            await self._columnas(driver, recurso, tabla, self._db_id(db_id)))
         # Paginación portable: SQL Server necesita OFFSET/FETCH y ORDER BY.
         if driver.motor == "mssql":
             sql = (f"SELECT {columnas} FROM {tabla}{where} "
@@ -490,7 +566,8 @@ class CrudManager:
         recurso = self._recurso(recurso_nombre)
         driver = await self._driver(db_id)
         tabla = self._tabla(recurso)
-        columnas = ", ".join(recurso.columnas)
+        columnas = ", ".join(
+            await self._columnas(driver, recurso, tabla, self._db_id(db_id)))
 
         try:
             r = await driver.query(
@@ -561,10 +638,15 @@ class CrudManager:
 
         driver = await self._driver(db_id)
         tabla = self._tabla(recurso)
+        # Las que existen DE VERDAD. En una base sin migrar, `usuario_id`
+        # todavía no está: se descarta en silencio en vez de reventar el
+        # INSERT entero. Se pierde la firma, no la fila.
+        existentes = set(
+            await self._columnas(driver, recurso, tabla, self._db_id(db_id)))
 
         valores: Dict[str, Any] = {}
         for campo in recurso.editables():
-            if campo in datos:
+            if campo in datos and campo in existentes:
                 valores[campo] = self._convertir(
                     recurso, campo, datos[campo], driver.motor)
 
@@ -631,10 +713,12 @@ class CrudManager:
 
         driver = await self._driver(db_id)
         tabla = self._tabla(recurso)
+        existentes = set(
+            await self._columnas(driver, recurso, tabla, self._db_id(db_id)))
 
         valores: Dict[str, Any] = {}
         for campo in recurso.editables():
-            if campo in datos:
+            if campo in datos and campo in existentes:
                 valores[campo] = self._convertir(
                     recurso, campo, datos[campo], driver.motor)
 
@@ -806,6 +890,17 @@ class CrudManager:
             return ErrorCrud(
                 f"La tabla '{tabla}' no existe. Crea el esquema primero con "
                 f"POST /db/{{db_id}}/esquema.", 409)
+        # Una columna que falta NO es un misterio: es una base a la que le
+        # falta la última migración. Decirlo con el comando exacto ahorra la
+        # media hora de buscar el nombre de la columna en el código.
+        if ("no such column" in texto or "invalid column name" in texto
+                or "unknown column" in texto
+                or ("column" in texto and "does not exist" in texto)):
+            return ErrorCrud(
+                f"A la tabla '{tabla}' le falta alguna columna del esquema "
+                f"actual. Ponla al día con POST /db/{{db_id}}/esquema: añade "
+                f"lo que falte sin tocar los datos que ya hay. Detalle: {exc}",
+                409)
         if "foreign key" in texto or "reference" in texto:
             return ErrorCrud(
                 "Hay una referencia inválida: comprueba que `usuario_id` y "

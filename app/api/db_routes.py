@@ -18,6 +18,7 @@ Modelo de seguridad (importante entenderlo antes de tocar nada):
   POST   /db                    -> alta/actualización de una conexión.
   DELETE /db/{db_id}            -> baja (borra también sus consultas).
   POST   /db/{db_id}/test       -> comprueba que la BD responde.
+  POST   /db/{db_id}/esquema    -> crea/actualiza las tablas del HMI.
   GET    /db/{db_id}/tablas     -> tablas y vistas disponibles.
   GET    /db/{db_id}/columnas   -> columnas de una tabla.
   POST   /db/{db_id}/preview    -> ejecuta SQL suelto SIN guardarlo (diseñador).
@@ -38,6 +39,7 @@ from pydantic import BaseModel, Field
 from app.api.auth_routes import exigir_rol, sesion_actual, usuario_de
 from app.core.auth_manager import Sesion
 from app.db.entorno import revisar as revisar_entorno
+from app.db.migraciones import asegurar_columnas_hmi, resumir
 from app.db.provision import provisionar
 
 router = APIRouter()
@@ -591,6 +593,103 @@ async def quitar_conexion(
 )
 async def probar_conexion(request: Request, db_id: str) -> dict:
     return await _mgr(request).probar_conexion(db_id)
+
+
+@router.post(
+    "/db/{db_id}/esquema",
+    tags=["Bases de datos"],
+    summary="Crear o poner al día las tablas del HMI",
+    description="Crea las ocho tablas del esquema del HMI en una base ya dada "
+                "de alta, y **añade a las que ya existan las columnas que les "
+                "falten**.\n\n"
+                "Las dos mitades hacen falta por separado. `CREATE TABLE IF "
+                "NOT EXISTS` deja intacta una tabla que ya está, así que una "
+                "columna nueva del esquema nunca llegaría sola a una base en "
+                "producción: aparecería meses después como *\"Invalid column "
+                "name\"* en mitad de un turno.\n\n"
+                "**Es idempotente y no destruye nada.** No borra columnas, no "
+                "cambia tipos y no toca las filas existentes: las columnas "
+                "nuevas nacen a NULL, que es justo lo que significan — de esas "
+                "filas no se sabe quién fue.\n\n"
+                "Requiere rol **Administradores**: cambiar la estructura de la "
+                "base de producción no es una operación del día a día.",
+    responses={200: {"content": {"application/json": {"example": {
+        "ok": True, "db_id": "local",
+        "mensaje": "1 columna añadida.",
+        "tablas": ["usuarios", "plc_prg", "alarmas_def", "alarmas"],
+        "columnas": [
+            {"tabla": "alarmas_def", "añadidas": ["usuario_id"],
+             "ya_estaban": [], "avisos": []},
+            {"tabla": "receta_elementos", "añadidas": [],
+             "ya_estaban": ["usuario_id"], "avisos": []},
+        ],
+    }}}}},
+)
+async def crear_esquema_hmi(
+    request: Request,
+    db_id: str,
+    sesion: Sesion = Depends(exigir_rol("Administradores")),
+) -> dict:
+    """
+    Las tablas primero, las columnas después.
+
+    Ese orden importa: sobre una base vacía, el DDL las crea ya completas y
+    la pasada de columnas no encuentra nada que hacer; sobre una base
+    antigua, el DDL no hace nada y la pasada de columnas es la que trabaja.
+    Al revés, la migración se ejecutaría contra tablas que aún no existen y
+    solo produciría avisos.
+    """
+    mgr = _mgr(request)
+    try:
+        driver = await mgr._driver_de(db_id)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(503, f"No se pudo abrir la conexión: {exc}")
+
+    prefijo = getattr(request.app.state.settings, "esquema_prefijo", "") or ""
+
+    # 1 · Las tablas. Cada sentencia por separado: si una falla se dice CUÁL,
+    #     en vez de un "falló el esquema" que no se puede depurar.
+    creadas: list[str] = []
+    fallos: list[str] = []
+    for nombre, sentencia in driver.ddl_esquema_hmi(prefijo):
+        try:
+            await driver._ejecutar_interno(sentencia)
+            creadas.append(nombre)
+        except Exception as exc:  # noqa: BLE001
+            texto = str(exc).lower()
+            # MySQL no admite `CREATE INDEX IF NOT EXISTS`: que un índice ya
+            # exista no es un fallo, es el resultado esperado de repetir.
+            if "duplicate key name" in texto or "already exists" in texto:
+                creadas.append(nombre)
+                continue
+            fallos.append(f"{nombre}: {exc}")
+
+    # 2 · Las columnas que falten en las tablas que ya estaban.
+    try:
+        informe = await asegurar_columnas_hmi(driver, prefijo)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(500, f"Las tablas están, pero la revisión de "
+                                 f"columnas falló: {exc}")
+
+    # El CRUD recuerda qué columnas tiene cada tabla para no preguntarlo en
+    # cada listado. Acabamos de cambiar esa estructura: si no se le avisa,
+    # seguiría creyendo que `usuario_id` no existe hasta el siguiente
+    # reinicio — que es justo cuando alguien concluye que la migración no
+    # sirvió de nada.
+    crud = getattr(request.app.state, "crud_manager", None)
+    if crud is not None:
+        crud.invalidar_columnas()
+
+    await _avisar(request, "esquema", sesion, "actualizado")
+
+    mensaje = resumir(informe)
+    if fallos:
+        mensaje = (f"{mensaje} Pero {len(fallos)} sentencia(s) fallaron: "
+                   f"{fallos[0]}")
+    return {"ok": not fallos, "db_id": db_id, "mensaje": mensaje,
+            "tablas": creadas, "columnas": informe, "fallos": fallos}
 
 
 @router.get(

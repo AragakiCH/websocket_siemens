@@ -12,7 +12,12 @@
 // escribiendo.
 // =========================================================================
 import React from 'react';
-import { ChevronDownIcon } from 'lucide-react';
+import {
+  AlertCircleIcon,
+  CheckCircle2Icon,
+  ChevronDownIcon,
+  Loader2Icon,
+} from 'lucide-react';
 
 /**
  * Encabezado de columna.
@@ -209,6 +214,63 @@ export function AccionesFila({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
       {children}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════
+// Señales del guardado automático
+// ═════════════════════════════════════════════════════════════════
+
+/** En qué punto está lo que se escribió por última vez. */
+export type EstadoGuardado = 'limpio' | 'guardando' | 'guardado' | 'error';
+
+/**
+ * Indicador del guardado automático.
+ *
+ * Sin esta señal, "se guarda solo" es indistinguible de "no se guarda": el
+ * único momento en que se nota la diferencia es al recargar, y entonces ya
+ * es tarde.
+ */
+export function EstadoAutoguardado({
+  estado,
+  ocupado,
+}: {
+  estado: EstadoGuardado;
+  ocupado: boolean;
+}) {
+  if (estado === 'limpio' && !ocupado) return null;
+  const trabajando = ocupado || estado === 'guardando';
+  if (trabajando) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+        <Loader2Icon className="h-3 w-3 animate-spin" />
+        Guardando…
+      </span>
+    );
+  }
+  if (estado === 'error') {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-state-error">
+        <AlertCircleIcon className="h-3 w-3" />
+        No se pudo guardar
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-state-ok">
+      <CheckCircle2Icon className="h-3 w-3" />
+      Guardado
+    </span>
+  );
+}
+
+/** Espera con explicación: decir QUÉ se está cargando cuesta lo mismo. */
+export function Cargando({ texto }: { texto: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
+      <Loader2Icon className="h-6 w-6 animate-spin text-slate-300 dark:text-slate-600" />
+      <p className="text-xs text-slate-400">{texto}</p>
     </div>
   );
 }

@@ -6,21 +6,58 @@ import {
   LayoutDashboardIcon,
   ArrowRightIcon,
   UsersIcon,
+  ShieldCheckIcon,
+  BellIcon,
   LogOutIcon } from
 'lucide-react';
 import { useAppStore } from '../context/AppStore';
+import { fetchPendientes } from '../services/alarmasRuntimeApi';
 export function MainMenu() {
   const navigate = useNavigate();
   const { disconnect, t, permisos, presentes } = useAppStore();
-  // La tarjeta de Actividad solo se ofrece a quien puede usarla. El
+  // Las tarjetas de administración solo se ofrecen a quien puede usarlas. El
   // permiso REAL lo aplica el backend en cada endpoint; esto es comodidad,
   // no seguridad.
   const verActividad = !permisos || permisos.gestionar_bd ||
   permisos.gestionar_usuarios;
+  // Cuentas pide MÁS que Actividad: ver quién hizo qué es una cosa y poder
+  // cambiar quién entra es otra. Un Administrador entra igual, pero la
+  // pantalla se le presenta en modo consulta.
+  const verCuentas = !permisos || permisos.gestionar_usuarios;
+  // Cuántas tarjetas de administración se muestran. Hace falta el número
+  // porque con UNA hay que centrarla a mano bajo las dos fijas, y con DOS la
+  // rejilla ya cuadra sola en 2×2 y centrarla la descolocaría.
+  // Cuántas tarjetas hay en total. Dos fijas (Configuración y Diseñador),
+  // Alarmas siempre —la ve todo el mundo— y las dos de administración según
+  // permisos.
+  const total = 2 + 1 + (verActividad ? 1 : 0) + (verCuentas ? 1 : 0);
+  // En una rejilla de dos columnas, un número IMPAR deja la última pegada a
+  // la izquierda y desalineada de las de arriba. Ocupando las DOS columnas y
+  // volviendo al ancho de UNA (`50%` menos medio `gap-6`, que son 0.75rem)
+  // queda centrada bajo las otras, con exactamente su mismo tamaño.
+  //
+  // Solo puede llevarlo la ÚLTIMA que se pinte, que es siempre Alarmas.
+  // Ponérselo también a Actividad o a Cuentas centraría una tarjeta de en
+  // medio y rompería la rejilla entera.
+  const centrarUltima = total % 2 === 1
+    ? 'md:col-span-2 md:mx-auto md:w-[calc(50%-0.75rem)]'
+    : '';
   // Cuántas personas más están conectadas ahora mismo.
   const otros = presentes.filter(
     (p) => !p.usuario.includes('anónimo')
   ).length;
+
+  // Cuántas alarmas esperan a que alguien las reconozca. Se pide una vez al
+  // entrar al menú: el banner de arriba ya avisa en vivo, y aquí solo sirve
+  // para que la tarjeta diga si hay algo que mirar antes de entrar.
+  const [pendientes, setPendientes] = React.useState(0);
+  React.useEffect(() => {
+    let vivo = true;
+    fetchPendientes(1)
+      .then((p) => { if (vivo) setPendientes(p.total); })
+      .catch(() => { /* motor apagado o BD caída: la tarjeta va sin número */ });
+    return () => { vivo = false; };
+  }, []);
   const handleLogout = () => {
     disconnect();
     navigate('/');
@@ -87,12 +124,6 @@ export function MainMenu() {
 
           {verActividad &&
           <MenuCard
-            /* Tres tarjetas en una rejilla de dos columnas dejan la tercera
-               pegada a la izquierda, desalineada de las de arriba. Ocupando
-               las DOS columnas y volviendo al ancho de UNA (`50%` menos medio
-               `gap-6`, que son 0.75rem) queda centrada bajo las otras dos,
-               con exactamente su mismo tamaño. */
-            className="md:col-span-2 md:mx-auto md:w-[calc(50%-0.75rem)]"
             title="Actividad"
             description={
             otros > 1 ?
@@ -105,6 +136,35 @@ export function MainMenu() {
             delay={0.19}
             open={t('menu.open')} />
           }
+
+          {verCuentas &&
+          <MenuCard
+            title="Cuentas"
+            description={
+            'Cree y edite las cuentas, cambie categorías y contraseñas, y ' +
+            'active o desactive el acceso.'}
+            icon={<ShieldCheckIcon className="h-8 w-8" />}
+            onClick={() => navigate('/usuarios')}
+            delay={0.26}
+            open={t('menu.open')} />
+          }
+
+          {/* Alarmas va la ÚLTIMA y la ve todo el mundo: en una planta, saber
+              qué está saltando no es una función de administración. */}
+          <MenuCard
+            className={centrarUltima}
+            title="Alarmas"
+            description={
+            pendientes > 0 ?
+            `${pendientes} sin reconocer. Vea qué saltó, cuándo y con qué ` +
+            `valor, y déjelo firmado.` :
+            'Vea qué alarmas están activas, el histórico de lo que pasó y ' +
+            'reconozca las que ya ha atendido.'}
+            icon={<BellIcon className="h-8 w-8" />}
+            onClick={() => navigate('/alarmas')}
+            delay={0.33}
+            open={t('menu.open')}
+            distintivo={pendientes > 0 ? String(pendientes) : ''} />
         </div>
       </div>
     </div>);
@@ -117,7 +177,9 @@ function MenuCard({
   onClick,
   delay,
   open,
-  className = ''
+  className = '',
+  /** Contador sobre el icono. Vacío = sin distintivo. */
+  distintivo = ''
 
 
 
@@ -125,7 +187,7 @@ function MenuCard({
 
 
 
-}: {title: string;description: string;icon: React.ReactNode;onClick: () => void;delay: number;open: string;className?: string;}) {
+}: {title: string;description: string;icon: React.ReactNode;onClick: () => void;delay: number;open: string;className?: string;distintivo?: string;}) {
   return (
     <motion.button
       onClick={onClick}
@@ -150,8 +212,16 @@ function MenuCard({
       }}
       className={`group flex flex-col items-start gap-5 rounded-2xl border border-slate-200 bg-white p-8 text-left shadow-card transition-shadow hover:border-siemens/40 hover:shadow-cardHover dark:border-navy-slate dark:bg-navy-soft ${className}`}>
       
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-siemens-50 text-siemens transition-colors group-hover:bg-siemens group-hover:text-white dark:bg-siemens/15">
+      <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-siemens-50 text-siemens transition-colors group-hover:bg-siemens group-hover:text-white dark:bg-siemens/15">
         {icon}
+        {/* El contador va sobre el ICONO y no en el texto: desde el otro lado
+            de la sala se ve la mancha roja, y eso es todo lo que hace falta
+            para saber que hay que acercarse. */}
+        {distintivo && (
+          <span className="absolute -right-1.5 -top-1.5 flex h-6 min-w-[24px] items-center justify-center rounded-full bg-state-error px-1.5 text-[11px] font-bold text-white ring-2 ring-white dark:ring-navy-soft">
+            {distintivo}
+          </span>
+        )}
       </div>
       <div>
         <h2 className="text-xl font-bold text-navy dark:text-slate-100">

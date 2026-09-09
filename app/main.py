@@ -27,11 +27,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import (ai_routes, auth_routes, crud_routes, db_routes, 
-                     export_routes, historian_routes, lock_routes, 
-                     project_routes, rest_routes, sistema_routes, 
+from app.api import (ai_routes, alarm_routes, auth_routes, crud_routes,
+                     db_routes, export_routes, historian_routes, lock_routes,
+                     project_routes, rest_routes, sistema_routes,
                      websocket_routes, widget_routes)
 from app.config.settings import get_settings
+from app.core.alarm_engine import MotorAlarmas
 from app.core.connection_manager import ConnectionManager
 from app.core.crud_manager import CrudManager
 from app.core.db_manager import DbManager
@@ -154,6 +155,25 @@ async def lifespan(app: FastAPI):
     await historizador.start(manager)
     await grabador.start(manager)
 
+    # Motor de alarmas. DESPUÉS de `db_manager.start()`: lo primero que hace
+    # es leer las reglas de `alarmas_def`, y sin los pools abiertos arrancaría
+    # siempre con cero reglas.
+    #
+    # Va detrás del historizador a propósito. Los dos escuchan el mismo flujo
+    # y los observadores se llaman en orden de registro: así una muestra queda
+    # encolada para el histórico ANTES de que su alarma se evalúe, y el valor
+    # que disparó la alarma está garantizado en el histórico. Al revés podría
+    # existir un evento cuyo valor no aparece en la curva, que es justo lo
+    # primero que se va a mirar al investigarlo.
+    if settings.alarmas_enabled:
+        motor_alarmas = MotorAlarmas(crud_manager, settings)
+        app.state.motor_alarmas = motor_alarmas
+        await motor_alarmas.start(manager)
+    else:
+        motor_alarmas = None
+        app.state.motor_alarmas = None
+        logger.info("Motor de alarmas desactivado (PLC_ALARMAS_ENABLED=false).")
+
     # El asistente de IA se monta al final: su catálogo de herramientas se
     # deriva del OpenAPI, y el RAG lee el estado del resto de componentes.
     if settings.ai_enabled:
@@ -175,6 +195,11 @@ async def lifespan(app: FastAPI):
         # Orden importante: primero el historizador (vuelca su buffer
         # pendiente), y solo después se cierran los pools de la BD.
         await grabador.stop()
+        # El motor antes que la BD, por lo mismo: en su cola pueden quedar
+        # eventos de los últimos milisegundos, y son precisamente los del
+        # momento del apagado.
+        if motor_alarmas is not None:
+            await motor_alarmas.stop()
         await historizador.stop()
         await db_manager.stop()
 
@@ -459,6 +484,7 @@ app.include_router(db_routes.router)
 app.include_router(crud_routes.router)
 app.include_router(widget_routes.router)
 app.include_router(historian_routes.router)
+app.include_router(alarm_routes.router)
 app.include_router(export_routes.router)
 app.include_router(ai_routes.router)
 app.include_router(sistema_routes.router)
@@ -470,6 +496,46 @@ app.include_router(sistema_routes.router)
 # ------------------------------------------------------------------ #
 _RAIZ_PROYECTO = os.path.dirname(os.path.dirname(__file__))
 _FRONTEND_DIST = os.path.join(_RAIZ_PROYECTO, "frontend", "dist")
+
+# Extensiones que identifican un ARCHIVO y no una ruta de React Router.
+# Se usan para decidir si una petición fallida merece un 404 honesto.
+_EXT_ESTATICAS = (
+    ".js", ".mjs", ".css", ".map", ".json", ".webmanifest",
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico", ".avif",
+    ".woff", ".woff2", ".ttf", ".otf", ".eot",
+)
+
+
+@app.middleware("http")
+async def _cabeceras_de_cache(request, call_next):
+    """
+    Decide qué puede guardar el navegador y qué no.
+
+    ESTO ARREGLA UN FALLO MUY DESCONCERTANTE. Sin cabeceras de caché,
+    Chromium —y WebView2, que es Chromium— aplica *caché heurística*: si una
+    respuesta trae `Last-Modified` y ningún `Cache-Control`, se la guarda y
+    la da por fresca durante un 10% del tiempo transcurrido desde esa fecha.
+    Para un `index.html` con fecha de hace un mes, eso son tres días.
+
+    El `index.html` es justo el archivo que NO se puede cachear, porque es el
+    que dice qué bundle cargar (`/assets/index-<hash>.js`). Cacheado, la
+    aplicación de escritorio arrancaba unas veces con la versión nueva y
+    otras con la anterior, según le tocara revalidar o no. Y sobrevivía a la
+    reinstalación, porque el perfil de WebView2 vive en
+    `datos\navegador`, dentro de la carpeta que el instalador conserva a
+    propósito. Actualizar de verdad y seguir viendo lo viejo, alternando.
+
+    Los `/assets/` son el caso contrario: Vite les pone un hash del contenido
+    en el nombre, así que un archivo con ese nombre NUNCA cambia. Se marcan
+    `immutable` y un año de vida — la nueva versión trae nombres nuevos, y
+    los viejos simplemente dejan de pedirse.
+    """
+    respuesta = await call_next(request)
+    if request.url.path.startswith("/assets/"):
+        respuesta.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    else:
+        respuesta.headers["Cache-Control"] = "no-store, must-revalidate"
+    return respuesta
 
 if os.path.isdir(os.path.join(_FRONTEND_DIST, "assets")):
     app.mount(
@@ -493,14 +559,75 @@ async def root():
     )
 
 
+def _archivo_del_build(ruta: str) -> str:
+    """
+    Ruta real de un archivo suelto del build, o "" si no lo es.
+
+    **Por qué hace falta.** Vite copia todo lo que hay en `frontend/public/`
+    a la RAÍZ de `frontend/dist/`, no dentro de `assets/`: `logo.png`,
+    `favicon.svg`, `icons.svg`. Como aquí solo estaba montado `/assets`,
+    esos archivos caían en el fallback de la SPA y el servidor respondía
+    `index.html` —HTML, con estado 200— a una petición de imagen.
+
+    El síntoma era de los que cuestan una tarde: en `npm run dev` el logo se
+    veía (Vite sí sirve `public/` en la raíz) y en el .exe empaquetado
+    aparecía el wordmark de respaldo que dibuja `Login.tsx` en su `onError`.
+    Todo parecía correcto —el archivo estaba dentro del paquete, el build era
+    reciente— porque el fallo no estaba en el empaquetado sino aquí, y no
+    daba ningún error: un 200 con el contenido equivocado.
+
+    Se comprueba que el resultado siga dentro de `dist` antes de servirlo.
+    La ruta viene de la URL, y sin esa comprobación un `..%2f..%2f` serviría
+    cualquier archivo de la máquina.
+    """
+    if not ruta or ruta.endswith("/"):
+        return ""
+    base = os.path.normpath(_FRONTEND_DIST)
+    candidato = os.path.normpath(os.path.join(base, ruta))
+    if candidato != base and not candidato.startswith(base + os.sep):
+        return ""                      # intento de salirse de dist
+    return candidato if os.path.isfile(candidato) else ""
+
+
 @app.get("/{ruta_spa:path}", include_in_schema=False)
 async def spa_fallback(ruta_spa: str):
     """
-    Fallback para React Router (SPA): cualquier ruta no-API (/menu, /designer,
-    /config, /preview...) devuelve el index.html del frontend para que el
-    router del navegador resuelva la vista. Se registra al FINAL, así que
-    /health, /plcs, /ws, /docs, /assets, etc. tienen prioridad.
+    Lo que no es API: primero un archivo del build, y si no, el index.
+
+    Ese orden importa. Las rutas de React Router (/menu, /designer, /config,
+    /preview...) no existen como archivo y tienen que devolver `index.html`
+    para que el router del navegador resuelva la vista. Pero `/logo.png` SÍ
+    existe, y devolverle el index sería mentirle al navegador.
+
+    Se registra al FINAL, así que /health, /plcs, /ws, /docs, /assets y todo
+    lo demás tienen prioridad.
     """
+    archivo = _archivo_del_build(ruta_spa)
+    if archivo:
+        return FileResponse(archivo)
+
+    # Un archivo que se pide y no está tiene que responder 404, NO el index.
+    #
+    # Devolverle `index.html` a una petición de `/assets/index-VIEJO.js` es
+    # lo que convierte "falta un archivo" en "pantalla en blanco": el
+    # navegador recibe HTML donde esperaba JavaScript, el `<script type=
+    # "module">` revienta al analizarlo y no queda ni un error que explique
+    # por qué. Con un 404 el fallo se ve en la pestaña de red a la primera.
+    # Una ruta con `..` no la genera React Router jamás. `_archivo_del_build`
+    # ya impide servir nada de fuera de `dist`, así que no es un agujero;
+    # pero devolverle el index a un intento de traversal es fingir que la
+    # petición era normal. Se responde 404, que es lo que era.
+    if (ruta_spa.startswith("assets/")
+            or ".." in ruta_spa.replace("\\", "/").split("/")
+            or ruta_spa.lower().endswith(_EXT_ESTATICAS)):
+        return JSONResponse(
+            {"error": f"'{ruta_spa}' no existe en este build del frontend. "
+                      f"Si el navegador lo pide, está usando un index.html "
+                      f"cacheado de una versión anterior: recarga forzando "
+                      f"(Ctrl+F5) o borra la caché."},
+            status_code=404,
+        )
+
     index_react = os.path.join(_FRONTEND_DIST, "index.html")
     if os.path.isfile(index_react):
         return FileResponse(index_react)

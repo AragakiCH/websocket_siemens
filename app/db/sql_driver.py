@@ -340,6 +340,38 @@ def _serializable(valor: Any) -> Any:
 
 
 # ====================================================================== #
+# Tipos del esquema del HMI, por motor
+# ====================================================================== #
+def tipos_motor(motor: str) -> Dict[str, str]:
+    """
+    Equivalencias de tipo para el esquema del HMI en cada motor.
+
+    Existe como función suelta —y no dentro de `ddl_esquema_hmi()`— porque
+    hay DOS sitios que necesitan los mismos tipos: el DDL que crea las tablas
+    desde cero, y las migraciones que añaden una columna a una tabla que ya
+    existe en producción. Con dos copias, la primera columna nueva que se
+    añadiera quedaría BIGINT en una base recién creada e INTEGER en una
+    migrada, y la FK fallaría solo en la segunda.
+    """
+    if motor == "postgresql":
+        return {"pk": "BIGSERIAL PRIMARY KEY", "fk": "BIGINT",
+                "ts": "TIMESTAMPTZ", "texto": "TEXT",
+                "real": "DOUBLE PRECISION", "entero": "INTEGER"}
+    if motor == "mysql":
+        return {"pk": "BIGINT AUTO_INCREMENT PRIMARY KEY", "fk": "BIGINT",
+                "ts": "DATETIME(3)", "texto": "TEXT",
+                "real": "DOUBLE PRECISION", "entero": "INT"}
+    if motor == "mssql":
+        return {"pk": "BIGINT IDENTITY(1,1) PRIMARY KEY", "fk": "BIGINT",
+                "ts": "DATETIME2", "texto": "NVARCHAR(MAX)",
+                "real": "FLOAT", "entero": "INT"}
+    return {"pk": "INTEGER PRIMARY KEY AUTOINCREMENT", "fk": "INTEGER",
+            "ts": "TEXT", "texto": "TEXT",
+            "real": "DOUBLE PRECISION", "entero": "INTEGER"}
+
+
+
+# ====================================================================== #
 # Driver
 # ====================================================================== #
 class SqlDriver(DbDriver):
@@ -853,34 +885,18 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
 
         m = self.motor
         # --- Tipos que cambian entre motores ---------------------------- #
-        if m == "postgresql":
-            pk = "BIGSERIAL PRIMARY KEY"
-            fk_tipo = "BIGINT"
-            ts = "TIMESTAMPTZ"
-            texto = "TEXT"
-            real = "DOUBLE PRECISION"
-            entero = "INTEGER"
-        elif m == "mysql":
-            pk = "BIGINT AUTO_INCREMENT PRIMARY KEY"
-            fk_tipo = "BIGINT"
-            ts = "DATETIME(3)"
-            texto = "TEXT"
-            real = "DOUBLE PRECISION"
-            entero = "INT"
-        elif m == "mssql":
-            pk = "BIGINT IDENTITY(1,1) PRIMARY KEY"
-            fk_tipo = "BIGINT"
-            ts = "DATETIME2"
-            texto = "NVARCHAR(MAX)"
-            real = "FLOAT"
-            entero = "INT"
-        else:  # sqlite
-            pk = "INTEGER PRIMARY KEY AUTOINCREMENT"
-            fk_tipo = "INTEGER"
-            ts = "TEXT"
-            texto = "TEXT"
-            real = "DOUBLE PRECISION"
-            entero = "INTEGER"
+        # Salen de `tipos_motor()` y no de un if/elif aquí dentro: las
+        # migraciones (`app/db/migraciones.py`) necesitan EXACTAMENTE los
+        # mismos tipos para añadir una columna a una tabla que ya existe, y
+        # dos copias de esta tabla de equivalencias se separarían a la
+        # primera columna nueva.
+        t = tipos_motor(m)
+        pk = t["pk"]
+        fk_tipo = t["fk"]
+        ts = t["ts"]
+        texto = t["texto"]
+        real = t["real"]
+        entero = t["entero"]
 
         # ---------------------------------------------------------------- #
         # usuarios
@@ -949,9 +965,19 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
         #   Name -> nombre · Alarm text -> texto · Alarm class -> clase
         #   Trigger tag -> tag · Trigger bit -> bit_disparo
         #   HMI acknowledgment tag -> tag_reconocimiento
+        fk_def_usr = (
+            f"CONSTRAINT fk_{p}alarmas_def_usuario FOREIGN KEY (usuario_id) "
+            f"REFERENCES {t_usuarios} (id)"
+        )
         alarmas_def = (
             f"CREATE TABLE {t_alarmas_def} ("
             f"id {pk}, "
+            # Quién configuró la regla. Lo sella el servidor desde el TOKEN,
+            # nunca el cliente: ver `CrudManager._sellar_autor()`. NULLable
+            # porque una instalación sin login (`auth_requerida=false`)
+            # escribe igual, y decir "no se sabe" es más honesto que
+            # atribuirle la regla a alguien.
+            f"usuario_id {fk_tipo}, "
             f"nombre VARCHAR(120) NOT NULL, "
             f"texto VARCHAR(500) NOT NULL, "
             # Critical | Error | Warning | Maintenance | Information
@@ -977,7 +1003,8 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
             f"area VARCHAR(80), "
             f"activo {entero} NOT NULL DEFAULT 1, "
             f"creado_en {ts}, "
-            f"actualizado_en {ts})"
+            f"actualizado_en {ts}, "
+            f"{fk_def_usr})"
         )
 
         # ---------------------------------------------------------------- #
@@ -1130,11 +1157,21 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
             f"CONSTRAINT fk_{p}receta_elementos_plc FOREIGN KEY (plc_prg_id) "
             f"REFERENCES {t_plc} (id)"
         )
+        fk_ele_usr = (
+            f"CONSTRAINT fk_{p}receta_elementos_usuario FOREIGN KEY (usuario_id) "
+            f"REFERENCES {t_usuarios} (id)"
+        )
         receta_elementos = (
             f"CREATE TABLE {t_rec_elem} ("
             f"id {pk}, "
             f"receta_id {fk_tipo} NOT NULL, "
             f"plc_prg_id {fk_tipo}, "
+            # Quién tocó este elemento por última vez. Es la columna que
+            # importa de verdad de las tres que se añaden: `valor_minimo` y
+            # `valor_maximo` son la última barrera antes de escribir en una
+            # máquina, y quién los movió es una pregunta que se hace SIEMPRE
+            # después de un lote que salió mal.
+            f"usuario_id {fk_tipo}, "
             f"nombre VARCHAR(160) NOT NULL, "
             f"nombre_visible VARCHAR(160), "
             # Tag del PLC al que se escribe. Mismo formato que en plc_prg.
@@ -1161,7 +1198,7 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
             f"activo {entero} NOT NULL DEFAULT 1, "
             f"creado_en {ts}, "
             f"actualizado_en {ts}, "
-            f"{fk_ele_rec}, {fk_ele_plc})"
+            f"{fk_ele_rec}, {fk_ele_plc}, {fk_ele_usr})"
         )
 
         # --- Data records: la CABECERA de cada mezcla concreta ----------- #
@@ -1202,6 +1239,10 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
             f"FOREIGN KEY (receta_elemento_id) "
             f"REFERENCES {t_rec_elem} (id)"
         )
+        fk_val_usr = (
+            f"CONSTRAINT fk_{p}receta_valores_usuario FOREIGN KEY (usuario_id) "
+            f"REFERENCES {t_usuarios} (id)"
+        )
         receta_valores = (
             f"CREATE TABLE {t_rec_val} ("
             f"id {pk}, "
@@ -1209,7 +1250,12 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
             f"receta_elemento_id {fk_tipo} NOT NULL, "
             f"valor_num {real}, "
             f"valor_texto VARCHAR(500), "
-            f"{fk_val_reg}, {fk_val_ele})"
+            # Quién escribió ESTA celda. El registro ya guarda quién editó la
+            # mezcla, pero una mezcla la tocan varias personas: sin esto, el
+            # último que guardó cualquier cosa se lleva la firma de todas las
+            # celdas, incluidas las que no cambió.
+            f"usuario_id {fk_tipo}, "
+            f"{fk_val_reg}, {fk_val_ele}, {fk_val_usr})"
         )
 
         tablas = [

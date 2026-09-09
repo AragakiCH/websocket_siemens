@@ -67,6 +67,19 @@ DefaultGroupName={#MiNombre}
 ; programa serio. Sin esto, quitarlo es borrar una carpeta a mano.
 UninstallDisplayName={#MiNombre} {#MiVersion}
 UninstallDisplayIcon={app}\{#MiExe}
+; Icono del PROPIO instalador, que es distinto del que acaba teniendo el
+; programa instalado (ese lo lleva dentro el .exe, puesto por PyInstaller).
+; Sin esta línea el Setup que se reparte sale con el icono genérico de Inno
+; Setup: el primer contacto con Psi Core en un equipo nuevo es un fichero
+; que no parece de Psi Core, y eso es justo cuando alguien duda de si abrirlo.
+;
+; Va con `#if FileExists` porque el .ico se genera con
+; `python tools/generar_icono.py` y no está en el repositorio como binario.
+; Si alguien clona y compila sin generarlo, se prefiere un instalador con el
+; icono soso a que la compilación falle entera por un adorno.
+#if FileExists(AddBackslash(SourcePath) + "psi_core.ico")
+SetupIconFile=psi_core.ico
+#endif
 OutputDir=..\dist
 OutputBaseFilename=PsiCore_Setup_{#MiVersion}
 Compression=lzma2/max
@@ -148,6 +161,23 @@ Name: "{autodesktop}\{#MiNombre}"; Filename: "{app}\{#MiExe}"; Tasks: escritorio
 Name: "{userstartup}\{#MiNombre}"; Filename: "{app}\{#MiExe}"; Tasks: inicio
 
 [Run]
+; Refresca la cache de iconos de Windows.
+;
+; Windows guarda los iconos que ya ha dibujado en una base de datos propia y
+; la consulta por RUTA, no por contenido. Al actualizar, el acceso directo
+; sigue apuntando al mismo PsiCore.exe de siempre, asi que Windows da por
+; bueno el icono que tenia guardado y no vuelve a mirar dentro del .exe:
+; el escritorio sigue enseñando el icono anterior (o el generico) aunque el
+; programa ya traiga otro. No es un fallo del instalador ni del acceso
+; directo, y por eso no se arregla recreandolo.
+;
+; `ie4uinit -show` le dice al shell que tire esa cache y la reconstruya.
+; Va con `runasoriginaluser` porque la cache es POR USUARIO: ejecutada como
+; el administrador del instalador refrescaria la de otra cuenta.
+Filename: "{sys}\ie4uinit.exe"; Parameters: "-show"; \
+    Flags: runasoriginaluser runhidden skipifdoesntexist; \
+    StatusMsg: "Actualizando los iconos..."
+
 Filename: "{app}\{#MiExe}"; Description: "Abrir {#MiNombre} ahora"; \
     Flags: nowait postinstall skipifsilent
 
@@ -319,6 +349,50 @@ begin
 end;
 
 { ---------------------------------------------------------------------
+  Cache del navegador incrustado.
+
+  ESTA ES LA QUE HACIA QUE UNA ACTUALIZACION "NO SE NOTARA".
+
+  La ventana de Psi Core es WebView2, o sea Chromium, y su perfil vive en
+  %ProgramData%\PsiCore\datos\navegador, DENTRO de la carpeta de datos que
+  este instalador conserva a proposito. Esa decision es correcta para el
+  localStorage (widgets importados, preferencias), pero arrastra tambien la
+  cache HTTP: el index.html de la version anterior, que apunta a un bundle
+  de JavaScript que esta version ya no trae.
+
+  El resultado era desesperante de diagnosticar: el instalador decia que
+  habia actualizado -y era verdad, los archivos del disco eran nuevos-, pero
+  la aplicacion arrancaba unas veces con la version nueva y otras con la
+  vieja, segun a Chromium le tocara revalidar o no.
+
+  Se borra SOLO la cache. Local Storage, Cookies y el resto del perfil se
+  quedan como estan: una cache se regenera sola en el siguiente arranque, y
+  un localStorage borrado se pierde para siempre.
+
+  OJO al escribir aqui: en el Pascal de Inno un comentario va entre llaves,
+  asi que una constante como la de ProgramData escrita con llaves CIERRA el
+  comentario a media frase y el resto del texto se compila como codigo. Por
+  eso arriba va %ProgramData%. Dentro de una cadena si se puede usar, que es
+  lo que hace ExpandConstant unas lineas mas abajo.
+  --------------------------------------------------------------------- }
+procedure LimpiarCacheNavegador();
+var
+  Perfil: String;
+begin
+  Perfil := ExpandConstant('{commonappdata}\PsiCore\datos\navegador\EBWebView\Default');
+  if not DirExists(Perfil) then
+    Exit;
+
+  Log('Limpiando la cache de WebView2 en ' + Perfil);
+  if DirExists(Perfil + '\Cache') then
+    DelTree(Perfil + '\Cache', True, True, True);
+  if DirExists(Perfil + '\Code Cache') then
+    DelTree(Perfil + '\Code Cache', True, True, True);
+  if DirExists(Perfil + '\Service Worker') then
+    DelTree(Perfil + '\Service Worker', True, True, True);
+end;
+
+{ ---------------------------------------------------------------------
   Limpieza de la versión anterior.
 
   PyInstaller en modo carpeta mete todo en `_internal`. Al actualizar,
@@ -344,6 +418,8 @@ begin
   end;
   if DirExists(Carpeta + '\__pycache__') then
     DelTree(Carpeta + '\__pycache__', True, True, True);
+
+  LimpiarCacheNavegador();
 end;
 
 { =====================================================================
