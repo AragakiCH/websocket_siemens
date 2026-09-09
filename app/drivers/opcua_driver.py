@@ -23,6 +23,7 @@ from typing import Dict, List, Optional
 from asyncua import Client, Node, ua
 
 from app.config.settings import Settings
+from app.drivers.escritura import convertir
 from app.drivers.plc_driver import (
     DataChangeCallback,
     PlcDriver,
@@ -383,6 +384,59 @@ class OpcUaDriver(PlcDriver):
             timestamp=_ahora_iso(),
             node_id=node_id,
         )
+
+    async def write_tag(self, node_id: str, valor: object) -> TagValue:
+        """
+        Escribe en un tag del S7-1500 y devuelve el valor RELEÍDO.
+
+        El tipo se pregunta al servidor con `read_data_type_as_variant_type()`
+        en vez de deducirlo del `data_type` que guardamos al hacer el browse.
+        Son dos fuentes distintas y la del servidor es la que manda: nuestro
+        catálogo pudo quedarse viejo si alguien recargó el programa del PLC, y
+        escribir con un Variant equivocado es justo lo que hay que evitar.
+
+        La relectura posterior no es opcional en un HMI: en un S7 es normal que
+        el programa sobrescriba una consigna en el mismo ciclo de scan si esa
+        variable la gobierna un bloque. Sin releer, la interfaz diría "escrito"
+        y el PLC tendría otra cosa.
+        """
+        if self._client is None:
+            raise RuntimeError("write_tag llamado sin conexión activa.")
+
+        node = self._client.get_node(node_id)
+        info = self.tag_por_nodeid.get(node_id)
+
+        try:
+            tipo_variante = await node.read_data_type_as_variant_type()
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(
+                f"No se pudo leer el tipo de dato de '{node_id}' en el PLC: {exc}"
+            ) from exc
+
+        # El nombre del tipo sale del propio servidor (Boolean, Int16, Float…),
+        # que es el mismo vocabulario que entiende `escritura.convertir`.
+        nombre_tipo = tipo_variante.name
+        valor_convertido = convertir(valor, nombre_tipo)
+
+        try:
+            await node.write_value(
+                ua.DataValue(ua.Variant(valor_convertido, tipo_variante))
+            )
+        except ua.UaStatusCodeError as exc:
+            # El caso más común con diferencia: la variable existe y se puede
+            # leer, pero el servidor OPC UA del S7 la expone como de solo
+            # lectura. Merece un mensaje que diga qué hacer en TIA Portal.
+            raise PermissionError(
+                f"El PLC rechazó la escritura en '{info.full_name if info else node_id}': "
+                f"{exc}. Si el código es BadUserAccessDenied o BadNotWritable, la "
+                f"variable está como solo lectura en el servidor OPC UA: en TIA "
+                f"Portal, propiedades del DB, hay que marcarla como accesible y "
+                f"escribible desde OPC UA."
+            ) from exc
+
+        logger.info("Escrito %s = %r en %s",
+                    info.full_name if info else node_id, valor_convertido, self.host)
+        return await self.read_tag(node_id)
 
     # ==================================================================== #
     # Watchdog

@@ -206,6 +206,64 @@ class SubscriptionHandler:
             "publishing_interval_ms": self._settings.publishing_interval_ms,
         }
 
+    # ==================================================================== #
+    # Escritura
+    # ==================================================================== #
+    def buscar_tag(self, nombre: str) -> Optional[TagInfo]:
+        """
+        Encuentra un tag por su `full_name` o por su `node_id`.
+
+        Se aceptan los dos porque son dos vocabularios reales del sistema: la
+        interfaz y las recetas hablan de `DB_snap7.setpoint_temp`, mientras
+        que el historizador y los widgets a veces arrastran el node_id crudo.
+        Obligar a normalizar en cada punto de llamada solo garantiza que
+        alguien se olvide.
+        """
+        if not nombre:
+            return None
+        for t in self._tags:
+            if t.full_name == nombre or t.node_id == nombre:
+                return t
+        return None
+
+    def soporta_escritura(self) -> bool:
+        return self._driver.soporta_escritura()
+
+    async def leer(self, node_id: str) -> TagValue:
+        """
+        Lee un tag AHORA, sin esperar a la siguiente notificación.
+
+        Existe para el paso previo a una escritura: para poder deshacer hay
+        que saber qué había, y el snapshot en memoria puede llevar rato sin
+        refrescarse si ese tag no ha cambiado. Guardar como "valor anterior"
+        algo que solo era el último notificado haría que la vuelta atrás
+        restaurase un valor viejo.
+        """
+        if not self._driver.is_connected():
+            raise ConnectionError(
+                f"El PLC '{self.plc_id}' ({self.endpoint}) no está conectado.")
+        return await self._driver.read_tag(node_id)
+
+    async def escribir(self, node_id: str, valor: object) -> TagValue:
+        """
+        Escribe y devuelve el valor releído por el driver.
+
+        El snapshot en memoria se actualiza con lo RELEÍDO, no con lo que se
+        pidió escribir. Si el PLC guardó otra cosa —un Real que recorta
+        precisión, o un bloque que pisa la consigna—, la interfaz debe ver la
+        verdad y no el deseo. Sin esto habría un intervalo, hasta la siguiente
+        notificación de la subscription, en el que la pantalla mostraría un
+        valor que el PLC nunca tuvo.
+        """
+        if not self._driver.is_connected():
+            raise ConnectionError(
+                f"El PLC '{self.plc_id}' ({self.endpoint}) no está conectado.")
+
+        tv = await self._driver.write_tag(node_id, valor)
+        if tv is not None:
+            self._snapshot[tv.tag] = tv
+        return tv
+
     def num_tags(self) -> int:
         return len(self._tags)
 

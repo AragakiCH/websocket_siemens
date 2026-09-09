@@ -112,6 +112,37 @@ class PlcDriver(ABC):
         """Lee de forma puntual (one-shot) el valor actual de un tag."""
         raise NotImplementedError
 
+    async def write_tag(self, node_id: str, valor: object) -> TagValue:
+        """
+        Escribe un valor en un tag y DEVUELVE LO QUE QUEDÓ, releyéndolo.
+
+        Se relee a propósito, y no es paranoia: un PLC puede aceptar la
+        escritura y guardar algo distinto. Un `Real` recorta la precisión;
+        un bloque de función puede sobrescribir la consigna en el siguiente
+        ciclo de scan; y una variable marcada como escribible en el servidor
+        OPC UA puede estar, de hecho, gobernada por el programa. Devolver el
+        valor releído permite que quien llamó compare lo que pidió con lo que
+        hay, en vez de suponer.
+
+        NO es abstracto a propósito. Un driver nuevo (Modbus, S7 por snap7)
+        debe poder existir siendo solo de lectura: obligar a implementar la
+        escritura para poder leer sería exigir la parte peligrosa para usar la
+        inofensiva. Quien no la implemente hereda este error, que dice
+        exactamente qué falta.
+        """
+        raise NotImplementedError(
+            f"El driver {type(self).__name__} no implementa escritura. "
+            f"Solo puede leer tags."
+        )
+
+    def soporta_escritura(self) -> bool:
+        """
+        ¿Este driver sabe escribir? Se comprueba mirando si `write_tag` sigue
+        siendo el de la clase base, para no tener que mantener una bandera
+        aparte que alguien olvidaría actualizar al añadir un driver.
+        """
+        return type(self).write_tag is not PlcDriver.write_tag
+
     @abstractmethod
     def is_connected(self) -> bool:
         """Devuelve True si la conexión con el PLC está activa."""

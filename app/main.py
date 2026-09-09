@@ -28,14 +28,16 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import (ai_routes, alarm_routes, auth_routes, crud_routes,
-                     db_routes, export_routes, historian_routes, lock_routes,
-                     project_routes, rest_routes, sistema_routes,
-                     websocket_routes, widget_routes)
+                     db_routes, escritura_routes, export_routes,
+                     historian_routes, lock_routes, project_routes,
+                     rest_routes, sistema_routes, websocket_routes,
+                     widget_routes)
 from app.config.settings import get_settings
 from app.core.alarm_engine import MotorAlarmas
 from app.core.connection_manager import ConnectionManager
 from app.core.crud_manager import CrudManager
 from app.core.db_manager import DbManager
+from app.core.escritura_store import EscrituraStore
 from app.db.historian import Historizador
 from app.db.widget_store import WidgetStore
 from app.export.grabador import Grabador
@@ -87,6 +89,10 @@ async def lifespan(app: FastAPI):
     # Widgets personalizados: la definición vive en el servidor, no en
     # el localStorage del navegador (ver app/db/widget_store.py).
     widget_store = WidgetStore()
+    # Lista blanca de escritura: QUÉ tags del PLC se pueden escribir y con qué
+    # límites. Nada es escribible hasta que alguien lo habilita a mano — ver
+    # app/core/escritura_store.py para por qué la regla va al revés aquí.
+    escritura_store = EscrituraStore()
     # El historizador escucha el MISMO flujo de tags que el WebSocket:
     # no abre una segunda sesión OPC UA ni añade carga al PLC.
     historizador = Historizador(db_manager, db_manager.store)
@@ -116,6 +122,7 @@ async def lifespan(app: FastAPI):
     app.state.db_manager = db_manager
     app.state.crud_manager = crud_manager
     app.state.widget_store = widget_store
+    app.state.escritura_store = escritura_store
     app.state.historizador = historizador
     app.state.grabador = grabador
     app.state.project_store = project_store
@@ -483,6 +490,7 @@ app.include_router(websocket_routes.router, tags=["WebSocket"])
 app.include_router(db_routes.router)
 app.include_router(crud_routes.router)
 app.include_router(widget_routes.router)
+app.include_router(escritura_routes.router)
 app.include_router(historian_routes.router)
 app.include_router(alarm_routes.router)
 app.include_router(export_routes.router)

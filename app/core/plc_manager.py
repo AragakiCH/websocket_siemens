@@ -29,6 +29,7 @@ from typing import Dict, List, Optional
 from app.config.settings import Settings
 from app.core.connection_manager import ConnectionManager
 from app.core.plc_discovery import EndpointPlc, descubrir_plcs
+from app.drivers.escritura import convertir
 from app.drivers.opcua_driver import OpcUaDriver
 from app.drivers.plc_driver import PlcDriver
 from app.drivers.rexroth_driver import RexrothDriver
@@ -422,6 +423,166 @@ class PlcManager:
             "total_tags": total_tags,
             "clientes_ws": self._manager.count(),
             "plcs": plcs,
+        }
+
+    # ------------------------------------------------------------------ #
+    # Escritura en el PLC
+    # ------------------------------------------------------------------ #
+    async def escribir_tags(
+        self,
+        escrituras: List[dict],
+        usuario: str = "",
+        permitidos=None,
+    ) -> dict:
+        """
+        Escribe uno o varios tags, con vuelta atrás si alguno falla.
+
+        `escrituras` es una lista de `{"plc_id", "tag", "valor"}`.
+        `permitidos` es el `EscrituraStore` con la lista blanca.
+
+        EL ORDEN DE LAS FASES ES LO IMPORTANTE
+        --------------------------------------
+        1. VALIDAR TODO antes de tocar el PLC. Si la receta trae ocho valores
+           y el séptimo se sale de rango, no puede haber escrito ya los seis
+           primeros: la máquina se quedaría a medio configurar, que es peor
+           que no haber empezado. Casi todos los fallos (tag no habilitado,
+           fuera de rango, tipo incorrecto, PLC desconectado) se detectan en
+           esta fase, sin mandar un solo paquete.
+
+        2. LEER los valores actuales. Sin esto no hay a dónde volver.
+
+        3. ESCRIBIR en orden, anotando lo ya hecho.
+
+        4. Si algo falla, RESTAURAR en orden INVERSO. Al revés porque si un
+           valor depende de otro —una consigna que solo tiene sentido con un
+           modo ya puesto— deshacer en el mismo orden dejaría estados
+           intermedios que el programa del PLC no espera.
+
+        LO QUE ESTO NO ES
+        -----------------
+        No es una transacción. Un PLC no las tiene: entre la escritura y la
+        vuelta atrás pasan milisegundos en los que el programa ya vio el valor
+        nuevo y pudo actuar. La vuelta atrás deja las VARIABLES como estaban,
+        no la máquina. Por eso la lista blanca y los rangos importan más que
+        este mecanismo: lo que de verdad protege es no haber escrito nunca un
+        valor imposible.
+        """
+        if not escrituras:
+            raise ValueError("No se indicó ningún tag que escribir.")
+
+        # ---------- Fase 1: validar TODO ---------------------------------
+        plan: List[dict] = []
+        for i, e in enumerate(escrituras):
+            plc_id = (e.get("plc_id") or "").strip()
+            tag = (e.get("tag") or "").strip()
+            valor = e.get("valor")
+
+            if not plc_id or not tag:
+                raise ValueError(f"Entrada {i}: hacen falta 'plc_id' y 'tag'.")
+
+            handler = self._handlers.get(plc_id)
+            if handler is None:
+                raise KeyError(
+                    f"No hay ningún PLC con id '{plc_id}'. Los conectados son: "
+                    f"{', '.join(self.list_plc_ids()) or '(ninguno)'}.")
+
+            if not handler.soporta_escritura():
+                raise NotImplementedError(
+                    f"El PLC '{plc_id}' usa un driver que no sabe escribir.")
+
+            if not handler.is_plc_connected():
+                raise ConnectionError(
+                    f"El PLC '{plc_id}' no está conectado ahora mismo.")
+
+            info = handler.buscar_tag(tag)
+            if info is None:
+                raise KeyError(
+                    f"El tag '{tag}' no existe en el PLC '{plc_id}'. "
+                    f"Comprueba el nombre con GET /tags?plc={plc_id}.")
+
+            # Lista blanca y rangos. Se valida el valor ya convertido al tipo
+            # real del tag: comparar la cadena "95" contra un máximo de 90
+            # daría un resultado sin sentido en Python.
+            valor_convertido = convertir(valor, info.data_type)
+            if permitidos is not None:
+                permitidos.validar(plc_id, info.full_name, valor_convertido)
+
+            plan.append({"plc_id": plc_id, "handler": handler, "info": info,
+                         "valor": valor_convertido, "pedido": valor})
+
+        # ---------- Fase 2: leer los valores actuales --------------------
+        for p in plan:
+            try:
+                anterior = await p["handler"].leer(p["info"].node_id)
+                p["anterior"] = anterior.value
+            except Exception as exc:  # noqa: BLE001
+                # Sin valor anterior no hay vuelta atrás posible para ese tag.
+                # Se sigue, pero queda anotado: es información que quien opera
+                # necesita si luego hay que deshacer a mano.
+                logger.warning("No se pudo leer el valor previo de %s: %s",
+                               p["info"].full_name, exc)
+                p["anterior"] = None
+
+        # ---------- Fase 3: escribir -------------------------------------
+        hechas: List[dict] = []
+        resultados: List[dict] = []
+        for p in plan:
+            try:
+                tv = await p["handler"].escribir(p["info"].node_id, p["valor"])
+                hechas.append(p)
+                resultados.append({
+                    "plc_id": p["plc_id"],
+                    "tag": p["info"].full_name,
+                    "solicitado": p["pedido"],
+                    "escrito": p["valor"],
+                    "confirmado": tv.value if tv else None,
+                    "data_type": p["info"].data_type,
+                    "anterior": p["anterior"],
+                    # El PLC pudo guardar algo distinto de lo pedido. Decirlo
+                    # explícitamente evita que la interfaz dé por bueno algo
+                    # que no lo es.
+                    "coincide": (tv is not None and tv.value == p["valor"]),
+                    "ok": True,
+                })
+            except Exception as exc:  # noqa: BLE001
+                # ---------- Fase 4: vuelta atrás -------------------------
+                revertidos, fallos_reversion = [], []
+                for h in reversed(hechas):
+                    if h["anterior"] is None:
+                        fallos_reversion.append(
+                            f"{h['info'].full_name} (no se leyó su valor previo)")
+                        continue
+                    try:
+                        await h["handler"].escribir(h["info"].node_id, h["anterior"])
+                        revertidos.append(h["info"].full_name)
+                    except Exception as exc2:  # noqa: BLE001
+                        fallos_reversion.append(f"{h['info'].full_name}: {exc2}")
+
+                logger.error(
+                    "Escritura fallida en %s (%s). Revertidos: %s. Sin revertir: %s",
+                    p["info"].full_name, exc, revertidos or "ninguno",
+                    fallos_reversion or "ninguno")
+
+                return {
+                    "ok": False,
+                    "escrituras": len(escrituras),
+                    "fallo_en": p["info"].full_name,
+                    "motivo": str(exc),
+                    "revertidos": revertidos,
+                    "sin_revertir": fallos_reversion,
+                    "resultados": resultados,
+                    "usuario": usuario,
+                    "timestamp": _ahora_iso(),
+                }
+
+        logger.info("%s escribió %d tag(s) correctamente.",
+                    usuario or "?", len(resultados))
+        return {
+            "ok": True,
+            "escrituras": len(resultados),
+            "resultados": resultados,
+            "usuario": usuario,
+            "timestamp": _ahora_iso(),
         }
 
     def num_plcs(self) -> int:

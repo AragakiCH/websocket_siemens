@@ -52,6 +52,7 @@ from typing import Dict, List, Optional, Tuple
 from asyncua import Client, Node, ua
 
 from app.config.settings import Settings
+from app.drivers.escritura import convertir
 from app.drivers.plc_driver import (
     DataChangeCallback,
     PlcDriver,
@@ -820,3 +821,53 @@ class RexrothDriver(PlcDriver):
             timestamp=_ahora_iso(),
             node_id=node_id,
         )
+
+    async def write_tag(self, node_id: str, valor: object) -> TagValue:
+        """
+        Escribe en una variable del ctrlX y devuelve el valor RELEÍDO.
+
+        El ctrlX se administra por REST, pero las variables del programa PLC
+        las expone por OPC UA igual que el S7. Por eso este método es casi
+        idéntico al de `opcua_driver`: la conversión de tipos se comparte en
+        `escritura.convertir`, y el `ua.Variant` se construye igual.
+
+        Lo que SÍ cambia es el diagnóstico del rechazo. En ctrlX una variable
+        puede no ser escribible por dos motivos que no existen en un S7: que
+        el programa esté en RUN y la variable no esté declarada como accesible
+        desde fuera, o que el usuario de la sesión no tenga el permiso en la
+        gestión de accesos del propio ctrlX. El mensaje lo dice, porque el
+        código de estado OPC UA es el mismo en ambos casos y por sí solo no
+        orienta a dónde mirar.
+        """
+        if self._client is None:
+            raise RuntimeError("write_tag llamado sin conexión activa.")
+
+        node = self._client.get_node(node_id)
+        info = self.tag_por_nodeid.get(node_id)
+
+        try:
+            tipo_variante = await node.read_data_type_as_variant_type()
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(
+                f"No se pudo leer el tipo de dato de '{node_id}' en el ctrlX: {exc}"
+            ) from exc
+
+        valor_convertido = convertir(valor, tipo_variante.name)
+
+        try:
+            await node.write_value(
+                ua.DataValue(ua.Variant(valor_convertido, tipo_variante))
+            )
+        except ua.UaStatusCodeError as exc:
+            raise PermissionError(
+                f"El ctrlX rechazó la escritura en "
+                f"'{info.full_name if info else node_id}': {exc}. Suele ser una "
+                f"de dos cosas: la variable no está declarada como accesible "
+                f"desde fuera en el programa PLC, o el usuario con el que se "
+                f"conecta Psi Core no tiene permiso de escritura en la gestión "
+                f"de accesos del ctrlX."
+            ) from exc
+
+        logger.info("Escrito %s = %r en %s",
+                    info.full_name if info else node_id, valor_convertido, self.host)
+        return await self.read_tag(node_id)
