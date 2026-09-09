@@ -58,6 +58,7 @@ import {
   setVistaActiva,
   setPantalla,
   publicarSecciones,
+  publicarPantallas,
   arbolDe,
   esWidgetDeNavegacion,
   KIND_MENU,
@@ -102,6 +103,7 @@ export function Designer() {
     projectVersion,
     setProjectVersion,
     pantallaCargada,
+    pantallas,
     permisos,
     presentes,
     setWidgets,
@@ -130,6 +132,21 @@ export function Designer() {
   useLayoutEffect(() => {
     setPantalla(projectId);
   }, [projectId]);
+
+  // ── EL CATÁLOGO DE PANTALLAS, PARA EL INSPECTOR DEL MENÚ ──────
+  //
+  // Cada sección del Menú Lateral puede apuntar a otra pantalla, y su
+  // desplegable necesita saber cuáles hay. No puede preguntárselo al
+  // AppStore: `inspector.tsx` lo importa `SidebarNavegacion`, a ese el
+  // `registry`, y a ese el propio AppStore — sería un ciclo de imports. Así
+  // que el dato se deja en el store de navegación, que no importa nada de la
+  // aplicación. La nota larga está en `publicarPantallas()`.
+  //
+  // El Diseñador es el único sitio donde se dibuja el Inspector, así que es
+  // el único que necesita publicarlo.
+  useEffect(() => {
+    publicarPantallas(pantallas);
+  }, [pantallas]);
 
   const vistaActiva = useVistaActiva(GRUPO_POR_DEFECTO);
   const secciones = useSecciones(GRUPO_POR_DEFECTO);

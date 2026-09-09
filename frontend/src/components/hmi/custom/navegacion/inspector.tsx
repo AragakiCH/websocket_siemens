@@ -18,6 +18,7 @@ import {
   PaletteIcon,
   IndentIncreaseIcon,
   IndentDecreaseIcon,
+  MonitorIcon,
 } from 'lucide-react';
 import {
   esNivel,
@@ -29,6 +30,8 @@ import {
   normalizarEstructura,
   idUnico,
   sanearIds,
+  usePantallas,
+  usePantallaAbierta,
   type Seccion } from
 './store';
 
@@ -325,6 +328,111 @@ function CampoId({
 }
 
 /**
+ * A qué PANTALLA salta una sección.
+ *
+ * LA OPCIÓN POR DEFECTO ES LA DE SIEMPRE. Sin pantalla asignada, la sección
+ * hace exactamente lo de hasta ahora: muestra los widgets de este mismo
+ * lienzo que la lleven en su campo «Vista». Asignar una pantalla AÑADE un
+ * comportamiento, no cambia el que ya funcionaba — por eso «esta misma
+ * pantalla» es la primera opción y el valor vacío.
+ *
+ * DE DÓNDE SALE LA LISTA
+ * Del catálogo que publica el Diseñador en `store.ts`, no de `useAppStore()`.
+ * Leer el AppStore desde aquí cerraría un ciclo de imports
+ * (AppStore → registry → SidebarNavegacion → este archivo). La nota larga
+ * está en `publicarPantallas()`.
+ *
+ * SOLO EN SECCIONES. Un nivel es un encabezado que pliega y despliega, no un
+ * destino: `publicarSecciones()` ni siquiera los publica. Ofrecerle un
+ * destino sería prometer algo que el menú no va a hacer.
+ */
+function SelectorPantalla({
+  valor,
+  onChange,
+  etiquetaSeccion,
+}: {
+  valor: string;
+  onChange: (projectId: string) => void;
+  etiquetaSeccion: string;
+}) {
+  const pantallas = usePantallas();
+  const abierta = usePantallaAbierta();
+
+  /**
+   * La pantalla asignada ya no está en el catálogo: alguien la borró.
+   *
+   * NO SE LIMPIA SOLA. Borrar la asignación en silencio haría desaparecer una
+   * configuración que costó hacer, y encima sin decir por qué — el mismo
+   * fallo de los widgets huérfanos. Se marca y decide el usuario.
+   *
+   * La guarda de `length > 0` importa: mientras el catálogo no se ha
+   * publicado todavía (primer render), TODO parecería borrado.
+   */
+  const huerfana =
+    !!valor && pantallas.length > 0 &&
+    !pantallas.some((p) => p.project_id === valor);
+
+  // Apuntarse a uno mismo. No se prohíbe —el Panel de Sección corta la
+  // recursión por su lado— pero casi siempre es un descuido, así que se
+  // avisa en vez de dejarlo pasar en silencio.
+  const esSiMisma = !!valor && valor === abierta;
+
+  return (
+    <div className="mt-1 pl-[26px]">
+      <div className="flex items-center gap-1.5">
+        <MonitorIcon
+          className={`h-3 w-3 shrink-0 transition ${
+          valor && !huerfana ?
+          'text-siemens' :
+          'text-slate-300 dark:text-navy-slate'}`
+          } />
+
+        <select
+          value={valor}
+          onChange={(e) => onChange(e.target.value)}
+          title={`Pantalla que se abre en el Panel de Sección al pulsar «${etiquetaSeccion}»`}
+          aria-label={`Pantalla de destino de ${etiquetaSeccion}`}
+          className={`min-w-0 flex-1 cursor-pointer rounded border bg-transparent px-1.5 py-0.5 text-[11px] outline-none transition focus:border-siemens focus:ring-1 focus:ring-siemens/30 dark:bg-navy ${
+          huerfana ?
+          'border-state-error/40 text-state-error' :
+          valor ?
+          'border-siemens/40 text-navy dark:text-slate-100' :
+          'border-transparent text-slate-400 hover:border-slate-200 dark:hover:border-navy-slate'}`
+          }>
+
+          <option value="">— esta misma pantalla —</option>
+          {pantallas.map((p) =>
+          <option key={p.project_id} value={p.project_id}>
+              {p.nombre}
+              {p.project_id === abierta ? ' (actual)' : ''}
+            </option>
+          )}
+          {/* La borrada se ofrece como opción para que el desplegable pueda
+              seguir mostrándola seleccionada. Sin ella el <select> caería a
+              la primera opción y la asignación se perdería solo con abrir el
+              Inspector. */}
+          {huerfana &&
+          <option value={valor}>{valor} — ya no existe</option>
+          }
+        </select>
+      </div>
+
+      {huerfana &&
+      <p className="mt-0.5 text-[10px] leading-snug text-state-error">
+          Esa pantalla ya no está en el proyecto. Elige otra o vuelve a «esta
+          misma pantalla».
+        </p>
+      }
+      {esSiMisma && !huerfana &&
+      <p className="mt-0.5 text-[10px] leading-snug text-amber-600 dark:text-amber-400">
+          Apunta a la pantalla en la que ya estás: el panel se quedaría igual.
+        </p>
+      }
+    </div>);
+
+}
+
+/**
  * Alta, baja, reordenado, renombrado e iconos del menú.
  *
  * Trabaja sobre UNA lista donde conviven encabezados y secciones, en el mismo
@@ -612,6 +720,19 @@ export function EditorEstructura({
                 </button>
               </div>
 
+              {/* El destino de la sección. Va FUERA de la tarjeta y no dentro
+                  de su fila: la fila ya lleva seis controles y el panel de
+                  propiedades es estrecho — metiendo aquí un desplegable, el
+                  nombre de la sección se quedaría sin sitio para leerse.
+                  Debajo y sangrado se ve que pertenece a esa entrada sin
+                  competir con ella. */}
+              {!nivel &&
+              <SelectorPantalla
+                valor={s.pantalla ?? ''}
+                etiquetaSeccion={s.label || s.id}
+                onChange={(pantalla) => editar(indice, { pantalla })} />
+              }
+
               {!nivel && abierto &&
               <EditorIcono
                 valor={s.icono ?? ''}
@@ -648,6 +769,11 @@ export function EditorEstructura({
           Un <b>nivel</b> es un encabezado que agrupa y no se pulsa; una{' '}
           <b>sección</b> sí se abre. Al quitar una entrada, lo que lleve dentro
           sube un nivel en vez de irse con ella.
+          <br />
+          <br />
+          El desplegable de cada sección elige <b>a qué pantalla salta</b>. En
+          «esta misma pantalla» se comporta como siempre: muestra los widgets
+          de este lienzo que la tengan asignada en «Vista».
         </p>
       }
     </div>);

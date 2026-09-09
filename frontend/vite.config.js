@@ -54,6 +54,8 @@ export default defineConfig({
       // Exportaciones (CSV/XLSX) y el asistente de IA.
       '/export': BACKEND,
       '/ai': BACKEND,
+      '/widgets': BACKEND
+      
     },
   },
   build: {
