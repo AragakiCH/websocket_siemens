@@ -232,6 +232,32 @@ export interface Seccion {
    */
   padre?: string;
 
+  /**
+   * Pantalla del proyecto que se abre al pulsar esta sección.
+   *
+   * VACÍO O AUSENTE = EL COMPORTAMIENTO DE SIEMPRE: la sección solo decide
+   * qué widgets de ESTE lienzo se ven (los que lleven su id en `vista`). No
+   * cambia nada de lo que ya funcionaba.
+   *
+   * Con un `project_id` dentro, el Panel de Sección carga esa pantalla y la
+   * dibuja dentro de su marco. Lo importante es lo que NO pasa: el menú no se
+   * va. Sigue siendo un widget de la pantalla actual y nunca se sale de este
+   * proyecto; lo único que cambia es el contenido del panel.
+   *
+   * SE GUARDA EL `project_id`, NO EL NOMBRE. El id es el nombre del fichero
+   * en el servidor y no cambia nunca; el nombre visible sí (hay un
+   * `PATCH /proyectos/{id}` para renombrar). Guardando el nombre, renombrar
+   * una pantalla rompería en silencio todos los enlaces que apuntaran a ella.
+   *
+   * OPCIONAL A PROPÓSITO, igual que `tipo`, `icono` y `padre`: los menús
+   * guardados antes de que esto existiera no traen el campo, se leen tal cual
+   * y no hace falta migrar nada.
+   *
+   * SOLO TIENE SENTIDO EN LAS SECCIONES. Un nivel no navega —solo pliega y
+   * despliega—, así que el Inspector no ofrece el desplegable en sus filas.
+   */
+  pantalla?: string;
+
 }
 
 /** ¿Esta entrada es un encabezado de nivel y no una sección navegable? */
@@ -641,6 +667,103 @@ export function useSecciones(grupo: string): Seccion[] {
 export function etiquetaDeVista(grupo: string, vistaId: string): string {
   if (!vistaId) return '';
   return getSecciones(grupo).find((s) => s.id === vistaId)?.label ?? vistaId;
+}
+
+// ─── Catálogo de pantallas del proyecto ──────────────────────────
+//
+// Qué pantallas existen, para que el Inspector del menú pueda ofrecerlas en
+// un desplegable y cada sección diga a cuál salta.
+//
+// POR QUÉ PASA POR AQUÍ Y NO POR `useAppStore()`
+// Sería lo natural —el AppStore ya publica `pantallas`— y sin embargo no se
+// puede: el Inspector del menú vive en `custom/navegacion/inspector.tsx`, lo
+// importa `SidebarNavegacion`, a ese lo importa `custom/registry`, y a ese lo
+// importa el propio `AppStore`. Leer el AppStore desde el Inspector cerraría
+// el círculo:
+//
+//     AppStore → registry → SidebarNavegacion → inspector → AppStore
+//
+// Un ciclo de imports en ESM no siempre revienta, pero cuando lo hace es de
+// la peor manera: uno de los módulos se evalúa a medias y alguna referencia
+// llega como `undefined` en el arranque, sin un error que apunte a la causa.
+//
+// Este módulo, en cambio, no importa NADA de la aplicación: solo React. Por
+// eso es el sitio correcto para dejar el dato — exactamente el mismo papel
+// que ya cumple con las secciones que publica el menú.
+//
+// Lo publica el Diseñador, que es quien tiene la lista y el único sitio donde
+// se dibuja el Inspector.
+
+/** Una pantalla entre las que puede elegir una sección. */
+export interface PantallaDisponible {
+  project_id: string;
+  nombre: string;
+}
+
+/**
+ * Lista vacía COMPARTIDA, por el mismo motivo que `SIN_SECCIONES`: devolver
+ * un `[]` nuevo en cada lectura haría que `useSyncExternalStore` creyera que
+ * el store cambió en cada render, y de ahí a "Maximum update depth exceeded".
+ */
+const SIN_PANTALLAS: PantallaDisponible[] = [];
+Object.freeze(SIN_PANTALLAS);
+
+let pantallasDisponibles: PantallaDisponible[] = SIN_PANTALLAS;
+
+/**
+ * Publica qué pantallas hay. Idempotente: si la lista es la misma no avisa a
+ * nadie, así que se puede llamar en cada render sin coste.
+ *
+ * Se copia solo `project_id` y `nombre` a propósito. Lo que llega del
+ * AppStore es un `ResumenPantalla` completo, con `version` y
+ * `actualizado_en` dentro — campos que cambian en CADA guardado del
+ * Diseñador. Comparando el objeto entero, mover un widget publicaría una
+ * lista "nueva" cada 400 ms y repintaría el Inspector sin motivo.
+ */
+export function publicarPantallas(lista: PantallaDisponible[]): void {
+  const limpia: PantallaDisponible[] = (lista ?? []).map((p) => ({
+    project_id: p.project_id,
+    nombre: p.nombre || p.project_id,
+  }));
+
+  const igual =
+    limpia.length === pantallasDisponibles.length &&
+    limpia.every(
+      (p, i) =>
+        p.project_id === pantallasDisponibles[i].project_id &&
+        p.nombre === pantallasDisponibles[i].nombre
+    );
+  if (igual) return;
+
+  pantallasDisponibles = limpia;
+  avisar();
+}
+
+export function getPantallas(): PantallaDisponible[] {
+  return pantallasDisponibles;
+}
+
+export function usePantallas(): PantallaDisponible[] {
+  return useSyncExternalStore(suscribir, getPantallas, getPantallas);
+}
+
+/**
+ * Pantalla que se está mirando, como hook.
+ *
+ * `getPantalla()` a secas serviría para leerla, pero no volvería a dibujar al
+ * cambiar de pestaña: el Inspector marcaría «(actual)» sobre la pantalla
+ * equivocada hasta el siguiente render por otro motivo.
+ */
+export function usePantallaAbierta(): string {
+  return useSyncExternalStore(suscribir, getPantalla, getPantalla);
+}
+
+/** Nombre legible de una pantalla. `''` si ya no está en el catálogo. */
+export function nombreDePantalla(projectId: string): string {
+  if (!projectId) return '';
+  return (
+    pantallasDisponibles.find((p) => p.project_id === projectId)?.nombre ?? ''
+  );
 }
 
 /**
