@@ -425,15 +425,22 @@ end;
 { =====================================================================
    EL PAPEL DE ESTE EQUIPO
 
-   Psi Core es un único .exe con tres modos. La elección se guarda en
-   psi_core.ini, junto al programa, y la lee desktop/psi_core.py.
+   Psi Core es un único .exe con DOS modos: servidor y visor. La elección
+   se guarda en psi_core.ini, junto al programa, y la lee psi_core.py.
 
-   Preguntarlo AQUÍ y no dentro del programa es deliberado. Si cada
-   equipo arranca en modo autónomo por defecto, cada uno se convierte en
-   su propio servidor con su propia carpeta de datos, y los widgets y
-   pantallas que configura una persona no aparecen para las demás. Eso
-   no da ningún error: da un widget en blanco, que parece un fallo del
-   programa y es una consecuencia de no haber decidido la topología.
+   Hubo un tercer modo, `autonomo`, para un puesto aislado. Se quitó porque
+   la única diferencia real con `servidor` era la interfaz de escucha
+   (127.0.0.1 en vez de 0.0.0.0); editar, guardar y hablar con los PLCs era
+   idéntico. Eran dos nombres para lo mismo y una pregunta de más aquí.
+   Quien quiera un puesto no publicado en la red pone host = 127.0.0.1 en
+   el .ini: la capacidad sigue, la decisión duplicada no.
+
+   Preguntar el papel AQUÍ y no dentro del programa es deliberado. Si todos
+   los equipos arrancaran como servidor, cada uno tendría su propia carpeta
+   de datos y los widgets y pantallas que configura una persona no
+   aparecerían para las demás. Eso no da ningún error: da un widget en
+   blanco, que parece un fallo del programa y es una consecuencia de no
+   haber decidido la topología.
    ===================================================================== }
 
 { Lee el modo de una instalación anterior para no perder la elección al
@@ -474,17 +481,17 @@ begin
   PaginaModo := CreateInputOptionPage(wpSelectTasks,
     'Papel de este equipo',
     '¿Cómo se va a usar Psi Core en este ordenador?',
-    'Si sois varias personas, solo UN equipo debe ser el servidor: es el ' +
-    'que guarda las pantallas, los widgets, las conexiones y el histórico. ' +
-    'Los demás serán visores y verán exactamente lo mismo que él. Si este ' +
-    'ordenador va a trabajar solo, elige "Equipo único".',
+    'SERVIDOR es donde se trabaja: se editan las pantallas y se guarda todo ' +
+    '(widgets, conexiones, cuentas e histórico). Si trabajas solo, este es ' +
+    'tu modo igualmente.' + #13#10 + #13#10 +
+    'VISOR solo muestra lo que hay en el servidor, y cada persona entra con ' +
+    'su propia cuenta. Si sois varios, solo UN equipo debe ser el servidor.',
     True, False);
 
   { Las etiquetas van en UNA línea a propósito: los controles de esta página
     no ajustan el texto, y una descripción larga se cortaría a media frase.
     La explicación va arriba, en el subtítulo. }
-  PaginaModo.Add('Equipo único — trabaja solo, no comparte nada');
-  PaginaModo.Add('Servidor — guarda los datos y se los sirve a los demás');
+  PaginaModo.Add('Servidor — se trabaja aquí y guarda todo');
   PaginaModo.Add('Visor — solo muestra lo que hay en el servidor');
 
   PaginaServidor := CreateInputQueryPage(PaginaModo.ID,
@@ -499,12 +506,13 @@ begin
   PaginaServidor.Values[1] := '8000';
 
   { Al actualizar se respeta lo que ya había: cambiar de modo por accidente
-    en una actualización dejaría a ese equipo sin ver los datos del grupo. }
+    en una actualización dejaría a ese equipo sin ver los datos del grupo.
+
+    Un equipo con el antiguo `autonomo` cae en el `else` y queda como
+    SERVIDOR, que es exactamente lo que era. }
   Anterior := Lowercase(LeerModoAnterior());
-  if Anterior = 'servidor' then
+  if Anterior = 'visor' then
     PaginaModo.SelectedValueIndex := 1
-  else if Anterior = 'visor' then
-    PaginaModo.SelectedValueIndex := 2
   else
     PaginaModo.SelectedValueIndex := 0;
 end;
@@ -514,43 +522,61 @@ begin
   ConfigurarPaginas();
 end;
 
-{ La página de la dirección solo tiene sentido en modo visor. }
+{ La página de la dirección solo tiene sentido en modo visor.
+  Índice 1 = Visor (0 = Servidor). }
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := False;
   if PageID = PaginaServidor.ID then
-    Result := (PaginaModo.SelectedValueIndex <> 2);
+    Result := (PaginaModo.SelectedValueIndex <> 1);
 end;
 
 { Escribe psi_core.ini con lo elegido. }
 procedure GuardarModo();
 var
-  Ruta, Modo, Texto: String;
+  Ruta, Modo, Host, Puerto, Comentario, Texto: String;
 begin
-  case PaginaModo.SelectedValueIndex of
-    1: Modo := 'servidor';
-    2: Modo := 'visor';
+  if PaginaModo.SelectedValueIndex = 1 then
+  begin
+    Modo := 'visor';
+    { En un visor, 'host' es A DÓNDE conectarse: lo que se tecleó. }
+    Host := Trim(PaginaServidor.Values[0]);
+    Puerto := Trim(PaginaServidor.Values[1]);
+    Comentario := '; En modo VISOR: donde esta el servidor.';
+  end
   else
-    Modo := 'autonomo';
+  begin
+    Modo := 'servidor';
+    { En un servidor, 'host' es EN QUÉ INTERFAZ escuchar, y tiene que ser
+      0.0.0.0 — no la IP del campo del visor, que ni siquiera es de este
+      equipo. Poner ahí una IP ajena haría que uvicorn no pudiera atarse y
+      el programa no arrancaría, con un error de red incomprensible para
+      quien solo ha pulsado "Siguiente". }
+    Host := '0.0.0.0';
+    Puerto := '8000';
+    Comentario :=
+      '; En modo SERVIDOR: en que interfaz se escucha.' + #13#10 +
+      ';    0.0.0.0    aceptar visores de toda la red local (lo normal)' + #13#10 +
+      ';    127.0.0.1  solo este equipo; nadie mas podra conectarse';
   end;
 
   Ruta := ExpandConstant('{app}\psi_core.ini');
   Texto :=
     '; Generado por el instalador de Psi Core {#MiVersion}.' + #13#10 +
     '; Se puede editar a mano; los cambios se aplican al reiniciar.' + #13#10 +
-    '; Valores de modo:  autonomo | servidor | visor' + #13#10 +
+    '; Valores de modo:  servidor | visor' + #13#10 +
     '' + #13#10 +
     '[psi]' + #13#10 +
     'modo = ' + Modo + #13#10 +
     '' + #13#10 +
     '[servidor]' + #13#10 +
-    '; Solo se usa en modo visor: donde esta el servidor.' + #13#10 +
-    'host = ' + Trim(PaginaServidor.Values[0]) + #13#10 +
-    'puerto = ' + Trim(PaginaServidor.Values[1]) + #13#10;
+    Comentario + #13#10 +
+    'host = ' + Host + #13#10 +
+    'puerto = ' + Puerto + #13#10;
 
   if not SaveStringToFile(Ruta, Texto, False) then
     MsgBox('No se pudo escribir ' + Ruta + '.' + #13#10 +
-           'Psi Core arrancara en modo "equipo unico". Para cambiarlo, ' +
+           'Psi Core arrancara como SERVIDOR. Para ponerlo como visor, ' +
            'crea ese fichero a mano.', mbError, MB_OK);
 end;
 

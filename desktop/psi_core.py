@@ -39,26 +39,29 @@ DÓNDE QUEDAN LOS DATOS
     NO junto al .exe: esa carpeta se reemplaza al actualizar y se borra al
     desinstalar, y con ella se irían los PLCs, las pantallas y las cuentas.
 
-LOS TRES MODOS
+LOS DOS MODOS
 
     Un mismo .exe se comporta de tres formas según `psi_core.ini` (que
     escribe el instalador) o según un argumento de la línea de órdenes:
 
-        autonomo   Backend en 127.0.0.1 + ventana. Un puesto aislado. Es el
-                   comportamiento de siempre y el valor por defecto.
-        servidor   Backend en 0.0.0.0 + ventana. El equipo que guarda las
-                   pantallas, los widgets, las conexiones y el histórico DE
-                   TODOS. Sigue siendo un puesto usable.
-        visor      Solo la ventana, apuntando al servidor. No arranca backend
-                   ni habla con los PLCs.
+        servidor   Backend + ventana. Edita, guarda y sirve. Es el equipo
+                   donde vive TODO: pantallas, widgets, conexiones, cuentas e
+                   histórico. Es el valor por defecto.
+        visor      Solo la ventana, apuntando a un servidor. No arranca
+                   backend ni habla con los PLCs. No guarda nada.
 
-    POR QUÉ HACE FALTA ESTA DISTINCIÓN. En modo autónomo cada equipo levanta
-    su propio backend y guarda en su propio ProgramData. Eso está bien para un
-    puesto único, pero con varias personas produce un fallo desconcertante:
-    los widgets y las pantallas que configura una NO existen para las demás,
-    porque el servidor de cada una es su propio PC. Y no se manifiesta como un
-    error, sino como un widget en blanco — parece un fallo del programa y es
-    una consecuencia de la arquitectura.
+    ANTES ERAN TRES, Y SOBRABA UNO. Existía además un modo `autonomo`, para un
+    puesto aislado. Pero la única diferencia real con `servidor` era a qué
+    interfaz se ataba uvicorn: `127.0.0.1` en vez de `0.0.0.0`. Todo lo demás
+    —editar, guardar, hablar con los PLCs— era idéntico. Dos nombres para el
+    mismo modo, y una pregunta más en el instalador que no aportaba nada.
+
+    Quien quiera un puesto que NO se publique en la red no necesita otro modo:
+    le basta con poner `host = 127.0.0.1` en la sección [servidor] del .ini.
+    La capacidad sigue estando; lo que desaparece es la decisión duplicada.
+
+    Las instalaciones que tengan `modo = autonomo` guardado siguen
+    funcionando: se leen como `servidor` (ver `resolver_modo`).
 
 Ejecutar en desarrollo:  python desktop/psi_core.py [--servidor|--visor HOST]
 Empaquetado:             dist/PsiCore.exe  (ver build_exe.bat)
@@ -79,27 +82,37 @@ PUERTO_PREFERIDO = 8000
 ANCHO, ALTO = 1400, 900
 
 CONFIG_NOMBRE = "psi_core.ini"
-MODOS = ("autonomo", "servidor", "visor")
+MODOS = ("servidor", "visor")
+
+# `autonomo` era un tercer modo que solo se diferenciaba de `servidor` en la
+# interfaz de escucha. Ya no se ofrece, pero se sigue LEYENDO: hay equipos
+# instalados con ese valor en su .ini, y una actualización que los dejara sin
+# arrancar por un nombre que cambió sería un fallo nuestro, no suyo.
+MODOS_ANTIGUOS = {"autonomo": "servidor", "unico": "servidor",
+                  "standalone": "servidor"}
 
 CONFIG_DEFECTO = """; ====================================================================
-;  Psi Core · modo de funcionamiento de ESTE equipo
+;  Psi Core · papel de ESTE equipo
 ; ====================================================================
-;  autonomo  Este equipo es un HMI completo y aislado. Guarda sus propias
-;            pantallas y widgets, y no los comparte con nadie.
+;  servidor  Este equipo edita, GUARDA TODO y se lo sirve a los demás.
+;            Pantallas, widgets, conexiones, cuentas e histórico viven
+;            aquí. Si trabajas solo, este es tu modo igualmente.
 ;
-;  servidor  Este equipo GUARDA TODO y sirve a los demás. Es el único que
-;            debe estar en este modo.
-;
-;  visor     Este equipo solo muestra lo que hay en el servidor. Rellena
-;            'host' con la IP que el servidor enseña al arrancar.
+;  visor     Este equipo solo muestra lo que hay en el servidor. No guarda
+;            nada. Rellena 'host' con la IP que el servidor enseña al
+;            arrancar.
 ; ====================================================================
 
 [psi]
-modo = autonomo
+modo = servidor
 
 [servidor]
-; Solo se usa en modo 'visor': dónde está el servidor.
-host = 127.0.0.1
+; En modo SERVIDOR: a qué interfaz se escucha.
+;    0.0.0.0    aceptar visores de toda la red local (lo normal)
+;    127.0.0.1  solo este equipo; nadie más podrá conectarse
+;
+; En modo VISOR: dónde está el servidor al que conectarse.
+host = 0.0.0.0
 puerto = 8000
 """
 
@@ -314,7 +327,7 @@ def resolver_modo(argv=None):
     Decide el modo y, si es 'visor', a dónde apuntar.
 
     Prioridad: línea de órdenes -> variables de entorno -> psi_core.ini ->
-    'autonomo'. La línea de órdenes va primero para poder probar los tres
+    'servidor'. La línea de órdenes va primero para poder probar los dos
     modos en un mismo equipo sin editar ficheros, que es justo lo que hace
     falta al montar esto por primera vez.
 
@@ -338,24 +351,34 @@ def resolver_modo(argv=None):
     except configparser.Error:
         pass
 
-    modo = (cfg.get("psi", "modo", fallback="autonomo") or "").strip().lower()
-    host = cfg.get("servidor", "host", fallback="127.0.0.1").strip()
+    modo = (cfg.get("psi", "modo", fallback="servidor") or "").strip().lower()
+    # Un equipo instalado con la versión anterior trae `modo = autonomo`. Se
+    # traduce en silencio en vez de caer al valor por defecto: son lo mismo, y
+    # avisar de algo que el usuario no eligió ni puede arreglar solo estorba.
+    modo = MODOS_ANTIGUOS.get(modo, modo)
+
+    # El host por defecto depende del modo, y esto importa:
+    #   servidor -> 0.0.0.0, o los visores no llegarían y el fallo sería mudo
+    #   visor    -> 127.0.0.1, un destino inofensivo hasta que se configure
+    host_defecto = "127.0.0.1" if modo == "visor" else "0.0.0.0"
+    host = cfg.get("servidor", "host", fallback=host_defecto).strip()
     try:
         puerto = cfg.getint("servidor", "puerto", fallback=PUERTO_PREFERIDO)
     except (ValueError, configparser.Error):
         puerto = PUERTO_PREFERIDO
 
     entorno = (os.getenv("PSI_MODO") or "").strip().lower()
+    entorno = MODOS_ANTIGUOS.get(entorno, entorno)
     if entorno in MODOS:
         modo = entorno
     destino = (os.getenv("PSI_SERVIDOR") or "").strip()
 
     for i, arg in enumerate(argv):
         a = arg.strip().lower()
-        if a in ("--servidor", "-s"):
+        if a in ("--servidor", "-s", "--autonomo", "-a"):
+            # `--autonomo` se sigue aceptando por los accesos directos y
+            # scripts que ya lo usen. Hace lo mismo que `--servidor`.
             modo = "servidor"
-        elif a in ("--autonomo", "-a"):
-            modo = "autonomo"
         elif a in ("--visor", "-v"):
             modo = "visor"
             # Acepta  --visor 192.168.1.50:8000  y  --visor=192.168.1.50
@@ -375,9 +398,55 @@ def resolver_modo(argv=None):
         else:
             host = destino
 
+    # Red de seguridad final. Un modo irreconocible cae a `servidor` y no a
+    # `visor`: un servidor de más es un equipo que funciona solo, mientras que
+    # un visor de más es una ventana que no encuentra a nadie y no sirve para
+    # nada. Ante la duda, el que arranca.
     if modo not in MODOS:
-        modo = "autonomo"
+        modo = "servidor"
+
+    if modo == "servidor":
+        host = _host_de_escucha(host)
     return modo, host, puerto
+
+
+def _host_de_escucha(host: str) -> str:
+    """
+    Valida la interfaz en la que va a escuchar un servidor.
+
+    HACE FALTA POR UNA ACTUALIZACIÓN QUE HABRÍA ROTO EQUIPOS. El instalador
+    anterior escribía en `[servidor] host` el valor del campo "dirección del
+    servidor" SIEMPRE, también cuando el equipo se instalaba como `autonomo`,
+    donde ese campo ni se usaba. Así que hay equipos por ahí con
+    `modo = autonomo` y `host = 192.168.1.100` —la IP de OTRA máquina, o
+    simplemente el valor de ejemplo que nadie cambió.
+
+    Al fusionar `autonomo` con `servidor`, esos equipos pasarían a intentar
+    atarse a esa IP. `bind()` fallaría con "cannot assign requested address",
+    uvicorn no arrancaría, y el usuario solo vería que el programa dejó de
+    funcionar después de actualizar.
+
+    Solo se aceptan tres cosas: escuchar en todas las interfaces, escuchar
+    solo en local, o una IP que de verdad sea de este equipo. Cualquier otra
+    se sustituye por 0.0.0.0 avisando.
+    """
+    h = (host or "").strip()
+    if not h or h == "0.0.0.0":
+        return "0.0.0.0"
+    if h in ("127.0.0.1", "localhost", "::1"):
+        return "127.0.0.1"
+    if h in _ips_locales():
+        # Es una IP real de esta máquina. Funciona, pero es frágil: con DHCP
+        # cambia y el programa dejaría de arrancar sin haber tocado nada.
+        print(f"[config] Escuchando solo en {h}. Si esa IP cambia (DHCP), "
+              f"habrá que actualizar psi_core.ini. Con 0.0.0.0 no haría falta.")
+        return h
+
+    print(f"[config] '{h}' no es una dirección de este equipo, así que no se "
+          f"puede escuchar en ella. Se usa 0.0.0.0 (toda la red local).")
+    print(f"[config] Suele venir de una instalación antigua. Para quitar este "
+          f"aviso, pon  host = 0.0.0.0  en psi_core.ini.")
+    return "0.0.0.0"
 
 
 # ====================================================================== #
@@ -574,7 +643,12 @@ def main() -> None:
     _preparar_entorno()
     _redirigir_salida()
 
-    modo, host_remoto, puerto_remoto = resolver_modo()
+    modo, host_cfg, puerto_remoto = resolver_modo()
+    # `host_cfg` significa dos cosas distintas según el modo, y por eso se
+    # renombra al usarlo: en VISOR es a dónde conectarse, en SERVIDOR es en qué
+    # interfaz escuchar. Es el mismo campo del .ini porque para el usuario es
+    # la misma pregunta —"¿dónde está el servidor?"— vista desde cada lado.
+    host_remoto = host_cfg
 
     # ---------------------------------------------------------------- #
     # VISOR: no se arranca backend. Solo la ventana, apuntando a otro
@@ -605,12 +679,15 @@ def main() -> None:
         return
 
     # ---------------------------------------------------------------- #
-    # AUTÓNOMO y SERVIDOR: backend local. La única diferencia es a qué
-    # interfaz se ata, y por tanto quién puede llegar.
+    # SERVIDOR: backend local + ventana. Edita, guarda y sirve.
     # ---------------------------------------------------------------- #
     _avisar_si_el_frontend_esta_viejo()
 
-    host_escucha = "0.0.0.0" if modo == "servidor" else "127.0.0.1"
+    # La interfaz sale del .ini, no de una constante. Por defecto es 0.0.0.0
+    # (los visores llegan), pero quien quiera un puesto que no se publique en
+    # la red pone 127.0.0.1 ahí y se acabó — que es lo que antes obligaba a
+    # tener un modo `autonomo` aparte.
+    host_escucha = host_cfg or "0.0.0.0"
     puerto = puerto_libre()
     arrancar_backend(puerto, host=host_escucha)
 
@@ -618,7 +695,7 @@ def main() -> None:
         print("*** El backend no respondió a tiempo. Se abre igualmente: "
               "puede que solo esté tardando más de lo normal.")
 
-    titulo = TITULO + (" (servidor)" if modo == "servidor" else "")
+    titulo = TITULO + ("" if host_escucha == "127.0.0.1" else " (servidor)")
     if not abrir_ventana(puerto, titulo=titulo):
         print("[ventana] Se abre en el navegador. Cierra ESTA consola para "
               "detener Psi Core.")
