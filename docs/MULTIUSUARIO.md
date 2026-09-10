@@ -35,7 +35,7 @@ app/core/lock_manager.py      El "lápiz" de edición (Fase 4)
 app/core/auditoria.py         Quién hizo qué (datos/auditoria.jsonl)
 app/core/plc_store.py         Persistencia de PLCs (cifrada)
 app/api/auth_routes.py        /auth/* y las dependencias de rol
-app/api/project_routes.py     /proyectos/*
+app/api/project_routes.py     /pantallas/*
 app/api/lock_routes.py        /locks/* y /auditoria
 app/db/project_store.py       Proyectos versionados
 frontend/src/services/authApi.ts     Cliente de sesión (token, fetchAuth)
@@ -101,7 +101,7 @@ en la vista no es seguridad: cualquiera puede llamar al endpoint con `curl`.
   sigan a la persona entre equipos, el sitio es una tabla `preferencias`
   con FK a `usuarios`.
 - **Selector de proyectos en la vista.** El backend ya soporta varios
-  (`datos/proyectos/<id>.json`, `GET /proyectos`), pero el frontend abre
+  (`datos/proyectos/<id>.json`, `GET /pantallas`), pero el frontend abre
   siempre `principal`. Añadir el desplegable es media hora.
 - **Edición colaborativa real** (CRDT, opción C de la Fase 4). Solo se
   justifica si varias personas construyen pantallas a la vez como trabajo

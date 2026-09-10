@@ -2,8 +2,14 @@
 // PantallasBar.tsx
 // Barra de pestañas de las PANTALLAS del HMI, dentro del Diseñador.
 //
-// UNA PANTALLA ES UN PROYECTO DEL BACKEND
-// No hay un modelo nuevo: cada pestaña es un documento de `/proyectos/<id>`.
+// SOLO SE VEN LAS PANTALLAS DEL PROYECTO ABIERTO
+// Un PROYECTO agrupa pantallas (ver `ProyectoSelector.tsx`). La barra pinta
+// `pantallas`, que el AppStore pide ya filtradas por el proyecto activo: por
+// eso la numeración empieza por 1 en cada proyecto y por eso no aparece aquí
+// nada del proyecto de al lado.
+//
+// CADA PESTAÑA ES UN DOCUMENTO DEL BACKEND
+// No hay un modelo nuevo: cada pestaña es un documento de `/pantallas/<id>`.
 // Esa decisión no es de comodidad, es lo que hace que funcione el resto:
 //
 //   * el lápiz de edición ya es POR RECURSO (`designer:<project_id>`), así
@@ -19,6 +25,10 @@
 //   eliminar                      -> rol Supervisor
 //   `principal`                   -> no se borra NUNCA (lo impide el backend:
 //                                    la vista siempre necesita una que abrir)
+//   la ÚLTIMA de un proyecto      -> tampoco: un proyecto sin pantallas es
+//                                    una pestaña en la que no se puede ni
+//                                    soltar un widget. Para deshacerse de él
+//                                    está el borrado de proyectos.
 //
 // Renombrar exige además tener el LÁPIZ de esa pantalla, porque sube su
 // versión: si lo hiciera alguien de fuera, quien está editando recibiría un
@@ -40,7 +50,7 @@ import {
   duplicarPantalla,
   renombrarPantalla,
   borrarPantalla,
-  PROYECTO_POR_DEFECTO,
+  PANTALLA_POR_DEFECTO,
 } from '../../utils/designStorage';
 
 interface Props {
@@ -52,10 +62,13 @@ export function PantallasBar({ puedeEditar }: Props) {
   const {
     t,
     pantallas,
+    estadoPantallas,
+    proyectoId,
     projectId,
     pantallaCargada,
     abrirPantalla,
     refrescarPantallas,
+    refrescarProyectos,
     setProjectVersion,
     permisos,
   } = useAppStore();
@@ -96,9 +109,17 @@ export function PantallasBar({ puedeEditar }: Props) {
   // ── Acciones ──────────────────────────────────────────────────
   const nuevaPantalla = () =>
     conError(async () => {
+      // El contador se reinicia en cada proyecto porque `pantallas` ya viene
+      // filtrada: la segunda pantalla del proyecto nuevo es su "Pantalla 2",
+      // aunque en el servidor haya otras seis.
       const n = pantallas.length + 1;
-      const creada = await crearPantalla(`${t('screens.defaultName')} ${n}`);
+      const creada = await crearPantalla(
+        `${t('screens.defaultName')} ${n}`,
+        proyectoId
+      );
       await refrescarPantallas();
+      // El contador del selector de proyectos también cambió.
+      await refrescarProyectos();
       abrirPantalla(creada.project_id);
       // Se entra directo a renombrarla: el nombre por defecto es un marcador
       // de posición, no una decisión, y pedirlo en un diálogo aparte antes de
@@ -111,9 +132,11 @@ export function PantallasBar({ puedeEditar }: Props) {
       const actual = pantallas.find((p) => p.project_id === projectId);
       const copia = await duplicarPantalla(
         projectId,
-        `${actual?.nombre ?? projectId} ${t('screens.copySuffix')}`
+        `${actual?.nombre ?? projectId} ${t('screens.copySuffix')}`,
+        proyectoId
       );
       await refrescarPantallas();
+      await refrescarProyectos();
       abrirPantalla(copia.project_id);
     });
 
@@ -123,10 +146,19 @@ export function PantallasBar({ puedeEditar }: Props) {
     setBorrar(null);
     void conError(async () => {
       await borrarPantalla(id);
-      await refrescarPantallas();
+      const lista = await refrescarPantallas();
+      await refrescarProyectos();
       // El WebSocket también avisa, pero no se espera a él: quien pulsó
       // Eliminar tiene que ver el efecto ya, no dentro de un instante.
-      if (id === projectId) abrirPantalla(PROYECTO_POR_DEFECTO);
+      //
+      // Se salta a otra pantalla DEL MISMO proyecto, no a la principal: si
+      // estabas en el proyecto "Línea 2", acabar en la pantalla principal del
+      // proyecto de al lado sería un salto que nadie pidió. El servidor no
+      // deja borrar la última, así que siempre queda alguna.
+      if (id === projectId) {
+        const destino = lista?.[0];
+        if (destino) abrirPantalla(destino.project_id);
+      }
     });
   };
 
@@ -160,7 +192,12 @@ export function PantallasBar({ puedeEditar }: Props) {
               // Solo se renombra la pantalla ACTIVA y con el lápiz en la mano:
               // el PATCH sube la versión y el backend exige el lock.
               const renombrable = activa && puedeEditar && puedeCrear;
-              const esPrincipal = p.project_id === PROYECTO_POR_DEFECTO;
+              // Dos pantallas no se dejan borrar, y el backend rechaza las
+              // dos: la principal (destino de rescate global) y la última que
+              // le quede a un proyecto.
+              const esUltima = pantallas.length <= 1;
+              const protegida =
+              p.project_id === PANTALLA_POR_DEFECTO || esUltima;
 
               return (
                 <motion.div
@@ -237,20 +274,22 @@ export function PantallasBar({ puedeEditar }: Props) {
                   {!editando && puedeBorrar && (
                     <button
                       type="button"
-                      disabled={esPrincipal || ocupado}
+                      disabled={protegida || ocupado}
                       onClick={() =>
                         setBorrar({ id: p.project_id, nombre: p.nombre })
                       }
                       title={
-                        esPrincipal
-                          ? t('screens.cantDeleteMain')
+                        protegida
+                          ? esUltima
+                            ? t('screens.cantDeleteLast')
+                            : t('screens.cantDeleteMain')
                           : t('screens.delete')
                       }
                       aria-label={`${t('screens.delete')}: ${p.nombre}`}
                       className={`mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded outline-none transition focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-siemens/40 ${
                         activa ? 'opacity-60' : 'opacity-0 group-hover:opacity-60'
                       } ${
-                        esPrincipal
+                        protegida
                           ? 'cursor-not-allowed text-slate-300 dark:text-slate-600'
                           : 'text-slate-400 hover:bg-red-50 hover:text-state-error hover:opacity-100 dark:hover:bg-state-error/10'
                       }`}
@@ -262,6 +301,28 @@ export function PantallasBar({ puedeEditar }: Props) {
               );
             })}
           </AnimatePresence>
+
+          {/* Barra vacía. El servidor no deja que un proyecto se quede sin
+              pantallas, así que si aquí no hay ninguna es que la lista no
+              llegó: lo normal es que el backend esté caído o que la petición
+              no salga de la máquina (en desarrollo, un prefijo que falta en
+              el proxy de `vite.config.js`). Decirlo ahorra buscar el fallo
+              en el sitio equivocado. */}
+          {pantallas.length === 0 && (
+            <p className="flex items-center gap-2 self-center px-2 text-xs text-slate-400">
+              {estadoPantallas === 'cargando' ? (
+                <>
+                  <Loader2Icon className="h-3.5 w-3.5 animate-spin" />
+                  {t('screens.loading')}
+                </>
+              ) : (
+                <>
+                  <AlertTriangleIcon className="h-3.5 w-3.5 text-state-error" />
+                  {t('screens.loadFailed')}
+                </>
+              )}
+            </p>
+          )}
 
           {/* ── Nueva pantalla ──────────────────────────────
               Vive DENTRO de la tira, pegado a la última pestaña, y no en

@@ -2,6 +2,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   createContext,
   useContext } from
@@ -28,13 +29,19 @@ import {
 '../services/authApi';
 import {
   cargarProyecto,
-  listarProyectos,
+  listarPantallas,
   loadDesign,
   getUltimaPantalla,
   setUltimaPantalla,
-  ResumenPantalla,
-  PROYECTO_POR_DEFECTO } from
+  ResumenPantalla } from
 '../utils/designStorage';
+import {
+  listarProyectosHmi,
+  getUltimoProyecto,
+  setUltimoProyecto,
+  ProyectoHmi,
+  PROYECTO_HMI_POR_DEFECTO } from
+'../utils/proyectoStorage';
 interface AppStore {
   // auth / conexión al PLC
   connected: boolean;
@@ -78,6 +85,29 @@ interface AppStore {
   cerrarSesion: () => Promise<void>;
   /** Quién más está mirando ahora mismo. */
   presentes: {usuario: string;categoria: string;}[];
+  // ---- PROYECTOS ----
+  //
+  // Un PROYECTO agrupa pantallas: es un HMI distinto, con su numeración
+  // empezando por 1. Ojo con los nombres, que vienen de cuando solo había un
+  // nivel: `projectId` (en inglés) es una PANTALLA; `proyectoId` es el
+  // proyecto que la contiene. La nota larga está en `proyectoStorage.ts`.
+  /** Proyecto abierto ahora mismo. */
+  proyectoId: string;
+  /** Todos los proyectos, para el selector del Diseñador. */
+  proyectos: ProyectoHmi[];
+  /**
+   * El proyecto abierto, ya resuelto. `null` mientras no ha llegado la lista
+   * o si el que había guardado ya no existe.
+   */
+  proyectoActivo: ProyectoHmi | null;
+  /** Vuelve a pedir la lista al servidor (tras crear, borrar o renombrar). */
+  refrescarProyectos: () => Promise<void>;
+  /**
+   * Cambia de proyecto. La pantalla que se abre la decide el store: la última
+   * que se estuvo mirando en ESE proyecto, o la primera si es la primera vez.
+   */
+  abrirProyecto: (proyectoId: string) => void;
+
   /** Pantalla abierta y su versión (para el control de conflictos). */
   projectId: string;
   projectVersion: number;
@@ -94,10 +124,23 @@ interface AppStore {
    * Cadena vacía = cargando.
    */
   pantallaCargada: string;
-  /** Todas las pantallas del proyecto, para la barra de pestañas. */
+  /**
+   * Las pantallas DEL PROYECTO ABIERTO, para la barra de pestañas.
+   *
+   * Filtradas en el servidor, no aquí: enseñar las de otro proyecto sería
+   * justo lo que se quiso separar, y la lista se pide en cada cambio.
+   */
   pantallas: ResumenPantalla[];
   /** Vuelve a pedir la lista al servidor (tras crear, borrar o renombrar). */
-  refrescarPantallas: () => Promise<void>;
+  refrescarPantallas: () => Promise<ResumenPantalla[] | null>;
+  /**
+   * Estado de esa lista. Hacen falta los tres: una barra de pestañas vacía
+   * puede ser "todavía no ha llegado" o "no llegó", y son cosas muy
+   * distintas. Sin distinguirlas, un fallo de red se ve igual que un
+   * instante de carga y el usuario se queda mirando una barra vacía sin
+   * saber si esperar o revisar el servidor.
+   */
+  estadoPantallas: 'cargando' | 'ok' | 'error';
   /** Cambia la pantalla activa del Diseñador. */
   abrirPantalla: (projectId: string) => void;
 
@@ -126,7 +169,7 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   // El diseño arranca desde la CACHÉ local para pintar al instante, y se
   // reconcilia con el servidor en cuanto responde (ver el efecto de abajo).
   const [widgets, setWidgets] = useState<HmiWidget[]>(
-    () => loadDesign(getUltimaPantalla())?.widgets ?? []
+    () => loadDesign(getUltimaPantalla(getUltimoProyecto()))?.widgets ?? []
   );
   const [sesion, setSesion] = useState<UsuarioSesion | null>(null);
   const [permisos, setPermisos] = useState<Permisos | null>(null);
@@ -138,11 +181,21 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   // al login durante el instante en que `sesion` todavía es null.
   const [comprobandoSesion, setComprobandoSesion] = useState(true);
   const [presentes, setPresentes] = useState<{usuario: string;categoria: string;}[]>([]);
-  // La última pantalla abierta se recuerda por navegador: al recargar vuelves
-  // a donde estabas, no al principio.
-  const [projectId, setProjectId] = useState<string>(getUltimaPantalla);
+  // El último proyecto y la última pantalla se recuerdan por navegador: al
+  // recargar vuelves a donde estabas, no al principio. La pantalla se guarda
+  // POR PROYECTO, porque si no, volver al proyecto A te dejaría en una
+  // pantalla del B que ni siquiera está en sus pestañas.
+  const [proyectoId, setProyectoId] = useState<string>(getUltimoProyecto);
+  const [proyectos, setProyectos] = useState<ProyectoHmi[]>([]);
+  // Cadena vacía = todavía no se sabe. La resuelve el efecto que carga las
+  // pantallas del proyecto: la recordada, o la primera que haya.
+  const [projectId, setProjectId] = useState<string>(() =>
+  getUltimaPantalla(getUltimoProyecto())
+  );
   const [pantallaCargada, setPantallaCargada] = useState<string>('');
   const [pantallas, setPantallas] = useState<ResumenPantalla[]>([]);
+  const [estadoPantallas, setEstadoPantallas] =
+  useState<'cargando' | 'ok' | 'error'>('cargando');
   const [projectVersion, setProjectVersion] = useState<number>(0);
   const [osDark, setOsDark] = useState<boolean>(systemPrefersDark);
   // Subscribe to the emulated PLC value stream.
@@ -263,25 +316,106 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   // ================================================================ //
   // MULTIUSUARIO: proyecto compartido
   // ================================================================ //
-  const refrescarPantallas = useCallback(async () => {
+  const refrescarPantallas = useCallback(
+    async (proyecto: string = proyectoId) => {
+      setEstadoPantallas('cargando');
+      try {
+        const lista = await listarPantallas(proyecto);
+        setPantallas(lista);
+        setEstadoPantallas('ok');
+        return lista;
+      } catch (e) {
+        setEstadoPantallas('error');
+        console.warn('[pantallas] no se pudo pedir la lista:', e);
+        // Sin lista, la barra se queda con lo último que sabía. Es preferible
+        // a vaciarla: perder las pestañas por un backend que parpadeó
+        // asustaría más que un dato de un minuto atrás.
+        return null;
+      }
+    },
+    [proyectoId]
+  );
+
+  const refrescarProyectos = useCallback(async () => {
     try {
-      setPantallas(await listarProyectos());
+      setProyectos(await listarProyectosHmi());
     } catch {
-      // Sin lista, la barra se queda con lo último que sabía. Es preferible a
-      // vaciarla: perder las pestañas por un backend que parpadeó asustaría
-      // más que un dato de un minuto atrás.
+      // Igual que con las pantallas: mejor la lista de hace un minuto que
+      // un selector vacío.
     }
   }, []);
 
   useEffect(() => {
-    void refrescarPantallas();
-  }, [refrescarPantallas]);
+    void refrescarProyectos();
+  }, [refrescarProyectos]);
 
-  const abrirPantalla = useCallback((destino: string) => {
-    if (!destino) return;
-    setUltimaPantalla(destino);
-    setProjectId(destino);
-  }, []);
+  const abrirPantalla = useCallback(
+    (destino: string) => {
+      if (!destino) return;
+      setUltimaPantalla(destino, proyectoId);
+      setProjectId(destino);
+    },
+    [proyectoId]
+  );
+
+  const abrirProyecto = useCallback(
+    (destino: string) => {
+      if (!destino || destino === proyectoId) return;
+      setUltimoProyecto(destino);
+      setProyectoId(destino);
+      // Qué pantalla se abre NO se decide aquí: todavía no se sabe cuáles
+      // tiene el proyecto destino. De eso se encarga el efecto de abajo, en
+      // cuanto llega su lista.
+    },
+    [proyectoId]
+  );
+
+  // La pantalla activa, en una ref, para poder consultarla desde el efecto
+  // del proyecto sin que ese efecto se vuelva a disparar cada vez que se
+  // cambia de pestaña. Con `projectId` en las dependencias, cambiar de
+  // pantalla relanzaría la carga entera del proyecto.
+  const projectIdRef = useRef(projectId);
+  projectIdRef.current = projectId;
+
+  // ── AL ABRIR UN PROYECTO ──────────────────────────────────────
+  //
+  // Se piden sus pantallas y se decide cuál mirar:
+  //
+  //   1. si la que ya está abierta es de este proyecto, no se toca nada
+  //      (es el caso normal al arrancar, y evita un salto de pestaña);
+  //   2. si no, la última que se estuvo mirando EN ESTE proyecto;
+  //   3. y si es la primera vez, la primera de la lista.
+  //
+  // Un proyecto sin pantallas no debería existir —el servidor no deja borrar
+  // la última—, pero si pasara, `projectId` se queda vacío y el Diseñador
+  // enseña que no hay nada abierto en vez de intentar cargar "".
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      const lista = await refrescarPantallas(proyectoId);
+      if (!vivo || !lista) return;
+      if (lista.some((p) => p.project_id === projectIdRef.current)) return;
+      const recordada = getUltimaPantalla(proyectoId);
+      const destino =
+      lista.find((p) => p.project_id === recordada) ?? lista[0];
+      if (destino) abrirPantalla(destino.project_id);else
+      setProjectId('');
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [proyectoId, refrescarPantallas, abrirPantalla]);
+
+  // El proyecto guardado en este navegador puede haber desaparecido mientras
+  // tanto (otro usuario lo borró). Sin esto, el selector se quedaría
+  // señalando a la nada y la barra de pestañas, vacía para siempre.
+  useEffect(() => {
+    if (proyectos.length === 0) return;
+    if (proyectos.some((p) => p.proyecto_id === proyectoId)) return;
+    console.warn('[proyecto] «%s» ya no existe; se abre el principal.',
+    proyectoId);
+    abrirProyecto(PROYECTO_HMI_POR_DEFECTO);
+  }, [proyectos, proyectoId, abrirProyecto]);
 
   // Hidratación de la pantalla activa. Se dispara también al CAMBIAR de
   // pestaña, y por eso el orden importa:
@@ -298,6 +432,15 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     let vivo = true;
     setPantallaCargada('');
     setProjectVersion(0);
+
+    // Proyecto recién abierto del que todavía no se sabe la pantalla, o
+    // proyecto sin ninguna. Pedir `/pantallas/` sin id sería un 404 y dejaría
+    // el Diseñador en "Cargando…" para siempre.
+    if (!projectId) {
+      setWidgets([]);
+      return;
+    }
+
     setWidgets(loadDesign(projectId)?.widgets ?? []);
 
     void (async () => {
@@ -345,12 +488,37 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
         return;
       }
 
+      // Alguien creó, renombró o borró un PROYECTO (el nivel de arriba).
+      if (msg.type === 'proyecto.updated') {
+        void refrescarProyectos();
+        // Crear un proyecto crea también su primera pantalla. Si el proyecto
+        // tocado es el que tengo abierto, esa pantalla es una pestaña nueva
+        // que tiene que aparecer sin recargar.
+        if (msg.proyecto_id === proyectoId) void refrescarPantallas();
+        return;
+      }
+
+      // Se borró un proyecto entero, con sus pantallas. Si era el mío, no
+      // puedo quedarme dentro de algo que ya no existe.
+      if (msg.type === 'proyecto.removed') {
+        void refrescarProyectos();
+        if (msg.proyecto_id === proyectoId) {
+          abrirProyecto(PROYECTO_HMI_POR_DEFECTO);
+        }
+        return;
+      }
+
       // Alguien borró una pantalla. Si era la que yo tenía abierta, no puedo
-      // quedarme mirando un diseño que ya no existe: se salta a la principal,
-      // que el backend garantiza que siempre está.
+      // quedarme mirando un diseño que ya no existe: se salta a otra del
+      // mismo proyecto (el servidor no deja borrar la última, así que
+      // siempre queda alguna).
       if (msg.type === 'project.removed') {
-        void refrescarPantallas();
-        if (msg.project_id === projectId) abrirPantalla(PROYECTO_POR_DEFECTO);
+        void (async () => {
+          const lista = await refrescarPantallas();
+          if (msg.project_id !== projectId) return;
+          const destino = lista?.[0];
+          if (destino) abrirPantalla(destino.project_id);
+        })();
         return;
       }
 
@@ -401,7 +569,8 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     };
     window.addEventListener('hmi:ws', alEvento as EventListener);
     return () => window.removeEventListener('hmi:ws', alEvento as EventListener);
-  }, [projectId, sesion, refrescarPantallas, abrirPantalla]);
+  }, [projectId, proyectoId, sesion, refrescarPantallas, refrescarProyectos,
+  abrirPantalla, abrirProyecto]);
 
   const disconnect = useCallback(() => setConnected(false), []);
   const toggleVariable = useCallback((id: string, selected: boolean) => {
@@ -448,6 +617,10 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     () => variables.filter((v) => v.selected),
     [variables]
   );
+  const proyectoActivo = useMemo(
+    () => proyectos.find((p) => p.proyecto_id === proyectoId) ?? null,
+    [proyectos, proyectoId]
+  );
   const value: AppStore = {
     connected,
     plcIp,
@@ -473,6 +646,12 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     authRequerida,
     comprobandoSesion,
     presentes,
+    estadoPantallas,
+    proyectoId,
+    proyectos,
+    proyectoActivo,
+    refrescarProyectos,
+    abrirProyecto,
     projectId,
     projectVersion,
     setProjectVersion,

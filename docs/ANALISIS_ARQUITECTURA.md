@@ -156,7 +156,7 @@ Un solo objeto (`core/connection_manager.py`) mantiene:
 
 ### 4.7 Persistencia del diseño
 
-`db/project_store.py`. Un fichero por pantalla en `datos/proyectos/<id>.json`, con **escritura atómica** (`.tmp` + `replace`), caché en memoria, id validado contra `^[A-Za-z0-9_-]{1,64}$` (es un nombre de fichero: un `../` sería escritura fuera de la carpeta) y **optimistic locking**: cada mutación sube `version`; si el cliente manda una versión vieja se lanza `ConflictoDeVersion` → HTTP **409**. `version: null` fuerza la escritura.
+`db/project_store.py`. **Dos niveles: PROYECTO (agrupa pantallas, `db/proyecto_store.py` → `datos/proyectos_hmi.json`, HTTP `/proyectos`) y PANTALLA (un diseño, este módulo, HTTP `/pantallas`).** Ojo con los nombres: `project_id` significa PANTALLA por razones históricas; está explicado en [PROYECTOS.md](PROYECTOS.md). Un fichero por pantalla en `datos/proyectos/<id>.json`, con **escritura atómica** (`.tmp` + `replace`), caché en memoria, id validado contra `^[A-Za-z0-9_-]{1,64}$` (es un nombre de fichero: un `../` sería escritura fuera de la carpeta) y **optimistic locking**: cada mutación sube `version`; si el cliente manda una versión vieja se lanza `ConflictoDeVersion` → HTTP **409**. `version: null` fuerza la escritura.
 
 ### 4.8 Capa de datos SQL
 
@@ -268,7 +268,7 @@ Persistencia en el navegador (`localStorage`/`sessionStorage`), toda ella **pref
 |---|---|
 | `hmi.auth.token` | Token de sesión (`localStorage` si "Recordarme", `sessionStorage` si no) |
 | `hmi.auth.db` | Última base elegida en el login |
-| `hmi.design.<pantalla>` | Caché del diseño (la verdad está en `/proyectos/<id>`) |
+| `hmi.design.<pantalla>` | Caché del diseño (la verdad está en `/pantallas/<id>`) |
 | `hmi.design.ultima` | Última pantalla abierta |
 | `hmi.plc.selection` | Qué variables tiene marcadas el usuario |
 | widgets ZIP y lienzo del Flow Editor | **Solo local**: no viajan al servidor |
@@ -316,7 +316,7 @@ No hay librería de formularios. Todo es estado local controlado + validación a
 1. `CanvasWidget` procesa el arrastre y llama a `setWidgets` (estado local del `AppStore`). **La UI se actualiza al instante**, sin esperar a nadie.
 2. Un efecto de `Designer.tsx` calcula `firmaActual = JSON.stringify({widgets, canvas})` y la compara con `firmaGuardada`. Si son iguales, no manda nada (evita subir la versión sin cambios).
 3. Tres guardas antes de escribir: `listo` (los widgets **y** el lienzo ya son de esta pantalla), `permisos.editar_diseño`, y `lock.puedeEditar`.
-4. **Debounce de 400 ms** → `guardarProyecto()` → `PUT /proyectos/<id>` con `{widgets, canvas, version}` y `Authorization: Bearer`.
+4. **Debounce de 400 ms** → `guardarProyecto()` → `PUT /pantallas/<id>` con `{widgets, canvas, version}` y `Authorization: Bearer`.
 5. Backend: `exigir_rol("Administradores")` → `_exigir_lapiz()` (si otro tiene el lápiz → **423**) → `ProjectStore.guardar_todo()` verifica versión (si no coincide → **409**) → escritura atómica en `datos/proyectos/<id>.json` **en un executor** (no congela los WebSockets) → auditoría → `broadcast({type:"project.updated", version, por, cambio})`.
 6. Respuesta: `{version}` → el Diseñador guarda `firmaGuardada` y `setProjectVersion(v)`. Ante 409 muestra *"Otro usuario guardó cambios, recarga"*; ante cualquier otro error, el mensaje del backend.
 7. **En los demás navegadores**: el mensaje llega por el WS → `RealPLCService` lo reemite como `hmi:ws` → el efecto de `AppStore` ignora el eco propio (compara `msg.por` con el usuario), y si no es suyo aplica el cambio (quirúrgico si es `widget_guardado`/`widget_borrado`, recarga completa si es un PUT). `Preview.tsx` escucha el mismo evento y recarga la pantalla.
@@ -347,7 +347,8 @@ No hay librería de formularios. Todo es estado local controlado + validación a
 | `GET /auth/estado` | `Login.tsx` (decide qué pintar) | público |
 | `POST /auth/registro` · `/login` · `/logout` · `GET /auth/me` | `authApi.ts` / `AppStore` | — |
 | `GET /auth/usuarios` · `PATCH /auth/usuarios/{u}` · `GET /auth/conectados` | `activityApi.ts` → `Actividad.tsx` | Administradores / Supervisor |
-| `GET /proyectos` · `GET/PUT/PATCH/DELETE /proyectos/{id}` · widgets | `designStorage.ts` → Designer, Preview, PantallasBar | Administradores (Supervisor para borrar) |
+| `GET /proyectos` · `POST/PATCH/DELETE /proyectos/{id}` | `proyectoStorage.ts` → ProyectoSelector | Administradores (Supervisor para borrar) |
+| `GET /pantallas` · `GET/PUT/PATCH/DELETE /pantallas/{id}` · widgets | `designStorage.ts` → Designer, Preview, PantallasBar | Administradores (Supervisor para borrar) |
 | `GET /locks` · `POST /locks/{r}/{adquirir,renovar,liberar,forzar}` | `lockApi.ts` / `useLock` | forzar = Supervisor |
 | `GET /auditoria` | `activityApi.ts` | Administradores |
 | `GET /db` · `POST /db` · `DELETE /db/{id}` · `POST /db/{id}/test` · `GET /db/drivers` · `GET /db/entorno` · `POST /db/provision` | `flows/api.ts`, `components/bd/*` | Administradores / Supervisor (provision) |
@@ -387,7 +388,7 @@ Y una trampa del protocolo: en un mensaje de cambio de valor, **`type` es el tip
   - `pedir()` (`flows/api.ts`): manda token, lee el cuerpo **como texto antes de parsear** (el catch-all SPA devuelve HTML con 200 ante una ruta mal escrita), y trata `{"ok": false}` con HTTP 200 como error, adjuntando `diagnostico` y `data` al `Error`.
   - `fetch` crudo en varios sitios: **sin token** (ver riesgo R1).
 - **Estados de carga**: `useState` booleanos por pantalla (`cargando`, `saving`, `adding`, `searching`) + `Loader2Icon` girando. No hay caché de peticiones ni deduplicación: cada pantalla pide lo suyo al montar.
-- **Degradación**: si `/proyectos/<id>` falla, `cargarProyecto()` cae a la caché local (mejor el último diseño conocido que una pantalla en blanco delante de un operario); si `/proyectos` falla, la barra de pestañas conserva lo último que sabía.
+- **Degradación**: si `/pantallas/<id>` falla, `cargarProyecto()` cae a la caché local (mejor el último diseño conocido que una pantalla en blanco delante de un operario); si `/pantallas` falla, la barra de pestañas conserva lo último que sabía.
 
 ---
 
@@ -483,7 +484,7 @@ Usuario arrastra un widget
    ▼ CanvasWidget (onMouseMove) → setWidgets (AppStore)  ── UI actualizada YA
    ▼ Designer: firma cambia → guardas (listo · permisos.editar_diseño · lock.puedeEditar)
    ▼ debounce 400 ms → designStorage.guardarProyecto()
-   ▼ fetchAuth PUT /proyectos/<id>  { widgets, canvas, version }  + Bearer
+   ▼ fetchAuth PUT /pantallas/<id>  { widgets, canvas, version }  + Bearer
    ▼ FastAPI: exigir_rol("Administradores") → _exigir_lapiz() [423] 
    ▼ ProjectStore.guardar_todo() → _verificar_version() [409] → _sellar() (version+1)
    ▼ escritura atómica en executor → datos/proyectos/<id>.json
@@ -582,7 +583,7 @@ Si la BD está caída, el lote **vuelve al buffer** y se reintenta; el log avisa
 
 1. **`RealPLCService` es el único socket.** Todo lo que no son datos de PLC (`project.*`, `presence`, `lock.changed`, `config.updated`) llega a la aplicación **solo porque este servicio lo reemite** como evento `hmi:ws`. Si se filtra ese reenvío, dejan de funcionar a la vez: la sincronización del diseño, la presencia, el lápiz y la recarga del Preview.
 2. **`AppStore` es el único Context.** Todas las páginas llaman a `useAppStore()`; añadir un campo re-renderiza toda la aplicación (no hay selectores).
-3. **`designStorage` es la única puerta a `/proyectos`.** Designer, Preview y PantallasBar pasan por ahí.
+3. **`designStorage` es la única puerta a `/pantallas`.** Designer, Preview y PantallasBar pasan por ahí.
 4. **`fetchAuth` (`authApi.ts`) centraliza el token y el 401.** Todo lo que no pase por ahí (o por `pedir()` de `flows/api.ts`) se queda sin sesión.
 5. **La clave `"<plc>|<tag>"`** enlaza `PlcVariable.id` ↔ `widget.variableId` ↔ tags del historizador ↔ `/export/tags`. Cambiar el formato rompe los cuatro.
 6. **`vite.config.js` lista los prefijos del proxy uno a uno.** Un endpoint nuevo con un prefijo nuevo **no funciona en desarrollo** hasta añadirlo ahí, y el síntoma engaña: Vite devuelve el `index.html` de la SPA con HTTP 200 y parece que el backend no tiene ese endpoint.
@@ -644,7 +645,7 @@ Bloquea 25 palabras en cualquier posición del SQL. Eso genera **falsos positivo
 |---|---|
 | `hooks/useWebSocket.js` (111 líneas) | **Huérfano**: nadie lo importa. Es un segundo cliente WS con su propio parseo del protocolo, que ya diverge del real (no maneja `presence`, `project.*` ni `lock.changed`) |
 | `services/MockPLCService.ts` (239 líneas) | **Huérfano**: `AppStore` importa `RealPLCService as MockPLCService`, así que el archivo real no se usa |
-| `designStorage.guardarWidget()` | Definida y con endpoint en el backend (`PATCH /proyectos/{id}/widgets/{wid}`), pero **nadie la llama**: el Designer guarda siempre con `PUT` completo. El camino "rápido" del arrastre existe en los dos extremos y no se usa |
+| `designStorage.guardarWidget()` | Definida y con endpoint en el backend (`PATCH /pantallas/{id}/widgets/{wid}`), pero **nadie la llama**: el Designer guarda siempre con `PUT` completo. El camino "rápido" del arrastre existe en los dos extremos y no se usa |
 | Tres capas HTTP (`fetchAuth`, `pedir`, `fetch` crudo) | Criterios distintos para token, errores y 401 |
 | `AppStore`: `connected`, `plcIp`, `disconnect`, `saveConfig` | Vestigios del login simulado (`connected` arranca en `true`, `saveConfig` es un no-op) |
 | `MainMenu.tsx` → botón **Salir** | Llama solo a `disconnect()` (que pone `connected=false`) y navega a `/`. **No llama a `cerrarSesion()`**, así que no hace `POST /auth/logout`, no borra el token del navegador y no libera el lápiz de edición: la sesión sigue abierta en el servidor y el siguiente que abra la URL entra como el anterior |
@@ -715,7 +716,7 @@ Todo el camino de "el widget lee de una consulta guardada" existe en el backend 
 │         └─────────┬──────────┘ ├── Grabador + Excel (openpyxl)          │
 │                   │            └── Auditoria (JSONL, hilo aparte)       │
 │  api/    /health /plcs /tags /browse /discover /rexroth/*               │
-│          /auth/* /proyectos/* /locks/* /auditoria                       │
+│          /auth/* /pantallas/* /locks/* /auditoria                       │
 │          /db/* /crud/* /historian/* /export/* /sistema/* /ai/*  + /ws   │
 └───────────┬─────────────────────────────────────┬──────────────────────┘
             │ SQL (SQLAlchemy async)              │ ficheros locales

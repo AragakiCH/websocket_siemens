@@ -52,6 +52,7 @@ import { AlarmsEditor } from '../components/alarms/AlarmsEditor';
 import { RecipesEditor } from '../components/recipes/RecipesEditor';
 import { PanelExportar } from '../components/export/PanelExportar';
 import { PantallasBar } from '../components/hmi/PantallasBar';
+import { ProyectoSelector } from '../components/hmi/ProyectoSelector';
 import {
   useVistaActiva,
   useSecciones,
@@ -686,9 +687,12 @@ export function Designer() {
             <h1 className="text-sm font-bold text-navy dark:text-slate-100">
               {t('designer.title')}
             </h1>
-            <p className="text-[11px] text-slate-400">
-              {t('designer.mainView')}
-            </p>
+            {/* Debajo del título iba "Vista Principal", un texto fijo que no
+                decía nada. Ahora va el PROYECTO abierto, que es lo que
+                contesta a "¿dónde estoy?" antes de arrastrar nada: con dos
+                proyectos de pantallas parecidas, sin esto no hay forma de
+                saber en cuál estás soltando el widget. */}
+            <ProyectoSelector />
           </div>
 
           {/* ── Pestañas ── */}

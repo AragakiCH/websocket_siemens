@@ -45,6 +45,7 @@ from typing import Optional
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from app.api.origen import es_local
 from app.core.auth_manager import (
     ESTADOS,
     ROLES,
@@ -328,6 +329,23 @@ async def estado_auth(
         logger.warning("No se pudieron listar las bases: %s", exc)
         bases = []
 
+    # ¿Esta pantalla puede configurar la base de datos, o solo entrar?
+    #
+    # Un VISOR muestra el frontend DEL SERVIDOR por HTTP: mismo HTML, mismo
+    # JavaScript. Así que no se puede decidir esto al empaquetar, ni fiándose
+    # de una marca en la URL —quien la quita vuelve a verlo todo—. Lo decide el
+    # servidor mirando por dónde entra la petición: su propia ventana viene por
+    # 127.0.0.1; un visor, desde otra IP de la red.
+    #
+    # La vista usa esto para ocultar el selector de bases, el asistente de
+    # creación y el registro. Pero ocultarlos es solo la mitad: los endpoints
+    # que configuran comprueban lo mismo por su cuenta (ver app/api/origen.py),
+    # porque un botón escondido no es un permiso.
+    local = es_local(request)
+
+    # Antes de que exista ninguna cuenta hay que dejar entrar a la pantalla de
+    # arranque, pero SOLO en el propio servidor. Si no, cualquiera en la red
+    # que llegue primero a un servidor recién instalado se crea el Supervisor.
     return {
         "ok": True,
         "hay_usuarios": total > 0,
@@ -339,8 +357,13 @@ async def estado_auth(
         "num_usuarios": total,
         "auth_requerida": request.app.state.settings.auth_requerida,
         "bd_disponible": disponible,
+        "puede_configurar": local,
+        "es_visor": not local,
         "bd": bd,
-        "bases": bases,
+        # Los nombres de las conexiones no salen de la máquina servidor. Desde
+        # un visor, la lista de bases es información de administración que no
+        # hace falta para entrar, y hasta ahora se enseñaba SIN sesión.
+        "bases": bases if local else [],
         "roles": ROLES,
         "estados": ESTADOS,
         "mensaje": detalle or (
@@ -385,6 +408,30 @@ async def registro(
             if not tiene_permiso(sesion.categoria, "Supervisor"):
                 raise HTTPException(
                     403, "Solo un Supervisor puede crear cuentas nuevas.")
+        elif sesion is None and not es_local(request):
+            # MODO ARRANQUE, Y AQUÍ ESTABA EL AGUJERO.
+            #
+            # Sin cuentas todavía, este endpoint deja crear la primera y el
+            # backend la fuerza a Supervisor. Eso es necesario para poder
+            # poner el sistema en marcha... pero hasta ahora valía desde
+            # CUALQUIER equipo de la red.
+            #
+            # Con el servidor escuchando en 0.0.0.0 —que ahora es lo normal—,
+            # eso significa que en un servidor recién instalado se queda la
+            # planta quien llegue primero a esa IP. No hace falta mala fe:
+            # basta con que alguien pruebe la dirección por curiosidad.
+            #
+            # El arranque se hace desde la ventana del propio servidor, que
+            # entra por 127.0.0.1. Un visor no tiene por qué crear la primera
+            # cuenta: para eso está el Supervisor, que ya existirá.
+            raise HTTPException(
+                403,
+                "La primera cuenta solo se puede crear desde el equipo "
+                "SERVIDOR, no desde un visor.\n\n"
+                "Abre Psi Core en el equipo servidor y créala allí. Después, "
+                "ese Supervisor da de alta las demás cuentas desde cualquier "
+                "sitio."
+            )
 
         usuario = await auth.registrar(
             usuario=cuerpo.usuario, password=cuerpo.password,

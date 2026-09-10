@@ -30,7 +30,13 @@ export default defineConfig({
       // como un fallo — por ejemplo, el Diseñador se queda en "Solo lectura"
       // porque no consigue pedir el lápiz.
       '/auth': BACKEND,
+      // Los DOS niveles del diseño: '/proyectos' agrupa pantallas y
+      // '/pantallas' es cada diseño. Son prefijos distintos, así que hacen
+      // falta las dos líneas: con solo '/proyectos', Vite se quedaba las
+      // peticiones de pantallas y devolvía el index.html, y la barra de
+      // pestañas se veía vacía con un 404 que parecía del backend.
       '/proyectos': BACKEND,
+      '/pantallas': BACKEND,
       '/locks': BACKEND,
       '/auditoria': BACKEND,
       // Flow Editor: conexiones a BD y grupos del historizador.

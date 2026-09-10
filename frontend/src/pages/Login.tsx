@@ -341,10 +341,31 @@ export function Login() {
   // ── Qué se puede hacer, según el estado del sistema ───────────
   const comprobando = estado === null && !errorEstado;
   const sinBackend = !!errorEstado;
-  const sinBd = !!estado && !estado.bd_disponible;
+  // ¿Este equipo puede configurar, o solo entrar?
+  //
+  // Lo dice el SERVIDOR según de dónde viene la petición: su propia ventana
+  // llega por 127.0.0.1, un visor desde otra IP de la red. No se decide aquí
+  // porque un visor carga ESTE MISMO JavaScript —es el frontend del servidor
+  // servido por HTTP—, así que cualquier decisión local se saltaría editando
+  // la URL.
+  //
+  // Por compatibilidad, si el backend es viejo y no manda el campo, se asume
+  // que sí (`!== false`): es preferible que una versión antigua siga
+  // funcionando igual que antes a que se quede sin poder configurarse.
+  const puedeConfigurar = estado?.puede_configurar !== false;
+
+  // En un visor no se ofrece crear ni elegir base: no tiene backend propio,
+  // todo vive en el servidor. Lo único que hace falta aquí es la cuenta que
+  // dio el supervisor.
+  const sinBd = !!estado && !estado.bd_disponible && puedeConfigurar;
   // Modo arranque: no hay cuentas todavía. El backend deja crear la primera
   // sin sesión y la fuerza a Supervisor.
-  const primeraCuenta = !!estado && estado.bd_disponible && !estado.hay_usuarios;
+  // La primera cuenta solo se crea desde el equipo servidor. El backend lo
+  // exige (si no, en un servidor recién instalado se quedaría la planta quien
+  // llegara antes a esa IP), así que aquí se oculta la pestaña en vez de
+  // dejar que alguien rellene un formulario que va a rebotar con 403.
+  const primeraCuenta =
+    !!estado && estado.bd_disponible && !estado.hay_usuarios && puedeConfigurar;
   // Ya hay cuentas: `/auth/registro` exige Supervisor, así que un anónimo no
   // puede registrarse. Se oculta la pestaña en vez de dejarle chocar con un 403.
   const registroCerrado = !!estado && estado.hay_usuarios;
@@ -457,7 +478,26 @@ export function Login() {
                 Plegado por defecto: quien siempre usa la misma no debería ver
                 un desplegable que no va a tocar. Se abre solo cuando importa
                 — ver `selectorAbierto`. */}
-            {bases.length > 1 ? (
+            {!puedeConfigurar && estado && !estado.bd_disponible && (
+              // Un visor no puede arreglar esto, así que no se le ofrece el
+              // asistente: se le dice qué pasa y a quién avisar. Enseñarle un
+              // formulario de configuración que va a fallar con 403 sería
+              // peor que no enseñarle nada.
+              <div className="mb-7">
+                <PanelEstado
+                  tono="error"
+                  icon={<DatabaseIcon className="h-4 w-4" />}
+                  titulo="El servidor no puede acceder a su base de datos"
+                  texto={
+                    'Este equipo es un visor: no guarda nada por sí mismo y no ' +
+                    'puede configurar la base. Avisa a quien administre el ' +
+                    'equipo servidor.'
+                  }
+                />
+              </div>
+            )}
+
+            {puedeConfigurar && bases.length > 1 ? (
               <div className="mb-7">
                 {!selectorAbierto ? (
                   <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 dark:border-navy-slate dark:bg-navy-soft">

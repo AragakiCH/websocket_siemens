@@ -10,7 +10,22 @@ hay API que lo haga viajar. Mientras el diseño estuviera ahí, el usuario 2
 jamás podría ver los widgets del usuario 1, por muy bueno que fuera el
 WebSocket. Este módulo mueve esa fuente de verdad al servidor.
 
-**Varios proyectos desde el principio.** Se guarda en
+**OJO CON EL NOMBRE: aquí "proyecto" significa PANTALLA.** Este módulo se
+escribió cuando solo había un nivel, y a cada pantalla se la llamó proyecto.
+Al aparecer un nivel de verdad por encima (`app/db/proyecto_store.py`) se
+decidió no renombrar esto: `project_id` está escrito en el lock
+(`designer:<project_id>`), en el evento `project.updated` del WebSocket, en la
+caché de cada navegador y en los ficheros ya guardados de la instalación. La
+frontera se puso en la API, que es lo que se lee de verdad:
+
+    /pantallas   -> lo que gestiona ESTE módulo (antes `/proyectos`)
+    /proyectos   -> el nivel de arriba, en `proyecto_store.py`
+
+Cada pantalla guarda a qué proyecto pertenece en su campo `proyecto`. Una
+pantalla sin ese campo es de antes de que existieran los proyectos y se
+adopta al por defecto al cargar.
+
+**Un fichero por pantalla desde el principio.** Se guarda en
 `datos/proyectos/<id>.json`, un fichero por proyecto, no un `proyecto.json`
 único. Cambiar esto más adelante obligaría a migrar el store, las rutas, el
 frontend y los datos ya guardados; hacerlo ahora es gratis. Al arrancar se crea
@@ -48,6 +63,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from app.db.proyecto_store import PROYECTO_POR_DEFECTO as PROYECTO_HMI_POR_DEFECTO
 from app.db.store import carpeta_datos
 
 logger = logging.getLogger("project_store")
@@ -57,7 +73,13 @@ logger = logging.getLogger("project_store")
 # escribir fuera de la carpeta. Por eso se valida, no se sanea.
 _RE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
-PROYECTO_POR_DEFECTO = "principal"
+#: Pantalla que el backend garantiza que existe dentro del proyecto por
+#: defecto. Es el destino al que se salta cuando cualquier otra desaparece.
+PANTALLA_POR_DEFECTO = "principal"
+
+#: Alias histórico. Aquí "proyecto" quería decir "pantalla"; se conserva para
+#: no romper importaciones antiguas, pero el nombre bueno es el de arriba.
+PROYECTO_POR_DEFECTO = PANTALLA_POR_DEFECTO
 
 
 def _ahora_iso() -> str:
@@ -93,7 +115,7 @@ def _orden_pantalla(doc: dict) -> tuple:
     la colocaba delante de "principal".
     """
     pid = doc.get("project_id", "")
-    return (0 if pid == PROYECTO_POR_DEFECTO else 1,
+    return (0 if pid == PANTALLA_POR_DEFECTO else 1,
             doc.get("creado_en", ""),
             pid)
 
@@ -139,34 +161,60 @@ class ProjectStore:
         con un aviso: no debe impedir abrir los demás proyectos.
         """
         self._cache = {}
+        # Pantallas que había que completar al vuelo (les faltaba `proyecto`
+        # porque son de antes de que existieran). Se reescriben al final:
+        # dejarlo solo en memoria funcionaría, pero el fichero seguiría sin
+        # decir a qué proyecto pertenece, y eso es justo lo que mira alguien
+        # que abre `datos/proyectos/` para entender qué hay ahí.
+        migradas: List[str] = []
         for ruta in sorted(self.carpeta.glob("*.json")):
             if ruta.name.endswith(".tmp"):
                 continue
             try:
                 doc = json.loads(ruta.read_text("utf-8"))
                 pid = doc.get("project_id") or ruta.stem
+                sin_proyecto = not doc.get("proyecto")
                 self._cache[pid] = self._normalizar(doc, pid)
+                if sin_proyecto:
+                    migradas.append(pid)
             except Exception as exc:  # noqa: BLE001
-                logger.error("Proyecto '%s' ilegible (%s); se ignora.",
+                logger.error("Pantalla '%s' ilegible (%s); se ignora.",
                              ruta.name, exc)
 
         if not self._cache:
             # Primera ejecución: se crea el proyecto por defecto para que la
             # vista tenga siempre algo que abrir.
-            self._cache[PROYECTO_POR_DEFECTO] = self._nuevo(
-                PROYECTO_POR_DEFECTO, "HMI Principal"
+            self._cache[PANTALLA_POR_DEFECTO] = self._nuevo(
+                PANTALLA_POR_DEFECTO, "HMI Principal"
             )
-            self._escribir(PROYECTO_POR_DEFECTO)
-            logger.info("Creado el proyecto por defecto '%s'.",
-                        PROYECTO_POR_DEFECTO)
+            self._escribir(PANTALLA_POR_DEFECTO)
+            logger.info("Creada la pantalla por defecto '%s'.",
+                        PANTALLA_POR_DEFECTO)
 
-        logger.info("ProjectStore cargado: %d proyecto(s).", len(self._cache))
+        for pid in migradas:
+            try:
+                self._escribir(pid)
+            except OSError as exc:
+                # No es crítico: en memoria ya está adoptada y se volverá a
+                # intentar en el siguiente arranque.
+                logger.warning("No se pudo migrar '%s' al proyecto por "
+                               "defecto en disco: %s", pid, exc)
+        if migradas:
+            logger.info("%d pantalla(s) adoptadas por el proyecto '%s'.",
+                        len(migradas), PROYECTO_HMI_POR_DEFECTO)
+
+        logger.info("ProjectStore cargado: %d pantalla(s).", len(self._cache))
 
     @staticmethod
-    def _nuevo(project_id: str, nombre: str = "") -> dict:
+    def _nuevo(project_id: str, nombre: str = "",
+               proyecto: str = PROYECTO_HMI_POR_DEFECTO) -> dict:
         return {
             "project_id": project_id,
             "nombre": nombre or project_id,
+            # A qué proyecto pertenece esta pantalla. Ver la nota de nombres
+            # de la cabecera: `project_id` es la PANTALLA, `proyecto` es la
+            # carpeta que la contiene.
+            "proyecto": proyecto or PROYECTO_HMI_POR_DEFECTO,
             "version": 1,
             # Momento de creacion. Es lo unico que permite ordenar las
             # pantallas como se crearon: `actualizado_en` cambia en cada
@@ -184,6 +232,10 @@ class ProjectStore:
         """Rellena los campos que falten en un fichero escrito a mano."""
         doc.setdefault("project_id", pid)
         doc.setdefault("nombre", pid)
+        # Una pantalla sin `proyecto` es de antes de que existieran: la adopta
+        # el proyecto por defecto, que es exactamente donde estaba.
+        if not doc.get("proyecto"):
+            doc["proyecto"] = PROYECTO_HMI_POR_DEFECTO
         doc.setdefault("version", 1)
         # Los proyectos creados antes de que existiera este campo se quedan
         # con "" a proposito: ordena antes que cualquier fecha, asi que las
@@ -221,12 +273,20 @@ class ProjectStore:
     # ------------------------------------------------------------------ #
     # Lectura
     # ------------------------------------------------------------------ #
-    def listar(self) -> List[dict]:
-        """Resumen de todos los proyectos (sin los widgets, que pesan)."""
+    def listar(self, proyecto: Optional[str] = None) -> List[dict]:
+        """
+        Resumen de las pantallas (sin los widgets, que pesan).
+
+        Con `proyecto` se devuelven solo las de ese proyecto, que es lo que
+        pide la barra de pestañas del Diseñador: enseñar las de otro sería
+        justo lo que se quiso separar. Sin él salen todas, que es lo que
+        necesitan la Vista Previa y el borrado en cascada.
+        """
         return [
             {
                 "project_id": d["project_id"],
                 "nombre": d["nombre"],
+                "proyecto": d.get("proyecto", PROYECTO_HMI_POR_DEFECTO),
                 "version": d["version"],
                 "creado_en": d.get("creado_en", ""),
                 "actualizado_en": d["actualizado_en"],
@@ -234,7 +294,25 @@ class ProjectStore:
                 "num_widgets": len(d["widgets"]),
             }
             for d in sorted(self._cache.values(), key=_orden_pantalla)
+            if proyecto is None
+            or d.get("proyecto", PROYECTO_HMI_POR_DEFECTO) == proyecto
         ]
+
+    def pantallas_de(self, proyecto: str) -> List[str]:
+        """Ids de las pantallas de un proyecto. Para el borrado en cascada."""
+        return [
+            d["project_id"]
+            for d in sorted(self._cache.values(), key=_orden_pantalla)
+            if d.get("proyecto", PROYECTO_HMI_POR_DEFECTO) == proyecto
+        ]
+
+    def contar_por_proyecto(self) -> Dict[str, int]:
+        """Cuántas pantallas tiene cada proyecto, para el selector."""
+        cuenta: Dict[str, int] = {}
+        for d in self._cache.values():
+            pid = d.get("proyecto", PROYECTO_HMI_POR_DEFECTO)
+            cuenta[pid] = cuenta.get(pid, 0) + 1
+        return cuenta
 
     def obtener(self, project_id: str) -> Optional[dict]:
         """Documento completo de un proyecto, o None si no existe."""
@@ -259,17 +337,28 @@ class ProjectStore:
             raise ConflictoDeVersion(int(version), int(doc["version"]))
 
     async def crear(self, project_id: str, nombre: str = "",
-                    usuario: str = "") -> dict:
-        """Crea un proyecto vacío. Falla si el id ya existe."""
+                    usuario: str = "",
+                    proyecto: str = PROYECTO_HMI_POR_DEFECTO) -> dict:
+        """
+        Crea una pantalla vacía dentro de un proyecto. Falla si el id existe.
+
+        Los ids de pantalla son ÚNICOS EN TODA LA INSTALACIÓN, no por
+        proyecto, porque cada uno es el nombre de un fichero en la misma
+        carpeta. Quien crea desde la vista antepone el id del proyecto para
+        que dos "Pantalla 1" de proyectos distintos no choquen; el nombre
+        visible sí puede repetirse, y de hecho se repite: cada proyecto
+        empieza a contar por 1.
+        """
         pid = validar_id(project_id)
         async with self._lock_async:
             if pid in self._cache:
-                raise ValueError(f"El proyecto '{pid}' ya existe.")
-            doc = self._nuevo(pid, nombre)
+                raise ValueError(f"La pantalla '{pid}' ya existe.")
+            doc = self._nuevo(pid, nombre, proyecto)
             doc["actualizado_por"] = usuario
             self._cache[pid] = doc
             await self._escribir_async(pid)
-        logger.info("Proyecto '%s' creado por '%s'.", pid, usuario or "-")
+        logger.info("Pantalla '%s' creada en '%s' por '%s'.", pid,
+                    doc["proyecto"], usuario or "-")
         return doc
 
     async def renombrar(self, project_id: str, nombre: str,
@@ -370,17 +459,40 @@ class ProjectStore:
             await self._escribir_async(pid)
             return doc
 
-    async def borrar(self, project_id: str) -> bool:
+    async def borrar(self, project_id: str, en_cascada: bool = False) -> bool:
         """
-        Elimina un proyecto entero. El proyecto por defecto no se borra: la
-        vista siempre necesita al menos uno que abrir.
+        Elimina una pantalla entera.
+
+        Dos cosas no se dejan borrar, y por el mismo motivo —que la vista
+        siempre tenga adónde ir—, pero a distinto nivel:
+
+          * la pantalla `principal`, que es el destino de rescate global;
+          * la ÚLTIMA pantalla de un proyecto. Un proyecto sin pantallas es
+            una pestaña vacía en la que no se puede ni soltar un widget; si
+            lo que se quiere es deshacerse de él, se borra el proyecto.
+
+        `en_cascada=True` se salta las dos comprobaciones. Lo usa el borrado
+        de un proyecto entero, donde quedarse sin pantallas es justo el
+        objetivo y el propio proyecto desaparece detrás.
         """
         pid = validar_id(project_id)
-        if pid == PROYECTO_POR_DEFECTO:
-            raise ValueError(
-                f"El proyecto '{PROYECTO_POR_DEFECTO}' no se puede borrar. "
-                f"Puedes vaciarlo, pero debe existir siempre uno."
-            )
+        if not en_cascada:
+            if pid == PANTALLA_POR_DEFECTO:
+                raise ValueError(
+                    f"La pantalla '{PANTALLA_POR_DEFECTO}' no se puede borrar. "
+                    f"Puedes vaciarla, pero debe existir siempre una."
+                )
+            doc = self._cache.get(pid)
+            if doc is not None:
+                hermanas = self.pantallas_de(
+                    doc.get("proyecto", PROYECTO_HMI_POR_DEFECTO)
+                )
+                if len(hermanas) <= 1:
+                    raise ValueError(
+                        "No se puede borrar la única pantalla de un proyecto. "
+                        "Vacíala, o borra el proyecto entero."
+                    )
+
         async with self._lock_async:
             if pid not in self._cache:
                 return False
@@ -389,8 +501,46 @@ class ProjectStore:
                 (self.carpeta / f"{pid}.json").unlink(missing_ok=True)
             except OSError as exc:
                 logger.error("No se pudo borrar el fichero de '%s': %s", pid, exc)
-        logger.info("Proyecto '%s' eliminado.", pid)
+        logger.info("Pantalla '%s' eliminada.", pid)
         return True
+
+    async def borrar_pantallas_de(self, proyecto: str) -> List[str]:
+        """
+        Borra TODAS las pantallas de un proyecto. Devuelve las que quitó.
+
+        Va aquí y no en la ruta porque el bucle tiene que ver el mismo caché
+        que el resto de mutaciones. La ruta se encarga del orden: primero
+        esto, después el proyecto.
+        """
+        borradas: List[str] = []
+        for pid in self.pantallas_de(proyecto):
+            if await self.borrar(pid, en_cascada=True):
+                borradas.append(pid)
+        return borradas
+
+    async def adoptar_huerfanas(self, proyectos_validos: List[str]) -> List[str]:
+        """
+        Manda al proyecto por defecto las pantallas cuyo proyecto ya no existe.
+
+        Pasa si alguien borra `proyectos_hmi.json` a mano, o restaura una
+        copia de `datos/proyectos/` de otra instalación. Sin esto, esas
+        pantallas quedarían invisibles: no salen en la lista de ningún
+        proyecto, pero siguen ocupando su id y su fichero.
+        """
+        validos = set(proyectos_validos)
+        adoptadas: List[str] = []
+        for doc in list(self._cache.values()):
+            if doc.get("proyecto", PROYECTO_HMI_POR_DEFECTO) not in validos:
+                doc["proyecto"] = PROYECTO_HMI_POR_DEFECTO
+                adoptadas.append(doc["project_id"])
+                await self._escribir_async(doc["project_id"])
+        if adoptadas:
+            logger.warning(
+                "%d pantalla(s) apuntaban a un proyecto inexistente; ahora son "
+                "de '%s': %s", len(adoptadas), PROYECTO_HMI_POR_DEFECTO,
+                ", ".join(adoptadas),
+            )
+        return adoptadas
 
     @staticmethod
     def _sellar(doc: dict, usuario: str) -> None:

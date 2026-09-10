@@ -22,6 +22,7 @@
 // =========================================================================
 import { HmiWidget } from '../models/widget';
 import { fetchAuth } from '../services/authApi';
+import { PROYECTO_HMI_POR_DEFECTO } from './proyectoStorage';
 
 export interface SavedDesign {
   widgets: HmiWidget[];
@@ -31,6 +32,8 @@ export interface SavedDesign {
 export interface Proyecto extends SavedDesign {
   project_id: string;
   nombre: string;
+  /** Proyecto al que pertenece la pantalla. */
+  proyecto: string;
   version: number;
   actualizado_en: string;
   actualizado_por: string;
@@ -46,8 +49,18 @@ export interface Proyecto extends SavedDesign {
 /** Clave de la caché local. Se mantiene el nombre histórico. */
 export const DESIGN_KEY = 'hmi.design';
 
-/** Proyecto por defecto; coincide con el que crea el backend al arrancar. */
-export const PROYECTO_POR_DEFECTO = 'principal';
+/**
+ * Pantalla por defecto; coincide con la que crea el backend al arrancar.
+ *
+ * OJO CON EL NOMBRE. En este fichero `projectId` significa PANTALLA, porque
+ * asi se llamaron las cosas cuando solo habia un nivel. El nivel de arriba
+ * —el PROYECTO, la carpeta que agrupa pantallas— vive en `proyectoStorage.ts`
+ * y se llama `proyectoId`. La API ya lo dice claro:
+ *
+ *   /pantallas   -> lo que gestiona este fichero
+ *   /proyectos   -> proyectoStorage.ts
+ */
+export const PANTALLA_POR_DEFECTO = 'principal';
 
 /**
  * Una pantalla en el selector, tal y como la resume `GET /proyectos`.
@@ -59,6 +72,8 @@ export const PROYECTO_POR_DEFECTO = 'principal';
 export interface ResumenPantalla {
   project_id: string;
   nombre: string;
+  /** Proyecto al que pertenece. Ver la nota de `PANTALLA_POR_DEFECTO`. */
+  proyecto: string;
   version: number;
   /** Cuándo se creó. Es lo que da el orden de las pestañas. */
   creado_en?: string;
@@ -76,19 +91,40 @@ export interface ResumenPantalla {
  */
 const PANTALLA_KEY = 'hmi.design.ultima';
 
-export function getUltimaPantalla(): string {
+/**
+ * Se recuerda UNA POR PROYECTO, no una sola.
+ *
+ * Con varios proyectos, recordar una unica pantalla haria que volver al
+ * proyecto A te dejara en la pantalla del B, que ni siquiera esta en sus
+ * pestanas. Cada proyecto guarda la suya bajo `hmi.design.ultima.<proyecto>`,
+ * y la clave vieja sin sufijo se sigue leyendo para el proyecto por defecto:
+ * quien ya tenia la aplicacion abierta vuelve donde estaba.
+ */
+function claveUltima(proyectoId: string): string {
+  return `${PANTALLA_KEY}.${proyectoId}`;
+}
+
+export function getUltimaPantalla(proyectoId = PROYECTO_HMI_POR_DEFECTO): string {
   try {
-    return localStorage.getItem(PANTALLA_KEY) ?? PROYECTO_POR_DEFECTO;
+    const guardada =
+      localStorage.getItem(claveUltima(proyectoId)) ??
+      (proyectoId === PROYECTO_HMI_POR_DEFECTO
+        ? localStorage.getItem(PANTALLA_KEY)
+        : null);
+    return guardada ?? '';
   } catch {
-    return PROYECTO_POR_DEFECTO;
+    return '';
   }
 }
 
-export function setUltimaPantalla(projectId: string): void {
+export function setUltimaPantalla(
+  projectId: string,
+  proyectoId = PROYECTO_HMI_POR_DEFECTO
+): void {
   try {
-    if (projectId) localStorage.setItem(PANTALLA_KEY, projectId);
+    if (projectId) localStorage.setItem(claveUltima(proyectoId), projectId);
   } catch {
-    /* sin storage: se abrira la pantalla por defecto */
+    /* sin storage: se abrira la primera pantalla del proyecto */
   }
 }
 
@@ -100,15 +136,22 @@ export function setUltimaPantalla(projectId: string): void {
  * carpeta. Aqui se sanea antes de mandarlo para que "Horno 2 - Linea A" no
  * rebote con un 400 que el usuario no puede interpretar.
  */
-export function idDesdeNombre(nombre: string): string {
+export function idDesdeNombre(nombre: string, proyectoId = ''): string {
   const base = (nombre || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')   // quita acentos
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
-    .slice(0, 64);
-  return base || `pantalla_${Date.now().toString(36)}`;
+    .slice(0, 40);
+  const limpio = base || `pantalla_${Date.now().toString(36)}`;
+  // Los ids de pantalla son unicos EN TODA la instalacion (cada uno es un
+  // fichero en la misma carpeta del servidor), pero los NOMBRES se repiten a
+  // proposito: cada proyecto empieza a contar por "Pantalla 1". Sin este
+  // prefijo, la "Pantalla 1" del segundo proyecto chocaria con la del
+  // primero y acabaria llamandose `pantalla_1_2` sin que nadie lo pidiera.
+  const prefijo = proyectoId ? `${proyectoId.slice(0, 20)}_` : '';
+  return `${prefijo}${limpio}`.slice(0, 64);
 }
 
 // ===================================================================== //
@@ -120,7 +163,7 @@ function claveCache(projectId: string): string {
 
 export function saveDesign(
   design: SavedDesign,
-  projectId: string = PROYECTO_POR_DEFECTO
+  projectId: string = PANTALLA_POR_DEFECTO
 ): void {
   try {
     localStorage.setItem(claveCache(projectId), JSON.stringify(design));
@@ -130,13 +173,13 @@ export function saveDesign(
 }
 
 export function loadDesign(
-  projectId: string = PROYECTO_POR_DEFECTO
+  projectId: string = PANTALLA_POR_DEFECTO
 ): SavedDesign | null {
   try {
     const raw =
       localStorage.getItem(claveCache(projectId)) ??
       // Compatibilidad: diseños guardados antes de que hubiera proyectos.
-      (projectId === PROYECTO_POR_DEFECTO
+      (projectId === PANTALLA_POR_DEFECTO
         ? localStorage.getItem(DESIGN_KEY)
         : null);
     return raw ? (JSON.parse(raw) as SavedDesign) : null;
@@ -148,10 +191,20 @@ export function loadDesign(
 // ===================================================================== //
 // Servidor (fuente de verdad)
 // ===================================================================== //
-/** Lista de pantallas disponibles, para el selector del Disenador. */
-export async function listarProyectos(): Promise<ResumenPantalla[]> {
-  const d = await fetchAuth('/proyectos');
-  return d.proyectos ?? [];
+/**
+ * Pantallas disponibles, para la barra de pestanas del Disenador.
+ *
+ * Con `proyectoId` solo las de ese proyecto, que es lo normal: ensenar las de
+ * otro seria justo lo que se quiso separar. Sin el salen todas, que es lo que
+ * necesita la Vista Previa cuando llega con una pantalla en la URL y todavia
+ * no sabe de que proyecto es.
+ */
+export async function listarPantallas(
+  proyectoId?: string
+): Promise<ResumenPantalla[]> {
+  const q = proyectoId ? `?proyecto=${encodeURIComponent(proyectoId)}` : '';
+  const d = await fetchAuth(`/pantallas${q}`);
+  return d.pantallas ?? [];
 }
 
 /**
@@ -162,18 +215,26 @@ export async function listarProyectos(): Promise<ResumenPantalla[]> {
  * razonable, y que la segunda rebote con "ya existe" seria hacerle pagar al
  * usuario un detalle de implementacion que no eligio.
  */
-export async function crearPantalla(nombre: string): Promise<ResumenPantalla> {
-  const base = idDesdeNombre(nombre);
+export async function crearPantalla(
+  nombre: string,
+  proyectoId: string = PROYECTO_HMI_POR_DEFECTO
+): Promise<ResumenPantalla> {
+  const base = idDesdeNombre(nombre, proyectoId);
   let intento = base;
   for (let i = 2; i <= 50; i++) {
     try {
-      const d = await fetchAuth('/proyectos', {
+      const d = await fetchAuth('/pantallas', {
         method: 'POST',
-        body: JSON.stringify({ project_id: intento, nombre }),
+        body: JSON.stringify({
+          project_id: intento,
+          nombre,
+          proyecto: proyectoId,
+        }),
       });
       return {
         project_id: d.project_id,
         nombre: d.nombre,
+        proyecto: d.proyecto ?? proyectoId,
         version: d.version,
         actualizado_en: d.actualizado_en,
         actualizado_por: d.actualizado_por,
@@ -194,7 +255,7 @@ export async function renombrarPantalla(
   projectId: string,
   nombre: string
 ): Promise<number> {
-  const d = await fetchAuth(`/proyectos/${encodeURIComponent(projectId)}`, {
+  const d = await fetchAuth(`/pantallas/${encodeURIComponent(projectId)}`, {
     method: 'PATCH',
     body: JSON.stringify({ nombre }),
   });
@@ -203,7 +264,7 @@ export async function renombrarPantalla(
 
 /** Borra una pantalla del servidor. Exige rol Supervisor. */
 export async function borrarPantalla(projectId: string): Promise<void> {
-  await fetchAuth(`/proyectos/${encodeURIComponent(projectId)}`, {
+  await fetchAuth(`/pantallas/${encodeURIComponent(projectId)}`, {
     method: 'DELETE',
   });
   try {
@@ -226,10 +287,14 @@ export async function borrarPantalla(projectId: string): Promise<void> {
  */
 export async function duplicarPantalla(
   origen: string,
-  nombre: string
+  nombre: string,
+  proyectoId?: string
 ): Promise<ResumenPantalla> {
   const doc = await cargarProyecto(origen);
-  const nueva = await crearPantalla(nombre);
+  // Si no se dice otra cosa, la copia se queda donde estaba el original. Que
+  // duplicar una pantalla la mandara a otro proyecto seria una sorpresa.
+  const destino = proyectoId ?? doc?.proyecto ?? PROYECTO_HMI_POR_DEFECTO;
+  const nueva = await crearPantalla(nombre, destino);
   if (doc && (doc.widgets.length > 0 || doc.canvas.width > 0)) {
     // version null = forzar: la pantalla acaba de nacer, no hay nada que pisar.
     await guardarProyecto(
@@ -267,13 +332,14 @@ export async function duplicarPantalla(
  *                  algo borrado -> se limpia la caché y se devuelve null.
  */
 export async function cargarProyecto(
-  projectId: string = PROYECTO_POR_DEFECTO
+  projectId: string = PANTALLA_POR_DEFECTO
 ): Promise<Proyecto | null> {
   try {
-    const d = await fetchAuth(`/proyectos/${projectId}`);
+    const d = await fetchAuth(`/pantallas/${projectId}`);
     const proyecto: Proyecto = {
       project_id: d.project_id,
       nombre: d.nombre,
+      proyecto: d.proyecto ?? PROYECTO_HMI_POR_DEFECTO,
       version: d.version,
       actualizado_en: d.actualizado_en,
       actualizado_por: d.actualizado_por,
@@ -318,6 +384,7 @@ export async function cargarProyecto(
       ? {
           project_id: projectId,
           nombre: projectId,
+          proyecto: PROYECTO_HMI_POR_DEFECTO,
           version: 0, // 0 = desconocida; al guardar habrá que refrescar
           actualizado_en: '',
           actualizado_por: '',
@@ -332,7 +399,7 @@ export async function cargarProyecto(
 export function olvidarCache(projectId: string): void {
   try {
     localStorage.removeItem(claveCache(projectId));
-    if (projectId === PROYECTO_POR_DEFECTO) localStorage.removeItem(DESIGN_KEY);
+    if (projectId === PANTALLA_POR_DEFECTO) localStorage.removeItem(DESIGN_KEY);
   } catch {
     /* sin storage: no hay nada que olvidar */
   }
@@ -348,10 +415,10 @@ export function olvidarCache(projectId: string): void {
 export async function guardarWidget(
   widget: HmiWidget,
   version: number | null,
-  projectId: string = PROYECTO_POR_DEFECTO
+  projectId: string = PANTALLA_POR_DEFECTO
 ): Promise<number> {
   const d = await fetchAuth(
-    `/proyectos/${projectId}/widgets/${encodeURIComponent(widget.id)}`,
+    `/pantallas/${projectId}/widgets/${encodeURIComponent(widget.id)}`,
     {
       method: 'PATCH',
       body: JSON.stringify({ widget, version }),
@@ -364,11 +431,11 @@ export async function guardarWidget(
 export async function borrarWidget(
   widgetId: string,
   version: number | null,
-  projectId: string = PROYECTO_POR_DEFECTO
+  projectId: string = PANTALLA_POR_DEFECTO
 ): Promise<number> {
   const q = version === null ? '' : `?version=${version}`;
   const d = await fetchAuth(
-    `/proyectos/${projectId}/widgets/${encodeURIComponent(widgetId)}${q}`,
+    `/pantallas/${projectId}/widgets/${encodeURIComponent(widgetId)}${q}`,
     { method: 'DELETE' }
   );
   return d.version;
@@ -383,9 +450,9 @@ export async function borrarWidget(
 export async function guardarProyecto(
   design: SavedDesign,
   version: number | null,
-  projectId: string = PROYECTO_POR_DEFECTO
+  projectId: string = PANTALLA_POR_DEFECTO
 ): Promise<number> {
-  const d = await fetchAuth(`/proyectos/${projectId}`, {
+  const d = await fetchAuth(`/pantallas/${projectId}`, {
     method: 'PUT',
     body: JSON.stringify({
       widgets: design.widgets,

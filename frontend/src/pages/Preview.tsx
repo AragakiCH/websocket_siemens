@@ -5,7 +5,11 @@
 // del PLC en vivo. Pensada para abrirse en una pestaña nueva.
 //
 // MULTIPANTALLA
-// El HMI tiene varias pantallas (una por proyecto del backend). Cuál se ve
+// El selector de arriba enseña solo las pantallas DEL MISMO PROYECTO que la
+// que se está viendo: saltar desde aquí a la pantalla de otro HMI sería un
+// viaje que nadie pidió, y con dos proyectos parecidos ni se notaría.
+//
+// El HMI tiene varias pantallas (una por documento del backend). Cuál se ve
 // sale, en este orden:
 //
 //   1. `?pantalla=<id>` en la URL — lo pone el botón "Vista previa" del
@@ -63,12 +67,13 @@ import {
 
 import {
   cargarProyecto,
-  listarProyectos,
+  listarPantallas,
   loadDesign,
   getUltimaPantalla,
   SavedDesign,
   ResumenPantalla,
 } from '../utils/designStorage';
+import { getUltimoProyecto } from '../utils/proyectoStorage';
 
 /** Pantalla pedida en la URL, si la hay. */
 function pantallaDeLaUrl(): string {
@@ -87,7 +92,13 @@ export function Preview() {
   // de esa sección.
   const vistaActiva = useVistaActiva(GRUPO_POR_DEFECTO);
 
-  const inicial = useMemo(() => pantallaDeLaUrl() || getUltimaPantalla(), []);
+  // Sin `?pantalla=` en la URL se abre la última que se estuvo viendo EN EL
+  // ÚLTIMO PROYECTO. Puede salir vacía (primera visita en este navegador): en
+  // ese caso la elige el efecto del catálogo, en cuanto llega la lista.
+  const inicial = useMemo(
+    () => pantallaDeLaUrl() || getUltimaPantalla(getUltimoProyecto()),
+    []
+  );
   const [pantallaId, setPantallaId] = useState<string>(inicial);
   const [pantallas, setPantallas] = useState<ResumenPantalla[]>([]);
   const [design, setDesign] = useState<SavedDesign | null>(() =>
@@ -117,8 +128,19 @@ export function Preview() {
     let vivo = true;
     void (async () => {
       try {
-        const lista = await listarProyectos();
-        if (vivo) setPantallas(lista);
+        // Sin filtrar: al llegar con una pantalla en la URL todavía no se
+        // sabe de qué proyecto es. El filtro se hace abajo, ya con el dato.
+        const lista = await listarPantallas();
+        if (!vivo) return;
+        setPantallas(lista);
+        // Primera visita sin URL: no hay nada recordado, así que se abre la
+        // primera pantalla del proyecto recordado (o la primera que haya).
+        if (!pantallaId && lista.length > 0) {
+          const proyecto = getUltimoProyecto();
+          const destino =
+          lista.find((p) => p.proyecto === proyecto) ?? lista[0];
+          setPantallaId(destino.project_id);
+        }
       } catch {
         // Sin lista no hay selector, pero la pantalla pedida sigue viéndose.
       }
@@ -126,6 +148,7 @@ export function Preview() {
     return () => {
       vivo = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Carga del diseño ────────────────────────────────────────────
@@ -227,7 +250,17 @@ export function Preview() {
 
   const nombreActual =
     pantallas.find((p) => p.project_id === pantallaId)?.nombre ?? pantallaId;
-  const hayVarias = pantallas.length > 1;
+
+  // Solo las hermanas: las pantallas del MISMO proyecto que la que se ve.
+  // Mientras no se sepa de cuál es (la lista aún no ha llegado) se enseñan
+  // todas, que es lo que había antes de que existieran los proyectos.
+  const proyectoActual = pantallas.find(
+    (p) => p.project_id === pantallaId
+  )?.proyecto;
+  const hermanas = proyectoActual
+    ? pantallas.filter((p) => p.proyecto === proyectoActual)
+    : pantallas;
+  const hayVarias = hermanas.length > 1;
 
   return (
     <div className="flex h-full w-full flex-col bg-slate-200 dark:bg-navy">
@@ -254,7 +287,7 @@ export function Preview() {
               aria-label="Pantalla que se está viendo"
               className="cursor-pointer appearance-none rounded-lg border border-slate-200 bg-white py-1.5 pl-3 pr-8 text-xs font-semibold text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
             >
-              {pantallas.map((p) => (
+              {hermanas.map((p) => (
                 <option key={p.project_id} value={p.project_id}>
                   {p.nombre}
                 </option>

@@ -86,8 +86,26 @@ export interface EstadoAuth {
   auth_requerida: boolean;
   bd_disponible: boolean;
   bd?: InfoBd;
-  /** Catálogo para el desplegable. Vacío si no hay conexiones dadas de alta. */
+  /**
+   * Catálogo para el desplegable. Vacío si no hay conexiones dadas de alta —
+   * o si esta pantalla es un visor: los nombres de las bases no salen del
+   * equipo servidor.
+   */
   bases?: BaseDatos[];
+  /**
+   * ¿Esta pantalla puede configurar la base de datos, o solo entrar?
+   *
+   * Lo decide el SERVIDOR mirando de dónde viene la petición, no el cliente.
+   * Un visor muestra el frontend del servidor por HTTP —mismo HTML, mismo
+   * JavaScript—, así que esto no se puede decidir al empaquetar ni con una
+   * marca en la URL: quien la quita volvería a verlo todo.
+   *
+   * `false` en un visor. Ocultar la configuración es solo la mitad del
+   * trabajo: los endpoints comprueban lo mismo por su cuenta.
+   */
+  puede_configurar?: boolean;
+  /** Lo contrario de `puede_configurar`. Para textos, no para permisos. */
+  es_visor?: boolean;
   roles: string[];
   estados: string[];
   mensaje: string;

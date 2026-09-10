@@ -153,6 +153,39 @@ const es: Dict = {
   'menu.open': 'Abrir',
 
 
+
+  // Proyectos del HMI (el nivel que agrupa pantallas)
+  'projects.title': 'Proyectos',
+  'projects.new': 'Nuevo proyecto',
+  'projects.defaultName': 'Proyecto',
+  'projects.none': 'Sin proyecto',
+  'projects.loading': 'Cargando proyectos…',
+  'projects.switchHint':
+  'Cambiar de proyecto. Cada proyecto tiene sus propias pantallas.',
+  'projects.rename': 'Renombrar proyecto',
+  'projects.export': 'Exportar proyecto a un fichero',
+  'projects.exported': 'Proyecto descargado:',
+  'projects.import': 'Importar',
+  'projects.importHint':
+  'Crear un proyecto a partir de un fichero exportado. No sobrescribe nada de lo que ya hay.',
+  'projects.importedScreens': 'pantallas importadas',
+  'projects.importedRenamed':
+  'pantallas se renombraron porque ya existía una con su nombre interno.',
+  'projects.importedWidgets': 'widgets personalizados nuevos.',
+  'projects.importedWidgetsKept':
+  'widgets personalizados ya estaban en este equipo y se han conservado.',
+  'projects.delete': 'Eliminar proyecto',
+  'projects.cantDeleteMain':
+  'El proyecto principal no se puede eliminar: siempre debe existir uno. Puedes vaciarlo.',
+  'projects.deleteTitle': 'Eliminar este proyecto',
+  'projects.deleteBody1': 'Se va a borrar del servidor el proyecto',
+  'projects.deleteBody2': 'con sus',
+  'projects.deleteScreens': 'pantallas',
+  'projects.deleteBody3': ' y todos sus widgets. Esta acción no se puede deshacer.',
+  'projects.deleteTypeName': 'Escribe el nombre del proyecto para confirmar:',
+  'projects.deleteConfirm': 'Eliminar proyecto',
+  'projects.cancel': 'Cancelar',
+
   // Pantallas del HMI (pestañas del Diseñador)
   'screens.barLabel': 'Pantallas del HMI',
   'screens.new': 'Pantalla',
@@ -161,9 +194,14 @@ const es: Dict = {
   'screens.duplicate': 'Duplicar',
   'screens.duplicateHint': 'Crear una copia de la pantalla activa, con sus widgets',
   'screens.renameHint': 'Doble clic para renombrar',
+  'screens.loading': 'Cargando pantallas…',
+  'screens.loadFailed':
+  'No se pudieron cargar las pantallas de este proyecto. Comprueba que el servidor responde.',
   'screens.delete': 'Eliminar pantalla',
   'screens.cantDeleteMain':
   'La pantalla principal no se puede eliminar: siempre debe existir una. Puedes vaciarla.',
+  'screens.cantDeleteLast':
+  'Es la única pantalla del proyecto y no se puede eliminar: un proyecto sin pantallas no se puede usar. Puedes vaciarla, o eliminar el proyecto entero.',
   'screens.deleteTitle': 'Eliminar esta pantalla',
   'screens.deleteBody1': 'Se va a borrar del servidor la pantalla ',
   'screens.deleteBody2':
@@ -407,6 +445,38 @@ const en: Dict = {
   'menu.mainDesc': 'Design your HMI screen with widgets and live data.',
   'menu.open': 'Open',
 
+
+  // HMI projects (the level that groups screens)
+  'projects.title': 'Projects',
+  'projects.new': 'New project',
+  'projects.defaultName': 'Project',
+  'projects.none': 'No project',
+  'projects.loading': 'Loading projects…',
+  'projects.switchHint': 'Switch project. Each project has its own screens.',
+  'projects.rename': 'Rename project',
+  'projects.export': 'Export project to a file',
+  'projects.exported': 'Project downloaded:',
+  'projects.import': 'Import',
+  'projects.importHint':
+  'Create a project from an exported file. Nothing already here is overwritten.',
+  'projects.importedScreens': 'screens imported',
+  'projects.importedRenamed':
+  'screens were renamed because their internal name was taken.',
+  'projects.importedWidgets': 'new custom widgets.',
+  'projects.importedWidgetsKept':
+  'custom widgets were already on this machine and were kept.',
+  'projects.delete': 'Delete project',
+  'projects.cantDeleteMain':
+  'The main project cannot be deleted: there must always be one. You can empty it instead.',
+  'projects.deleteTitle': 'Delete this project',
+  'projects.deleteBody1': 'The project',
+  'projects.deleteBody2': 'and its',
+  'projects.deleteScreens': 'screens',
+  'projects.deleteBody3': ' will be removed from the server, widgets included. This cannot be undone.',
+  'projects.deleteTypeName': 'Type the project name to confirm:',
+  'projects.deleteConfirm': 'Delete project',
+  'projects.cancel': 'Cancel',
+
   // HMI screens (Designer tabs)
   'screens.barLabel': 'HMI screens',
   'screens.new': 'Screen',
@@ -415,9 +485,14 @@ const en: Dict = {
   'screens.duplicate': 'Duplicate',
   'screens.duplicateHint': 'Create a copy of the active screen, widgets included',
   'screens.renameHint': 'Double-click to rename',
+  'screens.loading': 'Loading screens…',
+  'screens.loadFailed':
+  'Could not load this project\u2019s screens. Check that the server is responding.',
   'screens.delete': 'Delete screen',
   'screens.cantDeleteMain':
   'The main screen cannot be deleted: there must always be one. You can empty it instead.',
+  'screens.cantDeleteLast':
+  'This is the project\u2019s only screen and cannot be deleted: a project with no screens is unusable. Empty it, or delete the whole project.',
   'screens.deleteTitle': 'Delete this screen',
   'screens.deleteBody1': 'The screen ',
   'screens.deleteBody2':

@@ -37,6 +37,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from app.api.auth_routes import exigir_rol, sesion_actual, usuario_de
+from app.api.origen import es_local
 from app.core.auth_manager import Sesion
 from app.db.entorno import revisar as revisar_entorno
 from app.db.migraciones import asegurar_columnas_hmi, resumir
@@ -187,7 +188,23 @@ async def listar_conexiones(
                     "conectada hasta que algo intenta usarla. Cuesta una "
                     "conexión por cada base dada de alta.",
     ),
+    sesion: Optional[Sesion] = Depends(sesion_actual),
 ) -> dict:
+    # Esto lista los nombres, servidores y bases de datos de la planta. Era
+    # accesible SIN sesión desde cualquier equipo de la red: bastaba con abrir
+    # http://IP-del-servidor:8000/db en un navegador.
+    #
+    # Se pide una de dos cosas: o venir del propio servidor (la pantalla de
+    # acceso lo necesita antes de que exista ninguna sesión, para poder
+    # configurar la base la primera vez), o estar autenticado. Un visor sin
+    # sesión no encaja en ninguna, que es exactamente lo que se busca.
+    if sesion is None and not es_local(request):
+        raise HTTPException(
+            401,
+            "Hay que iniciar sesión para ver las conexiones de base de datos. "
+            "Configurarlas se hace desde el equipo servidor."
+        )
+
     mgr = _mgr(request)
     if revisar:
         await mgr.revisar_conexiones()

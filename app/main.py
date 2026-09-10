@@ -30,14 +30,16 @@ from fastapi.staticfiles import StaticFiles
 from app.api import (ai_routes, alarm_routes, auth_routes, crud_routes,
                      db_routes, escritura_routes, export_routes,
                      historian_routes, lock_routes, project_routes,
-                     rest_routes, sistema_routes, websocket_routes,
-                     widget_routes)
+                     proyecto_routes, rest_routes, sistema_routes,
+                     variables_routes,
+                     websocket_routes, widget_routes)
 from app.config.settings import get_settings
 from app.core.alarm_engine import MotorAlarmas
 from app.core.connection_manager import ConnectionManager
 from app.core.crud_manager import CrudManager
 from app.core.db_manager import DbManager
 from app.core.escritura_store import EscrituraStore
+from app.core.variables_store import VariablesStore
 from app.db.historian import Historizador
 from app.db.widget_store import WidgetStore
 from app.export.grabador import Grabador
@@ -47,6 +49,7 @@ from app.core.auth_manager import AuthManager
 from app.core.lock_manager import LockManager
 from app.core.plc_manager import PlcManager
 from app.db.project_store import ProjectStore
+from app.db.proyecto_store import ProyectoStore
 
 
 def _configurar_logging(nivel: str) -> None:
@@ -93,6 +96,10 @@ async def lifespan(app: FastAPI):
     # límites. Nada es escribible hasta que alguien lo habilita a mano — ver
     # app/core/escritura_store.py para por qué la regla va al revés aquí.
     escritura_store = EscrituraStore()
+    # Variables creadas desde la vista sobre huecos ya reservados en el
+    # PLC. No se crea nada en el autómata: se reclama un hueco y se le
+    # pone nombre (ver app/core/variables_store.py).
+    variables_store = VariablesStore()
     # El historizador escucha el MISMO flujo de tags que el WebSocket:
     # no abre una segunda sesión OPC UA ni añade carga al PLC.
     historizador = Historizador(db_manager, db_manager.store)
@@ -104,6 +111,15 @@ async def lifespan(app: FastAPI):
     # navegador: es lo único que permite que dos personas vean la misma
     # pantalla. Va versionado para detectar escrituras simultáneas.
     project_store = ProjectStore()
+    # El nivel de arriba: PROYECTOS, cada uno con sus pantallas y su
+    # numeración propia. `project_store` guarda las pantallas (se llama así
+    # por historia; ver la nota de app/db/proyecto_store.py).
+    proyecto_store = ProyectoStore()
+    # Una pantalla puede apuntar a un proyecto que ya no existe si alguien
+    # tocó los ficheros a mano o restauró una copia a medias. Si no se
+    # adoptan, quedan invisibles: no salen en ninguna lista pero siguen
+    # ocupando su id.
+    await project_store.adoptar_huerfanas(proyecto_store.ids())
     # Identidad: las cuentas están en la tabla SQL `usuarios`, así que
     # este gestor necesita el DbManager para llegar a ellas.
     auth_manager = AuthManager(db_manager, settings)
@@ -123,9 +139,11 @@ async def lifespan(app: FastAPI):
     app.state.crud_manager = crud_manager
     app.state.widget_store = widget_store
     app.state.escritura_store = escritura_store
+    app.state.variables_store = variables_store
     app.state.historizador = historizador
     app.state.grabador = grabador
     app.state.project_store = project_store
+    app.state.proyecto_store = proyecto_store
     app.state.auth_manager = auth_manager
     app.state.lock_manager = lock_manager
     app.state.auditoria = auditoria
@@ -483,6 +501,7 @@ app.add_middleware(
 
 # Routers.
 app.include_router(auth_routes.router)
+app.include_router(proyecto_routes.router)
 app.include_router(project_routes.router)
 app.include_router(lock_routes.router)
 app.include_router(rest_routes.router, tags=["REST"])
@@ -491,6 +510,7 @@ app.include_router(db_routes.router)
 app.include_router(crud_routes.router)
 app.include_router(widget_routes.router)
 app.include_router(escritura_routes.router)
+app.include_router(variables_routes.router)
 app.include_router(historian_routes.router)
 app.include_router(alarm_routes.router)
 app.include_router(export_routes.router)

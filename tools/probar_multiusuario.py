@@ -263,9 +263,9 @@ async def escenario(tmp: Path) -> None:
         # Luis toma el lápiz para poder editar
         await c.post("/locks/designer:principal/adquirir", headers=LUIS)
 
-        r = await c.get("/proyectos/principal", headers=LUIS)
+        r = await c.get("/pantallas/principal", headers=LUIS)
         v = r.json()["version"]
-        r = await c.patch("/proyectos/principal/widgets/w_horno", headers=LUIS,
+        r = await c.patch("/pantallas/principal/widgets/w_horno", headers=LUIS,
                           json={"widget": {"id": "w_horno", "tipo": "gauge",
                                            "x": 300, "y": 150},
                                 "version": v})
@@ -279,13 +279,13 @@ async def escenario(tmp: Path) -> None:
 
         # ---- 7. Conflicto de versión --------------------------------- #
         titulo("7 · Conflicto de versión")
-        r = await c.patch("/proyectos/principal/widgets/w_horno", headers=LUIS,
+        r = await c.patch("/pantallas/principal/widgets/w_horno", headers=LUIS,
                           json={"widget": {"id": "w_horno", "x": 999},
                                 "version": v})     # versión VIEJA
         check("escribir con versión vieja -> 409", r.status_code == 409)
         check("el 409 dice cuál es la versión actual",
               r.json()["detail"]["version_actual"] == v2)
-        r = await c.patch("/proyectos/principal/widgets/w_horno", headers=LUIS,
+        r = await c.patch("/pantallas/principal/widgets/w_horno", headers=LUIS,
                           json={"widget": {"id": "w_horno", "x": 999},
                                 "version": None})  # forzar
         check("forzando con version=null sí escribe", r.status_code == 200)
@@ -305,7 +305,7 @@ async def escenario(tmp: Path) -> None:
               r.json().get("titular", {}).get("usuario") == "luis")
 
         # Hugo (Administradores? no, es Supervisor) intenta ESCRIBIR sin lápiz
-        r = await c.patch("/proyectos/principal/widgets/w_otro", headers=SUP,
+        r = await c.patch("/pantallas/principal/widgets/w_otro", headers=SUP,
                           json={"widget": {"id": "w_otro"}, "version": None})
         check("escribir sin el lápiz -> 423 Locked", r.status_code == 423,
               f"(salió {r.status_code})")
