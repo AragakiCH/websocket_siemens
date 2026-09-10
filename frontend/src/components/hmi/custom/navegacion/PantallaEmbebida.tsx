@@ -186,18 +186,37 @@ function usePantallaEmpotrada(projectId: string): EstadoCarga {
     };
   }, [projectId, pedir]);
 
-  // Alguien editó esa pantalla en otro equipo (o en otra pestaña). El evento
-  // ya llega: `project.updated` sí está en la lista que reemite
-  // `RealPLCService`. Se refresca sin recargar nada.
+  // ── Lo que le pase a ESA pantalla, en vivo ────────────────────────────
+  //
+  // Los dos eventos llegan de verdad: `project.updated` y `project.removed`
+  // están los dos en la lista que reemite `RealPLCService` (no como
+  // `lock.changed` y los `alarma.*`, que se caen ahí).
+  //
+  // EL BORRADO HACE FALTA ESCUCHARLO, no basta con el 404 al recargar. El
+  // panel puede llevar horas abierto en la vista de un operador: sin esto,
+  // alguien borra la pantalla desde el Diseñador y el operador sigue viendo
+  // un HMI que ya no existe, con valores que nadie va a volver a tocar,
+  // hasta que a alguien se le ocurra recargar. Eso en planta no vale.
   useEffect(() => {
     if (!projectId) return;
     let vivo = true;
+
     const alEvento = (ev: Event) => {
       const msg = (ev as CustomEvent).detail;
-      if (msg?.type !== 'project.updated') return;
-      if (msg.project_id !== projectId) return;
-      pedir(projectId, () => vivo);
+      if (msg?.project_id !== projectId) return;
+
+      if (msg.type === 'project.removed') {
+        // Se tira la caché a la vez que el estado. Si solo se limpiara el
+        // estado, el siguiente montaje del panel volvería a pintar el diseño
+        // borrado desde el módulo — el fantasma otra vez.
+        cache.delete(projectId);
+        if (vivo) setEstado({ design: null, cargando: false, error: 'no_existe' });
+        return;
+      }
+
+      if (msg.type === 'project.updated') pedir(projectId, () => vivo);
     };
+
     window.addEventListener('hmi:ws', alEvento as EventListener);
     return () => {
       vivo = false;
@@ -298,6 +317,11 @@ export default function PantallaEmbebida({
   const cw = design?.canvas?.width ?? 0;
   const ch = design?.canvas?.height ?? 0;
 
+  // El fondo viaja con la pantalla, no con el marco que la enseña. Una vista
+  // de alarmas oscura sigue siendo oscura cuando se empotra dentro de un
+  // sinóptico claro: es parte de su diseño, no del sitio donde se muestra.
+  const fondo = design?.canvas?.fondo || undefined;
+
   /**
    * Escala y desplazamiento.
    *
@@ -384,6 +408,7 @@ export default function PantallaEmbebida({
             height: ch || '100%',
             transform: `scale(${sx}, ${sy})`,
             transformOrigin: 'top left',
+            background: fondo,
           }}
         >
           {aDibujar.map((w) => (
