@@ -698,17 +698,20 @@ export function Configuracion() {
       {/* ══════════════════════════════════════════════════════════ */}
       <aside className="hidden w-56 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-navy-slate dark:bg-navy-soft md:flex">
 
-        {/* Marca + salida. La flecha de volver vive aquí y no en la barra
-            superior: es navegación, igual que los tres destinos de abajo. */}
+        {/* La marca. Sigue llevando al menú al pulsarla —un logotipo que
+            vuelve al inicio es de lo más común— pero ya NO se transforma en
+            una flecha al pasar el ratón: la vuelta de verdad es la flecha de
+            la barra superior, que se ve sin tener que descubrir nada. Un
+            icono que cambia de identidad al pasar por encima solo lo
+            encuentra quien ya sabe que está ahí. */}
         <div className="flex items-center gap-2.5 border-b border-slate-200 px-4 py-4 dark:border-navy-slate">
           <button
             onClick={() => navigate('/menu')}
             title="Volver al menú"
             aria-label="Volver al menú"
-            className="group flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-siemens/10 text-siemens outline-none transition hover:bg-siemens hover:text-white focus-visible:ring-2 focus-visible:ring-siemens/40"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-siemens/10 text-siemens outline-none transition hover:bg-siemens hover:text-white focus-visible:ring-2 focus-visible:ring-siemens/40"
           >
-            <MonitorIcon className="h-4 w-4 group-hover:hidden" />
-            <ArrowLeftIcon className="hidden h-4 w-4 group-hover:block" />
+            <MonitorIcon className="h-4 w-4" />
           </button>
           <div className="min-w-0">
             <p className="truncate text-[13px] font-bold text-navy dark:text-slate-100">
@@ -770,12 +773,23 @@ export function Configuracion() {
         {/* ── Barra superior ─────────────────────────────────────── */}
         <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-slate-200 bg-white px-5 py-3 dark:border-navy-slate dark:bg-navy-soft">
           <div className="flex min-w-0 items-center gap-3">
-            {/* En móvil el panel lateral no cabe, así que la vuelta al menú
-                reaparece aquí. */}
+            {/* VOLVER AL MENÚ. Antes esto llevaba `md:hidden` —solo salía en
+                móvil— porque en escritorio ya estaba la flecha del panel
+                lateral. Pero aquella solo aparece al pasar el ratón por
+                encima del icono de la marca, así que en pantalla grande no
+                había NADA que se leyera como "volver": para salir de
+                Configuración había que descubrir que un logotipo era un
+                botón, o usar el botón atrás del navegador.
+
+                Ahora está siempre, en el mismo sitio y con la misma pinta que
+                en Alarmas, Usuarios, Actividad y el Diseñador. Una flecha en
+                la esquina superior izquierda no se busca: se sabe dónde
+                está. */}
             <button
               onClick={() => navigate('/menu')}
+              title="Volver al menú"
               aria-label="Volver al menú"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 dark:hover:bg-navy-slate/40 md:hidden"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 outline-none transition hover:bg-slate-100 hover:text-navy focus-visible:ring-2 focus-visible:ring-siemens/40 dark:hover:bg-navy-slate/40 dark:hover:text-slate-100"
             >
               <ArrowLeftIcon className="h-5 w-5" />
             </button>
