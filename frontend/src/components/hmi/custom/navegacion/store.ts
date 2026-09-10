@@ -42,7 +42,7 @@
 // abre en su portada. Lo que sí se guarda con el proyecto es a qué vista
 // pertenece cada widget (`HmiWidget.vista`), que es otra cosa.
 // =========================================================================
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 
 /** Grupo por defecto. Sidebar y Screen lo usan si no se cambia. */
 export const GRUPO_POR_DEFECTO = 'principal';
@@ -661,6 +661,78 @@ export function useSecciones(grupo: string): Seccion[] {
     () => getSecciones(grupo),
     () => getSecciones(grupo)
   );
+}
+
+// ─── La estructura COMPLETA, con sus niveles ─────────────────────
+//
+// `publicarSecciones()` publica solo lo NAVEGABLE (`soloSecciones`), y así
+// tiene que seguir siendo: quien pregunta «¿qué vistas hay?» no quiere
+// encabezados en la lista, y el Panel de Sección y el Diseñador cuentan con
+// eso.
+//
+// Pero para decir DÓNDE ESTÁS —«GENERAL / Detalles»— hacen falta justo los
+// encabezados, que son los que dan la jerarquía. De ahí esta segunda
+// publicación con la lista entera, en vez de cambiar la primera y romper a
+// los tres que ya la usan.
+//
+// Es la misma lista que se guarda en `config.secciones` del menú, así que no
+// cuesta nada publicarla: el Sidebar ya la tiene en la mano.
+
+const estructuraPorGrupo = new Map<string, Seccion[]>();
+
+export function publicarEstructura(grupo: string, lista: Seccion[]): void {
+  const k = llave(grupo);
+  const previas = estructuraPorGrupo.get(k);
+  // Misma precaución que en `publicarSecciones`: el Sidebar publica en cada
+  // dibujo y avisar sin cambios sería un bucle de render.
+  if (previas && JSON.stringify(previas) === JSON.stringify(lista)) return;
+  if (!previas && lista.length === 0) return;
+  estructuraPorGrupo.set(k, lista);
+  avisar();
+}
+
+export function getEstructura(grupo: string): Seccion[] {
+  return estructuraPorGrupo.get(llave(grupo)) ?? SIN_SECCIONES;
+}
+
+export function useEstructura(grupo: string): Seccion[] {
+  return useSyncExternalStore(
+    suscribir,
+    () => getEstructura(grupo),
+    () => getEstructura(grupo)
+  );
+}
+
+/**
+ * El camino hasta la vista abierta, de la raíz a la hoja.
+ *
+ * Con el menú del ejemplo devuelve `[GENERAL, Detalles]`, que es lo que pinta
+ * la barra de la Vista Previa para que el operador sepa dónde está sin tener
+ * que mirar qué botón quedó encendido.
+ *
+ * Va aquí y no en la vista porque la jerarquía es asunto de este módulo:
+ * `ancestrosDe()` ya sabe resolver el `padre` implícito de los menús viejos,
+ * y duplicar esa regla fuera sería tener dos versiones de la misma verdad.
+ *
+ * Lista vacía si no hay navegación montada o si la vista abierta ya no está
+ * en la estructura (una sección borrada mientras alguien la miraba).
+ */
+export function useRutaDeVista(grupo: string): Seccion[] {
+  const estructura = useEstructura(grupo);
+  const activa = useVistaActiva(grupo);
+
+  return useMemo(() => {
+    if (!activa) return SIN_SECCIONES;
+    const actual = estructura.find((s) => s.id === activa);
+    if (!actual) return SIN_SECCIONES;
+    // `ancestrosDe` los da del más cercano al más lejano; la ruta se lee al
+    // revés, de la raíz hacia dentro.
+    const linaje = ancestrosDe(estructura, activa)
+      .map((id) => estructura.find((s) => s.id === id))
+      .filter((s): s is Seccion => !!s)
+      .reverse();
+    return [...linaje, actual];
+  }, [estructura, activa]);
 }
 
 /** Nombre legible de una vista, para las cabeceras. */

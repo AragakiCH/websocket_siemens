@@ -6,7 +6,12 @@ interface Props {
   widget: HmiWidget;
   variable?: PlcVariable;
   selected: boolean;
-  onSelect: (id: string) => void;
+  /**
+   * `aditivo` = venía con Ctrl (o Cmd) pulsado: se suma o se quita de la
+   * selección en vez de reemplazarla. Es lo que permite elegir varios para
+   * agruparlos después.
+   */
+  onSelect: (id: string, aditivo: boolean) => void;
   onMove: (id: string, x: number, y: number) => void;
   onResize: (id: string, w: number, h: number) => void;
   canvasRef: React.RefObject<HTMLDivElement>;
@@ -68,12 +73,32 @@ export function CanvasWidget({
 
   const handlePointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
-    onSelect(widget.id);
 
-    // Solo el botón IZQUIERDO arrastra. Sin esto, abrir el menú con el
-    // derecho empezaba un arrastre invisible: movías el ratón para elegir
-    // una opción y el widget se iba detrás del cursor.
-    if (e.button !== 0) return;
+    // ── BOTÓN DERECHO (o central): NO TOCA UNA SELECCIÓN QUE YA LO INCLUYE ──
+    //
+    // `pointerdown` corre ANTES que `contextmenu`. Seleccionar aquí a secas
+    // deshacía la selección múltiple justo en el gesto con el que ibas a
+    // pulsar «Agrupar»: marcabas cinco widgets con Ctrl, dabas clic derecho
+    // sobre uno, y el menú se abría con uno solo marcado — sin la opción de
+    // agrupar, porque ya no había nada que agrupar.
+    //
+    // Poner el guardia solo en `onContextMenu` no servía de nada: para cuando
+    // ese evento llega, este ya reemplazó la selección.
+    //
+    // Y tampoco arrastra. Sin este `return`, abrir el menú con el derecho
+    // empezaba un arrastre invisible: movías el ratón para elegir una opción
+    // y el widget se iba detrás del cursor.
+    if (e.button !== 0) {
+      if (!selected) onSelect(widget.id, false);
+      return;
+    }
+
+    // Un Ctrl+clic es un gesto para MARCAR, no para mover. Si además
+    // arrastrara, quitar algo de la selección con Ctrl lo desplazaría un par
+    // de píxeles cada vez sin que nadie lo pidiera.
+    const aditivo = e.ctrlKey || e.metaKey;
+    onSelect(widget.id, aditivo);
+    if (aditivo) return;
 
     movido.current = false;
     drag.current = {
@@ -158,7 +183,10 @@ export function CanvasWidget({
         // Fuera el menú del navegador: aquí el clic derecho es del editor.
         e.preventDefault();
         e.stopPropagation();
-        onSelect(widget.id);
+        // Red de seguridad para el menú abierto con TECLADO (la tecla de
+        // menú contextual), que no dispara `pointerdown`. Con el ratón esto
+        // ya está resuelto arriba, y volver a llamarlo no cambia nada.
+        if (!selected) onSelect(widget.id, false);
         onContextMenu(widget.id, e.clientX, e.clientY);
       }}
       style={{
@@ -192,4 +220,4 @@ export function CanvasWidget({
       }
     </div>);
 
-}
+}

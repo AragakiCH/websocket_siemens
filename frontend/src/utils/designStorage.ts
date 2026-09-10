@@ -24,9 +24,31 @@ import { HmiWidget } from '../models/widget';
 import { fetchAuth } from '../services/authApi';
 import { PROYECTO_HMI_POR_DEFECTO } from './proyectoStorage';
 
+/** Medidas y aspecto del lienzo de una pantalla. */
+export interface Lienzo {
+  width: number;
+  height: number;
+  /**
+   * Color de fondo de la pantalla, en CSS (`#0f172a`, `rgb(...)`, lo que sea).
+   *
+   * Vacío o ausente = el fondo del tema, que es lo que se ha visto siempre.
+   * Por eso es OPCIONAL: ninguna pantalla guardada necesita migrarse, y una
+   * que no lo traiga se dibuja exactamente igual que antes.
+   *
+   * Es POR PANTALLA a propósito. Un HMI real no es de un solo color: la vista
+   * de proceso puede ir oscura y la de recetas clara, y cada pantalla es un
+   * documento aparte en el servidor, así que su fondo viaja con ella.
+   *
+   * Va dentro de `canvas` y no suelto en la raíz porque el backend guarda ese
+   * objeto tal cual (`ProjectStore` no valida su contenido): cabe aquí sin
+   * tocar una línea de Python ni el esquema de nada.
+   */
+  fondo?: string;
+}
+
 export interface SavedDesign {
   widgets: HmiWidget[];
-  canvas: { width: number; height: number };
+  canvas: Lienzo;
 }
 
 export interface Proyecto extends SavedDesign {

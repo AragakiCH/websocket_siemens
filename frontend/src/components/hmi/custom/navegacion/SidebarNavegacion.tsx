@@ -31,6 +31,7 @@ import {
   setVistaActiva,
   iniciarVista,
   publicarSecciones,
+  publicarEstructura,
   esNivel,
   soloSecciones,
   arbolDe,
@@ -110,6 +111,11 @@ function Sidebar({ widget, style }: RenderCtx) {
 
   useEffect(() => {
     publicarSecciones(cfg.grupo, navegables);
+    // Y la estructura ENTERA, con sus niveles. `publicarSecciones` filtra los
+    // encabezados a propósito —quien pregunta por las vistas no los quiere—,
+    // pero son justo ellos los que dan la jerarquía que necesita la barra de
+    // la Vista Previa para decir «GENERAL / Detalles». Ver `useRutaDeVista()`.
+    publicarEstructura(cfg.grupo, secciones);
     if (navegables.length > 0) iniciarVista(cfg.grupo, navegables[0].id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg.grupo, cfg.secciones]);

@@ -109,6 +109,32 @@ class RealPLCServiceImpl {
     this.retryTimer = null;
     this.ws?.close();
     this.ws = null;
+    this.marcarConexion(false);
+  }
+
+  // ---- Estado del enlace ---------------------------------------------- //
+  //
+  // Para el indicador «EN VIVO» de la Vista Previa. No vale mirar
+  // `AppStore.connected`: ese dice si se dio de alta un PLC, no si el enlace
+  // con el backend está abierto — y en un SCADA «en vivo» significa
+  // exactamente lo segundo. Un cartel verde que no comprueba nada es peor
+  // que no tener cartel.
+  //
+  // Se avisa por evento del navegador, igual que los mensajes de proyecto,
+  // para no obligar a nadie a suscribirse a este singleton.
+  private vivo = false;
+
+  /** ¿Está abierto el WebSocket ahora mismo? */
+  estaConectado(): boolean {
+    return this.vivo;
+  }
+
+  private marcarConexion(vivo: boolean) {
+    if (this.vivo === vivo) return; // sin cambio, sin evento
+    this.vivo = vivo;
+    window.dispatchEvent(
+      new CustomEvent('hmi:conexion', { detail: { vivo } })
+    );
   }
 
   // ---- WebSocket ------------------------------------------------------ //
@@ -122,6 +148,8 @@ class RealPLCServiceImpl {
     const url = tokenParaWs(`${proto}://${window.location.host}/ws`);
     const ws = new WebSocket(url);
     this.ws = ws;
+
+    ws.onopen = () => this.marcarConexion(true);
 
     ws.onmessage = (ev) => {
       let msg: any;
@@ -164,6 +192,7 @@ class RealPLCServiceImpl {
     };
 
     ws.onclose = () => {
+      this.marcarConexion(false);
       if (!this.manualClose) {
         this.retryTimer = setTimeout(() => this.openSocket(), RETRY_MS);
       }

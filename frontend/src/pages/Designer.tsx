@@ -18,6 +18,9 @@ import {
   ChevronsUpIcon,
   ChevronUpIcon,
   ChevronsDownIcon,
+  GroupIcon,
+  UngroupIcon,
+  PaletteIcon,
   UsersIcon } from
 'lucide-react';
 import { useAppStore } from '../context/AppStore';
@@ -30,11 +33,15 @@ import {
   esContenedor,
   contenedorBajo,
   hijosDe,
-  moverBloque,
   reasignarPadre,
   soltarHijos,
   reordenar,
   puedeReordenar,
+  agrupar,
+  desagrupar,
+  moverSeleccion,
+  raicesDeSeleccion,
+  KIND_CONTENEDOR,
   type AccionOrden } from
 '../components/hmi/grupo';
 import { PropertyInspector } from '../components/hmi/PropertyInspector';
@@ -70,6 +77,22 @@ import {
 type DesignerTab = 'designer' | 'flows' | 'alarms' | 'recipes' | 'export';
 
 let counter = 1;
+
+/**
+ * Colores de fondo a un clic.
+ *
+ * No son «bonitos», son los que se usan en un panel de planta: dos claros para
+ * sinópticos, tres oscuros para salas de control con poca luz, y el gris azulado
+ * de siempre. Cualquier otro color sale del selector de al lado; esto es solo
+ * para no tener que abrirlo en el 90% de los casos.
+ */
+const FONDOS: { nombre: string; valor: string }[] = [
+{ nombre: 'Blanco', valor: '#ffffff' },
+{ nombre: 'Gris claro', valor: '#f1f5f9' },
+{ nombre: 'Gris', valor: '#cbd5e1' },
+{ nombre: 'Azul acero', valor: '#334155' },
+{ nombre: 'Navy', valor: '#111c2e' },
+{ nombre: 'Negro', valor: '#000000' }];
 
 // Límites razonables para el tamaño del lienzo (px).
 const CANVAS_MIN = 200;
@@ -114,7 +137,31 @@ export function Designer() {
     isDark,
     t
   } = useAppStore();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // ── SELECCIÓN MÚLTIPLE ────────────────────────────────────────
+  //
+  // Un array y no un id suelto, porque agrupar necesita varios. El orden es
+  // el de marcado, que es el que se lee al decir «3 seleccionados».
+  //
+  // `selectedId` se deriva y sigue existiendo: el Inspector edita UN widget,
+  // y con varios marcados no hay uno del que enseñar las propiedades. Así
+  // todo lo que ya dependía de él sigue igual sin tocarse.
+  const [seleccion, setSeleccion] = useState<string[]>([]);
+  const selectedId = seleccion.length === 1 ? seleccion[0] : null;
+
+  /**
+   * Marca un widget. Con Ctrl (o Cmd) se suma o se quita; sin él, reemplaza.
+   *
+   * Devolver el MISMO array cuando no cambia nada evita repintar el lienzo
+   * entero cada vez que se vuelve a pulsar lo que ya estaba marcado.
+   */
+  const alSeleccionar = useCallback((id: string, aditivo: boolean) => {
+    setSeleccion((prev) => {
+      if (!aditivo) {
+        return prev.length === 1 && prev[0] === id ? prev : [id];
+      }
+      return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+    });
+  }, []);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<DesignerTab>('designer');
 
@@ -205,6 +252,16 @@ export function Designer() {
   const [canvasW, setCanvasW] = useState<number>(inicial?.canvas.width ?? 1280);
   const [canvasH, setCanvasH] = useState<number>(inicial?.canvas.height ?? 760);
 
+  // ── FONDO DE LA PANTALLA ──────────────────────────────────────
+  //
+  // Cadena vacía = sin fondo propio, se usa el del tema. Es lo que se ha
+  // visto siempre, así que una pantalla guardada antes de que esto existiera
+  // se dibuja exactamente igual.
+  //
+  // Va con el lienzo y no en un widget de fondo: un rectángulo a tamaño
+  // completo se puede seleccionar, mover y borrar sin querer, y encima
+  // estorba al arrastrar todo lo demás encima de él.
+  const [canvasBg, setCanvasBg] = useState<string>(inicial?.canvas.fondo ?? '');
   // Texto que se escribe en los inputs (se aplica al salir / dar Enter).
   const [wInput, setWInput] = useState(String(canvasW));
   const [hInput, setHInput] = useState(String(canvasH));
@@ -249,7 +306,7 @@ export function Designer() {
   const firmaGuardada = useRef<string>('');
   const firmaActual = JSON.stringify({
     widgets,
-    canvas: { width: canvasW, height: canvasH },
+    canvas: { width: canvasW, height: canvasH, fondo: canvasBg },
   });
 
   // Adopción del lienzo de la pantalla recién cargada. Corre UNA vez por
@@ -259,15 +316,17 @@ export function Designer() {
     const c = loadDesign(projectId)?.canvas;
     const w = clampCanvas(c?.width || 1280);
     const h = clampCanvas(c?.height || 760);
+    const bg = c?.fondo ?? '';
     setCanvasW(w);
     setCanvasH(h);
+    setCanvasBg(bg);
     setWInput(String(w));
     setHInput(String(h));
     firmaGuardada.current = JSON.stringify({
       widgets,
-      canvas: { width: w, height: h },
+      canvas: { width: w, height: h, fondo: bg },
     });
-    setSelectedId(null);
+    setSeleccion([]);
     setErrorGuardado('');
     setLienzoDe(projectId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -276,8 +335,11 @@ export function Designer() {
   // Caché local, inmediata: si se recarga la página no se pierde nada.
   useEffect(() => {
     if (!listo) return;
-    saveDesign({ widgets, canvas: { width: canvasW, height: canvasH } }, projectId);
-  }, [listo, widgets, canvasW, canvasH, projectId]);
+    saveDesign(
+      { widgets, canvas: { width: canvasW, height: canvasH, fondo: canvasBg || undefined } },
+      projectId
+    );
+  }, [listo, widgets, canvasW, canvasH, canvasBg, projectId]);
 
   // Guardado al SERVIDOR, con debounce de 400 ms: es lo que ven los demás.
   //
@@ -299,7 +361,10 @@ export function Designer() {
     const id = setTimeout(async () => {
       try {
         const v = await guardarProyecto(
-          { widgets, canvas: { width: canvasW, height: canvasH } },
+          {
+            widgets,
+            canvas: { width: canvasW, height: canvasH, fondo: canvasBg || undefined },
+          },
           projectVersion,
           projectId
         );
@@ -373,22 +438,46 @@ export function Designer() {
       return;
 
       if (e.key === 'Escape') {
-        setSelectedId(null);
+        setSeleccion([]);
         return;
       }
+      // ── Ctrl+G AGRUPA · Ctrl+Shift+G DESAGRUPA ──
+      //
+      // Es el atajo que usa todo editor gráfico, así que se prueba solo. Va
+      // aquí y no en el menú del clic derecho para que agrupar no dependa de
+      // un único gesto: si el clic derecho falla en algún ratón o navegador,
+      // el teclado y el botón de la barra siguen estando.
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'g' || e.key === 'G')) {
+        e.preventDefault(); // Ctrl+G es «buscar siguiente» en el navegador
+        if (e.shiftKey) {
+          if (contenedorSel) desagruparWidget(contenedorSel.id);
+        } else if (puedeAgrupar) {
+          agruparSeleccion();
+        }
+        return;
+      }
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (!selectedId) return;
+        if (seleccion.length === 0) return;
         // Venías de un panel, no del lienzo: la tecla no es para borrar nada.
         if (!ratonEnLienzo.current) return;
         e.preventDefault(); // Retroceso navegaría atrás en algunos navegadores
-        deleteWidget(selectedId);
+        borrarSeleccion();
       }
     };
 
     window.addEventListener('keydown', alPulsar);
     return () => window.removeEventListener('keydown', alPulsar);
+    // La dependencia es `seleccion`, NO `selectedId`. Con varios marcados
+    // `selectedId` vale null y deja de cambiar, así que al pasar de 2 a 3 con
+    // Ctrl+clic el listener se quedaba con la lista vieja y Supr borraba dos.
+    //
+    // Y `widgets` también, porque de él salen `puedeAgrupar` y `contenedorSel`:
+    // sin esto, meter algo en un contenedor y pulsar Ctrl+Shift+G miraría un
+    // árbol viejo. Volver a enganchar un listener es barato; equivocarse de
+    // widgets, no.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, selectedId, puedeEditar]);
+  }, [activeTab, seleccion, widgets, puedeEditar, projectId]);
 
   // ── Meter en el lienzo lo que se haya quedado fuera ───────────
   //
@@ -430,6 +519,27 @@ export function Designer() {
   }, [menuAbierto, selectorAbierto, menuOrden]);
 
   const selected = widgets.find((w) => w.id === selectedId) ?? null;
+
+  // ── QUÉ SE PUEDE AGRUPAR AHORA MISMO ──────────────────────────
+  //
+  // Se cuentan las RAÍCES, no los marcados: elegir un contenedor y dos de sus
+  // hijos es una sola raíz, y agrupar eso no haría nada. Un botón que no hace
+  // nada es peor que no tener botón.
+  //
+  // Se calcula UNA vez aquí y lo usan los tres caminos —la barra, el atajo de
+  // teclado y el menú del clic derecho—, para que los tres estén de acuerdo
+  // sobre si se puede o no.
+  const raicesSel = useMemo(
+    () => raicesDeSeleccion(widgets, seleccion),
+    [widgets, seleccion]
+  );
+  const puedeAgrupar = puedeEditar && raicesSel.length >= 2;
+
+  // Desagrupar necesita UN contenedor con hijos, no una selección cualquiera.
+  const contenedorSel =
+  selected && esContenedor(selected.kind) && hijosDe(widgets, selected.id).length > 0 ?
+  selected :
+  null;
 
   // ── Grupos ────────────────────────────────────────────────────
   //
@@ -620,7 +730,7 @@ export function Designer() {
       [...prev, nuevo] :
       [...prev.slice(0, i), nuevo, ...prev.slice(i)];
     });
-    setSelectedId(w.id);
+    setSeleccion([w.id]);
     // Acabas de soltarlo AQUÍ, aunque el ratón empezara en la barra de
     // widgets. Sin esto, Suprimir justo después de soltar no haría nada.
     ratonEnLienzo.current = true;
@@ -646,7 +756,7 @@ export function Designer() {
     // quedan donde estan. Ver soltarHijos() en grupo.ts — no hay deshacer
     // en este editor y un borrado en cadena por una tecla seria brutal.
     setWidgets((prev) => soltarHijos(prev, id).filter((w) => w.id !== id));
-    setSelectedId(null);
+    setSeleccion((prev) => prev.filter((x) => x !== id));
     // El PUT con debounce ya lo reflejaría, pero un borrado conviene
     // propagarlo de inmediato: es la operación que más molesta ver con
     // retraso en la pantalla de otro.
@@ -655,16 +765,96 @@ export function Designer() {
       .catch(() => {/* el guardado con debounce lo reintentará */});
   };
 
+  /**
+   * Borra TODO lo seleccionado. Es lo que hace la tecla Supr.
+   *
+   * Un solo `setWidgets` para las N bajas, no N llamadas: cada `setWidgets`
+   * dispara un repintado y el guardado con debounce, y con cinco widgets
+   * seleccionados se veían desaparecer de uno en uno.
+   *
+   * Se sueltan los hijos igual que en `deleteWidget` — y si un hijo también
+   * estaba seleccionado, cae en su propia vuelta del bucle. Sale de aquí un
+   * árbol coherente sea cual sea la mezcla de padres e hijos marcados.
+   */
+  const borrarSeleccion = () => {
+    if (!puedeEditar || seleccion.length === 0) return;
+    const bajas = [...seleccion];
+    setWidgets((prev) =>
+    bajas.reduce(
+      (acc, id) => soltarHijos(acc, id).filter((w) => w.id !== id),
+      prev
+    )
+    );
+    setSeleccion([]);
+    for (const id of bajas) {
+      void apiBorrarWidget(id, null, projectId)
+        .then(setProjectVersion)
+        .catch(() => {/* el guardado con debounce lo reintentará */});
+    }
+  };
+
+  /**
+   * Envuelve la selección en un Contenedor nuevo.
+   *
+   * El contenedor se crea con el mismo patrón de id y de estilo que cualquier
+   * widget soltado desde la paleta, para que no haya dos clases de contenedor
+   * según cómo naciera.
+   *
+   * Al terminar queda seleccionado ÉL solo: es lo que acabas de crear y lo que
+   * vas a querer mover o renombrar acto seguido.
+   */
+  const agruparSeleccion = () => {
+    if (!puedeEditar) return;
+    const raices = raicesDeSeleccion(widgets, seleccion);
+    if (raices.length < 2) return;
+
+    const id = `w_${Date.now()}_${counter}`;
+    const nombre = `Grupo ${counter++}`;
+    const def = customByKind(KIND_CONTENEDOR)?.defaultConfig;
+
+    setWidgets((prev) =>
+    agrupar(prev, seleccion, {
+      id,
+      nombre,
+      style: defaultStyle(),
+      config: def ? { ...def } : undefined,
+      limite: { width: canvasW, height: canvasH }
+    })
+    );
+    setSeleccion([id]);
+    setMenuOrden(null);
+  };
+
+  /** Deshace un grupo: fuera el contenedor, los hijos se quedan donde están. */
+  const desagruparWidget = (id: string) => {
+    if (!puedeEditar) return;
+    setWidgets((prev) => desagrupar(prev, id));
+    setSeleccion([]);
+    setMenuOrden(null);
+    // El contenedor desaparece de verdad, así que se avisa ya y no se espera
+    // al PUT con debounce: es un borrado, igual que en `deleteWidget`.
+    void apiBorrarWidget(id, null, projectId)
+      .then(setProjectVersion)
+      .catch(() => {/* el guardado con debounce lo reintentará */});
+  };
+
   // Abre la vista previa en una pestaña nueva (guarda antes por si acaso).
   const openPreview = () => {
-    saveDesign({ widgets, canvas: { width: canvasW, height: canvasH } }, projectId);
-    // La pantalla activa viaja en la URL: abrir la vista previa desde la
-    // pestaña "Horno 2" tiene que enseñar el Horno 2, no la principal.
-    window.open(
-      `/preview?pantalla=${encodeURIComponent(projectId)}`,
-      '_blank',
-      'noopener'
+    saveDesign(
+      { widgets, canvas: { width: canvasW, height: canvasH, fondo: canvasBg || undefined } },
+      projectId
     );
+    // SIN `?pantalla=`, y a propósito.
+    //
+    // Antes se abría la pestaña que estabas editando. Tenía sentido cuando
+    // cada pantalla era una isla, pero ya no: el HMI tiene UN punto de
+    // entrada —la primera pantalla— y desde su menú se llega al resto. La
+    // Vista Previa simula al OPERADOR, y el operador no elige por dónde
+    // entrar: entra por donde arranca el HMI.
+    //
+    // Para ver una pantalla suelta mientras la diseñas está el propio lienzo,
+    // que ya la enseña con los valores en vivo.
+    window.open('/preview', '_blank', 'noopener');
   };
 
   const rawRate = UPDATE_RATE_OPTIONS.find((o) => o.value === config.updateRate);
@@ -930,6 +1120,40 @@ export function Designer() {
           </div>
           }
 
+          {/* ── AGRUPAR / DESAGRUPAR, A LA VISTA ────────────────
+              El menú del clic derecho ya lo ofrece, pero esconderlo ahí tiene
+              dos problemas: hay que saber que está, y si el gesto no marca lo
+              que creías, el menú aparece «sin la opción» y no hay forma de
+              saber por qué. Aquí se ve el número de marcados en todo momento,
+              así que si dice «Agrupar 2» cuando creías llevar cinco, ya sabes
+              que el problema es la selección y no el botón.
+
+              Solo aparece cuando hay algo que hacer, para no meter ruido en la
+              barra durante el 90% del tiempo. */}
+          {(puedeAgrupar || contenedorSel) &&
+          <div className="flex items-center gap-1">
+            {puedeAgrupar &&
+            <button
+              onClick={agruparSeleccion}
+              title="Meter lo seleccionado en un Contenedor (Ctrl+G)"
+              className="flex items-center gap-1.5 rounded-lg bg-siemens/10 px-2.5 py-1.5 text-xs font-semibold text-siemens outline-none transition hover:bg-siemens/20 focus-visible:ring-2 focus-visible:ring-siemens/50">
+              <GroupIcon className="h-3.5 w-3.5" />
+              Agrupar {raicesSel.length}
+            </button>
+            }
+            {contenedorSel &&
+            <button
+              onClick={() => desagruparWidget(contenedorSel.id)}
+              title={`Deshacer «${contenedorSel.name}» y dejar sus widgets donde están (Ctrl+Shift+G)`}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-500 outline-none transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-siemens/50 dark:text-slate-400 dark:hover:bg-navy-slate/50">
+              <UngroupIcon className="h-3.5 w-3.5" />
+              Desagrupar
+            </button>
+            }
+            <div className="mx-0.5 h-4 w-px bg-slate-200 dark:bg-navy-slate" />
+          </div>
+          }
+
           {/* ── Vista previa: solo el play ─────────────────────── */}
           <button
             onClick={openPreview}
@@ -999,6 +1223,64 @@ export function Designer() {
                       className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
                       title="Alto (px)" />
                     <span className="text-[11px] text-slate-400">px</span>
+                  </div>
+
+                  {/* ── FONDO DEL LIENZO ──
+                      Es de ESTA pantalla, no del proyecto entero: se guarda en
+                      `canvas.fondo` de la pantalla abierta. Así cada una puede
+                      llevar el suyo (un sinóptico claro, una vista de alarmas
+                      oscura) y para tenerlas todas iguales basta con elegir el
+                      mismo color en cada una.
+
+                      Va aquí, en el menú del lienzo, y no en el Inspector: el
+                      Inspector es de widgets y con el lienzo vacío —que es
+                      justo cuando se quiere poner el fondo— no hay ninguno
+                      seleccionado y el panel está en blanco. */}
+                  <div className="mt-2.5 border-t border-slate-100 pt-2.5 dark:border-navy-slate">
+                    <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <PaletteIcon className="h-3 w-3" />
+                      Fondo
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {FONDOS.map((c) => {
+                      const activo = canvasBg.toLowerCase() === c.valor.toLowerCase();
+                      return (
+                        <button
+                          key={c.valor}
+                          disabled={!puedeEditar}
+                          onClick={() => setCanvasBg(c.valor)}
+                          title={c.nombre}
+                          style={{ background: c.valor }}
+                          className={`h-6 w-6 rounded-md border transition disabled:cursor-not-allowed disabled:opacity-40 ${activo ? 'border-siemens ring-2 ring-siemens/30' : 'border-slate-300 hover:border-slate-400 dark:border-navy-slate'}`} />);
+
+                      })}
+
+                      {/* Cualquier otro color. El `value` no puede ir vacío:
+                          un <input type=color> sin valor se pinta negro y
+                          parecería que el fondo ya es negro. */}
+                      <label
+                        title="Otro color"
+                        className={`relative flex h-6 w-6 items-center justify-center overflow-hidden rounded-md border border-dashed border-slate-300 text-[9px] font-bold text-slate-400 dark:border-navy-slate ${puedeEditar ? 'cursor-pointer hover:border-siemens hover:text-siemens' : 'cursor-not-allowed opacity-40'}`}>
+                        +
+                        <input
+                          type="color"
+                          disabled={!puedeEditar}
+                          value={/^#[0-9a-fA-F]{6}$/.test(canvasBg) ? canvasBg : '#ffffff'}
+                          onChange={(e) => setCanvasBg(e.target.value)}
+                          className="absolute inset-0 cursor-pointer opacity-0" />
+                      </label>
+                    </div>
+
+                    {/* Quitarlo devuelve el lienzo al color del tema, que es
+                        distinto en claro y en oscuro. Sin este botón, elegir un
+                        fondo sería irreversible. */}
+                    <button
+                      disabled={!puedeEditar || !canvasBg}
+                      onClick={() => setCanvasBg('')}
+                      className="mt-2 w-full rounded-lg border border-slate-200 px-2 py-1 text-[11px] text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:border-navy-slate dark:text-slate-400 dark:hover:bg-navy-slate/40">
+                      {canvasBg ? `Quitar fondo (${canvasBg})` : 'Sin fondo'}
+                    </button>
                   </div>
                 </div>
 
@@ -1073,7 +1355,7 @@ export function Designer() {
                 <button
                   onClick={() => {
                     setWidgets([]);
-                    setSelectedId(null);
+                    setSeleccion([]);
                     setMenuAbierto(false);
                   }}
                   className="flex w-full items-center gap-2 px-3 py-2.5 text-xs font-medium text-slate-500 transition hover:bg-red-50 hover:text-state-error dark:hover:bg-state-error/10">
@@ -1112,11 +1394,19 @@ export function Designer() {
             ref={canvasRef}
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
-            onPointerDown={() => setSelectedId(null)}
-            className={`relative mx-auto rounded-xl border shadow-inner ${isDark ? 'border-navy-slate bg-navy-soft' : 'border-slate-300 bg-white'}`}
+            onPointerDown={() => setSeleccion([])}
+            // SIN `rounded-*`: el lienzo es la pantalla del panel, y un panel
+            // industrial no tiene las esquinas redondeadas. Con el fondo puesto
+            // se notaba especialmente: aparecían cuatro muescas del color del
+            // editor en las esquinas del HMI.
+            //
+            // El color de fondo se aplica por `style` y no por clase para poder
+            // caer en el `bg-*` del tema cuando no hay ninguno elegido.
+            className={`relative mx-auto border shadow-inner ${isDark ? 'border-navy-slate' : 'border-slate-300'} ${canvasBg ? '' : isDark ? 'bg-navy-soft' : 'bg-white'}`}
             style={{
               width: canvasW,
-              height: canvasH
+              height: canvasH,
+              background: canvasBg || undefined
             }}>
             {widgets.length === 0 &&
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-slate-400">
@@ -1153,15 +1443,28 @@ export function Designer() {
               variables.find((v) => v.id === w.variableId) :
               undefined
               }
-              selected={w.id === selectedId}
-              onSelect={setSelectedId}
-              // Mover pasa SIEMPRE por moverBloque, tambien un widget
-              // suelto: para el es un bloque de uno, y asi no hay dos
-              // caminos distintos que puedan acabar comportandose distinto.
+              selected={seleccion.includes(w.id)}
+              onSelect={alSeleccionar}
+              // Mover pasa SIEMPRE por moverSeleccion, tambien un widget
+              // suelto: para el es una seleccion de uno —que delega en
+              // moverBloque—, y asi no hay dos caminos distintos que puedan
+              // acabar comportandose distinto.
               onMove={(id, x, y) => {
                 if (!puedeEditar) return;
+                // Arrastrar uno de varios seleccionados mueve a TODOS, con el
+                // mismo desplazamiento. Si el widget agarrado no estaba en la
+                // selección, se mueve solo él —es lo que acaba de marcar el
+                // pointerdown, así que en la práctica siempre está.
                 setWidgets((prev) =>
-                moverBloque(prev, id, x, y, canvasW, canvasH)
+                moverSeleccion(
+                  prev,
+                  id,
+                  x,
+                  y,
+                  seleccion.includes(id) ? seleccion : [id],
+                  canvasW,
+                  canvasH
+                )
                 );
               }}
               onMoveStart={setArrastrando}
@@ -1171,7 +1474,18 @@ export function Designer() {
                 // Al soltar se decide si entro o salio de un contenedor.
                 // Solo aqui: hacerlo durante el arrastre haria que un widget
                 // entrara y saliera de un grupo al pasar por encima.
-                setWidgets((prev) => reasignarPadre(prev, id));
+                //
+                // Con varios seleccionados se recalcula CADA RAÍZ, no solo la
+                // arrastrada: las demás se han movido igual y pueden haber
+                // entrado en un contenedor. Los hijos no se tocan — su padre no
+                // cambia porque el bloque entero se desplazó junto.
+                setWidgets((prev) => {
+                  const ids = seleccion.includes(id) ? seleccion : [id];
+                  return raicesDeSeleccion(prev, ids).reduce(
+                    (acc, raiz) => reasignarPadre(acc, raiz),
+                    prev
+                  );
+                });
               }}
               onResize={(id, width, height) => patchWidget(id, { width, height })}
               onContextMenu={(id, x, y) => setMenuOrden({ id, x, y })}
@@ -1203,10 +1517,20 @@ export function Designer() {
           { accion: 'atras', label: 'Enviar atrás', Icono: ChevronDownIcon },
           { accion: 'fondo', label: 'Enviar al fondo', Icono: ChevronsDownIcon }];
 
+          // `puedeAgrupar` y `raicesSel` salen de arriba, los MISMOS que usan
+          // la barra y el atajo de teclado: si el botón de la barra dice
+          // «Agrupar 3», aquí dice lo mismo. Con dos cuentas separadas, tarde
+          // o temprano una dice que sí y la otra que no.
+          //
+          // Desagrupar sí se calcula aquí, porque es sobre el widget del clic
+          // derecho, que no tiene por qué ser el que muestra el Inspector.
+          const puedeDesagrupar =
+            puedeEditar && esContenedor(w.kind) && hijosDe(widgets, w.id).length > 0;
+
           // Que no se salga por el borde. Un menú medio fuera de pantalla
           // con la última opción cortada es peor que no tenerlo.
-          const ANCHO = 200;
-          const ALTO = 190;
+          const ANCHO = 208;
+          const ALTO = 190 + (puedeAgrupar ? 30 : 0) + (puedeDesagrupar ? 30 : 0);
           const x = Math.min(menuOrden.x, window.innerWidth - ANCHO - 8);
           const y = Math.min(menuOrden.y, window.innerHeight - ALTO - 8);
 
@@ -1232,6 +1556,9 @@ export function Designer() {
                       «traer adelante» va a hacer algo. */}
                   <p className="text-[10px] text-slate-400">
                     Capa {widgets.findIndex((x) => x.id === w.id) + 1} de {widgets.length}
+                    {/* Cuántos hay marcados. Sin esto no se sabe si el
+                        Ctrl+clic de hace tres widgets contó o no. */}
+                    {seleccion.length > 1 && ` · ${seleccion.length} seleccionados`}
                   </p>
                 </div>
 
@@ -1250,6 +1577,33 @@ export function Designer() {
                     </button>);
 
                 })}
+
+                {/* ── AGRUPAR / DESAGRUPAR ──
+                    Separadas del bloque de orden por una línea: son de otra
+                    familia. Reordenar mueve una capa; agrupar cambia de quién
+                    es hijo qué. Solo aparecen cuando pueden hacer algo. */}
+                {(puedeAgrupar || puedeDesagrupar) &&
+                <div className="mt-1 border-t border-slate-100 pt-1 dark:border-navy-slate">
+                  {puedeAgrupar &&
+                  <button
+                    onClick={agruparSeleccion}
+                    title="Los mete en un Contenedor nuevo: a partir de ahí se mueven juntos."
+                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs font-semibold text-siemens transition hover:bg-siemens/10">
+                    <GroupIcon className="h-3.5 w-3.5 shrink-0" />
+                    Agrupar {raicesSel.length} widgets
+                  </button>
+                  }
+                  {puedeDesagrupar &&
+                  <button
+                    onClick={() => desagruparWidget(w.id)}
+                    title="Quita el contenedor. Los widgets se quedan donde están."
+                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-slate-600 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-navy-slate/50">
+                    <UngroupIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    Desagrupar
+                  </button>
+                  }
+                </div>
+                }
 
                 {/* Un contenedor arrastra a los suyos: conviene decirlo antes
                     de pulsar, no después de ver moverse cinco widgets. */}
