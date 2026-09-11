@@ -309,11 +309,38 @@ export function loadZipWidgets(): ZipWidget[] {
   }
 }
 
+/**
+ * Evento que se emite cada vez que cambia el catálogo de widgets
+ * personalizados.
+ *
+ * POR QUÉ HACE FALTA
+ * El catálogo se lee de `localStorage` de forma SÍNCRONA (`loadZipWidgets`)
+ * desde el registry, el catálogo del panel y el lienzo. Eso es lo que permite
+ * dibujar un widget importado sin esperas... y también lo que hace que nadie
+ * se entere cuando el catálogo cambia a media sesión: React no puede
+ * suscribirse a `localStorage` de esta pestaña.
+ *
+ * Mientras el catálogo solo cambiaba al subir un `.zip` desde el propio panel
+ * no se notaba: ese componente refrescaba su estado a mano, justo ahí. Pero al
+ * IMPORTAR UN PROYECTO llegan widgets nuevos desde otro sitio, y sin este
+ * aviso el resultado era desconcertante: el servidor los tenía, el proyecto
+ * los usaba, y en pantalla salían cajas vacías hasta recargar la página.
+ */
+export const EVENTO_WIDGETS = 'hmi:widgets-personalizados';
+
 export function saveZipWidgets(widgets: ZipWidget[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets));
   } catch {
     // Cuota llena: no es fatal, el servidor sigue teniendo la verdad.
+  }
+  // Fuera del try: aunque no se haya podido guardar en la caché, los widgets
+  // que se acaban de recibir YA están en memoria del resto de la aplicación,
+  // y avisar es lo que hace que se pinten.
+  try {
+    window.dispatchEvent(new CustomEvent(EVENTO_WIDGETS));
+  } catch {
+    /* sin `window` (pruebas, SSR): no hay a quién avisar */
   }
 }
 

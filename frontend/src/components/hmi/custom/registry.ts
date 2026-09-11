@@ -39,3 +39,27 @@ export function getZipWidgets(): ZipWidget[] {
 export function zipByKind(kind: string): ZipWidget | undefined {
   return loadZipWidgets().find(w => fullKind(w.meta.kind) === kind);
 }
+
+/**
+ * Los `custom:` de una lista de widgets que NO se van a poder dibujar.
+ *
+ * Se pregunta a las dos fuentes que sabe resolver el lienzo: los que vienen
+ * compilados con la aplicación (`customByKind`: menú lateral, panel de
+ * sección, tendencia...) y los importados desde un `.zip` (`zipByKind`). Lo
+ * que no esté en ninguna de las dos saldrá como una caja vacía.
+ *
+ * Lo usan exportar/importar para avisarlo por su nombre en vez de dejar
+ * huecos sin explicación. Vive aquí y no en cada llamador porque la pregunta
+ * «¿sé dibujar esto?» la contesta el registry, y duplicarla era la forma
+ * segura de que una copia se quedara atrás.
+ */
+export function kindsSinDefinicion(widgets: { kind?: string }[]): string[] {
+  const faltan = new Set<string>();
+  for (const w of widgets ?? []) {
+    const kind = String(w?.kind ?? '');
+    if (!kind.startsWith('custom:')) continue;
+    if (customByKind(kind) || zipByKind(kind)) continue;
+    faltan.add(kind.replace('custom:', ''));
+  }
+  return [...faltan];
+}

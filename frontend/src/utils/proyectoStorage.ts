@@ -23,6 +23,7 @@
 // que no se puede ni soltar un widget.
 // =========================================================================
 import { fetchAuth } from '../services/authApi';
+import { descargarJson, hoy, leerJsonDeFichero } from './descargas';
 
 /** Proyecto que el backend garantiza que existe. No se puede borrar. */
 export const PROYECTO_HMI_POR_DEFECTO = 'principal';
@@ -180,9 +181,6 @@ export async function borrarProyectoHmi(proyectoId: string): Promise<string[]> {
 // instalacion, no del diseno. Para mover una instalacion entera esta la copia
 // de seguridad de Configuracion.
 
-/** Tope del fichero a importar. Un proyecto normal no pasa de unos pocos MB. */
-const MAX_BYTES_IMPORTAR = 25 * 1024 * 1024;
-
 export interface ProyectoExportado {
   formato: string;
   version: number;
@@ -211,26 +209,13 @@ export async function exportarProyecto(
   return fetchAuth(`/proyectos/${encodeURIComponent(proyectoId)}/exportar`);
 }
 
-/**
- * Nombre del fichero: reconocible en la carpeta de Descargas dentro de un mes.
- *
- * Lleva la fecha porque lo normal es exportar el mismo proyecto varias veces
- * segun avanza, y tres ficheros llamados igual con "(1)" y "(2)" detras no
- * dicen cual es el bueno.
- */
+/** Nombre del fichero: reconocible en la carpeta de Descargas dentro de un mes. */
 export function nombreDeFichero(nombreProyecto: string): string {
-  const dia = new Date().toISOString().slice(0, 10);
-  return `proyecto-${idDesdeNombreProyecto(nombreProyecto)}-${dia}.json`;
+  return `proyecto-${idDesdeNombreProyecto(nombreProyecto)}-${hoy()}.json`;
 }
 
 /**
  * Descarga el proyecto como fichero, donde el usuario elija guardarlo.
- *
- * POR QUE `fetch` + blob Y NO UN `<a href>` DIRECTO
- * El endpoint va autenticado y un enlace normal no lleva la cabecera
- * `Authorization`: con la sesion activada devolveria un 401 y el usuario
- * veria una pestana en blanco. Es el mismo camino que ya usan la copia de
- * seguridad y los Excel de exportacion.
  *
  * Devuelve el nombre con el que se guardo.
  */
@@ -239,28 +224,7 @@ export async function descargarProyecto(
   nombreProyecto: string
 ): Promise<string> {
   const doc = await exportarProyecto(proyectoId);
-  const nombre = nombreDeFichero(nombreProyecto || proyectoId);
-
-  // Con sangria (2 espacios): el fichero se puede abrir con cualquier editor
-  // para ver que trae antes de meterlo en un equipo de planta.
-  const blob = new Blob([JSON.stringify(doc, null, 2)], {
-    type: 'application/json',
-  });
-
-  // El objeto URL se revoca SIEMPRE, aunque el clic falle: cada blob sin
-  // revocar se queda en memoria hasta que se recargue la pestana.
-  const url = URL.createObjectURL(blob);
-  try {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = nombre;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-  return nombre;
+  return descargarJson(doc, nombreDeFichero(nombreProyecto || proyectoId));
 }
 
 /**
@@ -270,31 +234,13 @@ export async function descargarProyecto(
  * la diferencia entre "ese fichero no es un proyecto" al instante y esperar a
  * que suban 8 MB para recibir un 400.
  */
-export async function leerFicheroDeProyecto(
-  archivo: File
-): Promise<ProyectoExportado> {
-  if (archivo.size > MAX_BYTES_IMPORTAR) {
-    throw new Error(
-      `El fichero ocupa ${Math.round(archivo.size / 1024 / 1024)} MB y el ` +
-        `maximo son ${MAX_BYTES_IMPORTAR / 1024 / 1024} MB.`
-    );
-  }
-  let doc: any;
-  try {
-    doc = JSON.parse(await archivo.text());
-  } catch {
-    throw new Error(
-      'El fichero no se puede leer: no es un JSON valido. ¿Se eligio el ' +
-        'fichero correcto?'
-    );
-  }
-  if (!doc || doc.formato !== 'psicore.proyecto') {
-    throw new Error(
-      'Este fichero no es un proyecto exportado desde la aplicacion. Debe ' +
-        'ser el .json que genera «Exportar proyecto».'
-    );
-  }
-  return doc as ProyectoExportado;
+export function leerFicheroDeProyecto(archivo: File): Promise<ProyectoExportado> {
+  return leerJsonDeFichero<ProyectoExportado>(
+    archivo,
+    'psicore.proyecto',
+    'Este fichero no es un proyecto exportado desde la aplicacion. Debe ser ' +
+      'el .json que genera «Exportar proyecto».'
+  );
 }
 
 /** Crea un proyecto nuevo a partir del documento. Nunca sobrescribe nada. */

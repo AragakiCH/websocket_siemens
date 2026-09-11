@@ -33,10 +33,8 @@ La nota larga está en `app/db/proyecto_store.py`.
 from __future__ import annotations
 
 import logging
-import re
-import unicodedata
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -44,37 +42,22 @@ from pydantic import BaseModel, Field
 
 from app.api.auth_routes import exigir_rol, sesion_actual, usuario_de
 from app.core.auth_manager import Sesion
+from app.api.intercambio import (
+    FORMATO_PROYECTO,
+    FORMATO_VERSION,
+    MAX_PANTALLAS_IMPORTADAS,
+    id_libre,
+    importar_widgets,
+    nombre_libre,
+    remapear_pantallas,
+    slug,
+    widgets_para_exportar,
+)
 from app.db.proyecto_store import PROYECTO_POR_DEFECTO, validar_proyecto_id
 
 logger = logging.getLogger("proyecto_routes")
 
 router = APIRouter()
-
-# ====================================================================== #
-# Formato de intercambio
-# ====================================================================== #
-#: Marca del fichero exportado. Se comprueba al importar para poder decir
-#: "esto no es un proyecto" en vez de reventar con un KeyError en la línea 40.
-FORMATO = "psicore.proyecto"
-
-#: Versión del formato. Sube cuando cambie de forma incompatible. Un fichero
-#: con una versión MAYOR se rechaza con un mensaje que dice qué pasa: leerlo a
-#: medias y crear un proyecto incompleto sería mucho peor que no importarlo.
-FORMATO_VERSION = 1
-
-#: Tope de pantallas por fichero. No es una limitación del producto: es que un
-#: JSON de fuera puede traer cualquier cosa, y crear diez mil pantallas dejaría
-#: la carpeta de datos inservible antes de que nadie pudiera cancelar.
-MAX_PANTALLAS_IMPORTADAS = 200
-
-#: Claves cuyo valor es el ID DE UNA PANTALLA dentro de la configuración de un
-#: widget. Hoy solo la usa el Menú Lateral (`config.secciones[].pantalla`),
-#: que guarda a qué pantalla salta cada sección.
-#:
-#: Importa porque los ids pueden CAMBIAR al importar (si ya hay una pantalla
-#: con ese id en este equipo), y un enlace que apunte al id viejo llevaría a
-#: la pantalla de otro proyecto —o a ninguna— sin dar ningún error.
-CLAVES_DE_PANTALLA = ("pantalla", "project_id")
 
 #: Nombre de la primera pantalla de un proyecto recién creado. Es un marcador
 #: de posición: la vista lleva a renombrarla nada más entrar.
@@ -131,16 +114,13 @@ def _id_de_pantalla_libre(store, proyecto_id: str) -> str:
     El recorte a 50 deja sitio al sufijo sin pasarse del límite de 64 que
     valida el almacén.
     """
-    base = f"{proyecto_id[:50]}_pantalla_1"
-    if not store.existe(base):
-        return base
-    for i in range(2, 100):
-        intento = f"{proyecto_id[:46]}_pantalla_1_{i}"
-        if not store.existe(intento):
-            return intento
-    raise HTTPException(
-        500, "No se encontró un identificador libre para la primera pantalla."
-    )
+    elegido = id_libre(store.existe, f"{proyecto_id[:50]}_pantalla_1", 64)
+    if elegido is None:
+        raise HTTPException(
+            500, "No se encontró un identificador libre para la primera "
+                 "pantalla."
+        )
+    return elegido
 
 
 # ====================================================================== #
@@ -370,82 +350,8 @@ async def borrar_proyecto(
 # git como cualquier otro fichero de texto.
 
 
-def _slug(texto: str, maximo: int = 40) -> str:
-    """Convierte un nombre de persona en algo que valga como id."""
-    base = unicodedata.normalize("NFD", texto or "")
-    base = "".join(c for c in base if unicodedata.category(c) != "Mn")
-    base = re.sub(r"[^A-Za-z0-9]+", "_", base).strip("_").lower()
-    return base[:maximo]
 
 
-def _id_libre(ocupado: Callable[[str], bool], base: str,
-              maximo: int = 64) -> str:
-    """
-    Primer id de la familia `base`, `base_2`, `base_3`… que esté libre.
-
-    Se prefiere SIEMPRE el original. Importar en un equipo donde ese proyecto
-    no existe deja los ids tal cual estaban, y eso vale por dos: los enlaces
-    entre pantallas siguen apuntando a donde deben sin tocar nada, y el
-    fichero de disco se llama igual en los dos equipos, que es lo que uno
-    espera al mover un proyecto de sitio.
-    """
-    base = (base or "importado")[:maximo]
-    if not ocupado(base):
-        return base
-    for i in range(2, 500):
-        sufijo = f"_{i}"
-        intento = f"{base[:maximo - len(sufijo)]}{sufijo}"
-        if not ocupado(intento):
-            return intento
-    raise HTTPException(500, f"No se encontró un identificador libre para "
-                             f"'{base}'.")
-
-
-def _kinds_personalizados(pantallas: List[dict]) -> List[str]:
-    """
-    Los widgets `custom:` que usan estas pantallas, sin repetir.
-
-    Ojo: no todos los `custom:` son importados. Los de navegación
-    (`custom:menu-lateral`, `custom:pantalla-screen`…) vienen compilados
-    dentro de la aplicación y no están en el almacén, así que el que llama
-    tiene que aceptar que alguno no aparezca. No es un error: significa
-    "ese ya lo trae el programa".
-    """
-    kinds: List[str] = []
-    for pantalla in pantallas:
-        for widget in pantalla.get("widgets", []):
-            kind = str(widget.get("kind") or "")
-            if not kind.startswith("custom:"):
-                continue
-            limpio = kind[len("custom:"):]
-            if limpio and limpio not in kinds:
-                kinds.append(limpio)
-    return kinds
-
-
-def _remapear_pantallas(valor: Any, mapa: Dict[str, str]) -> Any:
-    """
-    Reescribe los enlaces entre pantallas cuando sus ids han cambiado.
-
-    Recorre la configuración del widget entera porque las secciones del Menú
-    Lateral están anidadas dentro de `config`, y mañana puede haber otro
-    widget que enlace igual. Solo se tocan las claves de `CLAVES_DE_PANTALLA`
-    y solo si su valor es exactamente un id que se ha renombrado: una
-    etiqueta que por casualidad diga lo mismo que un id no se toca, porque no
-    está bajo una de esas claves.
-    """
-    if isinstance(valor, dict):
-        salida = {}
-        for clave, dentro in valor.items():
-            if (clave in CLAVES_DE_PANTALLA and isinstance(dentro, str)
-                    and dentro in mapa):
-                salida[clave] = mapa[dentro]
-            else:
-                salida[clave] = _remapear_pantallas(dentro, mapa)
-        return salida
-    if isinstance(valor, list):
-        return [_remapear_pantallas(x, mapa) for x in valor]
-    return valor
 
 
 class ProyectoExportado(BaseModel):
@@ -458,7 +364,7 @@ class ProyectoExportado(BaseModel):
     delante de un operario no significa nada.
     """
 
-    formato: str = Field(default="", examples=[FORMATO])
+    formato: str = Field(default="", examples=[FORMATO_PROYECTO])
     version: int = Field(default=0, examples=[FORMATO_VERSION])
     proyecto: Dict[str, Any] = Field(default_factory=dict)
     pantallas: List[Dict[str, Any]] = Field(default_factory=list)
@@ -503,22 +409,12 @@ async def exportar_proyecto(
             "widgets": doc.get("widgets", []),
         })
 
-    widgets_store = getattr(request.app.state, "widget_store", None)
-    personalizados = []
-    if widgets_store is not None:
-        for kind in _kinds_personalizados(pantallas):
-            w = widgets_store.obtener(kind)
-            if w is None:
-                # Un `custom:` que no está en el almacén viene compilado con
-                # la aplicación (los de navegación). No hay nada que llevarse.
-                continue
-            personalizados.append({
-                "kind": w.kind, "nombre": w.nombre,
-                "html": w.html, "css": w.css, "js": w.js, "meta": w.meta,
-            })
+    personalizados = widgets_para_exportar(
+        getattr(request.app.state, "widget_store", None), pantallas
+    )
 
     doc = {
-        "formato": FORMATO,
+        "formato": FORMATO_PROYECTO,
         "version": FORMATO_VERSION,
         "exportado_en": _ahora_iso(),
         "exportado_por": usuario_de(sesion),
@@ -534,7 +430,7 @@ async def exportar_proyecto(
              {"pantallas": len(pantallas),
               "widgets_personalizados": len(personalizados)})
 
-    nombre_fichero = f"proyecto-{_slug(proyecto['nombre']) or proyecto_id}.json"
+    nombre_fichero = f"proyecto-{slug(proyecto['nombre']) or proyecto_id}.json"
     return JSONResponse(
         content=doc,
         # Para quien llame a la API directamente (curl, el navegador). La
@@ -580,7 +476,7 @@ async def importar_proyecto(
     quien = usuario_de(sesion)
 
     # ── 1. ¿Esto es lo que dice ser? ──────────────────────────────
-    if cuerpo.formato != FORMATO:
+    if cuerpo.formato != FORMATO_PROYECTO:
         raise HTTPException(
             400,
             "Este fichero no es un proyecto exportado desde la aplicación. "
@@ -611,15 +507,16 @@ async def importar_proyecto(
         nombre_final = "Proyecto importado"
     nombre_final = nombre_final[:80]
 
-    # Dos proyectos con el MISMO nombre en la lista son indistinguibles, y el
-    # caso normal de importar es "traigo otra vez el que ya tenía". Se marca
-    # solo cuando de verdad choca, para no ensuciar el nombre sin motivo.
-    if any(p["nombre"] == nombre_final for p in proyectos.listar()):
-        nombre_final = f"{nombre_final} (importado)"[:80]
+    nombre_final = nombre_libre(
+        [p["nombre"] for p in proyectos.listar()], nombre_final, "(importado)"
+    )
 
-    base_id = _slug(str(cuerpo.proyecto.get("proyecto_id") or ""), 32) \
-        or _slug(nombre_final, 32) or "importado"
-    proyecto_id = _id_libre(proyectos.existe, base_id, 32)
+    base_id = slug(str(cuerpo.proyecto.get("proyecto_id") or ""), 32) \
+        or slug(nombre_final, 32) or "importado"
+    proyecto_id = id_libre(proyectos.existe, base_id, 32)
+    if proyecto_id is None:
+        raise HTTPException(
+            500, "No se encontró un identificador libre para el proyecto.")
 
     # ── 3. Ids de las pantallas, y el mapa de lo que cambió ───────
     #
@@ -635,9 +532,13 @@ async def importar_proyecto(
     for i, pantalla in enumerate(cuerpo.pantallas, start=1):
         original = str(pantalla.get("project_id") or "")
         etiqueta = str(pantalla.get("nombre") or "").strip() or f"Pantalla {i}"
-        base = _slug(original, 55) or f"{proyecto_id}_{_slug(etiqueta, 30)}" \
+        base = slug(original, 55) or f"{proyecto_id}_{slug(etiqueta, 30)}" \
             or f"{proyecto_id}_pantalla_{i}"
-        nuevo = _id_libre(ocupado, base, 64)
+        nuevo = id_libre(ocupado, base, 64)
+        if nuevo is None:
+            raise HTTPException(
+                500, f"No se encontró un identificador libre para la pantalla "
+                     f"'{etiqueta}'.")
         reservados.add(nuevo)
         if original and original != nuevo:
             mapa[original] = nuevo
@@ -650,7 +551,7 @@ async def importar_proyecto(
         for nuevo, etiqueta, pantalla in destinos:
             await almacen.crear(nuevo, etiqueta, quien, proyecto_id)
             creadas.append(nuevo)
-            widgets = _remapear_pantallas(pantalla.get("widgets", []), mapa)
+            widgets = remapear_pantallas(pantalla.get("widgets", []), mapa)
             await almacen.guardar_todo(
                 nuevo, widgets, pantalla.get("canvas") or {},
                 None,          # version=None: acaba de nacer, no hay conflicto
@@ -672,29 +573,10 @@ async def importar_proyecto(
     # creado, no llevarse un widget es un problema pequeño y visible (una
     # caja vacía) mientras que tirar el proyecto entero por eso sería una
     # sorpresa desproporcionada. Se cuenta lo que pasó y se sigue.
-    widgets_store = getattr(request.app.state, "widget_store", None)
-    importados: List[str] = []
-    omitidos: List[str] = []
-    fallidos: List[str] = []
-    if widgets_store is not None:
-        for w in cuerpo.widgets_personalizados:
-            kind = str(w.get("kind") or "")
-            if not kind:
-                continue
-            if widgets_store.obtener(kind) is not None:
-                omitidos.append(kind)
-                continue
-            try:
-                widgets_store.guardar(
-                    kind, str(w.get("nombre") or ""), str(w.get("html") or ""),
-                    str(w.get("css") or ""), str(w.get("js") or ""),
-                    w.get("meta") or {}, quien,
-                )
-                importados.append(kind)
-            except ValueError as exc:
-                logger.warning("Widget '%s' del fichero no se pudo guardar: %s",
-                               kind, exc)
-                fallidos.append(kind)
+    importados, omitidos, fallidos = importar_widgets(
+        getattr(request.app.state, "widget_store", None),
+        cuerpo.widgets_personalizados, quien,
+    )
 
     _auditar(request, "proyecto.importado", sesion, proyecto_id,
              {"pantallas": len(creadas), "widgets_nuevos": importados,

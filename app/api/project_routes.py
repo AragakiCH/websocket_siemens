@@ -12,6 +12,8 @@ Las PANTALLAS del HMI: su diseño, compartido entre todos los usuarios.
   PATCH  /pantallas/{id}/widgets/{wid}    -> un widget          [Administradores]
   DELETE /pantallas/{id}/widgets/{wid}    -> quitar un widget   [Administradores]
   DELETE /pantallas/{id}                  -> borrar la pantalla [Supervisor]
+  GET    /pantallas/{id}/exportar         -> un .json con la pantalla
+  POST   /pantallas/importar              -> crearla desde ese .json [Administradores]
 
 **Antes esto era `/proyectos`.** Cuando solo había un nivel, a cada pantalla
 se la llamaba proyecto. Ahora `/proyectos` es el nivel de ARRIBA —la carpeta
@@ -41,10 +43,22 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.api.auth_routes import exigir_rol, sesion_actual, usuario_de
+from app.api.intercambio import (
+    FORMATO_PANTALLA,
+    FORMATO_VERSION,
+    id_libre,
+    importar_widgets,
+    nombre_libre,
+    remapear_pantallas,
+    slug,
+    soltar_enlaces_rotos,
+    widgets_para_exportar,
+)
 from app.core.auth_manager import Sesion
 from app.db.project_store import ConflictoDeVersion, validar_id
 from app.db.proyecto_store import PROYECTO_POR_DEFECTO as PROYECTO_HMI_POR_DEFECTO
@@ -478,3 +492,246 @@ async def borrar_pantalla(
     })
     return {"ok": True, "project_id": project_id,
             "mensaje": f"Pantalla '{project_id}' eliminada."}
+
+
+# ====================================================================== #
+# Exportar / importar UNA pantalla
+# ====================================================================== #
+#
+# Es el hermano pequeño de exportar un proyecto (`proyecto_routes.py`), y se
+# usa para otra cosa: llevarse UNA pantalla —la sinóptica de un equipo, una
+# vista de recetas— a otro proyecto o a otro equipo, sin arrastrar el HMI
+# entero. Las reglas comunes (ids libres, widgets que viajan) están en
+# `app/api/intercambio.py`, para que las dos operaciones no se separen con el
+# tiempo.
+#
+# LA DIFERENCIA QUE IMPORTA: LOS ENLACES A LAS HERMANAS
+# Una pantalla puede enlazar a otras del mismo proyecto desde su Menú Lateral.
+# Al llevarse una sola, esos destinos NO viajan. Qué hacer con ellos es la
+# decisión de fondo de todo esto, y está explicada en `soltar_enlaces_rotos`:
+# se vacían y se dice cuáles, porque dejar el id apuntando al vacío —o peor, a
+# una pantalla de otro proyecto que por casualidad se llame igual— es un fallo
+# que no da ningún error y enseña el HMI equivocado.
+
+
+class PantallaExportada(BaseModel):
+    """
+    El fichero de intercambio de una pantalla. Es el cuerpo de `/importar`.
+
+    Todo lleva valor por defecto a propósito: un fichero al que le falte un
+    campo tiene que fallar con un mensaje escrito por nosotros ("esto no es
+    una pantalla exportada"), no con el error de validación de Pydantic, que
+    delante de un operario no significa nada.
+    """
+
+    formato: str = Field(default="", examples=[FORMATO_PANTALLA])
+    version: int = Field(default=0, examples=[FORMATO_VERSION])
+    pantalla: Dict[str, Any] = Field(default_factory=dict)
+    widgets_personalizados: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+@router.get(
+    "/pantallas/{project_id}/exportar",
+    tags=["Pantallas HMI"],
+    summary="Exportar una pantalla a un fichero",
+    description="Devuelve un `.json` con la pantalla, sus widgets y la "
+                "definición de los widgets personalizados que use.\n\n"
+                "Para llevarse el HMI entero está "
+                "`GET /proyectos/{id}/exportar`, que además conserva los "
+                "enlaces entre pantallas.",
+    responses={404: {"description": "No existe esa pantalla."}},
+)
+async def exportar_pantalla(
+    request: Request,
+    project_id: str,
+    sesion: Optional[Sesion] = Depends(sesion_actual),
+) -> JSONResponse:
+    try:
+        doc = _store(request).obtener(project_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if doc is None:
+        raise HTTPException(404, f"No existe la pantalla '{project_id}'.")
+
+    pantalla = {
+        "project_id": doc["project_id"],
+        "nombre": doc["nombre"],
+        "canvas": doc.get("canvas", {}),
+        "widgets": doc.get("widgets", []),
+    }
+
+    # De qué proyecto salió. Es informativo —al importar se elige el destino—
+    # pero permite decir de dónde viene un fichero que lleva meses en una
+    # carpeta de Descargas.
+    origen = _proyectos(request).obtener(
+        doc.get("proyecto", PROYECTO_HMI_POR_DEFECTO)
+    )
+
+    salida = {
+        "formato": FORMATO_PANTALLA,
+        "version": FORMATO_VERSION,
+        "exportado_en": _ahora_iso(),
+        "exportado_por": usuario_de(sesion),
+        "proyecto_origen": {
+            "proyecto_id": origen["proyecto_id"] if origen else "",
+            "nombre": origen["nombre"] if origen else "",
+        },
+        "pantalla": pantalla,
+        "widgets_personalizados": widgets_para_exportar(
+            getattr(request.app.state, "widget_store", None), [pantalla]
+        ),
+    }
+
+    _auditar(request, "pantalla.exportada", sesion, project_id,
+             {"widgets": len(pantalla["widgets"])})
+
+    nombre_fichero = f"pantalla-{slug(doc['nombre']) or project_id}.json"
+    return JSONResponse(
+        content=salida,
+        headers={
+            "Content-Disposition": f'attachment; filename="{nombre_fichero}"'
+        },
+    )
+
+
+@router.post(
+    "/pantallas/importar",
+    tags=["Pantallas HMI"],
+    summary="Importar una pantalla desde un fichero exportado",
+    dependencies=[Depends(exigir_rol("Administradores"))],
+    description="Crea una pantalla NUEVA dentro del proyecto indicado, a "
+                "partir del `.json` de `GET /pantallas/{id}/exportar`.\n\n"
+                "**Nunca sobrescribe nada.** Si ya hay una pantalla con ese "
+                "id, la importada nace con un sufijo. Los widgets "
+                "personalizados que ya existan en este equipo se dejan como "
+                "están.\n\n"
+                "Los enlaces del Menú Lateral que apunten a pantallas que no "
+                "están en el proyecto destino se vacían, y se devuelven en "
+                "`enlaces_sueltos` para poder avisarlo: dejarlos apuntando a "
+                "un id de otro proyecto abriría el HMI equivocado sin dar "
+                "ningún error.",
+    responses={
+        400: {"description": "El fichero no es una pantalla exportada, o su "
+                             "formato es más nuevo que este servidor."},
+        404: {"description": "No existe el proyecto de destino."},
+    },
+)
+async def importar_pantalla(
+    request: Request,
+    cuerpo: PantallaExportada,
+    proyecto: str = Query(
+        default=PROYECTO_HMI_POR_DEFECTO,
+        description="Proyecto en el que se crea la pantalla.",
+    ),
+    nombre: Optional[str] = Query(
+        default=None, max_length=80,
+        description="Nombre para la pantalla importada. Si se omite, el que "
+                    "traiga el fichero.",
+    ),
+    sesion: Optional[Sesion] = Depends(sesion_actual),
+) -> dict:
+    quien = usuario_de(sesion)
+
+    # ── 1. ¿Esto es lo que dice ser? ──────────────────────────────
+    if cuerpo.formato != FORMATO_PANTALLA:
+        raise HTTPException(
+            400,
+            "Este fichero no es una pantalla exportada desde la aplicación. "
+            "Debe ser el .json que genera «Exportar pantalla». (Si lo que "
+            "tienes es un proyecto entero, impórtalo desde el selector de "
+            "proyectos.)",
+        )
+    if cuerpo.version > FORMATO_VERSION:
+        raise HTTPException(
+            400,
+            f"El fichero se exportó con una versión más nueva del programa "
+            f"(formato v{cuerpo.version}; este servidor entiende hasta la "
+            f"v{FORMATO_VERSION}). Actualiza este equipo para poder abrirlo.",
+        )
+    if not cuerpo.pantalla:
+        raise HTTPException(400, "El fichero no trae ninguna pantalla.")
+
+    if not _proyectos(request).existe(proyecto):
+        raise HTTPException(404, f"No existe el proyecto '{proyecto}'.")
+
+    almacen = _store(request)
+
+    # ── 2. Nombre e id ───────────────────────────────────────────
+    hermanas = almacen.listar(proyecto)
+    etiqueta = (nombre or cuerpo.pantalla.get("nombre") or "").strip()
+    etiqueta = nombre_libre(
+        [p["nombre"] for p in hermanas], etiqueta or "Pantalla importada",
+        "(importada)",
+    )
+
+    original = str(cuerpo.pantalla.get("project_id") or "")
+    base = slug(original, 55) or f"{slug(proyecto, 20)}_{slug(etiqueta, 30)}"
+    nuevo_id = id_libre(almacen.existe, base or "pantalla_importada", 64)
+    if nuevo_id is None:
+        raise HTTPException(
+            500, "No se encontró un identificador libre para la pantalla.")
+
+    # ── 3. Los enlaces, en dos pasos ─────────────────────────────
+    widgets = cuerpo.pantalla.get("widgets", [])
+
+    # 3a. Lo que apuntaba A ELLA MISMA sigue a la copia. Si el id cambió (ya
+    #     había una pantalla con ese nombre interno) y no se hiciera esto, la
+    #     copia enlazaría a la ORIGINAL: dos pantallas distintas enseñando lo
+    #     mismo, que es justo lo contrario de duplicar.
+    if original and original != nuevo_id:
+        widgets = remapear_pantallas(widgets, {original: nuevo_id})
+
+    # 3b. Lo que apuntaba a sus HERMANAS solo vale si esas hermanas están en
+    #     el proyecto destino. Las que no, se vacían y se cuentan (ver
+    #     `soltar_enlaces_rotos`: el id de una pantalla de otro proyecto
+    #     abriría el HMI equivocado sin dar ningún error).
+    validos = {p["project_id"] for p in hermanas}
+    validos.add(nuevo_id)
+    widgets, enlaces_sueltos = soltar_enlaces_rotos(widgets, validos)
+
+    # ── 4. Crear. Si algo falla, se deshace ──────────────────────
+    try:
+        await almacen.crear(nuevo_id, etiqueta, quien, proyecto)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+    try:
+        await almacen.guardar_todo(
+            nuevo_id, widgets, cuerpo.pantalla.get("canvas") or {},
+            None,      # version=None: acaba de nacer, no hay nada que pisar
+            quien,
+        )
+    except Exception as exc:  # noqa: BLE001
+        await almacen.borrar(nuevo_id, en_cascada=True)
+        raise HTTPException(
+            500, f"No se pudo importar la pantalla: {exc}. No se ha creado "
+                 f"nada; el equipo se queda como estaba.")
+
+    # ── 5. Widgets personalizados ────────────────────────────────
+    importados, omitidos, fallidos = importar_widgets(
+        getattr(request.app.state, "widget_store", None),
+        cuerpo.widgets_personalizados, quien,
+    )
+
+    _auditar(request, "pantalla.importada", sesion, nuevo_id,
+             {"proyecto": proyecto, "widgets_nuevos": importados,
+              "enlaces_sueltos": enlaces_sueltos})
+    # Se difunde como una pantalla creada: es lo que hace que a los demás les
+    # aparezca la pestaña sin recargar.
+    doc = almacen.obtener(nuevo_id) or {"version": 1}
+    await _difundir(request, nuevo_id, doc, quien,
+                    {"accion": "proyecto_creado", "proyecto": proyecto})
+
+    return {
+        "ok": True,
+        "project_id": nuevo_id,
+        "nombre": etiqueta,
+        "proyecto": proyecto,
+        "num_widgets": len(widgets),
+        # Para que la vista pueda decir "2 secciones se quedaron sin destino"
+        # en vez de dejar que el usuario lo descubra pulsándolas.
+        "enlaces_sueltos": enlaces_sueltos,
+        "widgets_importados": importados,
+        "widgets_ya_existentes": omitidos,
+        "widgets_con_error": fallidos,
+    }

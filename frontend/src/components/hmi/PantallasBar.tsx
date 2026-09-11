@@ -25,6 +25,8 @@
 //   eliminar                      -> rol Supervisor
 //   `principal`                   -> no se borra NUNCA (lo impide el backend:
 //                                    la vista siempre necesita una que abrir)
+//   exportar                      -> cualquiera (es leer el diseño)
+//   importar                      -> rol Administradores
 //   la ÚLTIMA de un proyecto      -> tampoco: un proyecto sin pantallas es
 //                                    una pestaña en la que no se puede ni
 //                                    soltar un widget. Para deshacerse de él
@@ -40,6 +42,8 @@ import {
   PlusIcon,
   XIcon,
   CopyIcon,
+  DownloadIcon,
+  UploadIcon,
   MonitorIcon,
   AlertTriangleIcon,
   Loader2Icon,
@@ -50,8 +54,14 @@ import {
   duplicarPantalla,
   renombrarPantalla,
   borrarPantalla,
+  descargarPantalla,
+  leerFicheroDePantalla,
+  importarPantalla,
   PANTALLA_POR_DEFECTO,
 } from '../../utils/designStorage';
+import { sincronizarWidgets } from '../../services/zipWidgetLoader';
+import { kindsSinDefinicion } from './custom/registry';
+import { PilaDeAvisos } from '../ui/Avisos';
 
 interface Props {
   /** Si esta persona tiene el lápiz de la pantalla activa. */
@@ -76,6 +86,10 @@ export function PantallasBar({ puedeEditar }: Props) {
   const sinMovimiento = useReducedMotion();
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState('');
+  // Confirmación de lo que salió bien. Importar tiene cosas que contar aunque
+  // funcione: cuántos widgets entraron y qué enlaces se quedaron sin destino.
+  const [aviso, setAviso] = useState('');
+  const ficheroRef = useRef<HTMLInputElement>(null);
   const [renombrando, setRenombrando] = useState<string | null>(null);
   const [borrar, setBorrar] = useState<{ id: string; nombre: string } | null>(null);
   const barraRef = useRef<HTMLDivElement>(null);
@@ -86,17 +100,10 @@ export function PantallasBar({ puedeEditar }: Props) {
   const puedeCrear = !permisos || permisos.editar_diseño;
   const puedeBorrar = !permisos || permisos.gestionar_usuarios;
 
-  // Un error de permisos o de red se muestra unos segundos y se va solo: es
-  // información puntual, no un estado en el que haya que quedarse.
-  useEffect(() => {
-    if (!error) return;
-    const id = setTimeout(() => setError(''), 6000);
-    return () => clearTimeout(id);
-  }, [error]);
-
   const conError = useCallback(async (fn: () => Promise<void>) => {
     setOcupado(true);
     setError('');
+    setAviso('');
     try {
       await fn();
     } catch (e: any) {
@@ -139,6 +146,70 @@ export function PantallasBar({ puedeEditar }: Props) {
       await refrescarProyectos();
       abrirPantalla(copia.project_id);
     });
+
+  const exportar = () =>
+    conError(async () => {
+      const actual = pantallas.find((p) => p.project_id === projectId);
+      const fichero = await descargarPantalla(
+        projectId,
+        actual?.nombre ?? projectId
+      );
+      setAviso(`${t('screens.exported')} ${fichero}`);
+    });
+
+  /**
+   * Importar una pantalla en el proyecto abierto.
+   *
+   * El `value = ''` del final no es un detalle: sin él, elegir el MISMO
+   * fichero dos veces seguidas no dispara `change` y parece que el botón se
+   * ha quedado colgado.
+   */
+  const alElegirFichero = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = '';
+    if (!archivo) return;
+    void conError(async () => {
+      const doc = await leerFicheroDePantalla(archivo);
+      const r = await importarPantalla(doc, proyectoId);
+
+      // Los widgets personalizados del fichero acaban de entrar en el
+      // SERVIDOR, pero el lienzo los resuelve contra una caché local que solo
+      // se llena al arrancar. Sin esto, la pantalla importada se abre con
+      // cajas vacías hasta recargar la página.
+      await sincronizarWidgets();
+
+      await refrescarPantallas();
+      await refrescarProyectos();
+      abrirPantalla(r.project_id);
+
+      const partes = [
+        `«${r.nombre}»: ${r.num_widgets} ${t('screens.importedWidgets')}.`,
+      ];
+      if (r.enlaces_sueltos.length > 0) {
+        partes.push(
+          `${r.enlaces_sueltos.length} ${t('screens.importedLinks')}`
+        );
+      }
+      if (r.widgets_importados.length > 0) {
+        partes.push(
+          `${r.widgets_importados.length} ${t('projects.importedWidgets')}`
+        );
+      }
+      if (r.widgets_ya_existentes.length > 0) {
+        partes.push(
+          `${r.widgets_ya_existentes.length} ${t('projects.importedWidgetsKept')}`
+        );
+      }
+
+      // Lo que no se va a poder dibujar, dicho por su nombre. Va al aviso de
+      // error: la pantalla está importada, pero se verá incompleta.
+      const faltan = kindsSinDefinicion((doc.pantalla?.widgets ?? []) as any[]);
+      if (faltan.length > 0) {
+        setError(`${t('projects.importedMissing')} ${faltan.join(', ')}.`);
+      }
+      setAviso(partes.join(' '));
+    });
+  };
 
   const confirmarBorrado = () => {
     if (!borrar) return;
@@ -349,33 +420,72 @@ export function PantallasBar({ puedeEditar }: Props) {
           }
         </div>
 
-        {/* ── Acciones ─────────────────────────────────────── */}
-        {puedeCrear && (
-          <div className="flex shrink-0 items-center gap-1 border-l border-slate-200 py-1.5 pl-2 dark:border-navy-slate">
-            <button
-              type="button"
-              onClick={duplicar}
-              disabled={ocupado || pantallas.length === 0}
-              title={t('screens.duplicateHint')}
-              className="flex h-[32px] items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-500 outline-none transition hover:bg-white hover:text-siemens focus-visible:ring-2 focus-visible:ring-siemens/40 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-navy-soft"
-            >
-              <CopyIcon className="h-3.5 w-3.5" />
-              <span className="hidden lg:inline">{t('screens.duplicate')}</span>
-            </button>
-          </div>
-        )}
+        {/* ── Acciones ───────────────────────────────────────
+            Las tres hacen lo mismo visto de lejos —conseguir otra pantalla—
+            así que van juntas: duplicar la de al lado, traerla de un fichero,
+            o guardarla en uno. */}
+        <div className="flex shrink-0 items-center gap-1 border-l border-slate-200 py-1.5 pl-2 dark:border-navy-slate">
+          {/* Exportar no exige rol: es leer el diseño, que cualquiera con
+              acceso a la vista ya puede hacer. */}
+          <button
+            type="button"
+            onClick={() => void exportar()}
+            disabled={ocupado || !projectId}
+            title={t('screens.exportHint')}
+            className="flex h-[32px] items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-500 outline-none transition hover:bg-white hover:text-siemens focus-visible:ring-2 focus-visible:ring-siemens/40 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-navy-soft"
+          >
+            <DownloadIcon className="h-3.5 w-3.5" />
+            <span className="hidden lg:inline">{t('screens.export')}</span>
+          </button>
+
+          {puedeCrear && (
+            <>
+              <button
+                type="button"
+                onClick={() => ficheroRef.current?.click()}
+                disabled={ocupado}
+                title={t('screens.importHint')}
+                className="flex h-[32px] items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-500 outline-none transition hover:bg-white hover:text-siemens focus-visible:ring-2 focus-visible:ring-siemens/40 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-navy-soft"
+              >
+                <UploadIcon className="h-3.5 w-3.5" />
+                <span className="hidden lg:inline">{t('screens.import')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={duplicar}
+                disabled={ocupado || pantallas.length === 0}
+                title={t('screens.duplicateHint')}
+                className="flex h-[32px] items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-500 outline-none transition hover:bg-white hover:text-siemens focus-visible:ring-2 focus-visible:ring-siemens/40 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-navy-soft"
+              >
+                <CopyIcon className="h-3.5 w-3.5" />
+                <span className="hidden lg:inline">{t('screens.duplicate')}</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* ── Error ──────────────────────────────────────────── */}
-      {error && (
-        <div
-          role="alert"
-          className="flex items-start gap-2 border-t border-state-error/20 bg-state-error/5 px-4 py-2 text-[11px] leading-relaxed text-state-error"
-        >
-          <AlertTriangleIcon className="mt-px h-3.5 w-3.5 shrink-0" />
-          <span className="min-w-0">{error}</span>
-        </div>
-      )}
+      {/* El input vive FUERA de cualquier menú: si estuviera dentro de algo
+          que se cierra, el diálogo del sistema lo desmontaría y el `change`
+          no llegaría a ninguna parte. */}
+      <input
+        ref={ficheroRef}
+        type="file"
+        accept=".json,application/json"
+        onChange={alElegirFichero}
+        className="hidden"
+      />
+
+      {/* Los avisos van abajo a la derecha, no en una franja aquí: esta
+          empujaba el lienzo hacia abajo cada vez que aparecía, y el resumen
+          de una importación ocupa varias líneas. */}
+      <PilaDeAvisos
+        error={error}
+        aviso={aviso}
+        onCerrarError={() => setError('')}
+        onCerrarAviso={() => setAviso('')}
+      />
 
       {/* ── Confirmación de borrado ────────────────────────── */}
       {borrar && (

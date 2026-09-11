@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UploadIcon, Trash2Icon, AlertCircleIcon, CheckCircle2Icon } from 'lucide-react';
 import { getWidgetCatalog, CatalogItem } from './widgetCatalog';
@@ -9,6 +9,7 @@ import {
   removeZipWidget,
   loadZipWidgets,
   fullKind,
+  EVENTO_WIDGETS,
 } from '../../services/zipWidgetLoader';
 
 const categories: CatalogItem['category'][] = [
@@ -26,6 +27,14 @@ export function WidgetSidebar() {
 
   // Refresca el catálogo después de agregar/quitar un ZIP widget
   const refreshCatalog = useCallback(() => setCatalog(getWidgetCatalog()), []);
+
+  // ...y también cuando el catálogo cambia desde FUERA de este panel, que hoy
+  // pasa al importar un proyecto: trae sus widgets personalizados y tienen
+  // que aparecer aquí sin recargar la página.
+  useEffect(() => {
+    window.addEventListener(EVENTO_WIDGETS, refreshCatalog);
+    return () => window.removeEventListener(EVENTO_WIDGETS, refreshCatalog);
+  }, [refreshCatalog]);
 
   const showToast = (msg: string, ok: boolean) => {
     setToast({ msg, ok });

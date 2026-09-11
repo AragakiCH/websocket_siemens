@@ -174,6 +174,8 @@ const es: Dict = {
   'projects.importedWidgets': 'widgets personalizados nuevos.',
   'projects.importedWidgetsKept':
   'widgets personalizados ya estaban en este equipo y se han conservado.',
+  'projects.importedMissing':
+  'El proyecto usa widgets personalizados que no venían en el fichero ni están en este equipo, y saldrán como cajas vacías:',
   'projects.delete': 'Eliminar proyecto',
   'projects.cantDeleteMain':
   'El proyecto principal no se puede eliminar: siempre debe existir uno. Puedes vaciarlo.',
@@ -193,6 +195,16 @@ const es: Dict = {
   'screens.copySuffix': '(copia)',
   'screens.duplicate': 'Duplicar',
   'screens.duplicateHint': 'Crear una copia de la pantalla activa, con sus widgets',
+  'screens.export': 'Exportar',
+  'screens.exportHint':
+  'Guardar esta pantalla en un fichero, con sus widgets y los widgets personalizados que use',
+  'screens.exported': 'Pantalla descargada:',
+  'screens.import': 'Importar',
+  'screens.importHint':
+  'Crear una pantalla en este proyecto a partir de un fichero exportado. No sobrescribe nada de lo que ya hay.',
+  'screens.importedWidgets': 'widgets',
+  'screens.importedLinks':
+  'secciones se quedaron sin destino porque su pantalla no venía en el fichero; vuelve a elegirla en el Inspector del Menú Lateral.',
   'screens.renameHint': 'Doble clic para renombrar',
   'screens.loading': 'Cargando pantallas…',
   'screens.loadFailed':
@@ -465,6 +477,8 @@ const en: Dict = {
   'projects.importedWidgets': 'new custom widgets.',
   'projects.importedWidgetsKept':
   'custom widgets were already on this machine and were kept.',
+  'projects.importedMissing':
+  'The project uses custom widgets that were not in the file and are not on this machine; they will show as empty boxes:',
   'projects.delete': 'Delete project',
   'projects.cantDeleteMain':
   'The main project cannot be deleted: there must always be one. You can empty it instead.',
@@ -484,6 +498,16 @@ const en: Dict = {
   'screens.copySuffix': '(copy)',
   'screens.duplicate': 'Duplicate',
   'screens.duplicateHint': 'Create a copy of the active screen, widgets included',
+  'screens.export': 'Export',
+  'screens.exportHint':
+  'Save this screen to a file, with its widgets and any custom widgets it uses',
+  'screens.exported': 'Screen downloaded:',
+  'screens.import': 'Import',
+  'screens.importHint':
+  'Create a screen in this project from an exported file. Nothing already here is overwritten.',
+  'screens.importedWidgets': 'widgets',
+  'screens.importedLinks':
+  'sections lost their target because their screen was not in the file; pick it again in the Side Menu inspector.',
   'screens.renameHint': 'Double-click to rename',
   'screens.loading': 'Loading screens…',
   'screens.loadFailed':

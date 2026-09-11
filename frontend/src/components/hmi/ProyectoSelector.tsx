@@ -54,8 +54,12 @@ import {
   leerFicheroDeProyecto,
   importarProyecto,
   PROYECTO_HMI_POR_DEFECTO,
+  type ProyectoExportado,
 } from '../../utils/proyectoStorage';
 import { olvidarCache } from '../../utils/designStorage';
+import { sincronizarWidgets } from '../../services/zipWidgetLoader';
+import { kindsSinDefinicion } from './custom/registry';
+import { PilaDeAvisos } from '../ui/Avisos';
 
 export function ProyectoSelector() {
   const {
@@ -89,20 +93,6 @@ export function ProyectoSelector() {
   // una sola persona.
   const puedeCrear = !permisos || permisos.editar_diseño;
   const puedeBorrar = !permisos || permisos.gestionar_usuarios;
-
-  useEffect(() => {
-    if (!error) return;
-    const id = setTimeout(() => setError(''), 6000);
-    return () => clearTimeout(id);
-  }, [error]);
-
-  // Más tiempo que el error: el resumen de una importación tiene varias
-  // frases y se lee más despacio que un "no tienes permiso".
-  useEffect(() => {
-    if (!aviso) return;
-    const id = setTimeout(() => setAviso(''), 12000);
-    return () => clearTimeout(id);
-  }, [aviso]);
 
   // Escape cierra el desplegable. Sin esto hay que ir a buscar el ratón para
   // salir de un menú que se abrió sin querer.
@@ -172,6 +162,18 @@ export function ProyectoSelector() {
     void conError(async () => {
       const doc = await leerFicheroDeProyecto(archivo);
       const r = await importarProyecto(doc);
+
+      // Los widgets personalizados del fichero acaban de entrar en el
+      // SERVIDOR, pero el lienzo y el panel de widgets los resuelven contra
+      // una caché local que solo se llena al arrancar. Sin este paso, el
+      // proyecto importado se abre con cajas vacías donde van sus widgets y
+      // el panel no los ofrece, hasta que alguien recarga la página: parece
+      // que la importación se dejó algo, cuando ya estaba todo guardado.
+      //
+      // `sincronizarWidgets` avisa al resto de la aplicación al terminar
+      // (ver EVENTO_WIDGETS), así que el lienzo se repinta solo.
+      await sincronizarWidgets();
+
       await refrescarProyectos();
       abrirProyecto(r.proyecto_id);
       setAbierto(false);
@@ -192,6 +194,14 @@ export function ProyectoSelector() {
         partes.push(
           `${r.widgets_ya_existentes.length} ${t('projects.importedWidgetsKept')}`
         );
+      }
+
+      // Lo que no se va a poder dibujar, dicho por su nombre. Va al aviso de
+      // error y no al de «salió bien»: el proyecto está importado, pero se
+      // verá incompleto y conviene que se note.
+      const faltan = widgetsQueFaltan(doc);
+      if (faltan.length > 0) {
+        setError(`${t('projects.importedMissing')} ${faltan.join(', ')}.`);
       }
       setAviso(partes.join(' '));
     });
@@ -427,27 +437,12 @@ export function ProyectoSelector() {
         className="hidden"
       />
 
-      {/* ── Aviso de que algo salió bien ─────────────────────── */}
-      {aviso && !error && (
-        <div
-          role="status"
-          className="absolute left-0 top-full z-50 mt-1.5 flex w-80 items-start gap-2 rounded-lg border border-siemens/30 bg-siemens-50 px-3 py-2 text-[11px] leading-relaxed text-siemens shadow-lg dark:bg-siemens/15 dark:text-siemens-200"
-        >
-          <CheckIcon className="mt-px h-3.5 w-3.5 shrink-0" />
-          <span className="min-w-0">{aviso}</span>
-        </div>
-      )}
-
-      {/* ── Error ────────────────────────────────────────────── */}
-      {error && (
-        <div
-          role="alert"
-          className="absolute left-0 top-full z-50 mt-1.5 flex w-80 items-start gap-2 rounded-lg border border-state-error/20 bg-state-error/5 px-3 py-2 text-[11px] leading-relaxed text-state-error shadow-lg"
-        >
-          <AlertTriangleIcon className="mt-px h-3.5 w-3.5 shrink-0" />
-          <span className="min-w-0">{error}</span>
-        </div>
-      )}
+      <PilaDeAvisos
+        error={error}
+        aviso={aviso}
+        onCerrarError={() => setError('')}
+        onCerrarAviso={() => setAviso('')}
+      />
 
       {borrar && (
         <ConfirmarBorrarProyecto
@@ -607,6 +602,23 @@ function ConfirmarBorrarProyecto({
       </div>
     </div>
   );
+}
+
+/**
+ * Widgets `custom:` que usa el fichero y que NO se van a poder dibujar.
+ *
+ * Se comprueba DESPUÉS de sincronizar, con el catálogo ya al día. Pasa cuando
+ * el fichero se exportó desde un equipo al que también le faltaba la
+ * definición: exportar no puede llevarse lo que allí tampoco estaba.
+ */
+function widgetsQueFaltan(doc: ProyectoExportado): string[] {
+  const faltan = new Set<string>();
+  for (const pantalla of (doc.pantallas ?? []) as any[]) {
+    for (const kind of kindsSinDefinicion(pantalla?.widgets ?? [])) {
+      faltan.add(kind);
+    }
+  }
+  return [...faltan];
 }
 
 /** Traduce el error del backend a algo accionable. */

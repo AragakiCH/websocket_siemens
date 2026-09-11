@@ -18,7 +18,7 @@ import {
 '../models/plc';
 import { HmiWidget, WidgetKind, BuiltInWidgetKind } from '../models/widget';
 import { RealPLCService as MockPLCService } from '../services/RealPLCService';
-import { sincronizarWidgets } from '../services/zipWidgetLoader';
+import { sincronizarWidgets, EVENTO_WIDGETS } from '../services/zipWidgetLoader';
 import { createTranslator, widgetLabel as widgetLabelFn, TFn } from '../i18n';
 import { customByKind, zipByKind } from '../components/hmi/custom/registry';
 import {
@@ -144,6 +144,16 @@ interface AppStore {
   /** Cambia la pantalla activa del Diseñador. */
   abrirPantalla: (projectId: string) => void;
 
+  /**
+   * Sube en cada cambio del catálogo de widgets personalizados.
+   *
+   * No se lee: existe para que el árbol se vuelva a dibujar. El lienzo
+   * resuelve cada `custom:` contra una caché que se lee de forma síncrona, así
+   * que un widget que llega a media sesión (al importar un proyecto) no se
+   * pintaría hasta el siguiente render por cualquier otro motivo.
+   */
+  widgetsVersion: number;
+
   // canvas widgets
   widgets: HmiWidget[];
   setWidgets: React.Dispatch<React.SetStateAction<HmiWidget[]>>;
@@ -198,6 +208,7 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   useState<'cargando' | 'ok' | 'error'>('cargando');
   const [projectVersion, setProjectVersion] = useState<number>(0);
   const [osDark, setOsDark] = useState<boolean>(systemPrefersDark);
+  const [widgetsVersion, setWidgetsVersion] = useState(0);
   // Subscribe to the emulated PLC value stream.
   useEffect(() => {
     const unsub = MockPLCService.subscribe(setVariables);
@@ -296,6 +307,15 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   // un widget importado desde otra máquina o en otra sesión no aparecería.
   useEffect(() => {
     void sincronizarWidgets();
+  }, []);
+
+  // El catálogo puede cambiar a media sesión: al subir un `.zip`, al borrar
+  // uno, o al importar un proyecto que trae los suyos. Repintar entonces es
+  // la diferencia entre ver el widget y ver una caja vacía hasta recargar.
+  useEffect(() => {
+    const alCambiar = () => setWidgetsVersion((v) => v + 1);
+    window.addEventListener(EVENTO_WIDGETS, alCambiar);
+    return () => window.removeEventListener(EVENTO_WIDGETS, alCambiar);
   }, []);
 
   useEffect(() => {
@@ -659,6 +679,7 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     pantallas,
     refrescarPantallas,
     abrirPantalla,
+    widgetsVersion,
     widgets,
     setWidgets
   };

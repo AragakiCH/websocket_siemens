@@ -23,6 +23,7 @@
 import { HmiWidget } from '../models/widget';
 import { fetchAuth } from '../services/authApi';
 import { PROYECTO_HMI_POR_DEFECTO } from './proyectoStorage';
+import { descargarJson, hoy, leerJsonDeFichero } from './descargas';
 
 /** Medidas y aspecto del lienzo de una pantalla. */
 export interface Lienzo {
@@ -484,4 +485,104 @@ export async function guardarProyecto(
   });
   saveDesign(design, projectId);
   return d.version;
+}
+
+// ===================================================================== //
+// Exportar / importar UNA pantalla
+// ===================================================================== //
+//
+// Es el hermano pequeno de exportar un proyecto (`proyectoStorage.ts`), y se
+// usa para otra cosa: llevarse UNA pantalla —la sinoptica de un equipo, una
+// vista de recetas— a otro proyecto o a otro equipo, sin arrastrar el HMI
+// entero.
+//
+// Viaja la pantalla con sus widgets y la DEFINICION de los widgets
+// personalizados que use. Sin eso, abrirla en otro equipo dejaria cajas
+// vacias donde habia un widget, sin ningun error que lo explicara.
+//
+// LO QUE NO PUEDE VIAJAR: LOS ENLACES A LAS HERMANAS
+// Una pantalla puede enlazar a otras del mismo proyecto desde su Menu
+// Lateral. Al llevarse una sola, esos destinos no van dentro. Al importar, el
+// servidor vacia los que no existan en el proyecto destino y los devuelve en
+// `enlaces_sueltos` para poder decirlo: dejar el id apuntando al vacio —o
+// peor, a una pantalla de otro proyecto— abriria el HMI equivocado sin dar
+// ningun error.
+
+export interface PantallaExportada {
+  formato: string;
+  version: number;
+  exportado_en?: string;
+  exportado_por?: string;
+  proyecto_origen?: { proyecto_id: string; nombre: string };
+  pantalla: { project_id: string; nombre: string; canvas: Lienzo; widgets: HmiWidget[] };
+  widgets_personalizados: unknown[];
+}
+
+export interface ResultadoImportacionPantalla {
+  project_id: string;
+  nombre: string;
+  proyecto: string;
+  num_widgets: number;
+  /** Secciones que se quedaron sin destino porque su pantalla no vino. */
+  enlaces_sueltos: string[];
+  widgets_importados: string[];
+  widgets_ya_existentes: string[];
+  widgets_con_error: string[];
+}
+
+/** Pide el documento de la pantalla. Es el contenido del fichero. */
+export async function exportarPantalla(
+  projectId: string
+): Promise<PantallaExportada> {
+  return fetchAuth(`/pantallas/${encodeURIComponent(projectId)}/exportar`);
+}
+
+/** Descarga la pantalla como fichero. Devuelve el nombre con el que se guardo. */
+export async function descargarPantalla(
+  projectId: string,
+  nombrePantalla: string
+): Promise<string> {
+  const doc = await exportarPantalla(projectId);
+  const base = idDesdeNombre(nombrePantalla || projectId);
+  return descargarJson(doc, `pantalla-${base}-${hoy()}.json`);
+}
+
+/** Lee el fichero elegido y comprueba que sea una pantalla exportada. */
+export function leerFicheroDePantalla(archivo: File): Promise<PantallaExportada> {
+  return leerJsonDeFichero<PantallaExportada>(
+    archivo,
+    'psicore.pantalla',
+    'Este fichero no es una pantalla exportada desde la aplicacion. Debe ser ' +
+      'el .json que genera «Exportar pantalla».'
+  );
+}
+
+/**
+ * Crea una pantalla nueva en `proyectoId` a partir del documento.
+ *
+ * Nunca sobrescribe: si ya hay una pantalla con ese id, la importada nace con
+ * un sufijo, y su nombre se marca como «(importada)» solo si choca con el de
+ * una hermana.
+ */
+export async function importarPantalla(
+  doc: PantallaExportada,
+  proyectoId: string,
+  nombre?: string
+): Promise<ResultadoImportacionPantalla> {
+  const params = new URLSearchParams({ proyecto: proyectoId });
+  if (nombre) params.set('nombre', nombre);
+  const d = await fetchAuth(`/pantallas/importar?${params.toString()}`, {
+    method: 'POST',
+    body: JSON.stringify(doc),
+  });
+  return {
+    project_id: d.project_id,
+    nombre: d.nombre,
+    proyecto: d.proyecto,
+    num_widgets: d.num_widgets ?? 0,
+    enlaces_sueltos: d.enlaces_sueltos ?? [],
+    widgets_importados: d.widgets_importados ?? [],
+    widgets_ya_existentes: d.widgets_ya_existentes ?? [],
+    widgets_con_error: d.widgets_con_error ?? [],
+  };
 }

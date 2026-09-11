@@ -60,6 +60,9 @@ DELETE /proyectos/{id}         borrar CON TODAS SUS PANTALLAS            [Superv
 GET    /proyectos/{id}/exportar   el proyecto entero en un .json
 POST   /proyectos/importar        crear uno desde ese .json                 [Administradores]
 
+GET    /pantallas/{id}/exportar   la pantalla en un .json
+POST   /pantallas/importar?proyecto=<id>   crearla en ese proyecto            [Administradores]
+
 GET    /pantallas?proyecto=<id>   las de un proyecto (sin el filtro, todas)
 POST   /pantallas                 {project_id, nombre, proyecto}
 ...el resto igual que antes, con /pantallas en vez de /proyectos
@@ -126,6 +129,25 @@ Se conservan los ids originales siempre que se pueda porque eso hace que el
 caso normal —llevar el proyecto a un equipo que no lo tiene— no toque
 absolutamente nada: mismos ficheros, mismos enlaces.
 
+### El catálogo de widgets se refresca en el acto
+
+Los widgets personalizados que trae el fichero entran en el servidor durante la
+importación, pero el lienzo y el panel de widgets los resuelven contra una
+caché del navegador que **solo se llenaba al arrancar**. El resultado era
+desconcertante: el servidor tenía el widget, el proyecto lo usaba, y en
+pantalla salía una caja vacía hasta recargar la página — como si la
+importación se hubiera dejado algo, cuando ya estaba todo guardado.
+
+Ahora, al terminar de importar se vuelve a pedir el catálogo (`GET /widgets`) y
+el almacén emite `hmi:widgets-personalizados`; el panel de widgets y el lienzo
+lo escuchan y se repintan. Lo mismo vale para subir o borrar un `.zip`: antes
+solo se enteraba el panel desde el que se hizo.
+
+Si el proyecto usa un widget que **no venía en el fichero ni está en este
+equipo**, se dice por su nombre al terminar. Eso pasa cuando el fichero se
+exportó desde un equipo al que también le faltaba la definición: exportar no
+puede llevarse lo que allí tampoco estaba.
+
 ### Rechazos, y por qué se leen
 
 | Situación | Respuesta |
@@ -137,6 +159,52 @@ absolutamente nada: mismos ficheros, mismos enlaces.
 
 Lo de la versión importa: leer a medias un formato que no se entiende y crear
 un proyecto incompleto es mucho peor que no importarlo.
+
+## Llevarse UNA pantalla
+
+Además del proyecto entero, cada pantalla se puede exportar por separado
+(botones **Exportar** e **Importar** en la barra de pestañas). Sirve para
+mover la sinóptica de un equipo a otro proyecto —o a otra instalación— sin
+arrastrar el HMI completo.
+
+Viaja lo mismo que en un proyecto, a su escala: la pantalla con sus widgets y
+la definición de los widgets personalizados que use. Si borras la pantalla
+**y** su widget personalizado y luego importas el fichero, vuelven los dos.
+
+| | Proyecto | Pantalla |
+|---|---|---|
+| Fichero | `psicore.proyecto` | `psicore.pantalla` |
+| Dónde | Selector de proyecto | Barra de pestañas |
+| Crea | Un proyecto nuevo con sus pantallas | Una pantalla en el proyecto abierto |
+| Enlaces entre pantallas | Se conservan (viajan todas) | Ver abajo |
+
+### Los enlaces a las hermanas, que es lo único distinto
+
+Una pantalla puede enlazar a otras del mismo proyecto desde su Menú Lateral.
+Al llevarse **una sola**, esos destinos no van dentro del fichero, y hay tres
+salidas posibles de las que solo una es aceptable:
+
+* dejar el id tal cual → si en el equipo de destino existe una pantalla con ese
+  id **de otro proyecto**, el Panel de Sección cargaría el diseño del HMI de al
+  lado sin decir nada. Es el peor final: no falla, miente;
+* borrarlo en silencio → el usuario pierde su intención sin enterarse;
+* **borrarlo y decirlo**, que es lo que se hace. La sección se queda como una
+  sección normal y el aviso dice cuántas se quedaron sin destino, para volver a
+  elegirla en el Inspector.
+
+Un enlace que **sí** apunta a una pantalla del proyecto de destino no se toca:
+ese es el caso de reimportar una pantalla junto a sus hermanas, y ahí funciona
+sin más. Y lo que la pantalla enlazaba **a sí misma** sigue a la copia, no al
+original: si no, dos pantallas distintas acabarían enseñando lo mismo, que es
+justo lo contrario de duplicar.
+
+### Dónde vive el código común
+
+`app/api/intercambio.py` tiene las piezas que comparten las dos operaciones:
+cómo se elige un id libre, qué widgets viajan, qué se hace con los enlaces.
+Están juntas a propósito — son exactamente las decisiones que se rompen cuando
+se copian y pegan: se arregla un caso, el otro se queda atrás, y nadie se
+entera hasta que alguien importa algo raro.
 
 ## Reglas que impone el servidor
 
