@@ -37,6 +37,12 @@ export default defineConfig({
       // pestañas se veía vacía con un 404 que parecía del backend.
       '/proyectos': BACKEND,
       '/pantallas': BACKEND,
+      // Paleta y tipografías (el Gestor de Temas). SIN esta línea el GET
+      // /temas no sale de Vite: el servidor de desarrollo responde el
+      // index.html de la aplicación, así que el fetch recibe HTML donde
+      // esperaba JSON, el catálogo se queda vacío y el Gestor enseña «No hay
+      // ningún tema seleccionado» — con el backend funcionando perfectamente.
+      '/temas': BACKEND,
       '/locks': BACKEND,
       '/auditoria': BACKEND,
       // Flow Editor: conexiones a BD y grupos del historizador.

@@ -32,6 +32,9 @@ from app.api import (ai_routes, alarm_routes, auth_routes, crud_routes,
                      historian_routes, lock_routes, project_routes,
                      proyecto_routes, rest_routes, sistema_routes,
                      variables_routes,
+                     db_routes, export_routes, historian_routes, lock_routes,
+                     project_routes, rest_routes, sistema_routes,
+                     tema_routes,
                      websocket_routes, widget_routes)
 from app.config.settings import get_settings
 from app.core.alarm_engine import MotorAlarmas
@@ -50,6 +53,7 @@ from app.core.lock_manager import LockManager
 from app.core.plc_manager import PlcManager
 from app.db.project_store import ProjectStore
 from app.db.proyecto_store import ProyectoStore
+from app.db.tema_store import TemaStore
 
 
 def _configurar_logging(nivel: str) -> None:
@@ -120,6 +124,11 @@ async def lifespan(app: FastAPI):
     # adoptan, quedan invisibles: no salen en ninguna lista pero siguen
     # ocupando su id.
     await project_store.adoptar_huerfanas(proyecto_store.ids())
+    # El ASPECTO del HMI —paleta y tipografías— también es del servidor y no
+    # del navegador, por el mismo motivo que el diseño: si cada máquina se
+    # guardara su tema, dos paneles de la misma línea acabarían con colores
+    # distintos y el rojo de alarma dejaría de significar lo mismo en todas.
+    tema_store = TemaStore()
     # Identidad: las cuentas están en la tabla SQL `usuarios`, así que
     # este gestor necesita el DbManager para llegar a ellas.
     auth_manager = AuthManager(db_manager, settings)
@@ -144,6 +153,7 @@ async def lifespan(app: FastAPI):
     app.state.grabador = grabador
     app.state.project_store = project_store
     app.state.proyecto_store = proyecto_store
+    app.state.tema_store = tema_store
     app.state.auth_manager = auth_manager
     app.state.lock_manager = lock_manager
     app.state.auditoria = auditoria
@@ -503,6 +513,8 @@ app.add_middleware(
 app.include_router(auth_routes.router)
 app.include_router(proyecto_routes.router)
 app.include_router(project_routes.router)
+# Paleta y tipografías del proyecto (el Gestor de Temas).
+app.include_router(tema_routes.router)
 app.include_router(lock_routes.router)
 app.include_router(rest_routes.router, tags=["REST"])
 app.include_router(websocket_routes.router, tags=["WebSocket"])

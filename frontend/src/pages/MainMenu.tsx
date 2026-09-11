@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import {
   SettingsIcon,
   LayoutDashboardIcon,
+  PaletteIcon,
   ArrowRightIcon,
   UsersIcon,
   ShieldCheckIcon,
@@ -108,6 +109,19 @@ export function MainMenu() {
             icon={<LayoutDashboardIcon className="h-6 w-6" />}
             onClick={() => navigate('/designer')}
             delay={0.12}
+            open={t('menu.open')} />
+
+          {/* Los temas van junto al Diseñador: son dos mitades de la misma
+              tarea. Allí se diseña la pantalla, y aquí se decide de qué color
+              es todo lo que se puso en ella, y con qué tipografía. */}
+          <MenuCard
+            title="Temas"
+            description={
+            'Defina los colores del proyecto en modo claro y oscuro, y las ' +
+            'tipografías. Lo que cambie aquí se ve en todos los paneles.'}
+            icon={<PaletteIcon className="h-6 w-6" />}
+            onClick={() => navigate('/temas')}
+            delay={0.16}
             open={t('menu.open')} />
 
           {verActividad &&
@@ -224,4 +238,4 @@ function MenuCard({
       </span>
     </motion.button>);
 
-}
+}

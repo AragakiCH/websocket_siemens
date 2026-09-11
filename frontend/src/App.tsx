@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AppStoreProvider } from './context/AppStore';
+import { TemaProvider } from './context/TemaProvider';
 import { Login } from './pages/Login';
 import { Actividad } from './pages/Actividad';
 import { Usuarios } from './pages/Usuarios';
@@ -11,6 +12,7 @@ import { RutaProtegida } from './components/auth/RutaProtegida';
 import { MainMenu } from './pages/MainMenu';
 import { Configuracion } from './pages/Configuracion';
 import { Designer } from './pages/Designer';
+import { GestorTemas } from './pages/GestorTemas';
 
 import { Preview } from './pages/Preview';   
 
@@ -38,6 +40,11 @@ function Page({ children }: {children: React.ReactNode;}) {
 export function App() {
   return (
     <AppStoreProvider>
+      {/* Por encima del enrutador a propósito: el tema tiene que estar puesto
+          ANTES del primer pintado y seguir puesto al cambiar de página. Dentro
+          de una ruta, el Diseñador y la Vista Previa lo cargarían por separado
+          y se verían distintos durante el primer fotograma. */}
+      <TemaProvider>
       <BrowserRouter>
         {/* `flex-col` y no el `h-full` de antes: el banner de alarmas es un
             hermano de las páginas, no un elemento flotante encima. Así,
@@ -88,6 +95,22 @@ export function App() {
                 <RutaProtegida>
                     <Page>
                       <Designer />
+                    </Page>
+                  </RutaProtegida>
+                } />
+
+              {/* El Gestor de Temas es herramienta de DISEÑO: decide el
+                  aspecto de TODOS los paneles de la instalación, no el de
+                  quien lo abre. Va con la misma protección que el Diseñador.
+                  Leer los temas sí es público —lo hace el runtime de cada
+                  panel—, pero eso lo resuelve el backend; esta ruta es la
+                  puerta de la EDICIÓN. */}
+              <Route
+                path="/temas"
+                element={
+                <RutaProtegida>
+                    <Page>
+                      <GestorTemas />
                     </Page>
                   </RutaProtegida>
                 } />
@@ -151,6 +174,7 @@ export function App() {
           </div>
         </div>
       </BrowserRouter>
+      </TemaProvider>
     </AppStoreProvider>);
 
-}
+}

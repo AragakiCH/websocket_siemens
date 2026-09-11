@@ -123,10 +123,18 @@ export interface EstiloParte {
   opacity?: number;
 }
 
+// LOS DOS COLORES ARRANCAN APUNTANDO AL TEMA, no a un literal. Es lo que
+// hace que el Gestor de Temas sirva de algo: un widget recién soltado ya
+// sigue la paleta del proyecto, y cambiar el color corporativo mueve todo lo
+// que nadie haya personalizado a mano.
+//
+// Los diseños que YA EXISTEN no cambian: siguen con su literal guardado, y
+// solo se enganchan si alguien los pasa por el botón de adopción del Gestor
+// de Temas o los reelige en el Inspector.
 export const defaultStyle = (): WidgetStyle => ({
-  color: '#009999',
+  color: 'var(--psi-primary)',
   background: 'transparent',
-  borderColor: '#94a3b8',
+  borderColor: 'var(--psi-outline)',
   borderWidth: 0,
   borderRadius: 8,
   fontSize: 14,
@@ -134,4 +142,4 @@ export const defaultStyle = (): WidgetStyle => ({
   align: 'center',
   rotation: 0,
   opacity: 1
-});
+});

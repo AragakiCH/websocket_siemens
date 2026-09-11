@@ -480,7 +480,7 @@ function CircularGauge({
           cy="50"
           r={r}
           fill="none"
-          stroke={color}
+          style={{ stroke: color }}
           strokeWidth="9"
           strokeLinecap="round"
           strokeDasharray={c}
@@ -579,7 +579,7 @@ function MiniChart({ color, frac }: { color: string; frac: number }) {
         <polyline
           points={pts}
           fill="none"
-          stroke={color}
+          style={{ stroke: color }}
           strokeWidth="2.5"
           vectorEffect="non-scaling-stroke"
         />
