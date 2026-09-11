@@ -29,7 +29,8 @@ import { esToken, tokenDeRol } from '../models/tema';
 import {
   cargarProyecto,
   guardarProyecto,
-  listarProyectos,
+  listarPantallas,
+  type Lienzo,
 } from './designStorage';
 
 /** Las propiedades de estilo que llevan un color. */
@@ -50,7 +51,12 @@ export interface Plan {
     projectId: string;
     version: number;
     widgets: HmiWidget[];
-    canvas: { width: number; height: number };
+    /**
+     * El lienzo tal cual venía. Se pasa entero y sin tocar: además de las
+     * medidas lleva el `fondo` de la pantalla, y reconstruirlo campo a campo
+     * sería la forma de perderlo en cada adopción de tema.
+     */
+    canvas: Lienzo;
   }[];
   /** Pantallas que no se pudieron leer. Se avisa en vez de callarlo. */
   ilegibles: string[];
@@ -85,7 +91,11 @@ export async function planificar(tema: Tema): Promise<Plan> {
   const pendientes: Plan['pendientes'] = [];
   const ilegibles: string[] = [];
 
-  const pantallas = await listarProyectos();
+  // TODAS las pantallas de la instalación, de todos los proyectos. Sin filtro
+  // a propósito: el tema es de la instalación, no de un proyecto, así que
+  // adoptar solo las del proyecto abierto dejaría los demás HMI con sus
+  // colores literales y la siguiente edición del tema no los movería.
+  const pantallas = await listarPantallas();
 
   for (const p of pantallas) {
     let doc;

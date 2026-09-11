@@ -49,10 +49,32 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.api.auth_routes import exigir_rol, usuario_de
 from app.core.auth_manager import Sesion
+from app.core.crud_manager import ErrorCrud
 
 logger = logging.getLogger("alarm_routes")
 
 router = APIRouter(prefix="/alarmas", tags=["Alarmas"])
+
+
+def _error(exc: ErrorCrud) -> HTTPException:
+    """
+    Convierte un `ErrorCrud` en la respuesta HTTP que ya lleva dentro.
+
+    POR QUÉ HACE FALTA. `ErrorCrud` nace con su código (503 si la base no
+    abre, 400 si el dato es inválido) y un mensaje escrito para que alguien lo
+    lea. Pero si nadie lo captura, FastAPI no sabe nada de él: se escapa como
+    una excepción cualquiera y sale un **500 con la traza entera** en el log.
+
+    Se notó con la base de datos caída: la vista consulta
+    `/alarmas/pendientes` cada pocos segundos, así que cada consulta escupía
+    dos trazas de sesenta líneas. El log quedaba inservible para ver cualquier
+    otra cosa, y el frontend recibía un 500 genérico en vez del motivo real,
+    que estaba ahí desde el principio: "no se pudo abrir la conexión".
+
+    `crud_routes` ya tenía este mismo helper. Esto no es un caso nuevo, es el
+    mismo tratamiento que faltaba en los endpoints de alarmas.
+    """
+    return HTTPException(exc.codigo, exc.mensaje)
 
 
 def _motor(request: Request):
@@ -105,7 +127,10 @@ async def pendientes(
     limite: int = Query(200, ge=1, le=500),
 ) -> Dict[str, Any]:
     motor = _motor(request)
-    filas = await motor.pendientes(limite=limite)
+    try:
+        filas = await motor.pendientes(limite=limite)
+    except ErrorCrud as exc:
+        raise _error(exc)
     return {
         "ok": True,
         "alarmas": filas,
@@ -153,12 +178,15 @@ async def historico(
     if tag:
         filtros["tag"] = tag
 
-    return await request.app.state.crud_manager.listar(
-        "alarmas", db_id=motor.db_id, filtros=filtros,
-        desde=desde, hasta=hasta,
-        orden="ts_activacion", descendente=True,
-        limite=limite, offset=offset,
-    )
+    try:
+        return await request.app.state.crud_manager.listar(
+            "alarmas", db_id=motor.db_id, filtros=filtros,
+            desde=desde, hasta=hasta,
+            orden="ts_activacion", descendente=True,
+            limite=limite, offset=offset,
+        )
+    except ErrorCrud as exc:
+        raise _error(exc)
 
 
 @router.get(
@@ -172,6 +200,10 @@ async def historico(
                 "editor no se distingue de una que sí funciona.",
 )
 async def estado(request: Request) -> Dict[str, Any]:
+    # Este NO toca la base —`estado()` lee contadores en memoria—, así que no
+    # puede lanzar ErrorCrud. Se deja tal cual a propósito: es justo el
+    # endpoint al que se recurre cuando la base está caída para entender por
+    # qué, y envolverlo en un try lo haría parecer frágil sin serlo.
     return {"ok": True, **_motor(request).estado()}
 
 
@@ -194,8 +226,11 @@ async def reconocer_todas(
     # ruta con parámetro, que intentaría convertirlo a int y devolvería un
     # 422 desconcertante.
     motor = _motor(request)
-    r = await motor.reconocer_todas(
-        usuario_id=getattr(sesion, "usuario_id", None))
+    try:
+        r = await motor.reconocer_todas(
+            usuario_id=getattr(sesion, "usuario_id", None))
+    except ErrorCrud as exc:
+        raise _error(exc)
     _auditar(request, "alarma.reconocidas_todas", sesion,
              detalle={"cuantas": r.get("reconocidas", 0)})
     return r
