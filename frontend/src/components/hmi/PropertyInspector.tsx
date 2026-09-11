@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { MousePointerSquareDashedIcon, Link2Icon, AlertTriangleIcon, ShapesIcon } from 'lucide-react';
 import { HmiWidget } from '../../models/widget';
 import { PlcVariable } from '../../models/plc';
+import { ColorTema } from './ColorTema';
 import { useAppStore } from '../../context/AppStore';
 import { catalogByKind } from './widgetCatalog';
 import {
@@ -30,7 +31,6 @@ import {
 import {
   TextField,
   NumberField,
-  ColorField,
   ToggleField,
   SliderField,
   SelectField,
@@ -43,92 +43,17 @@ interface Props {
   onStyleChange: (patch: Partial<HmiWidget['style']>) => void;
   onDelete: () => void;
 }
-/** Damero: el modo universal de decir «aquí no hay color». */
-const DAMERO: React.CSSProperties = {
-  backgroundImage:
-    'linear-gradient(45deg,#cbd5e1 25%,transparent 25%,transparent 75%,#cbd5e1 75%),' +
-    'linear-gradient(45deg,#cbd5e1 25%,transparent 25%,transparent 75%,#cbd5e1 75%)',
-  backgroundSize: '8px 8px',
-  backgroundPosition: '0 0, 4px 4px',
-  backgroundColor: '#fff'
-};
-
-/**
- * El fondo de un widget, que puede ser un color O NO EXISTIR.
- *
- * POR QUÉ NO ES UN <input type="color"> A SECAS
- * Porque ese control no sabe decir «ninguno». No tiene ese valor: siempre
- * devuelve un color. La versión anterior lo disimulaba cargándole #ffffff
- * cuando el fondo era transparente, y ahí estaba la trampa — un control
- * cargado con un valor que no es el real. Bastaba con que emitiera un solo
- * evento (abrirlo y cerrarlo sin elegir nada ya cuenta) para que ese #ffffff
- * de mentira se guardara como fondo de verdad.
- *
- * Y el sitio donde peor se nota es un widget ZIP: el fondo blanco no tapa su
- * dibujo, así que no se ve nada raro salvo un marco blanco alrededor, y desde
- * fuera parece que el ZIP viene con fondo. No hay forma de adivinar que lo
- * puso el editor.
- *
- * LA SOLUCIÓN: SIN FONDO NO HAY SELECTOR DE COLOR.
- * Cuando no hay fondo se dibuja un damero, y para poner uno hay que pedirlo.
- * Es un clic más, y a cambio es imposible acabar con un fondo que no elegiste.
- */
-function ControlFondo({
-  valor,
-  onChange,
-  t
-
-
-
-
-}: {valor: any;onChange: (v: any) => void;t: (k: string) => string;}) {
-  const sinFondo = !valor || valor === 'transparent';
-
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-        {t('insp.bgColor')}
-      </span>
-
-      <div className="flex items-center gap-1.5">
-        <span className="font-mono text-[11px] text-slate-400">
-          {sinFondo ? t('insp.noBg') : valor}
-        </span>
-
-        {sinFondo ?
-        // Gris neutro y no blanco: al añadir un fondo se tiene que VER que se
-        // añadió. Un blanco sobre el lienzo claro no se distingue de no tener
-        // fondo, que es justo la confusión que se quiere evitar.
-        <button
-          type="button"
-          onClick={() => onChange('#cbd5e1')}
-          title="Poner un color de fondo"
-          aria-label="Poner un color de fondo"
-          className="h-7 w-9 rounded border border-slate-200 transition hover:border-siemens dark:border-navy-slate"
-          style={DAMERO} /> :
-
-
-        <>
-            <input
-            type="color"
-            value={valor}
-            onChange={(e) => onChange(e.target.value)}
-            className="h-7 w-9 cursor-pointer rounded border border-slate-200 bg-white p-0.5 dark:border-navy-slate dark:bg-navy" />
-
-            <button
-            type="button"
-            onClick={() => onChange('transparent')}
-            title="Quitar el fondo"
-            aria-label="Quitar el fondo"
-            className="rounded border border-slate-200 px-1.5 py-1 text-[11px] text-slate-400 transition hover:border-siemens hover:text-siemens dark:border-navy-slate">
-              ∅
-            </button>
-          </>
-        }
-      </div>
-    </div>);
-
-}
+// El control del FONDO y el de los colores es ahora el MISMO: `ColorTema`.
+// Sabe decir «sin fondo» y sabe apuntar a un color del tema.
+//
+// Aquí vivía `ControlFondo`, y su motivo sigue vigente aunque el código se
+// haya ido: un <input type="color"> NO sabe representar «ninguno». La versión
+// que lo cargaba con #ffffff cuando el fondo era transparente enseñaba un
+// valor falso, y bastaba con abrirlo y cerrarlo para guardar ese blanco de
+// mentira. Donde peor se notaba era en un widget ZIP: el blanco no tapa su
+// dibujo, solo deja un marco, y no hay forma de adivinar que lo puso el
+// editor. Si algún día se vuelve a tocar esto, la regla es la de entonces:
+// sin fondo no hay selector de color.
 
 /**
  * Control de una propiedad de estilo.
@@ -148,12 +73,28 @@ function ControlProp({
 }: {prop: PropParte;valor: any;onChange: (v: any) => void;t: (k: string) => string;}) {
   switch (prop) {
     case 'background':
-      return <ControlFondo valor={valor} onChange={onChange} t={t} />;
+      return (
+        <ColorTema
+          label={t('insp.bgColor')}
+          value={valor}
+          onChange={onChange}
+          permiteNinguno />);
+
 
     case 'color':
-      return <ColorField label={t('insp.color')} value={valor ?? '#009999'} onChange={onChange} />;
+      return (
+        <ColorTema
+          label={t('insp.color')}
+          value={valor ?? 'var(--psi-primary)'}
+          onChange={onChange} />);
+
     case 'borderColor':
-      return <ColorField label={t('insp.borderColor')} value={valor ?? '#94a3b8'} onChange={onChange} />;
+      return (
+        <ColorTema
+          label={t('insp.borderColor')}
+          value={valor ?? 'var(--psi-outline)'}
+          onChange={onChange} />);
+
     case 'borderWidth':
       return <SliderField label={t('insp.borderWidth')} value={valor ?? 0} min={0} max={8} onChange={onChange} suffix="px" />;
     case 'borderRadius':
@@ -649,4 +590,4 @@ export function PropertyInspector({
       </Section>
     </aside>);
 
-}
+}
