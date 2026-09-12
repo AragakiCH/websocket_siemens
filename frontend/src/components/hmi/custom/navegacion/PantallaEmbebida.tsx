@@ -54,7 +54,7 @@ import type { HmiWidget } from '../../../../models/widget';
 import { useAppStore } from '../../../../context/AppStore';
 import { cargarProyecto, type SavedDesign } from '../../../../utils/designStorage';
 import { WidgetRenderer } from '../../WidgetRenderer';
-import { esWidgetDeNavegacion } from './store';
+import { ContextoEmbebido, esWidgetDeNavegacion } from './store';
 
 /** Cómo encaja el lienzo de la pantalla dentro del marco del panel. */
 export type ModoAjuste = 'ajustar' | 'estirar' | 'real';
@@ -289,12 +289,24 @@ interface Props {
   modo: ModoAjuste;
   /** true en la Vista Previa: los widgets se operan. */
   interactivo: boolean;
+  /**
+   * Dibujar SOLO los widgets de esta sección.
+   *
+   * Sin esto se dibuja la pantalla entera, que es lo que hace falta cuando
+   * una sección abre otra pantalla. Pero hay secciones que no abren nada:
+   * simplemente filtran los widgets de su propio lienzo. Para enseñar una de
+   * esas en miniatura hay que cargar esa misma pantalla y quedarse con los
+   * widgets que le pertenecen — que es exactamente lo que verá el operador
+   * al entrar en ella.
+   */
+  soloVista?: string;
 }
 
 export default function PantallaEmbebida({
   projectId,
   modo,
   interactivo,
+  soloVista,
 }: Props) {
   const { variables } = useAppStore();
   const { design, cargando, error } = usePantallaEmpotrada(projectId);
@@ -308,10 +320,15 @@ export default function PantallaEmbebida({
    */
   const aDibujar = useMemo<HmiWidget[]>(
     () =>
-      (design?.widgets ?? []).filter(
-        (w) => w.visible !== false && !esWidgetDeNavegacion(w.kind)
-      ),
-    [design]
+      (design?.widgets ?? []).filter((w) => {
+        if (w.visible === false || esWidgetDeNavegacion(w.kind)) return false;
+        if (!soloVista) return true;
+        // Los de vista vacía se ven en TODAS las secciones (un logo, una
+        // barra fija), así que también pertenecen a ésta.
+        const v = (w.vista ?? '').trim();
+        return !v || v === soloVista;
+      }),
+    [design, soloVista]
   );
 
   const cw = design?.canvas?.width ?? 0;
@@ -387,6 +404,10 @@ export default function PantallaEmbebida({
   }
 
   return (
+    /* Todo lo de dentro sabe que ya está empotrado. Lo usa la Tarjeta de
+       Acceso para no dibujar su propia miniatura aquí: dos tarjetas que se
+       apuntaran la una a la otra se pintarían sin final. */
+    <ContextoEmbebido.Provider value>
     <div
       ref={ref}
       style={{
@@ -436,5 +457,6 @@ export default function PantallaEmbebida({
         </div>
       )}
     </div>
+    </ContextoEmbebido.Provider>
   );
 }

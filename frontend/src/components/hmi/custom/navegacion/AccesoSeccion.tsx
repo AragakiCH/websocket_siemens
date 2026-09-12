@@ -26,12 +26,28 @@
 // Apuntando a la sección se usa el MISMO `setVistaActiva` que el menú y que
 // las pestañas de la barra: los tres mandos quedan sincronizados solos.
 //
-// POR QUÉ NO SE DIBUJA DENTRO DE UNA PANTALLA EMPOTRADA
-// Está en `KINDS_NAVEGACION`, como el menú y el Panel de Sección. Si una
-// tarjeta apuntara a una pantalla que a su vez tiene otra tarjeta apuntando
-// de vuelta, cada miniatura dibujaría la siguiente sin final. Cortarlo aquí
-// es una línea; detectarlo en caliente serían varias y un contador de
-// profundidad que alguien tendría que mantener.
+// QUÉ PREVISUALIZA, SEGÚN CÓMO SEA LA SECCIÓN
+// Una sección puede hacer dos cosas distintas, y la tarjeta cubre las dos:
+//
+//   · Si abre OTRA PANTALLA, se dibuja esa pantalla.
+//   · Si no abre ninguna —solo filtra los widgets de este mismo lienzo—, se
+//     dibuja la pantalla ACTUAL quedándose con los widgets de esa sección.
+//     Es exactamente lo que el operador verá al pulsar.
+//
+// El segundo caso es el más común en un proyecto de verdad, y al principio no
+// estaba: la tarjeta salía vacía sin que se entendiera por qué.
+//
+// DENTRO DE UNA MINIATURA NO DIBUJA OTRA
+// Si una tarjeta apuntara a una pantalla que lleva otra tarjeta apuntando de
+// vuelta, cada miniatura pintaría la siguiente sin final. Lo corta
+// `useEstaEmbebido()`, la bandera que pone `PantallaEmbebida` alrededor de lo
+// que dibuja.
+//
+// Se probó antes metiéndola en `KINDS_NAVEGACION` y estaba MAL: ese conjunto
+// significa «soy parte del armazón», así que el Diseñador le daba `VISTA_TODAS`
+// —la tarjeta aparecía en TODAS las secciones— y el Inspector ni siquiera le
+// ofrecía elegir la suya. La bandera apaga solo la miniatura y deja el resto
+// del widget intacto.
 // =========================================================================
 import { Suspense, lazy } from 'react';
 import { ImageIcon, ArrowUpRightIcon, Loader2Icon } from 'lucide-react';
@@ -43,6 +59,8 @@ import {
   setVistaActiva,
   nombreDePantalla,
   esNivel,
+  getPantalla,
+  useEstaEmbebido,
 } from './store';
 import { CampoGrupo, AvisoVistaPropia } from './inspector';
 import { estiloDeParte } from '../../partes';
@@ -90,8 +108,14 @@ function Acceso({ widget, interactivo }: RenderCtx) {
   const pTexto = estiloDeParte(widget, 'label');
 
   const destino = secciones.find((s) => s.id === cfg.seccion);
-  const pantalla = (destino?.pantalla ?? '').trim();
+  const asignada = (destino?.pantalla ?? '').trim();
   const esActual = !!cfg.seccion && cfg.seccion === activa;
+  const embebido = useEstaEmbebido();
+
+  // Qué dibujar dentro: la pantalla que la sección abre o, si no abre
+  // ninguna, esta misma pantalla filtrada a los widgets de esa sección.
+  const pantalla = asignada || (cfg.seccion ? getPantalla() : '');
+  const soloVista = asignada ? undefined : cfg.seccion || undefined;
 
   const titulo = destino?.label || destino?.id || 'Sin destino';
 
@@ -108,8 +132,8 @@ function Acceso({ widget, interactivo }: RenderCtx) {
       tabIndex={interactivo && cfg.seccion ? 0 : undefined}
       aria-current={esActual ? 'page' : undefined}
       title={
-        pantalla
-          ? `Abrir «${titulo}» (${nombreDePantalla(pantalla) || pantalla})`
+        asignada
+          ? `Abrir «${titulo}» (${nombreDePantalla(asignada) || asignada})`
           : `Abrir «${titulo}»`
       }
       onClick={ir}
@@ -166,7 +190,7 @@ function Acceso({ widget, interactivo }: RenderCtx) {
             {titulo}
           </span>
 
-          {cfg.mostrarDestino && pantalla && (
+          {cfg.mostrarDestino && asignada && (
             <span
               style={{
                 fontSize: Math.max(9, (pTexto.fontSize ?? 14) - 4),
@@ -176,7 +200,7 @@ function Acceso({ widget, interactivo }: RenderCtx) {
                 textOverflow: 'ellipsis',
               }}
             >
-              {nombreDePantalla(pantalla) || pantalla}
+              {nombreDePantalla(asignada) || asignada}
             </span>
           )}
 
@@ -209,7 +233,7 @@ function Acceso({ widget, interactivo }: RenderCtx) {
           pointerEvents: 'none',
         }}
       >
-        {pantalla ? (
+        {pantalla && !embebido ? (
           <Suspense
             fallback={
               <div
@@ -229,10 +253,11 @@ function Acceso({ widget, interactivo }: RenderCtx) {
             }
           >
             <PantallaEmbebida
-              key={pantalla}
+              key={`${pantalla}|${soloVista ?? ''}`}
               projectId={pantalla}
               modo="ajustar"
               interactivo={false}
+              soloVista={soloVista}
             />
           </Suspense>
         ) : (
@@ -252,9 +277,11 @@ function Acceso({ widget, interactivo }: RenderCtx) {
             }}
           >
             <ImageIcon style={{ width: 16, height: 16, opacity: 0.6 }} />
-            {cfg.seccion
-              ? 'Esta sección no abre ninguna pantalla, así que no hay nada que previsualizar.'
-              : 'Elige a qué sección lleva esta tarjeta.'}
+            {!cfg.seccion
+              ? 'Elige a qué sección lleva esta tarjeta.'
+              : embebido
+                ? 'Sin miniatura: esta tarjeta ya está dentro de otra pantalla.'
+                : 'No hay nada que previsualizar todavía.'}
           </div>
         )}
       </div>
@@ -272,7 +299,7 @@ function InspectorAcceso({ widget, config, setConfig }: InspectorCtx) {
   // que ofrecerlos aquí sería ofrecer un destino que no lleva a ningún sitio.
   const elegibles = secciones.filter((s) => !esNivel(s));
   const destino = secciones.find((s) => s.id === cfg.seccion);
-  const pantalla = (destino?.pantalla ?? '').trim();
+  const asignada = (destino?.pantalla ?? '').trim();
 
   return (
     <>
@@ -334,10 +361,10 @@ function InspectorAcceso({ widget, config, setConfig }: InspectorCtx) {
             Elige arriba a qué sección lleva. La miniatura enseñará la pantalla
             que esa sección tenga asignada en el <b>Menú Lateral</b>.
           </>
-        ) : pantalla ? (
+        ) : asignada ? (
           <>
-            Se previsualiza <b>{nombreDePantalla(pantalla) || pantalla}</b>, que
-            es la pantalla asignada a «{destino?.label || cfg.seccion}».
+            Se previsualiza <b>{nombreDePantalla(asignada) || asignada}</b>, que
+            es la pantalla que abre «{destino?.label || cfg.seccion}».
             <br />
             <br />
             La miniatura es el diseño de verdad, no una captura: si cambia esa
@@ -346,13 +373,13 @@ function InspectorAcceso({ widget, config, setConfig }: InspectorCtx) {
           </>
         ) : (
           <>
-            «{destino?.label || cfg.seccion}» no tiene ninguna pantalla asignada,
-            así que no hay nada que previsualizar: la tarjeta navegará igual,
-            pero enseñará un hueco.
+            «{destino?.label || cfg.seccion}» no abre ninguna pantalla: solo
+            enseña los widgets de ESTE lienzo que le pertenecen. La miniatura
+            los dibuja, que es lo que se verá al pulsar.
             <br />
             <br />
-            Para asignársela, elígela en el desplegable de esa sección, en las
-            propiedades del <b>Menú Lateral</b>.
+            Si todavía no has puesto ninguno en esa sección, saldrá vacía — y
+            entonces es que no hay nada que enseñar, no que esto falle.
           </>
         )}
       </div>

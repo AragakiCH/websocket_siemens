@@ -42,7 +42,7 @@
 // abre en su portada. Lo que sí se guarda con el proyecto es a qué vista
 // pertenece cada widget (`HmiWidget.vista`), que es otra cosa.
 // =========================================================================
-import { useMemo, useSyncExternalStore } from 'react';
+import { createContext, useContext, useMemo, useSyncExternalStore } from 'react';
 
 /** Grupo por defecto. Sidebar y Screen lo usan si no se cambia. */
 export const GRUPO_POR_DEFECTO = 'principal';
@@ -75,12 +75,34 @@ export const KIND_MENU = 'custom:sidebar-navegacion';
 export const KINDS_NAVEGACION = new Set<string>([
   KIND_MENU,
   'custom:pantalla-screen',
-  // La Tarjeta de Acceso dibuja dentro una miniatura de otra pantalla. Si esa
-  // pantalla llevara otra tarjeta apuntando de vuelta, cada miniatura pintaria
-  // la siguiente sin final. Dejandola fuera de las pantallas empotradas, el
-  // ciclo no puede empezar.
-  'custom:acceso-seccion',
+  // La Tarjeta de Acceso NO va aquí, aunque dibuje otra pantalla dentro.
+  // Este conjunto significa «soy parte del armazón»: `Designer.tsx` le da
+  // `VISTA_TODAS` al soltarlo —se ve en TODAS las secciones— y el Inspector
+  // no le ofrece elegir sección. Eso es lo correcto para el menú y para el
+  // Panel de Sección, que no pueden desaparecer al navegar; la tarjeta, en
+  // cambio, es contenido de UNA sección.
+  //
+  // La recursión que preocupaba se corta con `ContextoEmbebido`, más abajo:
+  // apaga solo la miniatura, sin tocar la vista ni el Inspector.
 ]);
+
+/**
+ * ¿Lo que se está dibujando va DENTRO de una pantalla empotrada?
+ *
+ * Lo pone `PantallaEmbebida` alrededor de lo que dibuja. Sirve para que un
+ * widget que a su vez empotra otra pantalla —la Tarjeta de Acceso— no lo
+ * haga cuando ya está dentro de una: si una tarjeta apuntara a una pantalla
+ * que lleva otra tarjeta apuntando de vuelta, cada miniatura dibujaría la
+ * siguiente sin final.
+ *
+ * Es una bandera de PROFUNDIDAD, no de tipo de widget: apaga exactamente lo
+ * que hay que apagar y deja intacto todo lo demás del widget.
+ */
+export const ContextoEmbebido = createContext(false);
+
+export function useEstaEmbebido(): boolean {
+  return useContext(ContextoEmbebido);
+}
 
 export function esWidgetDeNavegacion(kind: string): boolean {
   return KINDS_NAVEGACION.has(kind);
