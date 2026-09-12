@@ -62,7 +62,6 @@ import {
   useRutaDeVista,
   setPantalla,
   GRUPO_POR_DEFECTO,
-  type Seccion,
 } from '../components/hmi/custom/navegacion/store';
 
 import {
@@ -75,6 +74,7 @@ import {
 } from '../utils/designStorage';
 import {
   getUltimoProyecto,
+  listarProyectosHmi,
   PROYECTO_HMI_POR_DEFECTO,
 } from '../utils/proyectoStorage';
 
@@ -150,30 +150,47 @@ function Separador() {
  * pantalla no tiene navegación montada no se dibuja nada: un breadcrumb vacío
  * ocupa sitio para no decir nada.
  */
-function Ruta({ ruta }: { ruta: Seccion[] }) {
-  if (ruta.length === 0) return null;
-  const actual = ruta[ruta.length - 1];
+/**
+ * El camino hasta la vista abierta, y debajo dónde estás.
+ *
+ * Un SOLO camino, de fuera hacia dentro:
+ *
+ *     PROYECTO / PANTALLA / SECCIÓN / SUBSECCIÓN
+ *     Subsección
+ *
+ * Antes los mismos niveles estaban repartidos: el nombre de la pantalla como
+ * una etiqueta suelta y, tras un separador, la ruta de secciones. Nada decía
+ * que lo segundo colgara de lo primero, y el proyecto —que en esta versión es
+ * un nivel de verdad, un HMI distinto— no salía por ningún lado.
+ *
+ * Los niveles se van apagando hacia la izquierda y el último va en el color
+ * de marca: de un vistazo se ve cuánto has profundizado y por dónde llegaste.
+ */
+function Ruta({ niveles }: { niveles: string[] }) {
+  const camino = niveles.filter(Boolean);
+  if (camino.length === 0) return null;
+  const actual = camino[camino.length - 1];
 
   return (
     <div className="flex min-w-0 flex-col justify-center leading-tight">
       <span className="flex min-w-0 items-center gap-1 font-mono text-[10px] uppercase tracking-wider">
-        {ruta.map((s, i) => (
-          <span key={`${s.id}-${i}`} className="flex min-w-0 items-center gap-1">
+        {camino.map((label, i) => (
+          <span key={`${label}-${i}`} className="flex min-w-0 items-center gap-1">
             {i > 0 && <span className="text-slate-300 dark:text-navy-slate">/</span>}
             <span
               className={`truncate ${
-                i === ruta.length - 1
+                i === camino.length - 1
                   ? 'text-siemens'
                   : 'text-slate-400 dark:text-slate-500'
               }`}
             >
-              {s.label || s.id}
+              {label}
             </span>
           </span>
         ))}
       </span>
       <span className="truncate text-[13px] font-bold text-navy dark:text-slate-100">
-        {actual.label || actual.id}
+        {actual}
       </span>
     </div>
   );
@@ -235,6 +252,27 @@ export function Preview() {
   // operador porque alguien toca el Diseñador en otra ventana sería lo último
   // que uno espera de una pantalla de planta.
   const proyecto = useMemo(() => getUltimoProyecto(), []);
+
+  // El nombre legible del proyecto, para encabezar el camino. Se pide una vez
+  // y se cae en el id si el servidor no contesta: un camino que empieza por
+  // «principal» en vez de «Planta Norte» se entiende igual, y quedarse sin
+  // cabecera porque una lista no llegó no se entendería.
+  const [nombreProyecto, setNombreProyecto] = useState('');
+  useEffect(() => {
+    let vivo = true;
+    listarProyectosHmi()
+      .then((lista) => {
+        if (!vivo) return;
+        const p = lista.find((x) => x.proyecto_id === proyecto);
+        if (p) setNombreProyecto(p.nombre);
+      })
+      .catch(() => {
+        /* sin lista: el camino arranca por la pantalla, ver `niveles` */
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [proyecto]);
 
   // ── Qué pantalla se abre ────────────────────────────────────────
   //
@@ -434,6 +472,22 @@ export function Preview() {
   const nombreActual =
     pantallas.find((p) => p.project_id === pantallaId)?.nombre ?? pantallaId;
 
+  /**
+   * Los niveles del camino, de fuera hacia dentro.
+   *
+   * `ruta` son las secciones del Menú Lateral, que puede tener varios niveles
+   * anidados; delante van el proyecto y la pantalla, que son los dos niveles
+   * que existen aunque esa pantalla no lleve menú.
+   */
+  const niveles = useMemo(
+    () => [
+      nombreProyecto,
+      nombreActual,
+      ...ruta.map((s) => s.label || s.id),
+    ],
+    [nombreProyecto, nombreActual, ruta]
+  );
+
   return (
     <div className="flex h-full w-full flex-col bg-slate-200 dark:bg-navy">
 
@@ -445,13 +499,10 @@ export function Preview() {
 
         <Separador />
 
-        {/* En qué pantalla. Es un dato, no un selector. */}
-        <span className="shrink-0 truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
-          {nombreActual}
-        </span>
-
-        {ruta.length > 0 && <Separador />}
-        <Ruta ruta={ruta} />
+        {/* Proyecto / Pantalla / Sección…, y debajo dónde estás. Un solo
+            camino: antes la pantalla iba por un lado y las secciones por
+            otro, y no había forma de ver que colgaban unas de otra. */}
+        <Ruta niveles={niveles} />
 
         <div className="ml-auto flex shrink-0 items-center gap-3">
           {/* Lo que se ve NO viene del servidor. Decirlo no es un adorno: sin
