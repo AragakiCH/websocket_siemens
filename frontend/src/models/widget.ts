@@ -103,7 +103,7 @@ export interface HmiWidget {
 }
 
 /** Sub-elementos que puede tener un widget. */
-export type ParteId = 'box' | 'label' | 'icon' | 'boton' | 'valor';
+export type ParteId = 'box' | 'label' | 'icon' | 'boton' | 'valor' | 'scroll';
 
 /**
  * Propiedades estilizables de una parte.

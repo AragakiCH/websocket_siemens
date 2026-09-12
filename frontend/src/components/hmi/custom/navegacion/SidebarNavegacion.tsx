@@ -218,7 +218,23 @@ function Sidebar({ widget, style }: RenderCtx) {
           menú. En un panel de planta ese espacio vale más para una sección
           más visible. */}
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 6 }}>
+      {/* A PROPÓSITO sin `estiloDeParte`: esa función hereda del estilo
+          general del widget cuando la parte no se ha tocado, y el color
+          general de un menú es el petróleo de la marca. Una barra de
+          desplazamiento turquesa en todos los menús que ya existen, sin que
+          nadie lo haya pedido, no. El valor por defecto lo pone la hoja de
+          estilos: un gris apagado, como en el proyecto de ejemplo. */}
+      <div
+        className="barra-fina"
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: 6,
+          ...(widget.partes?.scroll?.color
+            ? ({ '--barra-pulgar': widget.partes.scroll.color } as React.CSSProperties)
+            : {}),
+        }}
+      >
         {secciones.length === 0 ?
         <p
           style={{
