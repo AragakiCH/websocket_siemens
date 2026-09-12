@@ -52,7 +52,12 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Loader2Icon, AlertTriangleIcon } from 'lucide-react';
+import {
+  Loader2Icon,
+  AlertTriangleIcon,
+  MaximizeIcon,
+  MinimizeIcon,
+} from 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { WidgetRenderer } from '../components/hmi/WidgetRenderer';
 import { Logo } from '../components/ui/Logo';
@@ -372,6 +377,44 @@ export function Preview() {
   const hueco = useRef<HTMLDivElement>(null);
   const [medida, setMedida] = useState({ ancho: 0, alto: 0 });
 
+  /**
+   * Modo panel: el sinóptico se queda con la pantalla entera.
+   *
+   * No basta con pedirle pantalla completa al navegador. Con la barra de
+   * PsiCore puesta, un diseño de 1920x1080 en un monitor de 1920x1080 sigue
+   * sin caber: harían falta 1053 px de alto para pintarlo a todo lo ancho y
+   * sólo quedan 942. La barra tiene que irse también.
+   */
+  const [modoPanel, setModoPanel] = useState(false);
+
+  // Salir con Esc lo gestiona el navegador, no esta aplicación: si no se
+  // escucha el cambio, al pulsar Esc se sale de la pantalla completa y la
+  // barra sigue escondida, con el operador sin saber cómo recuperarla.
+  useEffect(() => {
+    const alCambiar = () => {
+      if (!document.fullscreenElement) setModoPanel(false);
+    };
+    document.addEventListener('fullscreenchange', alCambiar);
+    return () => document.removeEventListener('fullscreenchange', alCambiar);
+  }, []);
+
+  const alternarPanel = useCallback(async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        setModoPanel(false);
+      } else {
+        // La pantalla completa puede fallar —un permiso, un navegador
+        // incrustado— y entonces se esconde la barra igualmente: se gana la
+        // altura de la barra aunque no la del navegador.
+        await document.documentElement.requestFullscreen().catch(() => {});
+        setModoPanel(true);
+      }
+    } catch {
+      setModoPanel((v) => !v);
+    }
+  }, []);
+
   useEffect(() => {
     const el = hueco.current;
     if (!el) return;
@@ -588,11 +631,12 @@ export function Preview() {
   }, [nombreProyecto, nombreActual, ruta, estructura]);
 
   return (
-    <div className="flex h-full w-full flex-col bg-slate-200 dark:bg-navy">
+    <div className="relative flex h-full w-full flex-col bg-slate-200 dark:bg-navy">
 
       {/* ── Barra de operación ────────────────────────────────────
           Sin un solo control: es informativa de principio a fin. Lo único
           que se puede tocar en esta vista es el HMI. */}
+      {!modoPanel && (
       <header className="flex shrink-0 items-center gap-3 border-b border-slate-300 bg-white px-4 py-2 dark:border-navy-slate dark:bg-navy-soft">
         <Logo variante="barra" />
 
@@ -627,16 +671,47 @@ export function Preview() {
           )}
 
           <PastillaEnVivo vivo={enVivo} />
+
+          {/* Como el ⛶ del proyecto de ejemplo, y además esconde esta barra:
+              es la única forma de que un diseño del tamaño del monitor quepa
+              entero. */}
+          <button
+            type="button"
+            onClick={() => void alternarPanel()}
+            title="Pantalla completa: el sinóptico ocupa todo el monitor (Esc para salir)"
+            aria-label="Pantalla completa"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-siemens dark:hover:bg-navy"
+          >
+            <MaximizeIcon className="h-4 w-4" />
+          </button>
+
           <Reloj />
         </div>
       </header>
+      )}
 
       {/* Segmento 3: las secciones del mismo nivel. */}
-      <Hermanas
-        hermanas={cabecera.hermanas}
-        activa={cabecera.activa}
-        grupo={GRUPO_POR_DEFECTO}
-      />
+      {!modoPanel && (
+        <Hermanas
+          hermanas={cabecera.hermanas}
+          activa={cabecera.activa}
+          grupo={GRUPO_POR_DEFECTO}
+        />
+      )}
+
+      {/* La salida del modo panel. Discreta pero SIEMPRE visible: esconder la
+          barra sin dejar una puerta sería encerrar al operador. */}
+      {modoPanel && (
+        <button
+          type="button"
+          onClick={() => void alternarPanel()}
+          title="Salir de pantalla completa (Esc)"
+          aria-label="Salir de pantalla completa"
+          className="absolute right-3 top-3 z-50 flex h-8 w-8 items-center justify-center rounded-lg bg-navy/25 text-white opacity-40 transition hover:opacity-100"
+        >
+          <MinimizeIcon className="h-4 w-4" />
+        </button>
+      )}
 
       {/* ── El lienzo ─────────────────────────────────────────────── */}
       {/* `overflow-hidden` y no `auto`: ahora el sinóptico SIEMPRE cabe, así
@@ -644,7 +719,7 @@ export function Preview() {
           cálculo de escala se ha equivocado. Que se note. */}
       <div
         ref={hueco}
-        className="mp-scroll mp-scroll-dark flex min-h-0 flex-1 items-center justify-center overflow-hidden p-6"
+        className="mp-scroll mp-scroll-dark flex min-h-0 flex-1 items-center justify-center overflow-hidden"
       >
         {sinSesion ? (
           <div className="max-w-md text-center text-sm text-slate-500 dark:text-slate-400">
