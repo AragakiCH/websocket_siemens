@@ -250,7 +250,7 @@ function Hermanas({
   return (
     <nav
       aria-label="Secciones del mismo nivel"
-      className="flex shrink-0 items-stretch gap-5 overflow-x-auto border-b border-slate-300 bg-white px-4 dark:border-navy-slate dark:bg-navy-soft"
+      className="flex min-w-0 items-stretch gap-5 overflow-x-auto"
     >
       {hermanas.map((s) => {
         const esActiva = s.id === activa;
@@ -261,7 +261,11 @@ function Hermanas({
             onClick={() => setVistaActiva(grupo, s.id)}
             aria-current={esActiva ? 'page' : undefined}
             title={s.label || s.id}
-            className={`shrink-0 whitespace-nowrap border-b-2 px-0.5 pb-2 pt-1.5 text-xs transition ${
+            /* `-mb-px` monta el subrayado sobre la línea de la cabecera, en
+               vez de dejarlo flotando un píxel por encima. Es lo que hace el
+               proyecto de ejemplo con `border-bottom` en la fila y en el
+               botón activo. */
+            className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-0.5 pb-2 pt-1 text-xs transition ${
               esActiva
                 ? 'border-siemens font-semibold text-siemens'
                 : 'border-transparent text-slate-500 hover:text-navy dark:text-slate-400 dark:hover:text-slate-200'
@@ -637,14 +641,20 @@ export function Preview() {
           Sin un solo control: es informativa de principio a fin. Lo único
           que se puede tocar en esta vista es el HMI. */}
       {!modoPanel && (
-      <header className="flex shrink-0 items-center gap-3 border-b border-slate-300 bg-white px-4 py-2 dark:border-navy-slate dark:bg-navy-soft">
-        <Logo variante="barra" />
+      <header className="shrink-0 border-b border-slate-300 bg-white px-4 dark:border-navy-slate dark:bg-navy-soft">
+        {/* Dos columnas: el logotipo manda el ancho de la primera y los tres
+            segmentos viven en la segunda. Así las pestañas caen alineadas con
+            el camino y el título sin medir nada ni escribir un ancho a mano,
+            que se quedaría desfasado el día que el logotipo cambie. */}
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3">
+        <div className="flex items-center gap-3 py-2">
+          <Logo variante="barra" />
+          <Separador />
+        </div>
 
-        <Separador />
-
+        <div className="flex min-w-0 items-center gap-3 py-2">
         {/* Segmentos 1 y 2: dónde está la pestaña abierta, y qué vista es
-            —con el nivel del que cuelga—. El tercero va debajo, fuera de
-            esta fila, porque es una barra de pestañas y no un dato. */}
+            —con el nivel del que cuelga—. */}
         <Ruta
           direccion={cabecera.direccion}
           titulo={cabecera.titulo}
@@ -687,16 +697,24 @@ export function Preview() {
 
           <Reloj />
         </div>
-      </header>
-      )}
+        </div>
 
-      {/* Segmento 3: las secciones del mismo nivel. */}
-      {!modoPanel && (
-        <Hermanas
-          hermanas={cabecera.hermanas}
-          activa={cabecera.activa}
-          grupo={GRUPO_POR_DEFECTO}
-        />
+        {/* Segmento 3, en la MISMA columna que los otros dos. La celda de la
+            izquierda va vacía: es lo que reserva el hueco del logotipo y lo
+            que hace que las pestañas arranquen donde arrancan el camino y el
+            título, sin escribir ningún ancho a mano. */}
+        {cabecera.hermanas.length > 1 && (
+          <>
+            <div />
+            <Hermanas
+              hermanas={cabecera.hermanas}
+              activa={cabecera.activa}
+              grupo={GRUPO_POR_DEFECTO}
+            />
+          </>
+        )}
+        </div>
+      </header>
       )}
 
       {/* La salida del modo panel. Discreta pero SIEMPRE visible: esconder la
