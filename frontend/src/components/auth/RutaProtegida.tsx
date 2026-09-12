@@ -62,9 +62,16 @@ export function RutaProtegida({ children, rolMinimo }: Props) {
     );
   }
 
-  // Instalación sin autenticación (`PLC_AUTH_REQUERIDA=false`): todo abierto,
-  // como siempre. Bloquear aquí dejaría fuera a quien nunca creó cuentas.
-  if (!authRequerida) return <>{children}</>;
+  // Instalación sin autenticación (`PLC_AUTH_REQUERIDA=false`): abierto, para
+  // no dejar fuera a quien nunca creó cuentas.
+  //
+  // Pero SOLO mientras no haya nadie dentro. En cuanto alguien inicia sesión,
+  // su rol manda aunque la autenticación no sea obligatoria: si no, un
+  // operario que ha entrado como `Usuarios` seguiría abriendo el Diseñador,
+  // que es justo lo que este componente existe para evitar. Antes se salía
+  // aquí sin mirar el rol, y `rolMinimo` no servía de nada en esa
+  // configuración — que es la de una instalación recién montada.
+  if (!authRequerida && !sesion) return <>{children}</>;
 
   if (!sesion) {
     // `state.desde` permite volver a donde iba después de entrar, en vez de
