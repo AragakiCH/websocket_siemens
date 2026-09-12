@@ -148,7 +148,7 @@ function Separador() {
   return (
     <span
       aria-hidden="true"
-      className="h-6 w-px shrink-0 bg-slate-300 dark:bg-navy-slate"
+      className="h-6 w-px shrink-0 bg-tema-borde-suave"
     />
   );
 }
@@ -208,7 +208,7 @@ function Ruta({
       {/* `mb-1.5` = los mismos 6 px que la rejilla deja hasta las pestañas.
           Sin esto el camino y el título quedaban pegados y la tercera fila
           muy por debajo: dos líneas juntas y una suelta. */}
-      <span className="mb-1.5 flex min-w-0 items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500">
+      <span className="mb-1.5 flex min-w-0 items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-tema-sobre-superficie-alt">
         {camino.map((label, i) => (
           <span key={`${label}-${i}`} className="flex min-w-0 items-center gap-1">
             {i > 0 && <span className="text-slate-300 dark:text-navy-slate">/</span>}
@@ -217,11 +217,11 @@ function Ruta({
         ))}
       </span>
       <span className="flex min-w-0 items-baseline gap-1.5">
-        <span className="truncate text-[13px] font-bold text-navy dark:text-slate-100">
+        <span className="truncate text-[13px] font-bold text-tema-sobre-superficie">
           {titulo}
         </span>
         {nivel && (
-          <span className="shrink-0 truncate text-[11px] text-slate-400 dark:text-slate-500">
+          <span className="shrink-0 truncate text-[11px] text-tema-sobre-superficie-alt">
             · {nivel}
           </span>
         )}
@@ -271,8 +271,8 @@ function Hermanas({
                botón activo. */
             className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-0.5 pb-2 text-xs transition ${
               esActiva
-                ? 'border-siemens font-semibold text-siemens'
-                : 'border-transparent text-slate-500 hover:text-navy dark:text-slate-400 dark:hover:text-slate-200'
+                ? 'border-tema-primario font-semibold text-tema-primario'
+                : 'border-transparent text-tema-sobre-superficie-alt hover:text-tema-sobre-superficie'
             }`}
           >
             {s.label || s.id}
@@ -293,14 +293,14 @@ function PastillaEnVivo({ vivo }: { vivo: boolean }) {
       }
       className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider transition ${
         vivo
-          ? 'border-state-ok/40 bg-state-ok/10 text-state-ok'
-          : 'border-state-error/40 bg-state-error/10 text-state-error'
+          ? 'border-tema-ok bg-tema-ok-fondo text-tema-sobre-ok-fondo'
+          : 'border-tema-error bg-tema-error-fondo text-tema-sobre-error-fondo'
       }`}
     >
       <span
         aria-hidden="true"
         className={`h-1.5 w-1.5 rounded-full ${
-          vivo ? 'animate-pulse bg-state-ok' : 'bg-state-error'
+          vivo ? 'animate-pulse bg-tema-ok' : 'bg-tema-error'
         }`}
       />
       {vivo ? 'En vivo' : 'Sin señal'}
@@ -315,7 +315,7 @@ function Reloj() {
       <span className="font-mono text-[15px] font-bold tabular-nums text-navy dark:text-slate-100">
         {hora}
       </span>
-      <span className="font-mono text-[10px] tabular-nums text-slate-400">
+      <span className="font-mono text-[10px] tabular-nums text-tema-sobre-superficie-alt">
         {fecha}
       </span>
     </div>
@@ -325,7 +325,7 @@ function Reloj() {
 // ─── La vista ────────────────────────────────────────────────────
 
 export function Preview() {
-  const { variables, isDark } = useAppStore();
+  const { variables } = useAppStore();
 
   // Vista abierta en la navegación. Al pulsar un botón del Menú Lateral
   // cambia, y este componente se vuelve a dibujar mostrando solo los widgets
@@ -647,13 +647,13 @@ export function Preview() {
   }, [nombreProyecto, nombreActual, ruta, estructura]);
 
   return (
-    <div className="relative flex h-full w-full flex-col bg-slate-200 dark:bg-navy">
+    <div className="relative flex h-full w-full flex-col bg-tema-fondo">
 
       {/* ── Barra de operación ────────────────────────────────────
           Sin un solo control: es informativa de principio a fin. Lo único
           que se puede tocar en esta vista es el HMI. */}
       {!modoPanel && (
-      <header className="shrink-0 border-b border-slate-300 bg-white px-4 dark:border-navy-slate dark:bg-navy-soft">
+      <header className="shrink-0 border-b border-tema-borde-suave bg-tema-superficie px-4">
         {/* Dos columnas: el logotipo manda el ancho de la primera y los tres
             segmentos viven en la segunda. Así las pestañas caen alineadas con
             el camino y el título sin medir nada ni escribir un ancho a mano,
@@ -700,7 +700,7 @@ export function Preview() {
               existe. */}
           {desfasado && !sinSesion && (
             <span
-              className="flex items-center gap-1.5 rounded-md bg-amber-500/15 px-2 py-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400"
+              className="flex items-center gap-1.5 rounded-md bg-tema-aviso-fondo px-2 py-1 text-[11px] font-semibold text-tema-sobre-aviso-fondo"
               title="No se pudo contactar con el servidor. Se muestra la última copia guardada en este navegador, que puede estar desfasada."
             >
               <AlertTriangleIcon className="h-3.5 w-3.5" />
@@ -722,7 +722,7 @@ export function Preview() {
             onClick={() => void alternarPanel()}
             title="Pantalla completa: el sinóptico ocupa todo el monitor (Esc para salir)"
             aria-label="Pantalla completa"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-siemens dark:hover:bg-navy"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-tema-sobre-superficie-alt transition hover:text-tema-primario"
           >
             <MaximizeIcon className="h-4 w-4" />
           </button>
@@ -835,7 +835,7 @@ export function Preview() {
             // El fondo elegido en el Diseñador manda; si no hay ninguno se cae
             // en el color del tema.
             className={`relative shrink-0 overflow-hidden shadow-xl ${
-              design.canvas.fondo ? '' : isDark ? 'bg-navy-soft' : 'bg-white'
+              design.canvas.fondo ? '' : 'bg-tema-superficie'
             }`}
             style={{
               width: design.canvas.width,
