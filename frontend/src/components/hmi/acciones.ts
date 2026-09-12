@@ -24,8 +24,38 @@
 // =========================================================================
 import { escribir, partirId } from '../../services/escrituraApi';
 import type { PlcVariable } from '../../models/plc';
+import { reconocerTodas } from '../../services/alarmasRuntimeApi';
+import { logout } from '../../services/authApi';
+import { leerTemas, guardarTemas } from '../../services/temaApi';
+import { setVistaActiva, GRUPO_POR_DEFECTO } from './custom/navegacion/store';
 
-export type TipoAccion = 'ninguna' | 'escribir' | 'alternar' | 'incrementar';
+export type TipoAccion =
+  | 'ninguna'
+  // Escriben en el PLC.
+  | 'escribir'
+  | 'alternar'
+  | 'incrementar'
+  // No escriben: mandan sobre la propia aplicación.
+  | 'reconocer-alarmas'
+  | 'ir-a-seccion'
+  | 'modo-color'
+  | 'tema'
+  | 'aviso'
+  | 'salir';
+
+/** Las que tocan el PLC. Son las que piden tag y lista blanca. */
+export const ACCIONES_DE_PLC: TipoAccion[] = ['escribir', 'alternar', 'incrementar'];
+
+/**
+ * Lo que la acción necesita de React y no puede importar.
+ *
+ * Cambiar el modo de color es del contexto de la aplicación, no una función
+ * suelta. Pasándolo aquí, este módulo sigue siendo una función normal —que se
+ * puede leer y razonar sin montar nada— en vez de un hook.
+ */
+export interface EntornoAccion {
+  setModoColor?: (modo: 'light' | 'dark' | 'auto') => void;
+}
 
 export interface AccionWidget {
   tipo: TipoAccion;
@@ -37,8 +67,15 @@ export interface AccionWidget {
   paso?: number;
   /** Pedir confirmación antes de mandar. */
   confirmar?: boolean;
-  /** El texto de esa confirmación. Vacío = uno genérico. */
+  /** El texto de esa confirmación, o el aviso de la acción `aviso`. */
   mensaje?: string;
+  /** Para `ir-a-seccion`. */
+  seccion?: string;
+  grupo?: string;
+  /** Para `modo-color`. */
+  modo?: 'light' | 'dark' | 'auto';
+  /** Para `tema`: el id del tema que pasa a estar activo. */
+  temaId?: string;
 }
 
 export const ACCION_VACIA: AccionWidget = {
@@ -51,9 +88,11 @@ export const ACCION_VACIA: AccionWidget = {
 
 export function leerAccion(config: any): AccionWidget {
   const a = config?.accion ?? {};
-  const tipo: TipoAccion = ['escribir', 'alternar', 'incrementar'].includes(a.tipo)
-    ? a.tipo
-    : 'ninguna';
+  const conocidas: TipoAccion[] = [
+    'escribir', 'alternar', 'incrementar',
+    'reconocer-alarmas', 'ir-a-seccion', 'modo-color', 'tema', 'aviso', 'salir',
+  ];
+  const tipo: TipoAccion = conocidas.includes(a.tipo) ? a.tipo : 'ninguna';
   return {
     tipo,
     tag: typeof a.tag === 'string' ? a.tag : '',
@@ -61,12 +100,26 @@ export function leerAccion(config: any): AccionWidget {
     paso: typeof a.paso === 'number' && Number.isFinite(a.paso) ? a.paso : 1,
     confirmar: !!a.confirmar,
     mensaje: typeof a.mensaje === 'string' ? a.mensaje : '',
+    seccion: typeof a.seccion === 'string' ? a.seccion : '',
+    grupo: typeof a.grupo === 'string' && a.grupo ? a.grupo : GRUPO_POR_DEFECTO,
+    modo: ['light', 'dark', 'auto'].includes(a.modo) ? a.modo : 'auto',
+    temaId: typeof a.temaId === 'string' ? a.temaId : '',
   };
 }
 
-/** ¿Este widget hace algo al pulsarlo? */
-export const tieneAccion = (a: AccionWidget): boolean =>
-  a.tipo !== 'ninguna' && !!a.tag;
+/**
+ * ¿Este widget hace algo al pulsarlo?
+ *
+ * Las de PLC necesitan tag; `ir-a-seccion` necesita sección. Las demás se
+ * bastan solas. Sin esta distinción, un botón de «Reconocer alarmas» se
+ * quedaría mudo por no tener un tag que no le hace ninguna falta.
+ */
+export const tieneAccion = (a: AccionWidget): boolean => {
+  if (a.tipo === 'ninguna') return false;
+  if (ACCIONES_DE_PLC.includes(a.tipo)) return !!a.tag;
+  if (a.tipo === 'ir-a-seccion') return !!a.seccion;
+  return true;
+};
 
 /**
  * El valor que hay que mandar, a partir del que hay ahora.
@@ -112,8 +165,15 @@ export function textoConfirmacion(
   etiqueta: string
 ): string {
   if (accion.mensaje) return accion.mensaje;
-  const nombre = etiqueta || accion.tag;
-  return `¿Escribir ${JSON.stringify(valor)} en «${nombre}»?`;
+  if (ACCIONES_DE_PLC.includes(accion.tipo)) {
+    const nombre = etiqueta || accion.tag;
+    return `¿Escribir ${JSON.stringify(valor)} en «${nombre}»?`;
+  }
+  if (accion.tipo === 'reconocer-alarmas') {
+    return '¿Reconocer TODAS las alarmas pendientes?';
+  }
+  if (accion.tipo === 'salir') return '¿Cerrar la sesión?';
+  return '¿Continuar?';
 }
 
 export interface ResultadoAccion {
@@ -133,10 +193,76 @@ export interface ResultadoAccion {
 export async function ejecutarAccion(
   accion: AccionWidget,
   actual: PlcVariable | undefined,
-  etiqueta = ''
+  etiqueta = '',
+  entorno: EntornoAccion = {}
 ): Promise<ResultadoAccion> {
   if (!tieneAccion(accion)) return { ok: false, error: 'Sin acción configurada.' };
 
+  // La confirmación se pregunta ANTES de nada, y es común a todas. Antes sólo
+  // la tenían las escrituras; reconocer todas las alarmas de golpe o cerrar
+  // la sesión de un panel en marcha merecen la misma pregunta.
+  //
+  // `confirm` y no un modal propio: es una orden, y el diálogo del navegador
+  // bloquea de verdad; uno casero se esquiva con un segundo clic.
+  if (accion.confirmar && accion.tipo !== 'aviso') {
+    const previo = ACCIONES_DE_PLC.includes(accion.tipo)
+      ? valorAEscribir(accion, actual)
+      : null;
+    if (!window.confirm(textoConfirmacion(accion, previo, etiqueta))) {
+      return { ok: false, error: '' };
+    }
+  }
+
+  // ── Las que NO escriben en el PLC ────────────────────────────
+  try {
+    switch (accion.tipo) {
+      case 'aviso':
+        window.alert(accion.mensaje || 'Aviso');
+        return { ok: true };
+
+      case 'ir-a-seccion':
+        // La MISMA función que el menú, las pestañas de la barra y la
+        // Tarjeta de Acceso: cuatro mandos de una sola navegación, que se
+        // sincronizan solos porque comparten estado.
+        setVistaActiva(accion.grupo || GRUPO_POR_DEFECTO, accion.seccion || '');
+        return { ok: true };
+
+      case 'modo-color':
+        if (!entorno.setModoColor) {
+          return { ok: false, error: 'El modo de color no está disponible aquí.' };
+        }
+        entorno.setModoColor(accion.modo ?? 'auto');
+        return { ok: true };
+
+      case 'tema': {
+        // Cambiar el tema ACTIVO de la instalación. Se relee antes de
+        // escribir para mandar la versión buena: si otro lo tocó mientras
+        // tanto, el servidor responde 409 y este botón no tiene forma de
+        // preguntarle nada a nadie.
+        const doc = await leerTemas();
+        if (!doc.temas.some((x) => x.id === accion.temaId)) {
+          return { ok: false, error: `El tema «${accion.temaId}» ya no existe.` };
+        }
+        await guardarTemas(doc.temas, accion.temaId!, doc.version);
+        return { ok: true };
+      }
+
+      case 'reconocer-alarmas':
+        await reconocerTodas();
+        return { ok: true };
+
+      case 'salir':
+        await logout();
+        // Recargar y no navegar: cerrar sesión tiene que dejar la aplicación
+        // como recién abierta, sin estado de la sesión anterior en memoria.
+        window.location.href = '/';
+        return { ok: true };
+    }
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? 'No se pudo completar la acción.' };
+  }
+
+  // ── Las que escriben en el PLC ───────────────────────────────
   const valor = valorAEscribir(accion, actual);
   if (valor === null) {
     return {
@@ -155,15 +281,6 @@ export async function ejecutarAccion(
       ok: false,
       error: `«${accion.tag}» no identifica un PLC, así que no se puede escribir.`,
     };
-  }
-
-  if (accion.confirmar) {
-    // `confirm` y no un modal propio: esto es una orden a una máquina y el
-    // diálogo del navegador BLOQUEA de verdad. Un modal casero se puede
-    // esquivar con un segundo clic mientras aparece.
-    if (!window.confirm(textoConfirmacion(accion, valor, etiqueta))) {
-      return { ok: false, error: '' };
-    }
   }
 
   try {

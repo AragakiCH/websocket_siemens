@@ -21,9 +21,13 @@ import { useEffect, useState } from 'react';
 import type { InspectorCtx } from '../custom/types';
 import {
   leerAccion,
+  ACCIONES_DE_PLC,
   type AccionWidget,
   type TipoAccion,
 } from '../acciones';
+import { useSecciones, GRUPO_POR_DEFECTO } from '../custom/navegacion/store';
+import { leerTemas } from '../../../services/temaApi';
+import type { Tema } from '../../../models/tema';
 import { listarPermitidos, unirId, type TagPermitido } from '../../../services/escrituraApi';
 
 const TIPOS: { valor: TipoAccion; label: string; ayuda: string }[] = [
@@ -45,6 +49,41 @@ const TIPOS: { valor: TipoAccion; label: string; ayuda: string }[] = [
     label: 'Sumar o restar',
     ayuda: 'Manda el valor actual más el paso. Con paso negativo, resta.',
   },
+  // ── Las que no tocan el PLC ──────────────────────────────────
+  {
+    valor: 'ir-a-seccion',
+    label: 'Ir a una sección',
+    ayuda:
+      'Abre una sección del Menú Lateral. Usa el mismo mando que el menú y ' +
+      'que las pestañas de la barra, así que los tres se sincronizan solos.',
+  },
+  {
+    valor: 'reconocer-alarmas',
+    label: 'Reconocer todas las alarmas',
+    ayuda: 'Firma de golpe todas las pendientes. Conviene pedir confirmación.',
+  },
+  {
+    valor: 'modo-color',
+    label: 'Cambiar modo claro / oscuro',
+    ayuda: 'Cambia el modo en ESTE equipo. No afecta a los demás paneles.',
+  },
+  {
+    valor: 'tema',
+    label: 'Cambiar el tema activo',
+    ayuda:
+      'Cambia el tema de TODA la instalación, no sólo de este panel: lo ven ' +
+      'todos los equipos conectados, al momento.',
+  },
+  {
+    valor: 'aviso',
+    label: 'Mostrar un aviso',
+    ayuda: 'Enseña un mensaje y no hace nada más.',
+  },
+  {
+    valor: 'salir',
+    label: 'Cerrar sesión',
+    ayuda: 'Cierra la sesión y vuelve a la pantalla de acceso.',
+  },
 ];
 
 export function InspectorAccion({ config, setConfig }: InspectorCtx) {
@@ -52,6 +91,26 @@ export function InspectorAccion({ config, setConfig }: InspectorCtx) {
   const [permitidos, setPermitidos] = useState<TagPermitido[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const secciones = useSecciones(accion.grupo || GRUPO_POR_DEFECTO);
+  const [temas, setTemas] = useState<Tema[]>([]);
+
+  // Los temas sólo hacen falta para una de las acciones, así que se piden
+  // sólo cuando se elige: en un Inspector que se abre a cada clic, una
+  // petición que casi nunca se usa es ruido en la red del panel.
+  useEffect(() => {
+    if (accion.tipo !== 'tema') return;
+    let vivo = true;
+    leerTemas()
+      .then((d) => {
+        if (vivo) setTemas(d.temas);
+      })
+      .catch(() => {
+        /* el aviso de abajo lo dice */
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [accion.tipo]);
 
   useEffect(() => {
     let vivo = true;
@@ -102,7 +161,92 @@ export function InspectorAccion({ config, setConfig }: InspectorCtx) {
         </span>
       </label>
 
-      {accion.tipo !== 'ninguna' && (
+      {/* Los campos de cada acción. La sección, el tema o el mensaje no
+          tienen nada que ver con un tag del PLC, así que sólo se pide lo que
+          esa acción usa: un formulario que enseña huecos que no hacen nada
+          es un formulario que se rellena mal. */}
+      {accion.tipo === 'ir-a-seccion' && (
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+            Sección
+          </span>
+          <select
+            value={accion.seccion ?? ''}
+            onChange={(e) => set({ seccion: e.target.value })}
+            className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+          >
+            <option value="">— Sin asignar —</option>
+            {secciones.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.label || x.id}
+              </option>
+            ))}
+          </select>
+          {secciones.length === 0 && (
+            <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
+              Esta pantalla no tiene Menú Lateral, así que no hay secciones a
+              las que ir.
+            </span>
+          )}
+        </label>
+      )}
+
+      {accion.tipo === 'modo-color' && (
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+            Poner el modo
+          </span>
+          <select
+            value={accion.modo ?? 'auto'}
+            onChange={(e) => set({ modo: e.target.value as 'light' | 'dark' | 'auto' })}
+            className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+          >
+            <option value="light">Claro</option>
+            <option value="dark">Oscuro</option>
+            <option value="auto">Según el sistema</option>
+          </select>
+        </label>
+      )}
+
+      {accion.tipo === 'tema' && (
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+            Tema
+          </span>
+          <select
+            value={accion.temaId ?? ''}
+            onChange={(e) => set({ temaId: e.target.value })}
+            className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+          >
+            <option value="">— Sin asignar —</option>
+            {temas.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.nombre}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
+            Cambia el tema de TODA la instalación, no sólo de este panel.
+          </span>
+        </label>
+      )}
+
+      {accion.tipo === 'aviso' && (
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+            Mensaje
+          </span>
+          <input
+            type="text"
+            value={accion.mensaje ?? ''}
+            onChange={(e) => set({ mensaje: e.target.value })}
+            placeholder="Revisar el nivel del tanque 3"
+            className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+          />
+        </label>
+      )}
+
+      {ACCIONES_DE_PLC.includes(accion.tipo) && (
         <>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -179,6 +323,14 @@ export function InspectorAccion({ config, setConfig }: InspectorCtx) {
             </label>
           )}
 
+        </>
+      )}
+
+      {/* La confirmación vale para todas menos el aviso, que ya ES un
+          mensaje: preguntarle a alguien si quiere ver un mensaje, y luego
+          enseñárselo, son dos diálogos para nada. */}
+      {accion.tipo !== 'ninguna' && accion.tipo !== 'aviso' && (
+        <>
           <label className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
               Pedir confirmación
@@ -201,6 +353,7 @@ export function InspectorAccion({ config, setConfig }: InspectorCtx) {
             />
           )}
 
+          {ACCIONES_DE_PLC.includes(accion.tipo) &&
           <div className="rounded-lg bg-slate-100 px-2.5 py-2 text-[11px] leading-relaxed text-slate-500 dark:bg-navy-slate/40 dark:text-slate-400">
             {error ? (
               <>No se pudo leer la lista de tags habilitados: {error}</>
@@ -231,6 +384,7 @@ export function InspectorAccion({ config, setConfig }: InspectorCtx) {
               </>
             )}
           </div>
+          }
         </>
       )}
     </>

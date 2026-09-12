@@ -5,6 +5,7 @@ import { HmiWidget } from "../../models/widget";
 import { PlcVariable } from "../../models/plc";
 import { formatValue, valueFraction, isTruthy } from "../../utils/format";
 import { leerAccion, tieneAccion, ejecutarAccion } from "./acciones";
+import { useAppStore } from "../../context/AppStore";
 import { customByKind, zipByKind } from "./custom/registry";
 import { estiloDeParte } from "./partes";
 import { HtmlWidgetRenderer } from "./HtmlWidgetRenderer";
@@ -27,6 +28,9 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
   // Qué manda este widget al pulsarlo. Sólo en la Vista Previa: en el
   // Diseñador el clic sirve para seleccionar y arrastrar, y escribir al PLC
   // mientras se coloca un botón sería lo contrario de lo que uno espera.
+  // El modo de color vive en el contexto de la aplicación, así que no se
+  // puede importar: se le pasa a la acción. Ver `EntornoAccion`.
+  const { setTheme } = useAppStore();
   const accion = leerAccion(widget.config);
   const mandaAlgo = interactivo && tieneAccion(accion);
 
@@ -39,7 +43,9 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
   const pulsar = async () => {
     if (!mandaAlgo || mandando) return;
     setMandando(true);
-    const r = await ejecutarAccion(accion, variable, widget.text || widget.name);
+    const r = await ejecutarAccion(accion, variable, widget.text || widget.name, {
+      setModoColor: setTheme,
+    });
     setMandando(false);
     // Cancelar en la confirmación no es un error: no se dice nada.
     if (!r.ok && r.error) {
