@@ -59,6 +59,7 @@
 import JSZip from 'jszip';
 import { DataType } from '../models/plc';
 import { TIPOS_VALIDOS, esTipoValido } from '../utils/widgetBinding';
+import { fetchAuth } from './authApi';
 
 const STORAGE_KEY = 'hmi.custom-html-widgets';
 
@@ -353,9 +354,10 @@ export function saveZipWidgets(widgets: ZipWidget[]): void {
  */
 export async function sincronizarWidgets(): Promise<ZipWidget[]> {
   try {
-    const r = await fetch('/widgets?con_contenido=true');
-    if (!r.ok) throw new Error(String(r.status));
-    const data = await r.json();
+    // fetchAuth y no fetch: con PLC_AUTH_REQUERIDA=true el servidor rechaza
+    // una petición sin token, y sin esto el catálogo se quedaba en la caché
+    // local sin decir por qué.
+    const data = await fetchAuth('/widgets?con_contenido=true');
     const widgets: ZipWidget[] = (data.widgets ?? []).map(desdeServidor);
     saveZipWidgets(widgets);
     return widgets;
@@ -371,26 +373,26 @@ export async function sincronizarWidgets(): Promise<ZipWidget[]> {
  */
 export async function addZipWidget(widget: ZipWidget): Promise<ZipWidget[]> {
   const kind = widget.meta.kind;
-  const r = await fetch(`/widgets/${encodeURIComponent(kind)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      nombre: widget.meta.label ?? kind,
-      html: widget.html,
-      css: widget.css ?? '',
-      js: widget.js ?? '',
-      meta: widget.meta,
-    }),
-  });
-
-  if (!r.ok) {
-    let detalle = `Error ${r.status}`;
-    try {
-      detalle = (await r.json()).detail ?? detalle;
-    } catch {
-      /* respuesta sin JSON */
-    }
-    throw new Error(`No se pudo guardar en el servidor: ${detalle}`);
+  // Guardar un widget exige rol Administradores en el backend, así que la
+  // petición TIENE que llevar el token. Con `fetch` a secas llegaba anónima y
+  // el servidor respondía "necesitas iniciar sesión" por muy iniciada que
+  // estuviera — el usuario salía y volvía a entrar, y le pasaba lo mismo.
+  // fetchAuth pone la cabecera, el Content-Type y traduce el error.
+  try {
+    await fetchAuth(`/widgets/${encodeURIComponent(kind)}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        nombre: widget.meta.label ?? kind,
+        html: widget.html,
+        css: widget.css ?? '',
+        js: widget.js ?? '',
+        meta: widget.meta,
+      }),
+    });
+  } catch (e: any) {
+    throw new Error(
+      `No se pudo guardar en el servidor: ${e?.message ?? 'error desconocido'}`
+    );
   }
 
   const actuales = loadZipWidgets().filter((w) => w.meta.kind !== kind);
@@ -402,7 +404,7 @@ export async function addZipWidget(widget: ZipWidget): Promise<ZipWidget[]> {
 export async function removeZipWidget(kind: string): Promise<ZipWidget[]> {
   const limpio = kind.replace(/^custom:/, '');
   try {
-    await fetch(`/widgets/${encodeURIComponent(limpio)}`, { method: 'DELETE' });
+    await fetchAuth(`/widgets/${encodeURIComponent(limpio)}`, { method: 'DELETE' });
   } catch {
     // Si el servidor no responde se quita igualmente de la caché; la próxima
     // sincronización lo devolverá y quedará claro que no se borró de verdad.
