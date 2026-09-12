@@ -49,6 +49,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { Loader2Icon, AlertTriangleIcon } from 'lucide-react';
@@ -250,6 +251,28 @@ export function Preview() {
   const arranque =
     proyecto === PROYECTO_HMI_POR_DEFECTO ? PANTALLA_POR_DEFECTO : '';
 
+  // ── Ajuste al hueco disponible ─────────────────────────────────
+  //
+  // El sinóptico se diseña en píxeles fijos, pero la pantalla donde se mira
+  // no siempre los tiene. Se mide el hueco y se escala lo que haga falta,
+  // hacia abajo (para que quepa) y hacia arriba (para que lo llene).
+  const hueco = useRef<HTMLDivElement>(null);
+  const [medida, setMedida] = useState({ ancho: 0, alto: 0 });
+
+  useEffect(() => {
+    const el = hueco.current;
+    if (!el) return;
+    // ResizeObserver y no el evento `resize` de la ventana: el hueco también
+    // cambia sin que la ventana se mueva —cuando aparece el banner de alarmas,
+    // por ejemplo—, y ahí `resize` no se dispara.
+    const ro = new ResizeObserver(([e]) => {
+      const r = e.contentRect;
+      setMedida({ ancho: r.width, alto: r.height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const [pantallaId, setPantallaId] = useState<string>(arranque);
   const [pantallas, setPantallas] = useState<ResumenPantalla[]>([]);
   const [design, setDesign] = useState<SavedDesign | null>(() =>
@@ -272,6 +295,24 @@ export function Preview() {
   // `cargando` en false y el operador mira una pantalla que no avanza sin
   // saber si esperar o avisar a alguien.
   const [sinCatalogo, setSinCatalogo] = useState(false);
+
+  /**
+   * Cuánto hay que escalar el sinóptico para que llene el hueco sin
+   * deformarse.
+   *
+   * Se toma el MENOR de los dos factores: el que quepa en los dos ejes. Usar
+   * cada eje por su cuenta estiraría el dibujo, y un depósito ovalado o un
+   * motor achatado es exactamente lo que no puede pasar en un sinóptico.
+   *
+   * Mientras no se ha medido (`ancho` en 0, el primer render) se deja en 1:
+   * pintar a escala 0 sería un parpadeo en negro en cada carga.
+   */
+  const escala = useMemo(() => {
+    if (!design || !medida.ancho || !medida.alto) return 1;
+    const { width, height } = design.canvas;
+    if (!width || !height) return 1;
+    return Math.min(medida.ancho / width, medida.alto / height);
+  }, [design, medida.ancho, medida.alto]);
 
   // ── Navegación por pantalla ─────────────────────────────────────
   // La navegación se guarda por pantalla: sin esto, dos pantallas
@@ -437,7 +478,13 @@ export function Preview() {
       </header>
 
       {/* ── El lienzo ─────────────────────────────────────────────── */}
-      <div className="mp-scroll mp-scroll-dark flex min-h-0 flex-1 items-center justify-center overflow-auto p-6">
+      {/* `overflow-hidden` y no `auto`: ahora el sinóptico SIEMPRE cabe, así
+          que una barra de desplazamiento aquí sólo podría significar que el
+          cálculo de escala se ha equivocado. Que se note. */}
+      <div
+        ref={hueco}
+        className="mp-scroll mp-scroll-dark flex min-h-0 flex-1 items-center justify-center overflow-hidden p-6"
+      >
         {sinSesion ? (
           <div className="max-w-md text-center text-sm text-slate-500 dark:text-slate-400">
             <p className="font-semibold text-slate-700 dark:text-slate-200">
@@ -485,6 +532,16 @@ export function Preview() {
             )}
           </div>
         ) : (
+          /* El envoltorio ocupa el tamaño YA ESCALADO. Sin él, el navegador
+             seguiría reservando el tamaño original —`transform` no cambia la
+             caja de maquetación— y el centrado saldría torcido con barras de
+             desplazamiento fantasma. */
+          <div
+            style={{
+              width: design.canvas.width * escala,
+              height: design.canvas.height * escala,
+            }}
+          >
           <div
             // SIN `rounded-*`, igual que en el Diseñador: esto es la pantalla
             // del panel. Redondearla aquí y no allí, además, haría que el
@@ -498,7 +555,11 @@ export function Preview() {
             style={{
               width: design.canvas.width,
               height: design.canvas.height,
-              background: design.canvas.fondo || undefined
+              background: design.canvas.fondo || undefined,
+              // El lienzo mantiene su tamaño CSS real y sólo se escala al
+              // pintar: los widgets siguen midiendo lo que se diseñó.
+              transform: `scale(${escala})`,
+              transformOrigin: 'top left',
             }}
           >
             {design.widgets
@@ -541,6 +602,7 @@ export function Preview() {
                   />
                 </div>
               ))}
+          </div>
           </div>
         )}
       </div>
