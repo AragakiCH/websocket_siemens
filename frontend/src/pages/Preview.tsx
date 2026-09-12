@@ -65,6 +65,7 @@ import { RealPLCService } from '../services/RealPLCService';
 import {
   useVistaActiva,
   useRutaDeVista,
+  publicarPantallas,
   useEstructura,
   hermanosDe,
   setVistaActiva,
@@ -438,6 +439,14 @@ export function Preview() {
 
   const [pantallaId, setPantallaId] = useState<string>(arranque);
   const [pantallas, setPantallas] = useState<ResumenPantalla[]>([]);
+
+  // El catálogo de pantallas hace falta también AQUÍ, no sólo en el
+  // Diseñador: lo lee todo el que tenga que poner el NOMBRE de una pantalla
+  // en vez de su id —la Tarjeta de Acceso, por ejemplo, que enseña a dónde
+  // lleva—. Sin esto se veía «acc_horno» donde debía poner «Horno».
+  useEffect(() => {
+    publicarPantallas(pantallas);
+  }, [pantallas]);
   const [design, setDesign] = useState<SavedDesign | null>(() =>
     arranque ? loadDesign(arranque) : null
   );

@@ -75,6 +75,11 @@ export const KIND_MENU = 'custom:sidebar-navegacion';
 export const KINDS_NAVEGACION = new Set<string>([
   KIND_MENU,
   'custom:pantalla-screen',
+  // La Tarjeta de Acceso dibuja dentro una miniatura de otra pantalla. Si esa
+  // pantalla llevara otra tarjeta apuntando de vuelta, cada miniatura pintaria
+  // la siguiente sin final. Dejandola fuera de las pantallas empotradas, el
+  // ciclo no puede empezar.
+  'custom:acceso-seccion',
 ]);
 
 export function esWidgetDeNavegacion(kind: string): boolean {
