@@ -204,7 +204,10 @@ function Ruta({
 
   return (
     <div className="flex min-w-0 flex-col justify-center leading-tight">
-      <span className="flex min-w-0 items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500">
+      {/* `mb-1.5` = los mismos 6 px que la rejilla deja hasta las pestañas.
+          Sin esto el camino y el título quedaban pegados y la tercera fila
+          muy por debajo: dos líneas juntas y una suelta. */}
+      <span className="mb-1.5 flex min-w-0 items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500">
         {camino.map((label, i) => (
           <span key={`${label}-${i}`} className="flex min-w-0 items-center gap-1">
             {i > 0 && <span className="text-slate-300 dark:text-navy-slate">/</span>}
@@ -265,7 +268,7 @@ function Hermanas({
                vez de dejarlo flotando un píxel por encima. Es lo que hace el
                proyecto de ejemplo con `border-bottom` en la fila y en el
                botón activo. */
-            className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-0.5 pb-2 pt-1 text-xs transition ${
+            className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-0.5 pb-2 text-xs transition ${
               esActiva
                 ? 'border-siemens font-semibold text-siemens'
                 : 'border-transparent text-slate-500 hover:text-navy dark:text-slate-400 dark:hover:text-slate-200'
@@ -646,22 +649,38 @@ export function Preview() {
             segmentos viven en la segunda. Así las pestañas caen alineadas con
             el camino y el título sin medir nada ni escribir un ancho a mano,
             que se quedaría desfasado el día que el logotipo cambie. */}
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3">
-        <div className="flex items-center gap-3 py-2">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3 gap-y-1.5">
+        {/* El aire de ARRIBA lo pone esta fila. El de abajo lo pone el propio
+            botón de pestaña: la cabecera no puede llevar `pb` o el subrayado
+            de la activa dejaría de caer sobre su línea inferior. */}
+        <div className="flex items-center gap-3 pt-2">
           <Logo variante="barra" />
           <Separador />
         </div>
 
-        <div className="flex min-w-0 items-center gap-3 py-2">
         {/* Segmentos 1 y 2: dónde está la pestaña abierta, y qué vista es
-            —con el nivel del que cuelga—. */}
+            —con el nivel del que cuelga—.
+
+            `self-end` y no centrado: así el borde inferior de este bloque ES
+            el de la fila, y lo que queda hasta las pestañas es exactamente el
+            hueco de la rejilla. Centrado, el alto lo marcaban el logotipo y
+            los controles —más altos— y esos píxeles sobrantes se sumaban al
+            hueco, que salía de 9 px donde arriba había 6. */}
+        <div className="min-w-0 self-end pt-2">
         <Ruta
           direccion={cabecera.direccion}
           titulo={cabecera.titulo}
           nivel={cabecera.nivel}
         />
+        </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-3">
+        {/* Tercera columna: los avisos y el reloj. Fuera de la celda de los
+            segmentos, que es lo que les devuelve el ritmo. */}
+        <div
+          className={`flex shrink-0 items-center gap-3 pt-2 ${
+            cabecera.hermanas.length > 1 ? 'row-span-2' : ''
+          }`}
+        >
           {/* Lo que se ve NO viene del servidor. Decirlo no es un adorno: sin
               este aviso, una pantalla en caché es indistinguible de una en
               vivo, y alguien puede decidir algo mirando un diseño que ya no
@@ -696,7 +715,6 @@ export function Preview() {
           </button>
 
           <Reloj />
-        </div>
         </div>
 
         {/* Segmento 3, en la MISMA columna que los otros dos. La celda de la
