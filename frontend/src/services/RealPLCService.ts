@@ -183,6 +183,11 @@ class RealPLCServiceImpl {
         msg.type === 'project.updated' ||
         msg.type === 'project.removed' ||
         msg.type === 'config.updated' ||
+        // Sin esta línea el backend difunde el cambio de tema y el navegador
+        // lo tira: guardar en el Gestor de Temas no se veía hasta recargar la
+        // página, que es justo lo que no puede pasar en veinte paneles de
+        // planta.
+        msg.type === 'tema.updated' ||
         msg.type === 'presence'
       ) {
         // Canal de PROYECTO: baja frecuencia. Este servicio no los
