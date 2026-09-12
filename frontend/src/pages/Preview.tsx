@@ -60,6 +60,11 @@ import { RealPLCService } from '../services/RealPLCService';
 import {
   useVistaActiva,
   useRutaDeVista,
+  useEstructura,
+  hermanosDe,
+  setVistaActiva,
+  esNivel,
+  type Seccion,
   setPantalla,
   GRUPO_POR_DEFECTO,
 } from '../components/hmi/custom/navegacion/store';
@@ -166,33 +171,102 @@ function Separador() {
  * Los niveles se van apagando hacia la izquierda y el último va en el color
  * de marca: de un vistazo se ve cuánto has profundizado y por dónde llegaste.
  */
-function Ruta({ niveles }: { niveles: string[] }) {
-  const camino = niveles.filter(Boolean);
-  if (camino.length === 0) return null;
-  const actual = camino[camino.length - 1];
+/**
+ * Los dos primeros segmentos de la barra.
+ *
+ *     PROYECTO / PANTALLA / NIVEL        <- dónde está la pestaña abierta
+ *     Vista · Nivel                      <- qué vista es, y de quién cuelga
+ *
+ * El camino NO repite la vista al final: termina en el nivel que la contiene,
+ * porque el nombre va justo debajo. Antes se leía dos veces lo mismo, una
+ * línea encima de la otra, y el camino no añadía nada al título.
+ *
+ * El «· Nivel» del título es lo que hace el ejemplo con la línea: el nombre
+ * solo («Lavado», «Detalles») se repite entre zonas, y saber de cuál cuelga
+ * es la mitad del dato.
+ */
+function Ruta({
+  direccion,
+  titulo,
+  nivel,
+}: {
+  direccion: string[];
+  titulo: string;
+  nivel: string;
+}) {
+  const camino = direccion.filter(Boolean);
+  if (!titulo && camino.length === 0) return null;
 
   return (
     <div className="flex min-w-0 flex-col justify-center leading-tight">
-      <span className="flex min-w-0 items-center gap-1 font-mono text-[10px] uppercase tracking-wider">
+      <span className="flex min-w-0 items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500">
         {camino.map((label, i) => (
           <span key={`${label}-${i}`} className="flex min-w-0 items-center gap-1">
             {i > 0 && <span className="text-slate-300 dark:text-navy-slate">/</span>}
-            <span
-              className={`truncate ${
-                i === camino.length - 1
-                  ? 'text-siemens'
-                  : 'text-slate-400 dark:text-slate-500'
-              }`}
-            >
-              {label}
-            </span>
+            <span className="truncate">{label}</span>
           </span>
         ))}
       </span>
-      <span className="truncate text-[13px] font-bold text-navy dark:text-slate-100">
-        {actual}
+      <span className="flex min-w-0 items-baseline gap-1.5">
+        <span className="truncate text-[13px] font-bold text-navy dark:text-slate-100">
+          {titulo}
+        </span>
+        {nivel && (
+          <span className="shrink-0 truncate text-[11px] text-slate-400 dark:text-slate-500">
+            · {nivel}
+          </span>
+        )}
       </span>
     </div>
+  );
+}
+
+/**
+ * Tercer segmento: las secciones que están al MISMO nivel que la abierta.
+ *
+ * Pulsan el mismo `setVistaActiva` que el Menú Lateral, así que no son una
+ * segunda navegación compitiendo con él sino otro mando de la misma: al
+ * pulsar una pestaña se enciende también su botón en el menú.
+ *
+ * Con una sola hermana no se dibuja nada. Una pestaña suelta no es una
+ * elección: es una fila que le roba alto al sinóptico para no ofrecer nada.
+ */
+function Hermanas({
+  hermanas,
+  activa,
+  grupo,
+}: {
+  hermanas: Seccion[];
+  activa: string;
+  grupo: string;
+}) {
+  if (hermanas.length < 2) return null;
+
+  return (
+    <nav
+      aria-label="Secciones del mismo nivel"
+      className="flex shrink-0 items-stretch gap-5 overflow-x-auto border-b border-slate-300 bg-white px-4 dark:border-navy-slate dark:bg-navy-soft"
+    >
+      {hermanas.map((s) => {
+        const esActiva = s.id === activa;
+        return (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => setVistaActiva(grupo, s.id)}
+            aria-current={esActiva ? 'page' : undefined}
+            title={s.label || s.id}
+            className={`shrink-0 whitespace-nowrap border-b-2 px-0.5 pb-2 pt-1.5 text-xs transition ${
+              esActiva
+                ? 'border-siemens font-semibold text-siemens'
+                : 'border-transparent text-slate-500 hover:text-navy dark:text-slate-400 dark:hover:text-slate-200'
+            }`}
+          >
+            {s.label || s.id}
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -245,6 +319,7 @@ export function Preview() {
   // de esa sección.
   const vistaActiva = useVistaActiva(GRUPO_POR_DEFECTO);
   const ruta = useRutaDeVista(GRUPO_POR_DEFECTO);
+  const estructura = useEstructura(GRUPO_POR_DEFECTO);
   const enVivo = useEnVivo();
 
   // Qué proyecto es este HMI. Se lee UNA sola vez, al montar: la vista previa
@@ -473,20 +548,44 @@ export function Preview() {
     pantallas.find((p) => p.project_id === pantallaId)?.nombre ?? pantallaId;
 
   /**
-   * Los niveles del camino, de fuera hacia dentro.
+   * Los tres segmentos de la barra.
    *
-   * `ruta` son las secciones del Menú Lateral, que puede tener varios niveles
-   * anidados; delante van el proyecto y la pantalla, que son los dos niveles
-   * que existen aunque esa pantalla no lleve menú.
+   *   `direccion` — dónde está la pestaña abierta: proyecto, pantalla y los
+   *                 niveles por los que se ha bajado. SIN la vista actual,
+   *                 que va en el segundo segmento.
+   *   `titulo`    — la vista abierta.
+   *   `nivel`     — de quién cuelga. El nivel más cercano por encima; si no
+   *                 hay ninguno, la pantalla, que es el contenedor de todo.
+   *   `hermanas`  — las secciones a su misma altura, para el tercer segmento.
+   *                 Se descartan los niveles: son encabezados, no se pulsan.
    */
-  const niveles = useMemo(
-    () => [
-      nombreProyecto,
-      nombreActual,
-      ...ruta.map((s) => s.label || s.id),
-    ],
-    [nombreProyecto, nombreActual, ruta]
-  );
+  const cabecera = useMemo(() => {
+    const actual = ruta.length > 0 ? ruta[ruta.length - 1] : null;
+    const ancestros = ruta.slice(0, -1);
+    const nivelPadre = [...ancestros].reverse().find(esNivel);
+
+    const hermanas = actual
+      ? hermanosDe(estructura, actual.id)
+          .map((id) => estructura.find((s) => s.id === id))
+          .filter((s): s is Seccion => !!s && !esNivel(s))
+      : [];
+
+    return {
+      direccion: [
+        nombreProyecto,
+        nombreActual,
+        ...ancestros.map((s) => s.label || s.id),
+      ],
+      titulo: actual ? actual.label || actual.id : nombreActual,
+      nivel: actual
+        ? nivelPadre
+          ? nivelPadre.label || nivelPadre.id
+          : nombreActual
+        : '',
+      hermanas,
+      activa: actual?.id ?? '',
+    };
+  }, [nombreProyecto, nombreActual, ruta, estructura]);
 
   return (
     <div className="flex h-full w-full flex-col bg-slate-200 dark:bg-navy">
@@ -499,10 +598,14 @@ export function Preview() {
 
         <Separador />
 
-        {/* Proyecto / Pantalla / Sección…, y debajo dónde estás. Un solo
-            camino: antes la pantalla iba por un lado y las secciones por
-            otro, y no había forma de ver que colgaban unas de otra. */}
-        <Ruta niveles={niveles} />
+        {/* Segmentos 1 y 2: dónde está la pestaña abierta, y qué vista es
+            —con el nivel del que cuelga—. El tercero va debajo, fuera de
+            esta fila, porque es una barra de pestañas y no un dato. */}
+        <Ruta
+          direccion={cabecera.direccion}
+          titulo={cabecera.titulo}
+          nivel={cabecera.nivel}
+        />
 
         <div className="ml-auto flex shrink-0 items-center gap-3">
           {/* Lo que se ve NO viene del servidor. Decirlo no es un adorno: sin
@@ -527,6 +630,13 @@ export function Preview() {
           <Reloj />
         </div>
       </header>
+
+      {/* Segmento 3: las secciones del mismo nivel. */}
+      <Hermanas
+        hermanas={cabecera.hermanas}
+        activa={cabecera.activa}
+        grupo={GRUPO_POR_DEFECTO}
+      />
 
       {/* ── El lienzo ─────────────────────────────────────────────── */}
       {/* `overflow-hidden` y no `auto`: ahora el sinóptico SIEMPRE cabe, así
