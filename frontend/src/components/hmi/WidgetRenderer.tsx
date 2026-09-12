@@ -4,6 +4,7 @@ import { PowerIcon } from "lucide-react";
 import { HmiWidget } from "../../models/widget";
 import { PlcVariable } from "../../models/plc";
 import { formatValue, valueFraction, isTruthy } from "../../utils/format";
+import { leerAccion, tieneAccion, ejecutarAccion } from "./acciones";
 import { customByKind, zipByKind } from "./custom/registry";
 import { estiloDeParte } from "./partes";
 import { HtmlWidgetRenderer } from "./HtmlWidgetRenderer";
@@ -20,6 +21,32 @@ interface Props {
 // Pure visual renderer for a single HMI widget. Reused by canvas + preview.
 export function WidgetRenderer({ widget, variable, interactivo = false }: Props) {
   const { style } = widget;
+
+  // ── Acciones ──────────────────────────────────────────────────
+  //
+  // Qué manda este widget al pulsarlo. Sólo en la Vista Previa: en el
+  // Diseñador el clic sirve para seleccionar y arrastrar, y escribir al PLC
+  // mientras se coloca un botón sería lo contrario de lo que uno espera.
+  const accion = leerAccion(widget.config);
+  const mandaAlgo = interactivo && tieneAccion(accion);
+
+  // El fallo tiene que VERSE. Sin esto, el operario pulsa, no pasa nada, y
+  // vuelve a pulsar — que con una orden a una máquina es justo lo que no
+  // debe ocurrir.
+  const [avisoAccion, setAvisoAccion] = useState('');
+  const [mandando, setMandando] = useState(false);
+
+  const pulsar = async () => {
+    if (!mandaAlgo || mandando) return;
+    setMandando(true);
+    const r = await ejecutarAccion(accion, variable, widget.text || widget.name);
+    setMandando(false);
+    // Cancelar en la confirmación no es un error: no se dice nada.
+    if (!r.ok && r.error) {
+      setAvisoAccion(r.error);
+      setTimeout(() => setAvisoAccion(''), 6000);
+    }
+  };
 
   /**
    * Un widget ZIP tiene abierta una capa a pantalla completa (un modal).
@@ -100,8 +127,23 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
       case "button":
         return (
           <div
+            role={mandaAlgo ? 'button' : undefined}
+            tabIndex={mandaAlgo ? 0 : undefined}
+            onClick={mandaAlgo ? () => void pulsar() : undefined}
+            onKeyDown={
+              mandaAlgo
+                ? (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      void pulsar();
+                    }
+                  }
+                : undefined
+            }
             className="flex h-full w-full items-center justify-center shadow-sm"
             style={{
+              cursor: mandaAlgo ? (mandando ? 'progress' : 'pointer') : 'default',
+              opacity: mandando ? 0.7 : undefined,
               // El fondo del botón sale de la parte «Botón». Por defecto
               // hereda `style.color`, que es lo que usaba antes.
               background: pBoton.background && pBoton.background !== "transparent"
@@ -273,7 +315,24 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
 
       case "switch":
         return (
-          <div className="flex h-full w-full items-center justify-center">
+          <div
+            className="flex h-full w-full items-center justify-center"
+            role={mandaAlgo ? 'switch' : undefined}
+            aria-checked={mandaAlgo ? on : undefined}
+            tabIndex={mandaAlgo ? 0 : undefined}
+            onClick={mandaAlgo ? () => void pulsar() : undefined}
+            onKeyDown={
+              mandaAlgo
+                ? (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      void pulsar();
+                    }
+                  }
+                : undefined
+            }
+            style={{ cursor: mandaAlgo ? 'pointer' : 'default' }}
+          >
             <div
               className="flex h-8 w-16 items-center rounded-full p-1 transition-colors"
               style={{
@@ -439,8 +498,22 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
     }
   }
   return (
-    <div className="h-full w-full" style={rootStyle}>
+    <div className="relative h-full w-full" style={rootStyle}>
       {content()}
+
+      {/* El fallo de una orden tiene que VERSE, y encima del propio mando:
+          si el aviso saliera en una esquina de la pantalla, en un sinóptico
+          lleno nadie lo relaciona con el botón que acaba de pulsar.
+
+          `pointer-events-none` para que no bloquee el siguiente intento. */}
+      {avisoAccion && (
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-20 rounded-b bg-state-error px-1.5 py-1 text-[10px] font-semibold leading-tight text-white"
+          title={avisoAccion}
+        >
+          {avisoAccion}
+        </div>
+      )}
     </div>
   );
 }
