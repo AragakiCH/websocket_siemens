@@ -653,7 +653,11 @@ export function Preview() {
         {/* El aire de ARRIBA lo pone esta fila. El de abajo lo pone el propio
             botón de pestaña: la cabecera no puede llevar `pb` o el subrayado
             de la activa dejaría de caer sobre su línea inferior. */}
-        <div className="flex items-center gap-3 pt-2">
+        <div
+          className={`flex items-center gap-3 ${
+            cabecera.hermanas.length > 1 ? 'row-span-2' : 'pt-2'
+          }`}
+        >
           <Logo variante="barra" />
           <Separador />
         </div>
@@ -717,13 +721,13 @@ export function Preview() {
           <Reloj />
         </div>
 
-        {/* Segmento 3, en la MISMA columna que los otros dos. La celda de la
-            izquierda va vacía: es lo que reserva el hueco del logotipo y lo
-            que hace que las pestañas arranquen donde arrancan el camino y el
-            título, sin escribir ningún ancho a mano. */}
+        {/* Segmento 3, en la MISMA columna que los otros dos: lo coloca solo
+            el reparto de la rejilla, porque el logotipo ya ocupa la columna
+            de la izquierda en las dos filas. Un relleno vacío aquí empujaría
+            las pestañas a una TERCERA fila —se probó, y descentraba el
+            logotipo aún más—. */}
         {cabecera.hermanas.length > 1 && (
           <>
-            <div />
             <Hermanas
               hermanas={cabecera.hermanas}
               activa={cabecera.activa}
