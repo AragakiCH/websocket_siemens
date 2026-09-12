@@ -319,11 +319,13 @@ export async function duplicarPantalla(
   const destino = proyectoId ?? doc?.proyecto ?? PROYECTO_HMI_POR_DEFECTO;
   const nueva = await crearPantalla(nombre, destino);
   if (doc && (doc.widgets.length > 0 || doc.canvas.width > 0)) {
-    // version null = forzar: la pantalla acaba de nacer, no hay nada que pisar.
+    // La pantalla acaba de nacer, no hay nada que pisar: se fuerza, pero
+    // diciéndolo. El servidor ya no acepta un `version: null` a secas.
     await guardarProyecto(
       { widgets: doc.widgets, canvas: doc.canvas },
       null,
-      nueva.project_id
+      nueva.project_id,
+      true
     );
   }
   return { ...nueva, num_widgets: doc?.widgets.length ?? 0 };
@@ -473,7 +475,17 @@ export async function borrarWidget(
 export async function guardarProyecto(
   design: SavedDesign,
   version: number | null,
-  projectId: string = PANTALLA_POR_DEFECTO
+  projectId: string = PANTALLA_POR_DEFECTO,
+  /**
+   * Escribir SIN comprobar la versión.
+   *
+   * Sólo tiene sentido sobre una pantalla recién creada, donde no hay trabajo
+   * de nadie que pisar. El servidor rechaza con 400 una petición sin
+   * `version` que no lo pida explícitamente: mandar `version: null` y que eso
+   * bastara para sobrescribir convertía el control de versiones en algo que
+   * se saltaba quien no sabía que existía.
+   */
+  forzar: boolean = false
 ): Promise<number> {
   const d = await fetchAuth(`/pantallas/${projectId}`, {
     method: 'PUT',
@@ -481,6 +493,7 @@ export async function guardarProyecto(
       widgets: design.widgets,
       canvas: design.canvas,
       version,
+      forzar,
     }),
   });
   saveDesign(design, projectId);
