@@ -231,6 +231,13 @@ class ProyectoCompleto(BaseModel):
         description="Confirma que quieres escribir SIN comprobar la versión. "
                     "Sin esto, un cuerpo sin `version` se rechaza con 400.",
     )
+    faceplate: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Declaración de TIPO de faceplate: `es_tipo` y la lista "
+                    "de `parametros`. Omitirlo NO la borra — se deja como "
+                    "estaba, para que un cliente que no conozca los "
+                    "faceplates no se lleve por delante la declaración.",
+    )
 
 
 class WidgetUnico(BaseModel):
@@ -367,7 +374,7 @@ async def guardar_proyecto(
     try:
         doc = await _store(request).guardar_todo(
             project_id, cuerpo.widgets, cuerpo.canvas,
-            cuerpo.version, usuario_de(sesion),
+            cuerpo.version, usuario_de(sesion), cuerpo.faceplate,
         )
     except ConflictoDeVersion as exc:
         raise _conflicto(exc)

@@ -4,6 +4,7 @@ import { motorHidraulico } from './motor/MotorTrifasico';
 import { sidebarNavegacion } from './navegacion/SidebarNavegacion';
 import { pantallaScreen } from './navegacion/PantallaScreen';
 import { accesoSeccion } from './navegacion/AccesoSeccion';
+import { faceplate } from './faceplate/Faceplate';
 import { trendWidget } from './trend/Trend';
 import { contenedorGrupo } from './contenedor/Contenedor';
 import { valorUnidad } from './lectura/ValorUnidad';
@@ -17,6 +18,8 @@ export const customWidgets: CustomWidgetDef[] = [
   sidebarNavegacion,
   pantallaScreen,
   accesoSeccion,
+  // Instancia de un tipo de faceplate: se define una vez, se coloca muchas.
+  faceplate,
   // Tendencia en vivo: varias variables numéricas contra el tiempo.
   trendWidget,
   // Agrupa widgets para moverlos en bloque. Nada que ver con la

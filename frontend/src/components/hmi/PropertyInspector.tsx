@@ -177,7 +177,7 @@ export function PropertyInspector({
   onStyleChange,
   onDelete
 }: Props) {
-  const { t, widgetLabel } = useAppStore();
+  const { t, widgetLabel, pantallas, projectId } = useAppStore();
 
   // Secciones que declara el Menú Lateral del lienzo. Llena el desplegable
   // de "Vista".
@@ -283,15 +283,41 @@ export function PropertyInspector({
     value: v.id
   });
 
+  /* Si esta pantalla es un TIPO de faceplate, sus parámetros se pueden
+     enlazar como si fueran variables. Es lo que hace reutilizable al tipo:
+     el widget guarda `param:marcha` y cada instancia decide qué tag va ahí.
+
+     Van los PRIMEROS: dentro de un tipo, enlazar a un tag real es la
+     excepción —deja ese widget clavado al mismo tag en las cuarenta
+     instancias— y lo normal es enlazar a un parámetro. */
+  const fichaPantalla = pantallas.find((p) => p.project_id === projectId);
+  const paramsFaceplate = fichaPantalla?.es_faceplate
+    ? fichaPantalla.parametros ?? []
+    : [];
+
   const varGroups = [
   { label: '', options: [{ label: t('insp.none'), value: '' }] },
+  ...(paramsFaceplate.length > 0
+    ? [{
+        label: 'Parámetros del faceplate',
+        options: paramsFaceplate.map((p) => ({
+          label: `${p.nombre}  (${p.tipo})`,
+          value: `param:${p.id}`,
+        })),
+      }]
+    : []),
   { label: t('insp.varsCompatible'), options: compatibles.map(opcion) },
   { label: t('insp.varsOther'), options: otras.map(opcion) }];
 
   // Variable enlazada ahora mismo, para avisar si no calza. Puede venir de un
   // diseño guardado antes de que existiera esta validación.
   const variableActual = selectedVariables.find((v) => v.id === widget.variableId);
-  const aviso = avisoIncompatible(acepta, variableActual);
+  // Un `param:` no es una variable: no hay tipo que comparar todavía —lo
+  // pondrá cada instancia— así que avisar de incompatibilidad ahí sería
+  // avisar de algo que aún no se ha decidido.
+  const aviso = String(widget.variableId ?? '').startsWith('param:')
+    ? ''
+    : avisoIncompatible(acepta, variableActual);
 
   return (
     <aside className="mp-scroll mp-scroll-dark flex w-72 shrink-0 flex-col overflow-auto border-l border-slate-200 bg-white dark:border-navy-slate dark:bg-navy-soft">

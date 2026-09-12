@@ -300,6 +300,17 @@ interface Props {
    * al entrar en ella.
    */
   soloVista?: string;
+  /**
+   * Qué tag real corresponde a cada parámetro, cuando esta pantalla se está
+   * dibujando como un FACEPLATE.
+   *
+   * Dentro de un tipo, los widgets no apuntan a un tag sino a un parámetro:
+   * guardan `param:marcha` en su `variableId`. Aquí se cambia ese prefijo por
+   * el tag que le toque a esta instancia. Sin mapa, la pantalla se dibuja tal
+   * cual y los `param:` no resuelven a nada — que es exactamente lo que debe
+   * pasar al abrir el tipo como pantalla normal para editarlo.
+   */
+  mapaTags?: Record<string, string>;
 }
 
 export default function PantallaEmbebida({
@@ -307,6 +318,7 @@ export default function PantallaEmbebida({
   modo,
   interactivo,
   soloVista,
+  mapaTags,
 }: Props) {
   const { variables } = useAppStore();
   const { design, cargando, error } = usePantallaEmpotrada(projectId);
@@ -330,6 +342,24 @@ export default function PantallaEmbebida({
       }),
     [design, soloVista]
   );
+
+  /**
+   * De lo que el widget guarda al valor que hay que pintar.
+   *
+   * Un `param:<id>` se cambia por el tag de esta instancia; cualquier otra
+   * cosa se busca tal cual. Un parámetro sin asignar devuelve `undefined`, y
+   * entonces el widget pinta «—» en vez de un cero: un cero de mentira en un
+   * panel de planta es peor que un hueco, porque nadie lo distingue de una
+   * lectura real.
+   */
+  const resolver = (variableId: string | null | undefined) => {
+    if (!variableId) return undefined;
+    if (variableId.startsWith('param:')) {
+      const tag = mapaTags?.[variableId.slice('param:'.length)];
+      return tag ? variables.find((v) => v.id === tag) : undefined;
+    }
+    return variables.find((v) => v.id === variableId);
+  };
 
   const cw = design?.canvas?.width ?? 0;
   const ch = design?.canvas?.height ?? 0;
@@ -445,11 +475,7 @@ export default function PantallaEmbebida({
             >
               <WidgetRenderer
                 widget={w}
-                variable={
-                  w.variableId
-                    ? variables.find((v) => v.id === w.variableId)
-                    : undefined
-                }
+                variable={resolver(w.variableId)}
                 interactivo={interactivo}
               />
             </div>

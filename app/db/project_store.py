@@ -79,6 +79,49 @@ PANTALLA_POR_DEFECTO = "principal"
 
 #: Alias histórico. Aquí "proyecto" quería decir "pantalla"; se conserva para
 #: no romper importaciones antiguas, pero el nombre bueno es el de arriba.
+# Tipos de dato que puede tener un parámetro de faceplate. Son los mismos
+# que maneja el resto de la aplicación; uno inventado se rechaza en vez de
+# guardarse y fallar más tarde al enlazar.
+TIPOS_PARAMETRO = ("bool", "int", "double", "string")
+
+# Un id de parámetro acaba dentro de `variableId` como `param:<id>`, así que
+# no puede llevar nada que se confunda con un separador.
+_RE_PARAM = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]{0,39}$")
+
+
+def normalizar_faceplate(bruto) -> dict:
+    """
+    Deja el bloque `faceplate` en forma, o lo descarta.
+
+    Se valida aquí y no en el frontend porque el frontend no es la única vía:
+    un `.psiproj` importado de otra instalación entra por el mismo sitio.
+
+    Un parámetro mal formado se QUITA y los demás se conservan. Rechazar la
+    pantalla entera por una fila mala dejaría al usuario sin poder guardar y
+    sin saber cuál era.
+    """
+    if not isinstance(bruto, dict):
+        return {"es_tipo": False, "parametros": []}
+
+    limpios = []
+    vistos = set()
+    for p in (bruto.get("parametros") or [])[:60]:
+        if not isinstance(p, dict):
+            continue
+        pid = str(p.get("id") or "").strip()
+        if not _RE_PARAM.match(pid) or pid in vistos:
+            continue
+        vistos.add(pid)
+        tipo = p.get("tipo")
+        limpios.append({
+            "id": pid,
+            "nombre": (str(p.get("nombre") or pid).strip())[:80],
+            "tipo": tipo if tipo in TIPOS_PARAMETRO else "double",
+        })
+
+    return {"es_tipo": bool(bruto.get("es_tipo")), "parametros": limpios}
+
+
 PROYECTO_POR_DEFECTO = PANTALLA_POR_DEFECTO
 
 
@@ -225,6 +268,8 @@ class ProjectStore:
             "actualizado_por": "",
             "canvas": {},
             "widgets": [],
+            # Una pantalla normal. Se marca como tipo desde el Diseñador.
+            "faceplate": {"es_tipo": False, "parametros": []},
         }
 
     @staticmethod
@@ -244,6 +289,9 @@ class ProjectStore:
         doc.setdefault("actualizado_en", _ahora_iso())
         doc.setdefault("actualizado_por", "")
         doc.setdefault("canvas", {})
+        # Las pantallas guardadas antes de que existieran los faceplates no
+        # traen el bloque: se les pone vacío y se leen igual, sin migrar nada.
+        doc["faceplate"] = normalizar_faceplate(doc.get("faceplate"))
         widgets = doc.get("widgets")
         doc["widgets"] = widgets if isinstance(widgets, list) else []
         return doc
@@ -292,6 +340,10 @@ class ProjectStore:
                 "actualizado_en": d["actualizado_en"],
                 "actualizado_por": d["actualizado_por"],
                 "num_widgets": len(d["widgets"]),
+                # Para que el widget de Faceplate pueda ofrecer los tipos sin
+                # descargarse cada pantalla entera solo para mirar una marca.
+                "es_faceplate": bool(d.get("faceplate", {}).get("es_tipo")),
+                "parametros": d.get("faceplate", {}).get("parametros", []),
             }
             for d in sorted(self._cache.values(), key=_orden_pantalla)
             if proyecto is None
@@ -389,7 +441,8 @@ class ProjectStore:
     async def guardar_todo(self, project_id: str, widgets: List[dict],
                            canvas: Optional[dict] = None,
                            version: Optional[int] = None,
-                           usuario: str = "") -> dict:
+                           usuario: str = "",
+                           faceplate: Optional[dict] = None) -> dict:
         """Reemplaza widgets y lienzo completos (el PUT)."""
         pid = validar_id(project_id)
         async with self._lock_async:
@@ -401,6 +454,11 @@ class ProjectStore:
             doc["widgets"] = list(widgets or [])
             if canvas is not None:
                 doc["canvas"] = canvas
+            # `None` = «no se toca». Sin esa distinción, cualquier guardado de
+            # widgets desde un cliente que no conozca los faceplates borraría
+            # la declaración del tipo: la lección del PUT que vaciaba pantallas.
+            if faceplate is not None:
+                doc["faceplate"] = normalizar_faceplate(faceplate)
             self._sellar(doc, usuario)
             await self._escribir_async(pid)
             return doc
