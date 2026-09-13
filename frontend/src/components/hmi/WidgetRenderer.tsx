@@ -155,7 +155,14 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
               background: pBoton.background && pBoton.background !== "transparent"
                 ? pBoton.background
                 : style.color,
-              color: pBoton.color ?? "#fff",
+              // El rotulo, BLANCO salvo que se le haya puesto un color a
+              // proposito. `pBoton.color` no vale aqui: hereda de
+              // `style.color`, que es justo el color del FONDO del boton de
+              // dos lineas mas arriba, asi que el texto salia del mismo color
+              // que la caja y el boton se veia como un rectangulo liso. El
+              // `?? "#fff"` de antes no llegaba a entrar nunca, porque la
+              // herencia hace que ese campo nunca sea nulo.
+              color: widget.partes?.boton?.color ?? "#fff",
               fontSize: pBoton.fontSize,
               fontWeight: pBoton.bold ? 700 : 600,
               borderRadius: pBoton.borderRadius,
