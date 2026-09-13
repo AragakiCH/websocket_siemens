@@ -1,5 +1,8 @@
 # --- Python ---
 venv/
+# Entorno de Python creado en esta máquina: el `venv/` del repositorio
+# apunta a una ruta que aquí no existe (otra máquina, otro usuario).
+venv312/
 __pycache__/
 *.pyc
 *.pyo

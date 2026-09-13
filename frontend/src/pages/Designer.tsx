@@ -10,6 +10,7 @@ import {
   WorkflowIcon,
   BellIcon,
   BookOpenIcon,
+  VariableIcon,
   FileSpreadsheetIcon,
   LayersIcon,
   MenuIcon,
@@ -58,6 +59,7 @@ import {
 import { useLock } from '../hooks/useLock';
 import { recursoDisenador } from '../services/lockApi';
 import { FlowEditor } from '../components/flows/FlowEditor';
+import { PanelInternas } from '../components/internas/PanelInternas';
 import { AlarmsEditor } from '../components/alarms/AlarmsEditor';
 import { RecipesEditor } from '../components/recipes/RecipesEditor';
 import { PanelExportar } from '../components/export/PanelExportar';
@@ -77,7 +79,8 @@ import {
   VISTA_TODAS } from
 '../components/hmi/custom/navegacion/store';
 
-type DesignerTab = 'designer' | 'flows' | 'alarms' | 'recipes' | 'export';
+type DesignerTab =
+  'designer' | 'flows' | 'alarms' | 'recipes' | 'internas' | 'export';
 
 let counter = 1;
 
@@ -981,6 +984,17 @@ export function Designer() {
               Recetas
             </button>
             <button
+              onClick={() => setActiveTab('internas')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition ${
+                activeTab === 'internas'
+                  ? 'bg-white text-navy shadow-sm dark:bg-navy-slate dark:text-slate-100'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+              }`}
+            >
+              <VariableIcon className="h-3.5 w-3.5" />
+              Variables
+            </button>
+            <button
               onClick={() => setActiveTab('export')}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition ${
                 activeTab === 'export'
@@ -1514,6 +1528,8 @@ export function Designer() {
       {/* ═══ Contenido según pestaña activa ═══ */}
       {activeTab === 'alarms' ? (
         <AlarmsEditor />
+      ) : activeTab === 'internas' ? (
+        <PanelInternas />
       ) : activeTab === 'recipes' ? (
         <RecipesEditor />
       ) : activeTab === 'export' ? (
