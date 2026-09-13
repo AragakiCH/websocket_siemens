@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { PowerIcon } from "lucide-react";
 import { HmiWidget } from "../../models/widget";
@@ -44,6 +44,13 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
   // vuelve a pulsar — que con una orden a una máquina es justo lo que no
   // debe ocurrir.
   const [avisoAccion, setAvisoAccion] = useState('');
+  const relojAviso = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (relojAviso.current !== null) window.clearTimeout(relojAviso.current);
+    },
+    []
+  );
   const [mandando, setMandando] = useState(false);
 
   const pulsar = async () => {
@@ -57,7 +64,12 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
     // Cancelar en la confirmación no es un error: no se dice nada.
     if (!r.ok && r.error) {
       setAvisoAccion(r.error);
-      setTimeout(() => setAvisoAccion(''), 6000);
+      // El temporizador anterior se cancela antes de poner otro: si no, el
+      // reloj del aviso viejo borra el nuevo al vencer, y con dos fallos
+      // seguidos el segundo mensaje parpadea y desaparece sin que dé tiempo
+      // a leerlo.
+      if (relojAviso.current !== null) window.clearTimeout(relojAviso.current);
+      relojAviso.current = window.setTimeout(() => setAvisoAccion(''), 6000);
     }
   };
 
