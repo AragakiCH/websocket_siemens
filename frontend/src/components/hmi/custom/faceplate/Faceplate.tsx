@@ -85,11 +85,18 @@ export function leerConfigFaceplate(config: any): ConfigFaceplate {
  * parámetros de cada una: así el Inspector puede ofrecerlos y pintar sus
  * huecos sin descargarse cada pantalla entera para mirar una marca.
  */
-function useTipos(): { tipos: ResumenPantalla[]; cargando: boolean } {
+export function useTipos(
+  activo = true
+): { tipos: ResumenPantalla[]; cargando: boolean } {
   const [tipos, setTipos] = useState<ResumenPantalla[]>([]);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
+    // El panel de acciones llama a esto para CUALQUIER botón, y la lista sólo
+    // le hace falta si la acción es «abrir un faceplate». Sin el interruptor,
+    // seleccionar un botón cualquiera en el Diseñador pediría la lista de
+    // pantallas al servidor para no usarla.
+    if (!activo) return;
     let vivo = true;
     listarPantallas(getUltimoProyecto())
       .then((l) => {
@@ -104,7 +111,7 @@ function useTipos(): { tipos: ResumenPantalla[]; cargando: boolean } {
     return () => {
       vivo = false;
     };
-  }, []);
+  }, [activo]);
 
   return { tipos, cargando };
 }

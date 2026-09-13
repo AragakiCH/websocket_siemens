@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { HmiWidget, WidgetStyle } from '../../../models/widget';
 import type { PlcVariable } from '../../../models/plc';
+import type { ParametroFaceplate } from '../../../utils/designStorage';
 
 export interface CustomWidgetDef {
   kind: `custom:${string}`;                        // siempre con prefix 'custom:'
@@ -44,6 +45,17 @@ export interface InspectorCtx {
   config: Record<string, any>;
   /** Reemplaza la config entera. Se guarda como cualquier otro cambio. */
   setConfig: (config: Record<string, any>) => void;
+  /**
+   * Los parámetros que declara LA PANTALLA QUE SE ESTÁ EDITANDO, si es un
+   * tipo de faceplate. Vacío en una pantalla normal.
+   *
+   * Lo necesita el panel de acciones: un botón dentro de un tipo puede abrir
+   * otro faceplate pasándole los parámetros de éste (`param:motor`), y para
+   * ofrecerlos hay que saber cuáles son. El Inspector ya los tiene calculados
+   * para el selector de variable, así que se pasan en vez de volver a
+   * pedirlos.
+   */
+  paramsPantalla?: ParametroFaceplate[];
 }
 
 export interface RenderCtx {

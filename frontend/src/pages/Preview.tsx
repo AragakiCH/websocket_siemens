@@ -62,6 +62,7 @@ import { useAppStore } from '../context/AppStore';
 import { WidgetRenderer } from '../components/hmi/WidgetRenderer';
 import { Logo } from '../components/ui/Logo';
 import { RealPLCService } from '../services/RealPLCService';
+import CapaPopups from '../components/hmi/custom/faceplate/CapaPopups';
 import {
   useVistaActiva,
   useRutaDeVista,
@@ -648,6 +649,10 @@ export function Preview() {
 
   return (
     <div className="relative flex h-full w-full flex-col bg-tema-fondo">
+      {/* Las ventanas de faceplate. Van aqui, en la raiz del runtime, y no
+          dentro del lienzo: flotan sobre TODO —cabecera incluida— y no las
+          recorta ni las escala el `transform` del lienzo. */}
+      <CapaPopups />
 
       {/* ── Barra de operación ────────────────────────────────────
           Sin un solo control: es informativa de principio a fin. Lo único

@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { motion } from "framer-motion";
 import { PowerIcon } from "lucide-react";
 import { HmiWidget } from "../../models/widget";
 import { PlcVariable } from "../../models/plc";
 import { formatValue, valueFraction, isTruthy } from "../../utils/format";
 import { leerAccion, tieneAccion, ejecutarAccion } from "./acciones";
+import { ContextoMapaTags } from "./custom/faceplate/contexto";
 import { useAppStore } from "../../context/AppStore";
 import { customByKind, zipByKind } from "./custom/registry";
 import { estiloDeParte } from "./partes";
@@ -31,6 +32,11 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
   // El modo de color vive en el contexto de la aplicación, así que no se
   // puede importar: se le pasa a la acción. Ver `EntornoAccion`.
   const { setTheme } = useAppStore();
+  // Los tags de la instancia que envuelve a este widget, si esta dentro de un
+  // faceplate. Sirve para que un boton de aqui dentro abra OTRO faceplate del
+  // mismo equipo sin volver a elegir los tags a mano. Fuera de una instancia
+  // es `undefined`, y entonces un `param:` no resuelve a nada.
+  const mapaTags = useContext(ContextoMapaTags);
   const accion = leerAccion(widget.config);
   const mandaAlgo = interactivo && tieneAccion(accion);
 
@@ -45,6 +51,7 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
     setMandando(true);
     const r = await ejecutarAccion(accion, variable, widget.text || widget.name, {
       setModoColor: setTheme,
+      mapaTags,
     });
     setMandando(false);
     // Cancelar en la confirmación no es un error: no se dice nada.

@@ -55,6 +55,7 @@ import { useAppStore } from '../../../../context/AppStore';
 import { cargarProyecto, type SavedDesign } from '../../../../utils/designStorage';
 import { WidgetRenderer } from '../../WidgetRenderer';
 import { ContextoEmbebido, esWidgetDeNavegacion } from './store';
+import { ContextoMapaTags } from '../faceplate/contexto';
 
 /** Cómo encaja el lienzo de la pantalla dentro del marco del panel. */
 export type ModoAjuste = 'ajustar' | 'estirar' | 'real';
@@ -313,6 +314,25 @@ interface Props {
   mapaTags?: Record<string, string>;
 }
 
+/**
+ * El tamano del lienzo de una pantalla, sin dibujarla.
+ *
+ * Lo necesita el marco de un POPUP: tiene que decidir cuanto mide la ventana
+ * ANTES de que dentro haya nada, y lo correcto es que mida lo que el tipo se
+ * dibujo. Va por la misma cache que el dibujo, asi que preguntar aqui no
+ * cuesta una peticion extra: cuando la ventana se abre, la pantalla ya se
+ * esta pidiendo.
+ *
+ * `null` mientras no se sabe. Quien llama pone su medida por defecto.
+ */
+export function useTamanoPantalla(
+  projectId: string
+): { ancho: number; alto: number } | null {
+  const { design } = usePantallaEmpotrada(projectId);
+  const c = design?.canvas;
+  return c?.width && c?.height ? { ancho: c.width, alto: c.height } : null;
+}
+
 export default function PantallaEmbebida({
   projectId,
   modo,
@@ -438,6 +458,7 @@ export default function PantallaEmbebida({
        Acceso para no dibujar su propia miniatura aquí: dos tarjetas que se
        apuntaran la una a la otra se pintarían sin final. */
     <ContextoEmbebido.Provider value>
+    <ContextoMapaTags.Provider value={mapaTags}>
     <div
       ref={ref}
       style={{
@@ -483,6 +504,7 @@ export default function PantallaEmbebida({
         </div>
       )}
     </div>
+    </ContextoMapaTags.Provider>
     </ContextoEmbebido.Provider>
   );
 }

@@ -474,6 +474,7 @@ export function PropertyInspector({
           key={widget.id}
           widget={widget}
           config={widget.config ?? {}}
+          paramsPantalla={paramsFaceplate}
           setConfig={(config) => onChange({ config })} />
       </Section>
       }

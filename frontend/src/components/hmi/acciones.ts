@@ -28,6 +28,8 @@ import { reconocerTodas } from '../../services/alarmasRuntimeApi';
 import { logout } from '../../services/authApi';
 import { leerTemas, guardarTemas } from '../../services/temaApi';
 import { setVistaActiva, GRUPO_POR_DEFECTO } from './custom/navegacion/store';
+import { abrirPopup, cerrarPopup, cerrarTodos } from './custom/faceplate/popups';
+import { PREFIJO_PARAM } from '../../utils/designStorage';
 
 export type TipoAccion =
   | 'ninguna'
@@ -41,7 +43,10 @@ export type TipoAccion =
   | 'modo-color'
   | 'tema'
   | 'aviso'
-  | 'salir';
+  | 'salir'
+  // Ventanas de faceplate.
+  | 'abrir-faceplate'
+  | 'cerrar-faceplate';
 
 /** Las que tocan el PLC. Son las que piden tag y lista blanca. */
 export const ACCIONES_DE_PLC: TipoAccion[] = ['escribir', 'alternar', 'incrementar'];
@@ -55,6 +60,12 @@ export const ACCIONES_DE_PLC: TipoAccion[] = ['escribir', 'alternar', 'increment
  */
 export interface EntornoAccion {
   setModoColor?: (modo: 'light' | 'dark' | 'auto') => void;
+  /**
+   * Los tags de la instancia de faceplate que envuelve a este widget, si la
+   * hay. Es lo que permite que un boton DENTRO de un faceplate abra otro
+   * pasandole los mismos tags. Ver `faceplate/contexto.ts`.
+   */
+  mapaTags?: Record<string, string>;
 }
 
 export interface AccionWidget {
@@ -76,6 +87,33 @@ export interface AccionWidget {
   modo?: 'light' | 'dark' | 'auto';
   /** Para `tema`: el id del tema que pasa a estar activo. */
   temaId?: string;
+
+  // ── Ventanas de faceplate ───────────────────────────────────
+  /**
+   * Para `abrir-faceplate`: el `project_id` de la pantalla marcada como tipo.
+   *
+   * No se llama `tipo` porque ese nombre ya lo lleva el tipo de ACCION, y dos
+   * campos `tipo` en el mismo objeto es una confusion garantizada la primera
+   * vez que alguien lea este fichero con prisa.
+   */
+  faceplate?: string;
+  /**
+   * Que tag va en cada parametro del tipo.
+   *
+   * Un valor puede ser un tag (`plc1|DB.run`) o, si este boton vive dentro de
+   * otro faceplate, un parametro suyo (`param:motor`). Lo segundo se traduce
+   * al ejecutar, con los tags de la instancia que lo envuelve.
+   */
+  params?: Record<string, string>;
+  /** Lo que se lee en la barra de la ventana. */
+  titulo?: string;
+  /** 0 = el tamano con el que se dibujo el tipo. */
+  ancho?: number;
+  alto?: number;
+  /** Con velo detras, que bloquea el resto de la pantalla. */
+  modal?: boolean;
+  /** Para `cerrar-faceplate`: todas, en vez de solo la de arriba. */
+  cerrarTodas?: boolean;
 }
 
 export const ACCION_VACIA: AccionWidget = {
@@ -91,6 +129,7 @@ export function leerAccion(config: any): AccionWidget {
   const conocidas: TipoAccion[] = [
     'escribir', 'alternar', 'incrementar',
     'reconocer-alarmas', 'ir-a-seccion', 'modo-color', 'tema', 'aviso', 'salir',
+    'abrir-faceplate', 'cerrar-faceplate',
   ];
   const tipo: TipoAccion = conocidas.includes(a.tipo) ? a.tipo : 'ninguna';
   return {
@@ -104,7 +143,25 @@ export function leerAccion(config: any): AccionWidget {
     grupo: typeof a.grupo === 'string' && a.grupo ? a.grupo : GRUPO_POR_DEFECTO,
     modo: ['light', 'dark', 'auto'].includes(a.modo) ? a.modo : 'auto',
     temaId: typeof a.temaId === 'string' ? a.temaId : '',
+    faceplate: typeof a.faceplate === 'string' ? a.faceplate : '',
+    params: leerParams(a.params),
+    titulo: typeof a.titulo === 'string' ? a.titulo : '',
+    ancho: Number.isFinite(a.ancho) ? Number(a.ancho) : 0,
+    alto: Number.isFinite(a.alto) ? Number(a.alto) : 0,
+    modal: !!a.modal,
+    cerrarTodas: !!a.cerrarTodas,
   };
+}
+
+/** Solo pares texto→texto. Lo demas no significa nada como tag. */
+function leerParams(x: any): Record<string, string> {
+  const r: Record<string, string> = {};
+  if (x && typeof x === 'object') {
+    for (const [k, v] of Object.entries(x)) {
+      if (typeof v === 'string') r[k] = v;
+    }
+  }
+  return r;
 }
 
 /**
@@ -118,6 +175,9 @@ export const tieneAccion = (a: AccionWidget): boolean => {
   if (a.tipo === 'ninguna') return false;
   if (ACCIONES_DE_PLC.includes(a.tipo)) return !!a.tag;
   if (a.tipo === 'ir-a-seccion') return !!a.seccion;
+  // Cerrar no necesita decir cual: la de arriba. Abrir si necesita el tipo,
+  // porque una ventana sin contenido no es nada.
+  if (a.tipo === 'abrir-faceplate') return !!a.faceplate;
   return true;
 };
 
@@ -246,6 +306,36 @@ export async function ejecutarAccion(
         await guardarTemas(doc.temas, accion.temaId!, doc.version);
         return { ok: true };
       }
+
+      case 'abrir-faceplate': {
+        // Los parametros se resuelven AQUI y no en la ventana: lo que se
+        // apila son tags de verdad. Asi el popup no necesita saber nada de
+        // quien lo abrio, y dos ventanas del mismo tipo con equipos distintos
+        // se distinguen por su contenido y no por su procedencia.
+        const params: Record<string, string> = {};
+        for (const [k, v] of Object.entries(accion.params ?? {})) {
+          const real = v.startsWith(PREFIJO_PARAM)
+            ? entorno.mapaTags?.[v.slice(PREFIJO_PARAM.length)]
+            : v;
+          // Un parametro sin resolver se deja FUERA, no vacio: dentro, el
+          // widget pintara «—» en vez de un cero de mentira.
+          if (real) params[k] = real;
+        }
+        abrirPopup({
+          tipo: accion.faceplate!,
+          titulo: accion.titulo || '',
+          params,
+          ancho: accion.ancho || 0,
+          alto: accion.alto || 0,
+          modal: !!accion.modal,
+        });
+        return { ok: true };
+      }
+
+      case 'cerrar-faceplate':
+        if (accion.cerrarTodas) cerrarTodos();
+        else cerrarPopup();
+        return { ok: true };
 
       case 'reconocer-alarmas':
         await reconocerTodas();

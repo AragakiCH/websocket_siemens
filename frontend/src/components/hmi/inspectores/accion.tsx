@@ -29,6 +29,9 @@ import { useSecciones, GRUPO_POR_DEFECTO } from '../custom/navegacion/store';
 import { leerTemas } from '../../../services/temaApi';
 import type { Tema } from '../../../models/tema';
 import { listarPermitidos, unirId, type TagPermitido } from '../../../services/escrituraApi';
+import { useTipos } from '../custom/faceplate/Faceplate';
+import { useAppStore } from '../../../context/AppStore';
+import { PREFIJO_PARAM } from '../../../utils/designStorage';
 
 const TIPOS: { valor: TipoAccion; label: string; ayuda: string }[] = [
   { valor: 'ninguna', label: 'Ninguna', ayuda: 'El widget sólo se mira; no manda nada.' },
@@ -84,15 +87,50 @@ const TIPOS: { valor: TipoAccion; label: string; ayuda: string }[] = [
     label: 'Cerrar sesión',
     ayuda: 'Cierra la sesión y vuelve a la pantalla de acceso.',
   },
+  // ── Ventanas de faceplate ───────────────────────────────────
+  {
+    valor: 'abrir-faceplate',
+    label: 'Abrir un faceplate',
+    ayuda:
+      'Abre un tipo de faceplate en una ventana flotante, con los tags de ' +
+      'ESTE equipo. Es el popup de TIA Portal: pulsas el motor del sinóptico ' +
+      'y sale su faceplate encima, sin salir de la pantalla.',
+  },
+  {
+    valor: 'cerrar-faceplate',
+    label: 'Cerrar el faceplate',
+    ayuda:
+      'Cierra la ventana de encima. Dentro de un faceplate, eso es ella ' +
+      'misma, así que sirve para su propio botón de «Cerrar».',
+  },
 ];
 
-export function InspectorAccion({ config, setConfig }: InspectorCtx) {
+/** Las que no tiene sentido confirmar. Ver el comentario de más abajo. */
+const SIN_CONFIRMACION: TipoAccion[] = [
+  'ninguna',
+  'aviso',
+  'abrir-faceplate',
+  'cerrar-faceplate',
+];
+
+export function InspectorAccion({
+  config,
+  setConfig,
+  paramsPantalla = [],
+}: InspectorCtx) {
   const accion = leerAccion(config);
   const [permitidos, setPermitidos] = useState<TagPermitido[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const secciones = useSecciones(accion.grupo || GRUPO_POR_DEFECTO);
   const [temas, setTemas] = useState<Tema[]>([]);
+  const { variables } = useAppStore();
+  // Los tipos de faceplate, sólo si la acción los necesita (ver `useTipos`).
+  const { tipos, cargando: cargandoTipos } = useTipos(
+    accion.tipo === 'abrir-faceplate'
+  );
+  const tipoElegido = tipos.find((x) => x.project_id === accion.faceplate);
+  const parametros = tipoElegido?.parametros ?? [];
 
   // Los temas sólo hacen falta para una de las acciones, así que se piden
   // sólo cuando se elige: en un Inspector que se abre a cada clic, una
@@ -246,6 +284,179 @@ export function InspectorAccion({ config, setConfig }: InspectorCtx) {
         </label>
       )}
 
+      {accion.tipo === 'abrir-faceplate' && (
+        <>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+              Tipo de faceplate
+            </span>
+            <select
+              value={accion.faceplate ?? ''}
+              onChange={(e) => {
+                const t = tipos.find((x) => x.project_id === e.target.value);
+                // Los tags se vacían al cambiar de tipo: los del anterior no
+                // significan nada en el nuevo. Y el título se rellena con el
+                // nombre del tipo, que es lo que uno iba a escribir a mano.
+                set({
+                  faceplate: e.target.value,
+                  params: {},
+                  titulo: t?.nombre ?? '',
+                });
+              }}
+              className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+            >
+              <option value="">— Sin tipo —</option>
+              {tipos.map((x) => (
+                <option key={x.project_id} value={x.project_id}>
+                  {x.nombre}
+                </option>
+              ))}
+            </select>
+            {!cargandoTipos && tipos.length === 0 && (
+              <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
+                No hay ninguna pantalla marcada como tipo de faceplate. Se
+                marca en el Diseñador, en «Tipo de faceplate».
+              </span>
+            )}
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+              Título de la ventana
+            </span>
+            <input
+              type="text"
+              value={accion.titulo ?? ''}
+              onChange={(e) => set({ titulo: e.target.value })}
+              placeholder="Motor P-101"
+              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+            />
+          </label>
+
+          {parametros.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Tags de esta ventana
+              </p>
+              {parametros.map((p) => {
+                // Sólo lo del tipo que el parámetro pide. Ofrecer una
+                // booleana para una corriente es ofrecer un enlace que no
+                // funciona y que sólo se descubre en planta.
+                const compatibles = variables.filter((v) => v.type === p.tipo);
+                const propios = paramsPantalla.filter((x) => x.tipo === p.tipo);
+                return (
+                  <label key={p.id} className="block">
+                    <span className="mb-1 flex items-baseline justify-between gap-2">
+                      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        {p.nombre}
+                      </span>
+                      <code className="text-[10px] text-slate-400">{p.tipo}</code>
+                    </span>
+                    <select
+                      value={accion.params?.[p.id] ?? ''}
+                      onChange={(e) =>
+                        set({
+                          params: { ...accion.params, [p.id]: e.target.value },
+                        })
+                      }
+                      className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+                    >
+                      <option value="">— Sin asignar —</option>
+                      {/* Los parámetros de ESTA pantalla van primero y sólo
+                          aparecen si es un tipo de faceplate. Es lo que hace
+                          que un botón «Histórico» dentro del faceplate de un
+                          motor abra el histórico DE ESE motor, en las
+                          cuarenta instancias, sin tocar ninguna. */}
+                      {propios.length > 0 && (
+                        <optgroup label="Parámetros de esta pantalla">
+                          {propios.map((x) => (
+                            <option key={x.id} value={`${PREFIJO_PARAM}${x.id}`}>
+                              {x.nombre}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <optgroup label="Variables">
+                        {compatibles.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                Ancho
+              </span>
+              <input
+                type="number"
+                min={0}
+                value={accion.ancho ?? 0}
+                onChange={(e) => set({ ancho: Number(e.target.value) })}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                Alto
+              </span>
+              <input
+                type="number"
+                min={0}
+                value={accion.alto ?? 0}
+                onChange={(e) => set({ alto: Number(e.target.value) })}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+              />
+            </label>
+          </div>
+          <span className="block text-[10px] leading-relaxed text-slate-400">
+            0 = el tamaño con el que se dibujó el tipo.
+          </span>
+
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              Bloquear el resto
+            </span>
+            <input
+              type="checkbox"
+              checked={!!accion.modal}
+              onChange={(e) => set({ modal: e.target.checked })}
+              className="h-4 w-4 rounded border-slate-300 text-siemens focus:ring-2 focus:ring-siemens/40 dark:border-navy-slate dark:bg-navy"
+            />
+          </label>
+          <span className="block text-[10px] leading-relaxed text-slate-400">
+            Con velo detrás: hasta cerrarla no se puede tocar nada más. Sin
+            marcar, la ventana flota y el sinóptico se sigue operando.
+          </span>
+        </>
+      )}
+
+      {accion.tipo === 'cerrar-faceplate' && (
+        <>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              Cerrar todas
+            </span>
+            <input
+              type="checkbox"
+              checked={!!accion.cerrarTodas}
+              onChange={(e) => set({ cerrarTodas: e.target.checked })}
+              className="h-4 w-4 rounded border-slate-300 text-siemens focus:ring-2 focus:ring-siemens/40 dark:border-navy-slate dark:bg-navy"
+            />
+          </label>
+          <span className="block text-[10px] leading-relaxed text-slate-400">
+            Sin marcar cierra sólo la de encima, que es la que se está viendo.
+          </span>
+        </>
+      )}
+
       {ACCIONES_DE_PLC.includes(accion.tipo) && (
         <>
           <label className="block">
@@ -326,10 +537,12 @@ export function InspectorAccion({ config, setConfig }: InspectorCtx) {
         </>
       )}
 
-      {/* La confirmación vale para todas menos el aviso, que ya ES un
-          mensaje: preguntarle a alguien si quiere ver un mensaje, y luego
-          enseñárselo, son dos diálogos para nada. */}
-      {accion.tipo !== 'ninguna' && accion.tipo !== 'aviso' && (
+      {/* La confirmación vale para las que MANDAN algo. Se quedan fuera el
+          aviso —que ya ES un mensaje: preguntar si quieres ver un mensaje y
+          luego enseñártelo son dos diálogos para nada— y abrir o cerrar una
+          ventana, que no cambia nada del proceso y siempre se deshace
+          volviendo a pulsar. */}
+      {!SIN_CONFIRMACION.includes(accion.tipo) && (
         <>
           <label className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
