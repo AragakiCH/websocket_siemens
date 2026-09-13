@@ -1,0 +1,48 @@
+<!-- Ventilador de cuatro aspas.
+     Solo el dibujo: quién gira, a qué velocidad y cuándo lo deciden el
+     widget.css y el widget.js a partir de las variables. -->
+<div id="ventilador">
+  <svg viewBox="0 0 200 200" aria-label="Ventilador">
+
+    <defs>
+      <!-- UN aspa, dibujada apuntando hacia arriba. Las otras tres son la
+           misma girada 90, 180 y 270 grados: así el perfil se retoca en un
+           solo sitio y las cuatro siguen siendo idénticas. -->
+      <g id="aspa">
+        <!-- De gota: estrecha junto al buje y ancha en la punta, que es lo
+             que le da el perfil de hélice. -->
+        <path class="pala" d="M 95 71
+                              C 82 52, 78 27, 95 12
+                              C 110 -1, 133 5, 138 23
+                              C 143 43, 125 64, 107 72
+                              C 103 74, 98 74, 95 71 Z" />
+        <!-- Los nervios: las tres estrías claras del original. -->
+        <path class="nervio" d="M 99 64 C 91 47, 92 28, 101 17" />
+        <path class="nervio" d="M 108 64 C 104 46, 109 27, 118 18" />
+        <path class="nervio" d="M 116 61 C 117 45, 124 33, 130 27" />
+      </g>
+    </defs>
+
+    <!-- LO ÚNICO QUE GIRA. El buje se queda quieto: es la carcasa del motor,
+         y verla dar vueltas con sus agujeros delataría el truco. -->
+    <g id="aspas">
+      <use href="#aspa" />
+      <use href="#aspa" transform="rotate(90 100 100)" />
+      <use href="#aspa" transform="rotate(180 100 100)" />
+      <use href="#aspa" transform="rotate(270 100 100)" />
+    </g>
+
+    <!-- Buje -->
+    <circle class="aro" cx="100" cy="100" r="34" />
+    <circle class="aro-interior" cx="100" cy="100" r="27" />
+
+    <rect class="placa" x="78" y="78" width="44" height="44" rx="13" />
+    <rect class="hueco" x="94" y="80" width="12" height="8" rx="4" />
+    <rect class="hueco" x="94" y="112" width="12" height="8" rx="4" />
+    <rect class="hueco" x="80" y="94" width="8" height="12" rx="4" />
+    <rect class="hueco" x="112" y="94" width="8" height="12" rx="4" />
+
+    <circle class="eje-aro" cx="100" cy="100" r="10" />
+    <circle class="eje" cx="100" cy="100" r="6" />
+  </svg>
+</div>

@@ -1,0 +1,108 @@
+/* Ventilador.
+   La velocidad de giro sale de una variable ANALÓGICA y el arranque de una
+   DISCRETA, las dos declaradas en widget.json y asignadas desde el Diseñador.
+
+   Lo continuo va aquí, en CSS: la duración de la vuelta y lo apagado que se
+   ve cuando está parado. El arranque y la parada van en widget.js, porque
+   encender o apagar una animación es lo único que el CSS no sabe decidir a
+   partir de un número. */
+
+#ventilador {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+#ventilador svg {
+  /* Cuadrado y centrado dentro de la caja que le dé el lienzo, se estire
+     como se estire: un ventilador ovalado no se lee como un ventilador. */
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: visible;
+}
+
+/* ── El giro ─────────────────────────────────────────────────────
+   `--w-velocidad-frac` va de 0 a 1 (0-100 % del tag). La vuelta dura entre
+   2.4 s casi parado y 0.2 s a tope. Va con calc() porque una animación no
+   admite una variable como duración a secas.
+
+   `transform-box: fill-box` + `transform-origin: center` hacen que gire
+   sobre su propio centro sin tener que repetir las coordenadas del SVG. */
+#aspas {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: girar calc((2.4 - var(--w-velocidad-frac, 0) * 2.2) * 1s)
+             linear infinite;
+  /* Arranca parado. Lo suelta widget.js cuando la marcha está en ON. */
+  animation-play-state: paused;
+}
+
+@keyframes girar {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Parado se ve apagado ────────────────────────────────────────
+   `--w-marcha-on` vale 1 o 0, así que esto es una interpolación y no una
+   condición: encendido al 100 %, parado al 55 %. De un vistazo y desde
+   lejos se distingue un ventilador parado de uno en marcha aunque la
+   pantalla esté congelada en una foto. */
+#ventilador svg {
+  opacity: calc(0.55 + 0.45 * var(--w-marcha-on, 0));
+  transition: opacity 0.25s;
+}
+
+/* ── Colores ─────────────────────────────────────────────────────
+   Los del símbolo. No usan `--w-color` a propósito: un ventilador es gris
+   azulado, y si tomara el color del tema saldría verde azulado en cuanto
+   alguien lo suelte en el lienzo. Para cambiarlo con una variable están las
+   Dinámicas del Inspector. */
+.pala {
+  fill: #5a6780;
+  stroke: #3f4a60;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+.nervio {
+  fill: none;
+  stroke: #7d8aa6;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+
+.aro {
+  fill: #eef2f8;
+  stroke: #c6d0e0;
+  stroke-width: 3;
+}
+
+.aro-interior {
+  fill: #f8fafc;
+  stroke: #dde4ee;
+  stroke-width: 2;
+}
+
+.placa {
+  fill: #f6b73c;
+  stroke: #dd9a2b;
+  stroke-width: 2;
+}
+
+.hueco {
+  fill: #fffaf0;
+}
+
+.eje-aro {
+  fill: #ffffff;
+  stroke: #dde4ee;
+  stroke-width: 2;
+}
+
+.eje {
+  fill: #b3a3d4;
+  stroke: #8f7dc0;
+  stroke-width: 1.5;
+}

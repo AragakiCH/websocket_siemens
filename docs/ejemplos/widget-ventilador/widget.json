@@ -1,0 +1,24 @@
+{
+  "kind": "ventilador",
+  "label": "Ventilador",
+  "category": "Equipos",
+  "defaultWidth": 160,
+  "defaultHeight": 160,
+
+  "accepts": [],
+
+  "variables": [
+    {
+      "id": "marcha",
+      "label": "Marcha",
+      "accepts": ["bool"],
+      "ayuda": "Mientras esté en ON, el ventilador gira."
+    },
+    {
+      "id": "velocidad",
+      "label": "Velocidad",
+      "accepts": ["double", "int"],
+      "ayuda": "0-100 %. Cuanto mayor, más rápido gira."
+    }
+  ]
+}

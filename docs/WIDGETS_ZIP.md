@@ -168,9 +168,26 @@ volver a tocar su código.
 
 ---
 
-## Ejemplo completo
+## Ejemplos
 
-En [`ejemplos/widget-motor/`](ejemplos/widget-motor/) hay un motor que:
+### Ventilador — [`ejemplos/widget-ventilador/`](ejemplos/widget-ventilador/)
+
+Listo para importar: [`ejemplos/widget-ventilador.zip`](ejemplos/widget-ventilador.zip).
+
+Cuatro aspas que giran más deprisa cuanto mayor es una variable **analógica**
+(`velocidad`) y que arrancan y paran con una **discreta** (`marcha`). Parado se
+ve apagado, para distinguirlo de un vistazo. No usa la variable principal
+—declara `"accepts": []`—, así que el Diseñador solo pide sus dos variables,
+cada una por su nombre.
+
+Es el ejemplo más corto que enseña las dos mitades: lo continuo en CSS (la
+duración del giro y la opacidad salen de `calc()` sobre las variables) y lo
+discreto en tres líneas de `widget.js` (arrancar o parar la animación).
+
+### Motor — [`ejemplos/widget-motor/`](ejemplos/widget-motor/)
+
+Además de lo anterior, **escribe en el PLC**: un mando discreto (marcha) y uno
+analógico (consigna). Un motor que:
 
 * gira más deprisa cuanto mayor es la **velocidad**, en CSS puro;
 * arranca y para con la **principal** (marcha), en una línea de `widget.js`
@@ -179,7 +196,8 @@ En [`ejemplos/widget-motor/`](ejemplos/widget-motor/) hay un motor que:
 * enciende un rótulo de alarma con **fallo**;
 * y lleva dos mandos: uno discreto (marcha) y uno analógico (consigna 75 %).
 
-Comprimir la carpeta e importarla desde el Diseñador.
+Para importar cualquiera de los dos: comprimir su carpeta y soltar el `.zip`
+en el Diseñador (o usar el `.zip` ya hecho del ventilador).
 
 ---
 
