@@ -19,6 +19,14 @@ import {
   type DeclaracionEnlace } from
 '../../utils/enlaces';
 import { formatValue } from '../../utils/format';
+import {
+  leerDinamicas,
+  dinamicaNueva,
+  PIDE_VALOR,
+  type Dinamica,
+  type TipoDinamica,
+  type OperadorDinamica } from
+'../../utils/dinamicas';
 import { ColorTema } from './ColorTema';
 import { useAppStore } from '../../context/AppStore';
 import { catalogByKind } from './widgetCatalog';
@@ -308,6 +316,156 @@ function FilaEnlace({
 
 }
 
+/** Qué se puede cambiar, y con qué palabras se dice. */
+const TIPOS_DINAMICA: {valor: TipoDinamica;label: string;}[] = [
+{ valor: 'color', label: 'Color' },
+{ valor: 'fondo', label: 'Fondo' },
+{ valor: 'borde', label: 'Borde' },
+{ valor: 'visibilidad', label: 'Visibilidad' },
+{ valor: 'parpadeo', label: 'Parpadeo' }];
+
+
+const OPERADORES: {valor: OperadorDinamica;label: string;}[] = [
+{ valor: 'verdadero', label: 'es verdadero' },
+{ valor: 'falso', label: 'es falso' },
+{ valor: '==', label: '=' },
+{ valor: '!=', label: '≠' },
+{ valor: '>', label: '>' },
+{ valor: '>=', label: '≥' },
+{ valor: '<', label: '<' },
+{ valor: '<=', label: '≤' },
+{ valor: 'entre', label: 'entre' }];
+
+
+/**
+ * Una regla: CUANDO <condición>, ENTONCES <efecto>.
+ *
+ * Componente propio, como las filas de variables: así sus campos no obligan
+ * a repintar el Inspector entero mientras se escribe un número.
+ */
+function TarjetaDinamica({
+  d,
+  fuentes,
+  onCambio,
+  onQuitar
+
+
+
+
+}: {d: Dinamica;fuentes: {valor: string;label: string;}[];onCambio: (parche: Partial<Dinamica>) => void;onQuitar: () => void;}) {
+  const esColor = d.tipo === 'color' || d.tipo === 'fondo' || d.tipo === 'borde';
+
+  return (
+    <div className="space-y-2 rounded-lg border border-slate-200 px-2.5 py-2 dark:border-navy-slate">
+      <div className="flex items-center gap-2">
+        <select
+          value={d.tipo}
+          onChange={(e) => {
+            const tipo = e.target.value as TipoDinamica;
+            // Al pasar a un tipo de color hay que estrenar uno: sin color, la
+            // regla se cumpliría y no se vería nada, que parece un fallo.
+            const nuevo = dinamicaNueva(tipo);
+            onCambio({ tipo, color: d.color ?? nuevo.color });
+          }}
+          className="w-full cursor-pointer rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-navy outline-none transition focus:border-siemens dark:border-navy-slate dark:bg-navy dark:text-slate-100">
+
+          {TIPOS_DINAMICA.map((x) =>
+          <option key={x.valor} value={x.valor}>
+              {x.label}
+            </option>
+          )}
+        </select>
+        <button
+          onClick={onQuitar}
+          title="Quitar esta regla"
+          className="shrink-0 rounded p-0.5 text-slate-400 transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
+
+          <Trash2Icon className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      <div className="space-y-1.5 rounded-md bg-slate-50 px-2 py-1.5 dark:bg-navy-slate/30">
+        <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+          Cuando
+        </span>
+        <select
+          value={d.fuente}
+          onChange={(e) => onCambio({ fuente: e.target.value })}
+          className="w-full cursor-pointer rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-navy outline-none transition focus:border-siemens dark:border-navy-slate dark:bg-navy dark:text-slate-100">
+
+          {fuentes.map((f) =>
+          <option key={f.valor} value={f.valor}>
+              {f.label}
+            </option>
+          )}
+        </select>
+        <div className="flex items-center gap-1.5">
+          <select
+            value={d.operador}
+            onChange={(e) => onCambio({ operador: e.target.value as OperadorDinamica })}
+            className="w-full cursor-pointer rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-navy outline-none transition focus:border-siemens dark:border-navy-slate dark:bg-navy dark:text-slate-100">
+
+            {OPERADORES.map((x) =>
+            <option key={x.valor} value={x.valor}>
+                {x.label}
+              </option>
+            )}
+          </select>
+          {PIDE_VALOR(d.operador) &&
+          <input
+            value={String(d.valor ?? '')}
+            onChange={(e) => onCambio({ valor: e.target.value })}
+            placeholder="0"
+            className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-navy outline-none transition focus:border-siemens dark:border-navy-slate dark:bg-navy dark:text-slate-100" />
+
+          }
+          {d.operador === 'entre' &&
+          <>
+              <span className="shrink-0 text-[10px] text-slate-400">y</span>
+              <input
+              value={String(d.valor2 ?? '')}
+              onChange={(e) => onCambio({ valor2: Number(e.target.value) })}
+              placeholder="100"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-navy outline-none transition focus:border-siemens dark:border-navy-slate dark:bg-navy dark:text-slate-100" />
+
+            </>
+          }
+        </div>
+      </div>
+
+      {esColor &&
+      <ColorTema
+        label="Entonces, este color"
+        value={d.color ?? 'var(--psi-error)'}
+        onChange={(v) => onCambio({ color: v })} />
+
+      }
+
+      {d.tipo === 'visibilidad' &&
+      <label className="block">
+          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+            Entonces
+          </span>
+          <select
+          value={d.efecto ?? 'mostrar'}
+          onChange={(e) => onCambio({ efecto: e.target.value as 'mostrar' | 'ocultar' })}
+          className="w-full cursor-pointer rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-navy outline-none transition focus:border-siemens dark:border-navy-slate dark:bg-navy dark:text-slate-100">
+
+            <option value="mostrar">Se ve</option>
+            <option value="ocultar">No se ve</option>
+          </select>
+        </label>
+      }
+
+      {d.tipo === 'parpadeo' &&
+      <p className="text-[10px] leading-relaxed text-slate-400">
+          Parpadea en la Vista Previa. En el lienzo no, o no se podría trabajar.
+        </p>
+      }
+    </div>);
+
+}
+
 export function PropertyInspector({
   widget,
   selectedVariables,
@@ -481,6 +639,17 @@ export function PropertyInspector({
   id && !id.startsWith('param:') ?
   selectedVariables.find((v) => v.id === id) :
   undefined;
+
+  // ── Dinámicas ─────────────────────────────────────────────────
+  const dinamicas = leerDinamicas(widget);
+  const fuentesDinamica = [
+  { valor: '', label: 'Variable principal' },
+  ...nombresUsados.map((k) => ({ valor: k, label: k }))];
+
+  const cambiarDinamica = (id: string, parche: Partial<Dinamica>) =>
+  onChange({
+    dinamicas: dinamicas.map((x) => x.id === id ? { ...x, ...parche } : x)
+  });
 
   const varGroups = [
   { label: '', options: [{ label: t('insp.none'), value: '' }] },
@@ -710,6 +879,38 @@ export function PropertyInspector({
           Variables ADEMÁS de la principal, cada una con su nombre. Un equipo
           no se representa con un solo valor: una bomba es marcha, fallo,
           manual y velocidad a la vez.
+        </p>
+      </Section>
+
+      {/* ── Dinámicas ────────────────────────────────────────────
+          Lo que hace que la pantalla esté viva. Va DESPUÉS de las variables
+          porque una regla casi siempre mira una de ellas: primero se declara
+          qué se lee, y luego qué se hace con ello. */}
+      <Section title="Dinámicas">
+        {dinamicas.map((d) =>
+        <TarjetaDinamica
+          key={d.id}
+          d={d}
+          fuentes={fuentesDinamica}
+          onCambio={(parche) => cambiarDinamica(d.id, parche)}
+          onQuitar={() =>
+          onChange({ dinamicas: dinamicas.filter((x) => x.id !== d.id) })
+          } />
+
+        )}
+
+        <button
+          onClick={() => onChange({ dinamicas: [...dinamicas, dinamicaNueva()] })}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 py-1.5 text-xs font-medium text-slate-500 transition hover:border-siemens hover:text-siemens dark:border-navy-slate dark:text-slate-400">
+
+          <PlusIcon className="h-3.5 w-3.5" />
+          Añadir regla
+        </button>
+
+        <p className="text-[10px] leading-relaxed text-slate-400">
+          Se aplican de arriba abajo y manda la ÚLTIMA que se cumpla: pon
+          arriba lo general y debajo las excepciones. Si su variable no está
+          leyendo, la regla no se aplica — nunca se inventa un valor.
         </p>
       </Section>
 

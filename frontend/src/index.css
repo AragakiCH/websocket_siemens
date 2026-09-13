@@ -233,6 +233,19 @@ html.dark .input-field:focus {
  * El color entra por `--barra-pulgar`, que cada widget puede poner en su
  * `style`. Un pseudoelemento no se puede escribir en línea; una variable sí.
  */
+/* Parpadeo de las dinámicas.
+   Salto seco y no un desvanecido: es una señal de aviso y tiene que notarse
+   de reojo desde el otro lado de la nave. Y no se apaga del todo — un widget
+   que desaparece medio segundo se lee como un fallo de la pantalla, no como
+   una alarma. */
+@keyframes psi-parpadeo {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.25; }
+}
+.psi-parpadeo {
+  animation: psi-parpadeo 1s linear infinite;
+}
+
 .barra-fina {
   scrollbar-width: thin;
   scrollbar-color: var(--barra-pulgar, rgba(148, 163, 184, 0.45)) transparent;

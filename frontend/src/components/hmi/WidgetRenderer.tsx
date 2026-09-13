@@ -6,6 +6,7 @@ import { PlcVariable } from "../../models/plc";
 import { formatValue, valueFraction, isTruthy } from "../../utils/format";
 import { leerAccion, tieneAccion, ejecutarAccion } from "./acciones";
 import { resolverEnlaces } from "../../utils/enlaces";
+import { evaluarDinamicas, aplicarDinamicas } from "../../utils/dinamicas";
 import { ContextoMapaTags } from "./custom/faceplate/contexto";
 import { useAppStore } from "../../context/AppStore";
 import { customByKind, zipByKind } from "./custom/registry";
@@ -42,7 +43,36 @@ export function WidgetRenderer({
   interactivo = false,
   resolver,
 }: Props) {
-  const { style } = widget;
+  // Las variables con nombre. `useMemo` porque esto corre en cada tick de
+  // valores y por cada widget de la pantalla; sin él se reharía la búsqueda
+  // entera aunque no hubiera cambiado ni el widget ni las lecturas.
+  const enlacesResueltos = React.useMemo(
+    () => (resolver ? resolverEnlaces(widget, resolver) : undefined),
+    [widget, resolver]
+  );
+
+  /**
+   * El aspecto que mandan las dinámicas, y el widget ya repintado con él.
+   *
+   * Aquí y no en cada widget: por este componente pasan los 19 de fábrica,
+   * los custom en React y los importados en ZIP, así que una regla escrita
+   * una vez vale para los tres y ninguno tiene que enterarse de que las
+   * dinámicas existen.
+   *
+   * Sin reglas, `evaluarDinamicas` devuelve `null` y `aplicarDinamicas`
+   * devuelve el MISMO objeto: el camino de un widget normal queda igual que
+   * estaba, sin objetos nuevos ni comparaciones de estilo en cada lectura.
+   */
+  const efectos = React.useMemo(
+    () => evaluarDinamicas(widget, variable, enlacesResueltos),
+    [widget, variable, enlacesResueltos]
+  );
+  const pintado = React.useMemo(
+    () => aplicarDinamicas(widget, efectos),
+    [widget, efectos]
+  );
+
+  const { style } = pintado;
 
   // ── Acciones ──────────────────────────────────────────────────
   //
@@ -100,25 +130,20 @@ export function WidgetRenderer({
    * iframe. Aquí interesa por una razón muy concreta: `rootStyle` de abajo.
    */
   const [modalZip, setModalZip] = useState(false);
-  // Las variables con nombre. `useMemo` porque esto corre en cada tick de
-  // valores y por cada widget de la pantalla; sin él se reharía la búsqueda
-  // entera aunque no hubiera cambiado ni el widget ni las lecturas.
-  const enlacesResueltos = React.useMemo(
-    () => (resolver ? resolverEnlaces(widget, resolver) : undefined),
-    [widget, resolver]
-  );
-
   const frac = valueFraction(variable);
   const on = isTruthy(variable);
   const label = variable ? formatValue(variable) : widget.text;
   // Estilo de cada parte: la base del `style` de siempre con lo que se haya
   // ajustado por parte encima. Un widget sin ajustes se ve exactamente igual
   // que antes, así que ningún diseño guardado cambia de aspecto.
-  const pTexto = estiloDeParte(widget, "label");
-  const pCaja = estiloDeParte(widget, "box");
-  const pIcono = estiloDeParte(widget, "icon");
-  const pBoton = estiloDeParte(widget, "boton");
-  const pValor = estiloDeParte(widget, "valor");
+  // Sobre el widget REPINTADO: `estiloDeParte` mira dentro del widget, así
+  // que con el original las partes se quedarían con el color de diseño y una
+  // dinámica de color no se vería en la mitad de los widgets.
+  const pTexto = estiloDeParte(pintado, "label");
+  const pCaja = estiloDeParte(pintado, "box");
+  const pIcono = estiloDeParte(pintado, "icon");
+  const pBoton = estiloDeParte(pintado, "boton");
+  const pValor = estiloDeParte(pintado, "valor");
 
   const textStyle: React.CSSProperties = {
     fontSize: pTexto.fontSize,
@@ -139,7 +164,7 @@ export function WidgetRenderer({
     const custom = customByKind(widget.kind);
     if (custom) {
       return custom.render({
-        widget, variable, style, on, frac, label, interactivo,
+        widget: pintado, variable, style, on, frac, label, interactivo,
         enlaces: enlacesResueltos,
       });
     }
@@ -150,7 +175,7 @@ export function WidgetRenderer({
       return (
         <HtmlWidgetRenderer
           zipWidget={zip}
-          widget={widget}
+          widget={pintado}
           variable={variable}
           style={style}
           interactivo={interactivo}
@@ -547,8 +572,18 @@ export function WidgetRenderer({
   //
   // Así que mientras dure el modal se quitan los tres. Es exactamente cuando
   // no hacen falta: el widget está tapado por el modal de todas formas.
+  /**
+   * Una dinámica lo ha escondido.
+   *
+   * Se quita de en medio SOLO donde se opera. En el Diseñador se queda a la
+   * vista, atenuado: si desapareciera del lienzo no habría forma de volver a
+   * seleccionarlo para cambiarle la regla que lo esconde, y la única salida
+   * sería borrarlo desde otro sitio.
+   */
+  const oculto = !!efectos && !efectos.visible;
+
   const rootStyle: React.CSSProperties = {
-    opacity: modalZip ? 1 : style.opacity,
+    opacity: modalZip ? 1 : oculto ? style.opacity * 0.3 : style.opacity,
     transform: modalZip ? "none" : `rotate(${style.rotation}deg)`,
     filter: modalZip ? "none" : widget.enabled ? "none" : "grayscale(0.6)",
     borderRadius: isCircle ? "50%" : style.borderRadius,
@@ -560,8 +595,17 @@ export function WidgetRenderer({
       rootStyle.border = `${style.borderWidth}px solid ${style.borderColor}`;
     }
   }
+  if (oculto && interactivo) return null;
+
   return (
-    <div className="relative h-full w-full" style={rootStyle}>
+    <div
+      // El parpadeo, solo donde se opera: un lienzo lleno de widgets
+      // parpadeando mientras se coloca el de al lado es inservible.
+      className={`relative h-full w-full${
+        efectos?.parpadea && interactivo ? " psi-parpadeo" : ""
+      }`}
+      style={rootStyle}
+    >
       {content()}
 
       {/* El fallo de una orden tiene que VERSE, y encima del propio mando:
