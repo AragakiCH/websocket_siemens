@@ -39,7 +39,7 @@ import {
   type PropParte } from
 './partes';
 import type { ParteId } from '../../models/widget';
-import { customByKind } from './custom/registry';
+import { customByKind, zipByKind } from './custom/registry';
 import { panelBuiltIn } from './inspectores';
 import {
   useSecciones,
@@ -629,7 +629,12 @@ export function PropertyInspector({
   // quien diseña, y son las que harán falta para las dinámicas: un
   // rectángulo que cambia de color no declara nada, pero necesita mirar un
   // tag.
-  const declaradas: DeclaracionEnlace[] = custom?.enlaces ?? [];
+  // Las declara el tipo de widget: en su definición si es de los nuestros,
+  // y en el `widget.json` si vino importado en un ZIP. Para quien diseña la
+  // pantalla son lo mismo, así que se ofrecen igual.
+  const zipDef = zipByKind(widget.kind);
+  const declaradas: DeclaracionEnlace[] =
+  custom?.enlaces ?? zipDef?.meta.variables ?? [];
   const enlaces = leerEnlaces(widget);
   const libres = Object.keys(enlaces).filter(
     (k) => !declaradas.some((d) => d.id === k)

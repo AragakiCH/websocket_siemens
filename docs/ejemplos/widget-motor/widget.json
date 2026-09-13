@@ -1,0 +1,15 @@
+{
+  "kind": "motor_rotativo",
+  "label": "Motor rotativo",
+  "category": "Equipos",
+  "defaultWidth": 180,
+  "defaultHeight": 180,
+
+  "accepts": ["bool"],
+
+  "variables": [
+    { "id": "velocidad", "label": "Velocidad", "accepts": ["double", "int"],
+      "ayuda": "0-100 %. Marca la rapidez del giro." },
+    { "id": "fallo", "label": "Fallo", "accepts": ["bool"] }
+  ]
+}

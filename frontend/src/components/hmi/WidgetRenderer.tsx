@@ -177,6 +177,7 @@ export function WidgetRenderer({
           zipWidget={zip}
           widget={pintado}
           variable={variable}
+          enlaces={enlacesResueltos}
           style={style}
           interactivo={interactivo}
           onModal={setModalZip}
