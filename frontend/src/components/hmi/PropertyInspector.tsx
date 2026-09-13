@@ -1,7 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { MousePointerSquareDashedIcon, Link2Icon, AlertTriangleIcon, ShapesIcon } from 'lucide-react';
+import {
+  MousePointerSquareDashedIcon,
+  Link2Icon,
+  AlertTriangleIcon,
+  ShapesIcon,
+  PlusIcon,
+  Trash2Icon } from
+'lucide-react';
 import { HmiWidget } from '../../models/widget';
-import { PlcVariable } from '../../models/plc';
+import { PlcVariable, DataType } from '../../models/plc';
+import {
+  leerEnlaces,
+  conEnlace,
+  sinEnlace,
+  renombrarEnlace,
+  nombreLibre,
+  validarNombreEnlace,
+  type DeclaracionEnlace } from
+'../../utils/enlaces';
+import { formatValue } from '../../utils/format';
 import { ColorTema } from './ColorTema';
 import { useAppStore } from '../../context/AppStore';
 import { catalogByKind } from './widgetCatalog';
@@ -170,6 +187,127 @@ function Section({
     </div>);
 
 }
+/**
+ * Una variable con nombre del widget.
+ *
+ * Componente aparte y no JSX suelto dentro del Inspector porque necesita
+ * estado propio: el nombre se edita en un borrador y sólo se guarda al
+ * salir del campo. Guardando en cada tecla, escribir «fallo» crearía por el
+ * camino los enlaces «f», «fa», «fal»… y el primero que chocara con otro
+ * nombre cortaría la escritura a media palabra.
+ */
+function FilaEnlace({
+  nombre,
+  fijo,
+  etiqueta,
+  ayuda,
+  variableId,
+  grupos,
+  variable,
+  onVariable,
+  onRenombrar,
+  onQuitar
+
+
+
+
+
+}: {nombre: string;fijo: boolean;etiqueta: string;ayuda?: string;variableId: string;grupos: {label: string;options: {label: string;value: string;}[];}[];variable?: PlcVariable;onVariable: (v: string) => void;onRenombrar: (nuevo: string) => string;onQuitar: () => void;}) {
+  const [borrador, setBorrador] = useState(nombre);
+  const [error, setError] = useState('');
+
+  // Al saltar de un widget a otro, la fila se reutiliza con otro nombre.
+  useEffect(() => {
+    setBorrador(nombre);
+    setError('');
+  }, [nombre]);
+
+  const cerrarNombre = () => {
+    if (borrador === nombre) return;
+    const fallo = onRenombrar(borrador);
+    setError(fallo);
+    if (fallo) setBorrador(nombre);
+  };
+
+  return (
+    <div className="rounded-lg border border-slate-200 px-2.5 py-2 dark:border-navy-slate">
+      <div className="mb-1.5 flex items-center gap-2">
+        {fijo ?
+        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-navy dark:text-slate-100">
+            {etiqueta}
+          </span> :
+
+        <input
+          value={borrador}
+          onChange={(e) => setBorrador(e.target.value)}
+          onBlur={cerrarNombre}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur();
+            if (e.key === 'Escape') {
+              setBorrador(nombre);
+              setError('');
+            }
+          }}
+          spellCheck={false}
+          className={"min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-xs font-semibold text-navy outline-none transition focus:border-siemens dark:border-navy-slate dark:bg-navy dark:text-slate-100"} />
+
+        }
+
+        {/* El valor de AHORA MISMO. Es la forma de comprobar que el enlace
+            apunta a donde se quería sin salir del Diseñador. */}
+        <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-slate-500 dark:bg-navy-slate/50 dark:text-slate-400">
+          {variable ? formatValue(variable) : '—'}
+        </span>
+
+        {!fijo &&
+        <button
+          onClick={onQuitar}
+          title="Quitar esta variable"
+          className="shrink-0 rounded p-0.5 text-slate-400 transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
+
+            <Trash2Icon className="h-3.5 w-3.5" />
+          </button>
+        }
+      </div>
+
+      <select
+        value={variableId}
+        onChange={(e) => onVariable(e.target.value)}
+        className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100">
+
+        {grupos.map((g) =>
+        g.options.length === 0 ?
+        null :
+        g.label ?
+        <optgroup key={g.label} label={g.label}>
+              {g.options.map((o) =>
+          <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+          )}
+            </optgroup> :
+
+        g.options.map((o) =>
+        <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+        )
+        )}
+      </select>
+
+      {(error || ayuda) &&
+      <span
+        className={`mt-1 block text-[10px] leading-relaxed ${
+        error ? 'text-red-500' : 'text-slate-400'}`
+        }>
+
+          {error || ayuda}
+        </span>
+      }
+    </div>);
+
+}
+
 export function PropertyInspector({
   widget,
   selectedVariables,
@@ -294,6 +432,55 @@ export function PropertyInspector({
   const paramsFaceplate = fichaPantalla?.es_faceplate
     ? fichaPantalla.parametros ?? []
     : [];
+
+  /**
+   * Las opciones del desplegable de variables, para un tipo dado.
+   *
+   * Sale de aquí y no del cuerpo del Inspector porque ahora hay más de un
+   * desplegable: la variable principal y cada variable con nombre, y cada una
+   * admite tipos distintos.
+   */
+  const gruposDe = (admite: DataType[] | undefined) => {
+    const reparto = repartirPorCompatibilidad(selectedVariables, admite);
+    // Los parámetros del faceplate, filtrados por tipo cuando el enlace dice
+    // cuál quiere: ofrecer un parámetro booleano para una velocidad es
+    // ofrecer un enlace que no va a funcionar.
+    const params = paramsFaceplate.filter(
+      (p) => !admite || admite.length === 0 || admite.includes(p.tipo as DataType)
+    );
+    return [
+    { label: '', options: [{ label: t('insp.none'), value: '' }] },
+    ...(params.length > 0 ?
+    [{
+      label: 'Parámetros del faceplate',
+      options: params.map((p) => ({
+        label: `${p.nombre}  (${p.tipo})`,
+        value: `param:${p.id}`
+      }))
+    }] :
+    []),
+    { label: t('insp.varsCompatible'), options: reparto.compatibles.map(opcion) },
+    { label: t('insp.varsOther'), options: reparto.otras.map(opcion) }];
+
+  };
+
+  // ── Variables CON NOMBRE ──────────────────────────────────────
+  //
+  // Dos orígenes. Las DECLARADAS las pide el tipo de widget (una bomba sabe
+  // que quiere un `fallo`), y su nombre no se toca. Las LIBRES las añade
+  // quien diseña, y son las que harán falta para las dinámicas: un
+  // rectángulo que cambia de color no declara nada, pero necesita mirar un
+  // tag.
+  const declaradas: DeclaracionEnlace[] = custom?.enlaces ?? [];
+  const enlaces = leerEnlaces(widget);
+  const libres = Object.keys(enlaces).filter(
+    (k) => !declaradas.some((d) => d.id === k)
+  );
+  const nombresUsados = [...declaradas.map((d) => d.id), ...libres];
+  const variablePorId = (id: string) =>
+  id && !id.startsWith('param:') ?
+  selectedVariables.find((v) => v.id === id) :
+  undefined;
 
   const varGroups = [
   { label: '', options: [{ label: t('insp.none'), value: '' }] },
@@ -461,6 +648,70 @@ export function PropertyInspector({
         }
       </Section>
       }
+
+      {/* ── Variables con nombre ─────────────────────────────────
+          Aparece SIEMPRE, también en los widgets decorativos: un rectángulo
+          no lee ninguna variable para pintarse, pero es justo al que se le
+          querrá poner una para que cambie de color. */}
+      <Section title="Variables con nombre">
+        {declaradas.map((d) =>
+        <FilaEnlace
+          key={d.id}
+          nombre={d.id}
+          fijo
+          etiqueta={d.label}
+          ayuda={d.ayuda}
+          variableId={enlaces[d.id] ?? ''}
+          grupos={gruposDe(d.accepts)}
+          variable={variablePorId(enlaces[d.id] ?? '')}
+          onVariable={(v) =>
+          onChange({
+            enlaces: v ? conEnlace(widget, d.id, v) : sinEnlace(widget, d.id)
+          })
+          }
+          onRenombrar={() => ''}
+          onQuitar={() => {}} />
+
+        )}
+
+        {libres.map((k) =>
+        <FilaEnlace
+          key={k}
+          nombre={k}
+          fijo={false}
+          etiqueta={k}
+          variableId={enlaces[k] ?? ''}
+          grupos={gruposDe(undefined)}
+          variable={variablePorId(enlaces[k] ?? '')}
+          onVariable={(v) => onChange({ enlaces: conEnlace(widget, k, v) })}
+          onRenombrar={(nuevo) => {
+            const fallo = validarNombreEnlace(
+              nuevo,
+              nombresUsados.filter((x) => x !== k)
+            );
+            if (!fallo) onChange({ enlaces: renombrarEnlace(widget, k, nuevo) });
+            return fallo;
+          }}
+          onQuitar={() => onChange({ enlaces: sinEnlace(widget, k) })} />
+
+        )}
+
+        <button
+          onClick={() =>
+          onChange({ enlaces: conEnlace(widget, nombreLibre(enlaces), '') })
+          }
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 py-1.5 text-xs font-medium text-slate-500 transition hover:border-siemens hover:text-siemens dark:border-navy-slate dark:text-slate-400">
+
+          <PlusIcon className="h-3.5 w-3.5" />
+          Añadir variable
+        </button>
+
+        <p className="text-[10px] leading-relaxed text-slate-400">
+          Variables ADEMÁS de la principal, cada una con su nombre. Un equipo
+          no se representa con un solo valor: una bomba es marcha, fallo,
+          manual y velocidad a la vez.
+        </p>
+      </Section>
 
       {/* ── Panel propio del widget ──────────────────────────────
           Solo aparece si su tipo trae uno. Es donde el Menú Lateral declara

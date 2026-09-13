@@ -141,6 +141,20 @@ export function Designer() {
     isDark,
     t
   } = useAppStore();
+
+  /**
+   * Buscar una variable por su id.
+   *
+   * Se le pasa a cada widget del lienzo para que resuelva sus variables CON
+   * NOMBRE. En un `useCallback` atado a `variables`: suelto en el render
+   * cambiaría de identidad en cada dibujo y haría rehacer la búsqueda de
+   * todos los widgets aunque no hubiera llegado ninguna lectura nueva.
+   */
+  const resolverVariable = useCallback(
+    (id: string | null | undefined) =>
+      id ? variables.find((v) => v.id === id) : undefined,
+    [variables]
+  );
   // ── SELECCIÓN MÚLTIPLE ────────────────────────────────────────
   //
   // Un array y no un id suelto, porque agrupar necesita varios. El orden es
@@ -1569,6 +1583,7 @@ export function Designer() {
               variables.find((v) => v.id === w.variableId) :
               undefined
               }
+              resolver={resolverVariable}
               selected={seleccion.includes(w.id)}
               onSelect={alSeleccionar}
               // Mover pasa SIEMPRE por moverSeleccion, tambien un widget

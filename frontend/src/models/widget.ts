@@ -52,6 +52,19 @@ export interface HmiWidget {
   variableId: string | null;
 
   /**
+   * Variables ADICIONALES, cada una con su nombre: `{ fallo: 'plc1|DB.f' }`.
+   *
+   * `variableId` sigue siendo la principal —la que el widget pinta— y esto no
+   * la sustituye. Con una sola variable no se puede representar un equipo: una
+   * bomba es marcha, fallo, manual y velocidad a la vez, y lo que hay que ver
+   * de un vistazo es la combinación.
+   *
+   * Opcional a propósito. Un diseño guardado no lo trae, se lee como vacío y
+   * se comporta igual que siempre. Ver `utils/enlaces.ts`.
+   */
+  enlaces?: Record<string, string>;
+
+  /**
    * A qué vista de la navegación pertenece este widget.
    *
    * Vacío o ausente = se ve SIEMPRE, en todas las vistas. Es lo que quieres

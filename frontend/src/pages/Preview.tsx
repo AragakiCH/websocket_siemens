@@ -328,6 +328,21 @@ function Reloj() {
 export function Preview() {
   const { variables } = useAppStore();
 
+  /**
+   * Buscar una variable por su id.
+   *
+   * Se le pasa a cada widget para que resuelva sus variables CON NOMBRE. Va
+   * en un `useCallback` atado a `variables` y no suelto en el render: sin él
+   * cambiaría de identidad en cada dibujo y obligaría a rehacer la búsqueda
+   * de todos los widgets de la pantalla aunque no hubiera llegado ni una
+   * lectura nueva.
+   */
+  const resolverVariable = useCallback(
+    (id: string | null | undefined) =>
+      id ? variables.find((v) => v.id === id) : undefined,
+    [variables]
+  );
+
   // Vista abierta en la navegación. Al pulsar un botón del Menú Lateral
   // cambia, y este componente se vuelve a dibujar mostrando solo los widgets
   // de esa sección.
@@ -889,6 +904,7 @@ export function Preview() {
                     // para moverse en el tiempo. En el Diseñador no, porque
                     // allí el arrastre sirve para colocarlo.
                     interactivo
+                    resolver={resolverVariable}
                   />
                 </div>
               ))}

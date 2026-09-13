@@ -498,6 +498,10 @@ export default function PantallaEmbebida({
                 widget={w}
                 variable={resolver(w.variableId)}
                 interactivo={interactivo}
+                // El MISMO resolutor que traduce la variable principal, así
+                // que las variables con nombre de un faceplate leen los tags
+                // de ESTA instancia sin ningún camino aparte.
+                resolver={resolver}
               />
             </div>
           ))}

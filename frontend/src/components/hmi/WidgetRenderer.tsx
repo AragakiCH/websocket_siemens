@@ -5,6 +5,7 @@ import { HmiWidget } from "../../models/widget";
 import { PlcVariable } from "../../models/plc";
 import { formatValue, valueFraction, isTruthy } from "../../utils/format";
 import { leerAccion, tieneAccion, ejecutarAccion } from "./acciones";
+import { resolverEnlaces } from "../../utils/enlaces";
 import { ContextoMapaTags } from "./custom/faceplate/contexto";
 import { useAppStore } from "../../context/AppStore";
 import { customByKind, zipByKind } from "./custom/registry";
@@ -18,10 +19,29 @@ interface Props {
   live?: boolean; // whether values animate (Designer preview always live)
   /** true en la Vista previa (se opera), false/ausente en el Diseñador. */
   interactivo?: boolean;
+  /**
+   * Cómo se traduce un id de variable al valor que hay ahora.
+   *
+   * Hace falta para las variables CON NOMBRE del widget: la principal ya
+   * llega resuelta en `variable`, pero las demás las tiene que buscar alguien,
+   * y quién sabe hacerlo depende de dónde se esté dibujando — en la Vista
+   * Previa es buscar por id; dentro de un faceplate hay que cambiar antes
+   * `param:x` por el tag de esa instancia.
+   *
+   * Sin él, los enlaces con nombre se quedan sin resolver. No se inventa un
+   * respaldo que busque por id: en un faceplate acertaría a veces y a veces
+   * leería el tag de otro equipo, que es peor que no leer nada.
+   */
+  resolver?: (variableId: string | null | undefined) => PlcVariable | undefined;
 }
 
 // Pure visual renderer for a single HMI widget. Reused by canvas + preview.
-export function WidgetRenderer({ widget, variable, interactivo = false }: Props) {
+export function WidgetRenderer({
+  widget,
+  variable,
+  interactivo = false,
+  resolver,
+}: Props) {
   const { style } = widget;
 
   // ── Acciones ──────────────────────────────────────────────────
@@ -80,6 +100,14 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
    * iframe. Aquí interesa por una razón muy concreta: `rootStyle` de abajo.
    */
   const [modalZip, setModalZip] = useState(false);
+  // Las variables con nombre. `useMemo` porque esto corre en cada tick de
+  // valores y por cada widget de la pantalla; sin él se reharía la búsqueda
+  // entera aunque no hubiera cambiado ni el widget ni las lecturas.
+  const enlacesResueltos = React.useMemo(
+    () => (resolver ? resolverEnlaces(widget, resolver) : undefined),
+    [widget, resolver]
+  );
+
   const frac = valueFraction(variable);
   const on = isTruthy(variable);
   const label = variable ? formatValue(variable) : widget.text;
@@ -110,7 +138,10 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
     // 👇 primero checa si es custom TSX, si sí lo delega al registry
     const custom = customByKind(widget.kind);
     if (custom) {
-      return custom.render({ widget, variable, style, on, frac, label, interactivo });
+      return custom.render({
+        widget, variable, style, on, frac, label, interactivo,
+        enlaces: enlacesResueltos,
+      });
     }
 
     // 👇 luego checa si es un widget HTML cargado por ZIP
