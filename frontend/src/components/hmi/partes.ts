@@ -134,6 +134,8 @@ export const PARTES_POR_KIND: Record<string, DefParte[]> = {
   // El número y la unidad se estilizan por separado a propósito: casi
   // siempre quieres el valor grande y la unidad discreta al lado.
   'custom:valor-unidad': [CAJA, VALOR, { ...TEXTO, label: 'Unidad' }],
+  // El símbolo se dibuja solo; lo único que se estiliza es su rótulo.
+  'custom:simbolo': [CAJA, { ...TEXTO, label: 'Rótulo' }],
 
   // El color de cada línea NO se toca aquí: lo asigna la posición de la serie
   // desde una paleta validada para daltonismo. Lo que sí se ajusta es el

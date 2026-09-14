@@ -257,6 +257,10 @@ const ACCEPTS_TSX: Record<string, DataType[]> = {
   // El Contenedor solo agrupa y mueve. No representa ningún valor, así
   // que ofrecerle «Variable asociada» sería ofrecer algo que no hace nada.
   'custom:contenedor': NINGUNO,
+  // Un símbolo es un dibujo: no representa un valor por sí mismo. Lo que
+  // cambia con las variables es su color, su giro o si se ve, y eso va por
+  // Dinámicas — que usan las variables CON NOMBRE, no ésta.
+  'custom:simbolo': NINGUNO,
   // Es un display de una magnitud: enteros y decimales. Un bool o un
   // string se pintarían igual, pero «ON km/h» no significa nada.
   'custom:valor-unidad': NUMERICOS,

@@ -8,6 +8,7 @@ import { faceplate } from './faceplate/Faceplate';
 import { trendWidget } from './trend/Trend';
 import { contenedorGrupo } from './contenedor/Contenedor';
 import { valorUnidad } from './lectura/ValorUnidad';
+import { simbolo } from './simbolos/Simbolo';
 import { loadZipWidgets, fullKind, type ZipWidget } from '../../../services/zipWidgetLoader';
 // import { semaforoIndustrial } from './SemaforoIndustrial';
 
@@ -27,6 +28,8 @@ export const customWidgets: CustomWidgetDef[] = [
   contenedorGrupo,
   // Lectura suelta: el número del PLC con la unidad que escribas.
   valorUnidad,
+  // Biblioteca de símbolos de proceso: válvulas, y lo que se vaya añadiendo.
+  simbolo,
   // semaforoIndustrial,   ← aquí agregas cada widget nuevo, punto
 ];
 

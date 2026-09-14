@@ -30,3 +30,10 @@ datos/
 
 # --- Archivos que deja la app de escritorio de Claude (pantallazos, etc.) ---
 Claude outputs/
+
+# La biblioteca ORIGINAL de Symbol Factory (.CAT, SYMFAC1.EXE, su licencia).
+# Es software de terceros —y con licencia a nombre de otra empresa: mirar su
+# XSymfac1.ini—, asi que no entra en el repositorio ni por descuido. Lo que
+# si entra es el resultado de convertir un catalogo, que es lo que usa el
+# widget de simbolos.
+SymbolFactory/
