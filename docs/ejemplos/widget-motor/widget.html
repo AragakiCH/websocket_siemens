@@ -1,0 +1,23 @@
+<!-- Motor rotativo.
+     El dibujo y nada más: quién gira y de qué color lo decide el CSS a
+     partir de las variables. Ver widget.css. -->
+<div id="motor">
+  <div id="aro">
+    <div id="rotor"></div>
+  </div>
+
+  <div id="pie">
+    <span data-w-var="velocidad">—</span>
+    <span id="alarma">FALLO</span>
+  </div>
+
+  <div id="mandos">
+    <!-- `escribir(valor)` va a la variable PRINCIPAL del widget;
+         `escribir(valor, 'nombre')`, a una de las declaradas. -->
+    <button onclick="escribir(true)">MARCHA</button>
+    <button onclick="escribir(false)">PARO</button>
+    <button onclick="escribir(75, 'velocidad')">75 %</button>
+  </div>
+
+  <span id="resultado"></span>
+</div>

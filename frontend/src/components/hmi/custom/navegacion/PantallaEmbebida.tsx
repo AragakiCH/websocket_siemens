@@ -54,7 +54,8 @@ import type { HmiWidget } from '../../../../models/widget';
 import { useAppStore } from '../../../../context/AppStore';
 import { cargarProyecto, type SavedDesign } from '../../../../utils/designStorage';
 import { WidgetRenderer } from '../../WidgetRenderer';
-import { esWidgetDeNavegacion } from './store';
+import { ContextoEmbebido, esWidgetDeNavegacion } from './store';
+import { ContextoMapaTags } from '../faceplate/contexto';
 
 /** Cómo encaja el lienzo de la pantalla dentro del marco del panel. */
 export type ModoAjuste = 'ajustar' | 'estirar' | 'real';
@@ -289,12 +290,55 @@ interface Props {
   modo: ModoAjuste;
   /** true en la Vista Previa: los widgets se operan. */
   interactivo: boolean;
+  /**
+   * Dibujar SOLO los widgets de esta sección.
+   *
+   * Sin esto se dibuja la pantalla entera, que es lo que hace falta cuando
+   * una sección abre otra pantalla. Pero hay secciones que no abren nada:
+   * simplemente filtran los widgets de su propio lienzo. Para enseñar una de
+   * esas en miniatura hay que cargar esa misma pantalla y quedarse con los
+   * widgets que le pertenecen — que es exactamente lo que verá el operador
+   * al entrar en ella.
+   */
+  soloVista?: string;
+  /**
+   * Qué tag real corresponde a cada parámetro, cuando esta pantalla se está
+   * dibujando como un FACEPLATE.
+   *
+   * Dentro de un tipo, los widgets no apuntan a un tag sino a un parámetro:
+   * guardan `param:marcha` en su `variableId`. Aquí se cambia ese prefijo por
+   * el tag que le toque a esta instancia. Sin mapa, la pantalla se dibuja tal
+   * cual y los `param:` no resuelven a nada — que es exactamente lo que debe
+   * pasar al abrir el tipo como pantalla normal para editarlo.
+   */
+  mapaTags?: Record<string, string>;
+}
+
+/**
+ * El tamano del lienzo de una pantalla, sin dibujarla.
+ *
+ * Lo necesita el marco de un POPUP: tiene que decidir cuanto mide la ventana
+ * ANTES de que dentro haya nada, y lo correcto es que mida lo que el tipo se
+ * dibujo. Va por la misma cache que el dibujo, asi que preguntar aqui no
+ * cuesta una peticion extra: cuando la ventana se abre, la pantalla ya se
+ * esta pidiendo.
+ *
+ * `null` mientras no se sabe. Quien llama pone su medida por defecto.
+ */
+export function useTamanoPantalla(
+  projectId: string
+): { ancho: number; alto: number } | null {
+  const { design } = usePantallaEmpotrada(projectId);
+  const c = design?.canvas;
+  return c?.width && c?.height ? { ancho: c.width, alto: c.height } : null;
 }
 
 export default function PantallaEmbebida({
   projectId,
   modo,
   interactivo,
+  soloVista,
+  mapaTags,
 }: Props) {
   const { variables } = useAppStore();
   const { design, cargando, error } = usePantallaEmpotrada(projectId);
@@ -308,11 +352,34 @@ export default function PantallaEmbebida({
    */
   const aDibujar = useMemo<HmiWidget[]>(
     () =>
-      (design?.widgets ?? []).filter(
-        (w) => w.visible !== false && !esWidgetDeNavegacion(w.kind)
-      ),
-    [design]
+      (design?.widgets ?? []).filter((w) => {
+        if (w.visible === false || esWidgetDeNavegacion(w.kind)) return false;
+        if (!soloVista) return true;
+        // Los de vista vacía se ven en TODAS las secciones (un logo, una
+        // barra fija), así que también pertenecen a ésta.
+        const v = (w.vista ?? '').trim();
+        return !v || v === soloVista;
+      }),
+    [design, soloVista]
   );
+
+  /**
+   * De lo que el widget guarda al valor que hay que pintar.
+   *
+   * Un `param:<id>` se cambia por el tag de esta instancia; cualquier otra
+   * cosa se busca tal cual. Un parámetro sin asignar devuelve `undefined`, y
+   * entonces el widget pinta «—» en vez de un cero: un cero de mentira en un
+   * panel de planta es peor que un hueco, porque nadie lo distingue de una
+   * lectura real.
+   */
+  const resolver = (variableId: string | null | undefined) => {
+    if (!variableId) return undefined;
+    if (variableId.startsWith('param:')) {
+      const tag = mapaTags?.[variableId.slice('param:'.length)];
+      return tag ? variables.find((v) => v.id === tag) : undefined;
+    }
+    return variables.find((v) => v.id === variableId);
+  };
 
   const cw = design?.canvas?.width ?? 0;
   const ch = design?.canvas?.height ?? 0;
@@ -387,6 +454,11 @@ export default function PantallaEmbebida({
   }
 
   return (
+    /* Todo lo de dentro sabe que ya está empotrado. Lo usa la Tarjeta de
+       Acceso para no dibujar su propia miniatura aquí: dos tarjetas que se
+       apuntaran la una a la otra se pintarían sin final. */
+    <ContextoEmbebido.Provider value>
+    <ContextoMapaTags.Provider value={mapaTags}>
     <div
       ref={ref}
       style={{
@@ -424,17 +496,19 @@ export default function PantallaEmbebida({
             >
               <WidgetRenderer
                 widget={w}
-                variable={
-                  w.variableId
-                    ? variables.find((v) => v.id === w.variableId)
-                    : undefined
-                }
+                variable={resolver(w.variableId)}
                 interactivo={interactivo}
+                // El MISMO resolutor que traduce la variable principal, así
+                // que las variables con nombre de un faceplate leen los tags
+                // de ESTA instancia sin ningún camino aparte.
+                resolver={resolver}
               />
             </div>
           ))}
         </div>
       )}
     </div>
+    </ContextoMapaTags.Provider>
+    </ContextoEmbebido.Provider>
   );
 }

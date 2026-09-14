@@ -10,6 +10,7 @@ import {
   WorkflowIcon,
   BellIcon,
   BookOpenIcon,
+  VariableIcon,
   FileSpreadsheetIcon,
   LayersIcon,
   MenuIcon,
@@ -50,11 +51,15 @@ import {
   saveDesign,
   loadDesign,
   guardarProyecto,
-  borrarWidget as apiBorrarWidget } from
+  borrarWidget as apiBorrarWidget,
+  SIN_FACEPLATE,
+  type DeclaracionFaceplate,
+  type ParametroFaceplate } from
 '../utils/designStorage';
 import { useLock } from '../hooks/useLock';
 import { recursoDisenador } from '../services/lockApi';
 import { FlowEditor } from '../components/flows/FlowEditor';
+import { PanelInternas } from '../components/internas/PanelInternas';
 import { AlarmsEditor } from '../components/alarms/AlarmsEditor';
 import { RecipesEditor } from '../components/recipes/RecipesEditor';
 import { PanelExportar } from '../components/export/PanelExportar';
@@ -74,7 +79,8 @@ import {
   VISTA_TODAS } from
 '../components/hmi/custom/navegacion/store';
 
-type DesignerTab = 'designer' | 'flows' | 'alarms' | 'recipes' | 'export';
+type DesignerTab =
+  'designer' | 'flows' | 'alarms' | 'recipes' | 'internas' | 'export';
 
 let counter = 1;
 
@@ -128,6 +134,7 @@ export function Designer() {
     setProjectVersion,
     pantallaCargada,
     pantallas,
+    refrescarPantallas,
     permisos,
     presentes,
     setWidgets,
@@ -137,6 +144,20 @@ export function Designer() {
     isDark,
     t
   } = useAppStore();
+
+  /**
+   * Buscar una variable por su id.
+   *
+   * Se le pasa a cada widget del lienzo para que resuelva sus variables CON
+   * NOMBRE. En un `useCallback` atado a `variables`: suelto en el render
+   * cambiaría de identidad en cada dibujo y haría rehacer la búsqueda de
+   * todos los widgets aunque no hubiera llegado ninguna lectura nueva.
+   */
+  const resolverVariable = useCallback(
+    (id: string | null | undefined) =>
+      id ? variables.find((v) => v.id === id) : undefined,
+    [variables]
+  );
   // ── SELECCIÓN MÚLTIPLE ────────────────────────────────────────
   //
   // Un array y no un id suelto, porque agrupar necesita varios. El orden es
@@ -297,6 +318,21 @@ export function Designer() {
   // hidratación leería justo eso.
   const [errorGuardado, setErrorGuardado] = useState<string>('');
   const cargada = pantallaCargada === projectId;
+  // ── Tipo de faceplate ─────────────────────────────────────────
+  //
+  // La declaración sale de la LISTA de pantallas, que ya la trae. Un estado
+  // local aparte porque se edita antes de guardarse, igual que el ancho del
+  // lienzo.
+  const [fp, setFp] = useState<DeclaracionFaceplate>(SIN_FACEPLATE);
+
+  const ponerParam = (i: number, campo: keyof ParametroFaceplate, valor: string) =>
+    setFp((p) => ({
+      ...p,
+      parametros: p.parametros.map((x, k) =>
+        k === i ? { ...x, [campo]: valor } : x
+      ),
+    }));
+
   const [lienzoDe, setLienzoDe] = useState<string>('');
   const listo = cargada && lienzoDe === projectId;
 
@@ -307,6 +343,7 @@ export function Designer() {
   const firmaActual = JSON.stringify({
     widgets,
     canvas: { width: canvasW, height: canvasH, fondo: canvasBg },
+    fp,
   });
 
   // Adopción del lienzo de la pantalla recién cargada. Corre UNA vez por
@@ -322,9 +359,18 @@ export function Designer() {
     setCanvasBg(bg);
     setWInput(String(w));
     setHInput(String(h));
+    // La declaración de tipo viene con la lista, que ya la trae: no hace
+    // falta una petición aparte ni tocar el AppStore.
+    const ficha = pantallas.find((p) => p.project_id === projectId);
+    const decl: DeclaracionFaceplate = {
+      es_tipo: !!ficha?.es_faceplate,
+      parametros: ficha?.parametros ?? [],
+    };
+    setFp(decl);
     firmaGuardada.current = JSON.stringify({
       widgets,
       canvas: { width: w, height: h, fondo: bg },
+      fp: decl,
     });
     setSeleccion([]);
     setErrorGuardado('');
@@ -366,11 +412,17 @@ export function Designer() {
             canvas: { width: canvasW, height: canvasH, fondo: canvasBg || undefined },
           },
           projectVersion,
-          projectId
+          projectId,
+          false,
+          fp
         );
         firmaGuardada.current = firmaActual;
         setProjectVersion(v);
         setErrorGuardado('');
+        // La lista es de donde el widget de Faceplate saca los tipos que
+        // ofrece. Sin refrescarla, acabas de marcar una pantalla como tipo y
+        // el desplegable no la ve hasta recargar la página.
+        void refrescarPantallas();
       } catch (e: any) {
         if (e?.status === 409) {
           // Otro usuario guardó mientras editabas. No se pisa su trabajo: se
@@ -932,6 +984,17 @@ export function Designer() {
               Recetas
             </button>
             <button
+              onClick={() => setActiveTab('internas')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition ${
+                activeTab === 'internas'
+                  ? 'bg-white text-navy shadow-sm dark:bg-navy-slate dark:text-slate-100'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+              }`}
+            >
+              <VariableIcon className="h-3.5 w-3.5" />
+              Variables
+            </button>
+            <button
               onClick={() => setActiveTab('export')}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition ${
                 activeTab === 'export'
@@ -1284,6 +1347,97 @@ export function Designer() {
                   </div>
                 </div>
 
+                {/* ── TIPO DE FACEPLATE ──
+                    Es una propiedad de la PANTALLA, igual que su tamaño, así
+                    que vive aquí y no en el Inspector —que es de widgets—.
+
+                    Marcar una pantalla como tipo no la cambia en nada: se
+                    sigue editando igual. Lo único que hace es dejar que el
+                    widget «Faceplate» la ofrezca, y que sus widgets puedan
+                    enlazarse a un parámetro en vez de a un tag. */}
+                <div className="border-b border-slate-100 px-3 py-2.5 dark:border-navy-slate">
+                  <label className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Tipo de faceplate
+                    </span>
+                    <input
+                      type="checkbox"
+                      disabled={!puedeEditar}
+                      checked={fp.es_tipo}
+                      onChange={(e) => setFp({ ...fp, es_tipo: e.target.checked })}
+                      className="h-4 w-4 rounded border-slate-300 text-siemens focus:ring-2 focus:ring-siemens/40 disabled:opacity-40 dark:border-navy-slate dark:bg-navy" />
+                  </label>
+
+                  {!fp.es_tipo ?
+                  <p className="mt-1.5 text-[10.5px] leading-relaxed text-slate-400">
+                      Úsala como plantilla reutilizable: se define una vez y se
+                      coloca muchas con el widget «Faceplate». Corregir el tipo
+                      corrige todas las instancias.
+                    </p> :
+
+                  <div className="mt-2 space-y-1.5">
+                      <p className="text-[10.5px] leading-relaxed text-slate-400">
+                        Parámetros: los huecos que cada instancia rellena con
+                        sus tags. Dentro, enlaza cada widget a un parámetro en
+                        vez de a una variable.
+                      </p>
+
+                      {fp.parametros.map((p, i) =>
+                    <div key={i} className="flex items-center gap-1">
+                          <input
+                        type="text"
+                        disabled={!puedeEditar}
+                        value={p.nombre}
+                        onChange={(e) => ponerParam(i, 'nombre', e.target.value)}
+                        placeholder="Nombre"
+                        className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] text-navy outline-none focus:border-siemens dark:border-navy-slate dark:bg-navy dark:text-slate-100" />
+
+                          <select
+                        disabled={!puedeEditar}
+                        value={p.tipo}
+                        onChange={(e) => ponerParam(i, 'tipo', e.target.value)}
+                        className="shrink-0 rounded-lg border border-slate-200 bg-white px-1 py-1 text-[11px] text-navy outline-none focus:border-siemens dark:border-navy-slate dark:bg-navy dark:text-slate-100">
+                            <option value="bool">bool</option>
+                            <option value="int">int</option>
+                            <option value="double">double</option>
+                            <option value="string">texto</option>
+                          </select>
+
+                          <button
+                        type="button"
+                        disabled={!puedeEditar}
+                        onClick={() => setFp({ ...fp, parametros: fp.parametros.filter((_, k) => k !== i) })}
+                        title={`Quitar «${p.nombre || p.id}»`}
+                        className="shrink-0 rounded p-1 text-slate-400 transition hover:text-state-error disabled:opacity-40">
+                            <Trash2Icon className="h-3 w-3" />
+                          </button>
+                        </div>
+                    )}
+
+                      {/* El id se deriva del nombre y NO se puede editar: es
+                          lo que los widgets guardan dentro (`param:marcha`),
+                          así que cambiarlo a mano dejaría huérfanos todos los
+                          enlaces del tipo sin decir nada. */}
+                      <button
+                      type="button"
+                      disabled={!puedeEditar}
+                      onClick={() => {
+                        const n = fp.parametros.length + 1;
+                        setFp({
+                          ...fp,
+                          parametros: [
+                          ...fp.parametros,
+                          { id: `p${n}`, nombre: `Parámetro ${n}`, tipo: 'double' }]
+
+                        });
+                      }}
+                      className="w-full rounded-lg border border-dashed border-slate-300 px-2 py-1 text-[11px] text-slate-500 transition hover:border-siemens hover:text-siemens disabled:cursor-not-allowed disabled:opacity-40 dark:border-navy-slate dark:text-slate-400">
+                        + Añadir parámetro
+                      </button>
+                    </div>
+                  }
+                </div>
+
                 {/* Estado */}
                 <div className="space-y-1.5 border-b border-slate-100 px-3 py-2.5 dark:border-navy-slate">
                   <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -1374,6 +1528,8 @@ export function Designer() {
       {/* ═══ Contenido según pestaña activa ═══ */}
       {activeTab === 'alarms' ? (
         <AlarmsEditor />
+      ) : activeTab === 'internas' ? (
+        <PanelInternas />
       ) : activeTab === 'recipes' ? (
         <RecipesEditor />
       ) : activeTab === 'export' ? (
@@ -1443,6 +1599,7 @@ export function Designer() {
               variables.find((v) => v.id === w.variableId) :
               undefined
               }
+              resolver={resolverVariable}
               selected={seleccion.includes(w.id)}
               onSelect={alSeleccionar}
               // Mover pasa SIEMPRE por moverSeleccion, tambien un widget

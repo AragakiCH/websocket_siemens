@@ -3,6 +3,8 @@ import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { HmiWidget, WidgetStyle } from '../../../models/widget';
 import type { PlcVariable } from '../../../models/plc';
+import type { ParametroFaceplate } from '../../../utils/designStorage';
+import type { DeclaracionEnlace } from '../../../utils/enlaces';
 
 export interface CustomWidgetDef {
   kind: `custom:${string}`;                        // siempre con prefix 'custom:'
@@ -35,6 +37,19 @@ export interface CustomWidgetDef {
 
   /** Valores de `config` con los que nace el widget al soltarlo. */
   defaultConfig?: Record<string, any>;
+
+  /**
+   * Variables ADEMÁS de la principal que este tipo de widget sabe usar.
+   *
+   * Declararlas hace que el Inspector las pida con su nombre de verdad
+   * («Fallo») y ofrezca solo variables del tipo que encajan, en vez de dejar
+   * que el usuario invente el nombre y acierte por casualidad.
+   *
+   * Opcional: casi ningún widget necesita más de una, y los que no la
+   * declaran siguen igual — el usuario puede añadir enlaces sueltos a
+   * cualquier widget por su cuenta.
+   */
+  enlaces?: DeclaracionEnlace[];
 }
 
 /** Lo que recibe el panel del Inspector de un widget custom. */
@@ -44,11 +59,33 @@ export interface InspectorCtx {
   config: Record<string, any>;
   /** Reemplaza la config entera. Se guarda como cualquier otro cambio. */
   setConfig: (config: Record<string, any>) => void;
+  /**
+   * Los parámetros que declara LA PANTALLA QUE SE ESTÁ EDITANDO, si es un
+   * tipo de faceplate. Vacío en una pantalla normal.
+   *
+   * Lo necesita el panel de acciones: un botón dentro de un tipo puede abrir
+   * otro faceplate pasándole los parámetros de éste (`param:motor`), y para
+   * ofrecerlos hay que saber cuáles son. El Inspector ya los tiene calculados
+   * para el selector de variable, así que se pasan en vez de volver a
+   * pedirlos.
+   */
+  paramsPantalla?: ParametroFaceplate[];
 }
 
 export interface RenderCtx {
   widget: HmiWidget;
   variable?: PlcVariable;
+
+  /**
+   * Las variables con nombre del widget, YA RESUELTAS.
+   *
+   * `enlaces.fallo` es la variable, no su id. La clave existe siempre que el
+   * enlace esté declarado en el widget, aunque valga `undefined` por estar sin
+   * asignar: así se distingue «hay un hueco y está vacío» de «no hay hueco».
+   *
+   * Dentro de un faceplate ya vienen traducidas a los tags de esa instancia.
+   */
+  enlaces?: Record<string, PlcVariable | undefined>;
   style: WidgetStyle;
   on: boolean;         // ya calculado con isTruthy(variable)
   frac: number;        // ya calculado con valueFraction(variable) — 0..1

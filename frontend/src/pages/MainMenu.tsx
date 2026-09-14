@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   SettingsIcon,
@@ -26,6 +26,15 @@ export function MainMenu() {
   // cambiar quién entra es otra. Un Administrador entra igual, pero la
   // pantalla se le presenta en modo consulta.
   const verCuentas = !permisos || permisos.gestionar_usuarios;
+  // Quien no puede editar el diseño no tiene nada que elegir aquí: su sitio es
+  // la vista de planta, y este menú sólo le ofrecería puertas cerradas. Se le
+  // manda directo, y así un cliente se comporta como un cliente —entra y
+  // opera— mientras el Diseñador queda para quien desarrolla.
+  //
+  // `!permisos` (instalación sin cuentas todavía) NO entra aquí: ahí todo
+  // sigue abierto, que es lo que hace falta para montar el sistema la primera
+  // vez.
+  const soloRuntime = !!permisos && !permisos.editar_diseño;
   // NOTA SOBRE LA REJILLA
   //
   // Antes eran dos columnas fijas con un apaño para centrar la última cuando
@@ -57,6 +66,11 @@ export function MainMenu() {
     disconnect();
     navigate('/');
   };
+
+  // DESPUÉS de todos los hooks, nunca antes: salir por aquí en medio de la
+  // lista los dejaría sin ejecutar en unos renders sí y en otros no, que es
+  // el error que React castiga con un aviso y con estado corrupto.
+  if (soloRuntime) return <Navigate to="/preview" replace />;
   return (
     <div className="relative flex min-h-full w-full flex-col bg-slate-50 dark:bg-navy">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-4 dark:border-navy-slate dark:bg-navy-soft">
@@ -95,6 +109,8 @@ export function MainMenu() {
         </motion.div>
 
         <div className="grid w-full max-w-6xl grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {!soloRuntime &&
+          <>
           <MenuCard
             title={t('menu.configTitle')}
             description={t('menu.configDesc')}
@@ -123,6 +139,8 @@ export function MainMenu() {
             onClick={() => navigate('/temas')}
             delay={0.16}
             open={t('menu.open')} />
+          </>
+          }
 
           {verActividad &&
           <MenuCard

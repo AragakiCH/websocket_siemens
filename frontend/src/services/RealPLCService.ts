@@ -20,7 +20,7 @@
 // =========================================================================
 import { PlcVariable } from '../models/plc';
 import { toPlcVariables } from './plcAdapter';
-import { tokenParaWs } from './authApi';
+import { getToken, tokenParaWs } from './authApi';
 
 const RETRY_MS = 3000;
 const SELECTION_KEY = 'hmi.plc.selection'; // localStorage
@@ -142,6 +142,16 @@ class RealPLCServiceImpl {
     if (this.ws && this.ws.readyState <= WebSocket.OPEN) return; // ya abierto/abriendo
     this.manualClose = false;
 
+    // Sin token no se intenta siquiera. Con la autenticación activada el
+    // backend cierra el socket nada más abrirlo, y el reintento automático
+    // convertía eso en un martilleo constante contra una puerta cerrada —se
+    // midió: cuatro conexiones rechazadas seguidas en la pantalla de acceso—.
+    // Al entrar, `hmi:sesion-iniciada` vuelve a llamar aquí.
+    if (!getToken()) {
+      this.retryTimer = setTimeout(() => this.openSocket(), RETRY_MS);
+      return;
+    }
+
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
     // El token va en el query string porque la API de WebSocket del
     // navegador no permite cabeceras personalizadas al conectar.
@@ -173,6 +183,11 @@ class RealPLCServiceImpl {
         msg.type === 'project.updated' ||
         msg.type === 'project.removed' ||
         msg.type === 'config.updated' ||
+        // Sin esta línea el backend difunde el cambio de tema y el navegador
+        // lo tira: guardar en el Gestor de Temas no se veía hasta recargar la
+        // página, que es justo lo que no puede pasar en veinte paneles de
+        // planta.
+        msg.type === 'tema.updated' ||
         msg.type === 'presence'
       ) {
         // Canal de PROYECTO: baja frecuencia. Este servicio no los

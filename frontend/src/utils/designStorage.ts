@@ -52,6 +52,47 @@ export interface SavedDesign {
   canvas: Lienzo;
 }
 
+/**
+ * Un hueco de la interfaz de un FACEPLATE.
+ *
+ * Los widgets de dentro del tipo no apuntan a un tag real sino a uno de
+ * estos, escribiendo `param:<id>` en su `variableId`. Al dibujar una
+ * instancia, ese prefijo se cambia por el tag que le toque a esa instancia.
+ * No hizo falta ningún campo nuevo en el widget: `variableId` ya es texto.
+ */
+export interface ParametroFaceplate {
+  id: string;
+  nombre: string;
+  tipo: 'bool' | 'int' | 'double' | 'string';
+}
+
+/**
+ * Declaración de TIPO de una pantalla.
+ *
+ * Un faceplate aquí es una pantalla más con esta marca: así se reutiliza el
+ * editor entero —el motor se dibuja como se dibuja cualquier pantalla— y la
+ * instancia LEE la definición en vez de copiarla, de modo que corregir el
+ * tipo corrige todas las instancias sin botón de «actualizar».
+ */
+export interface DeclaracionFaceplate {
+  es_tipo: boolean;
+  parametros: ParametroFaceplate[];
+}
+
+export const SIN_FACEPLATE: DeclaracionFaceplate = {
+  es_tipo: false,
+  parametros: [],
+};
+
+/** El prefijo que marca «esto no es un tag, es un parámetro del tipo». */
+export const PREFIJO_PARAM = 'param:';
+
+export const esParametro = (variableId: string | null | undefined): boolean =>
+  typeof variableId === 'string' && variableId.startsWith(PREFIJO_PARAM);
+
+export const idDeParametro = (variableId: string): string =>
+  variableId.slice(PREFIJO_PARAM.length);
+
 export interface Proyecto extends SavedDesign {
   project_id: string;
   nombre: string;
@@ -60,6 +101,8 @@ export interface Proyecto extends SavedDesign {
   version: number;
   actualizado_en: string;
   actualizado_por: string;
+  /** Declaración de tipo, si esta pantalla es un faceplate. */
+  faceplate?: DeclaracionFaceplate;
   /**
    * `true` si esto salió de la caché local porque el servidor no respondía,
    * no del servidor. La vista DEBE avisarlo: puede estar desfasado, y un HMI
@@ -103,6 +146,11 @@ export interface ResumenPantalla {
   actualizado_en: string;
   actualizado_por: string;
   num_widgets: number;
+  /** La pantalla es un TIPO de faceplate, no una pantalla de operación. */
+  es_faceplate?: boolean;
+  /** Su interfaz. Viene en la lista para no tener que descargar la pantalla
+   *  entera solo para saber qué parámetros pide. */
+  parametros?: ParametroFaceplate[];
 }
 
 /**
@@ -319,11 +367,13 @@ export async function duplicarPantalla(
   const destino = proyectoId ?? doc?.proyecto ?? PROYECTO_HMI_POR_DEFECTO;
   const nueva = await crearPantalla(nombre, destino);
   if (doc && (doc.widgets.length > 0 || doc.canvas.width > 0)) {
-    // version null = forzar: la pantalla acaba de nacer, no hay nada que pisar.
+    // La pantalla acaba de nacer, no hay nada que pisar: se fuerza, pero
+    // diciéndolo. El servidor ya no acepta un `version: null` a secas.
     await guardarProyecto(
       { widgets: doc.widgets, canvas: doc.canvas },
       null,
-      nueva.project_id
+      nueva.project_id,
+      true
     );
   }
   return { ...nueva, num_widgets: doc?.widgets.length ?? 0 };
@@ -368,6 +418,7 @@ export async function cargarProyecto(
       actualizado_por: d.actualizado_por,
       widgets: d.widgets ?? [],
       canvas: d.canvas ?? { width: 0, height: 0 },
+      faceplate: d.faceplate ?? SIN_FACEPLATE,
     };
     saveDesign(
       { widgets: proyecto.widgets, canvas: proyecto.canvas },
@@ -473,7 +524,29 @@ export async function borrarWidget(
 export async function guardarProyecto(
   design: SavedDesign,
   version: number | null,
-  projectId: string = PANTALLA_POR_DEFECTO
+  projectId: string = PANTALLA_POR_DEFECTO,
+  /**
+   * Escribir SIN comprobar la versión.
+   *
+   * Sólo tiene sentido sobre una pantalla recién creada, donde no hay trabajo
+   * de nadie que pisar. El servidor rechaza con 400 una petición sin
+   * `version` que no lo pida explícitamente: mandar `version: null` y que eso
+   * bastara para sobrescribir convertía el control de versiones en algo que
+   * se saltaba quien no sabía que existía.
+   */
+  forzar: boolean = false,
+  /**
+   * Declaración de tipo de faceplate.
+   *
+   * `undefined` = «no la toques». Es deliberado: sin esa distinción, un
+   * guardado normal de widgets borraría la declaración del tipo — la misma
+   * lección del PUT que vaciaba pantallas con un cuerpo incompleto.
+   *
+   * Va EL ÚLTIMO a propósito: meterlo en medio cambió el significado de las
+   * llamadas que ya existían, y `duplicarPantalla` pasó a mandar un booleano
+   * donde se esperaba una declaración.
+   */
+  faceplate?: DeclaracionFaceplate
 ): Promise<number> {
   const d = await fetchAuth(`/pantallas/${projectId}`, {
     method: 'PUT',
@@ -481,6 +554,8 @@ export async function guardarProyecto(
       widgets: design.widgets,
       canvas: design.canvas,
       version,
+      forzar,
+      ...(faceplate ? { faceplate } : {}),
     }),
   });
   saveDesign(design, projectId);

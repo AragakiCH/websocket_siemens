@@ -63,6 +63,15 @@ const ICONO: DefParte = {
   props: ['color'],
 };
 
+// La barra de desplazamiento del menú, que aparece cuando hay más secciones
+// de las que caben. Solo el color del pulgar: el canal va transparente
+// siempre —es lo que la hace discreta— y el ancho lo fija la hoja de estilos.
+const BARRA: DefParte = {
+  id: 'scroll',
+  label: 'Barra de desplazamiento',
+  props: ['color'],
+};
+
 const BOTON: DefParte = {
   id: 'boton',
   label: 'Botón',
@@ -114,6 +123,7 @@ export const PARTES_POR_KIND: Record<string, DefParte[]> = {
     // que no hiciera nada sería peor que no ofrecerlo.
     { ...TEXTO, label: 'Niveles', props: ['color', 'fontSize', 'bold'] },
     { ...BOTON, label: 'Secciones' },
+    BARRA,
   ],
   'custom:pantalla-screen': [CAJA, { ...TEXTO, label: 'Cabecera' }],
 
@@ -124,6 +134,8 @@ export const PARTES_POR_KIND: Record<string, DefParte[]> = {
   // El número y la unidad se estilizan por separado a propósito: casi
   // siempre quieres el valor grande y la unidad discreta al lado.
   'custom:valor-unidad': [CAJA, VALOR, { ...TEXTO, label: 'Unidad' }],
+  // El símbolo se dibuja solo; lo único que se estiliza es su rótulo.
+  'custom:simbolo': [CAJA, { ...TEXTO, label: 'Rótulo' }],
 
   // El color de cada fila NO se toca aquí: lo pone la severidad, con la
   // misma paleta que la franja y la pantalla de Alarmas, y cambiarlo por

@@ -66,7 +66,15 @@ export default defineConfig({
       // Exportaciones (CSV/XLSX) y el asistente de IA.
       '/export': BACKEND,
       '/ai': BACKEND,
-      '/widgets': BACKEND
+      '/widgets': BACKEND,
+      // Escritura al PLC, variables internas del HMI y el catálogo de
+      // variables. Sin estas tres líneas, en `npm run dev` las peticiones se
+      // las queda Vite y responde el index.html de la SPA: el front recibe
+      // HTML donde espera JSON y parece que "no escribe", con el backend
+      // funcionando perfectamente. Es el mismo 404 que tuvo '/widgets'.
+      '/escritura': BACKEND,
+      '/internas': BACKEND,
+      '/variables': BACKEND
       
     },
   },

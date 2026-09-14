@@ -21,6 +21,7 @@
 import type { ReactNode } from 'react';
 import type { InspectorCtx } from '../custom/types';
 import { InspectorImagen } from './imagen';
+import { InspectorAccion } from './accion';
 
 /** Título de la sección + panel, por tipo de widget built-in. */
 interface PanelBuiltIn {
@@ -30,6 +31,10 @@ interface PanelBuiltIn {
 
 const PANELES: Record<string, PanelBuiltIn> = {
   image: { titulo: 'Imagen', render: InspectorImagen },
+  // Los dos mandos: lo que hacen al pulsarlos. Antes eran decorativos — el
+  // interruptor se movía en pantalla y el PLC ni se enteraba.
+  button: { titulo: 'Acción', render: InspectorAccion },
+  switch: { titulo: 'Acción', render: InspectorAccion },
 };
 
 /** Panel del Inspector de un built-in, o undefined si no tiene. */
@@ -38,4 +43,5 @@ export function panelBuiltIn(kind: string): PanelBuiltIn | undefined {
 }
 
 export { InspectorImagen, leerConfigImagen } from './imagen';
+export { InspectorAccion } from './accion';
 export type { ConfigImagen } from './imagen';

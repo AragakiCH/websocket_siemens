@@ -59,6 +59,8 @@
 import JSZip from 'jszip';
 import { DataType } from '../models/plc';
 import { TIPOS_VALIDOS, esTipoValido } from '../utils/widgetBinding';
+import { RE_NOMBRE_ENLACE, type DeclaracionEnlace } from '../utils/enlaces';
+import { fetchAuth } from './authApi';
 
 const STORAGE_KEY = 'hmi.custom-html-widgets';
 
@@ -82,6 +84,27 @@ export interface ZipWidgetMeta {
    * `[]` = declarado explícitamente como decorativo.
    */
   accepts?: DataType[];
+
+  /**
+   * Variables ADEMÁS de la principal, cada una con su nombre.
+   *
+   * Es lo que permite que un widget importado represente un EQUIPO y no un
+   * dato suelto: un motor necesita marcha, fallo y velocidad a la vez, y con
+   * una sola variable no se puede girar a la velocidad de una mientras se
+   * pinta de rojo por otra.
+   *
+   * El Diseñador las pide una por una, con su nombre y filtrando por tipo, y
+   * llegan al widget como `WIDGET.vars.<id>` y como variables CSS
+   * `--w-<id>-on`, `--w-<id>-frac` y `--w-<id>-value`.
+   *
+   *   "variables": [
+   *     { "id": "velocidad", "label": "Velocidad", "accepts": ["double"] },
+   *     { "id": "fallo", "label": "Fallo", "accepts": ["bool"] }
+   *   ]
+   *
+   * Ausente = el widget solo usa la principal, como siempre.
+   */
+  variables?: DeclaracionEnlace[];
 }
 
 export interface ZipWidget {
@@ -131,6 +154,49 @@ function validarAccepts(valor: unknown): DataType[] | undefined {
   return Array.from(new Set(valor as DataType[]));
 }
 
+/**
+ * Lee y valida `variables`.
+ *
+ * Falla ruidosamente, igual que `accepts`: un widget que declara mal sus
+ * variables se quedaría sin los huecos en el Inspector y su autor estaría
+ * media tarde buscando por qué su motor no gira.
+ */
+function validarVariables(valor: unknown): DeclaracionEnlace[] | undefined {
+  if (valor === undefined || valor === null) return undefined;
+  if (!Array.isArray(valor)) {
+    throw new Error(
+      'El .json del widget: "variables" debe ser una lista, por ejemplo ' +
+      '[{ "id": "velocidad", "label": "Velocidad", "accepts": ["double"] }].'
+    );
+  }
+
+  const vistos = new Set<string>();
+  const r: DeclaracionEnlace[] = [];
+  for (const x of valor as any[]) {
+    if (!x || typeof x !== 'object') {
+      throw new Error('El .json del widget: cada entrada de "variables" es un objeto.');
+    }
+    const id = String(x.id ?? '').trim();
+    if (!RE_NOMBRE_ENLACE.test(id)) {
+      throw new Error(
+        `El .json del widget: "${id}" no vale como id de variable. Empieza ` +
+        'por una letra y usa solo letras, números o guion bajo.'
+      );
+    }
+    if (vistos.has(id)) {
+      throw new Error(`El .json del widget: la variable "${id}" está repetida.`);
+    }
+    vistos.add(id);
+    r.push({
+      id,
+      label: typeof x.label === 'string' && x.label.trim() ? x.label : id,
+      accepts: validarAccepts(x.accepts),
+      ayuda: typeof x.ayuda === 'string' ? x.ayuda : undefined,
+    });
+  }
+  return r;
+}
+
 function validateMeta(raw: unknown): ZipWidgetMeta {
   if (!raw || typeof raw !== 'object') {
     throw new Error('El .json del widget debe ser un objeto JSON válido.');
@@ -158,6 +224,7 @@ function validateMeta(raw: unknown): ZipWidgetMeta {
     defaultWidth: Math.max(40, Math.min(800, dw)),
     defaultHeight: Math.max(40, Math.min(800, dh)),
     accepts: validarAccepts(obj.accepts),
+    variables: validarVariables(obj.variables),
   };
 }
 
@@ -353,9 +420,10 @@ export function saveZipWidgets(widgets: ZipWidget[]): void {
  */
 export async function sincronizarWidgets(): Promise<ZipWidget[]> {
   try {
-    const r = await fetch('/widgets?con_contenido=true');
-    if (!r.ok) throw new Error(String(r.status));
-    const data = await r.json();
+    // fetchAuth y no fetch: con PLC_AUTH_REQUERIDA=true el servidor rechaza
+    // una petición sin token, y sin esto el catálogo se quedaba en la caché
+    // local sin decir por qué.
+    const data = await fetchAuth('/widgets?con_contenido=true');
     const widgets: ZipWidget[] = (data.widgets ?? []).map(desdeServidor);
     saveZipWidgets(widgets);
     return widgets;
@@ -371,26 +439,26 @@ export async function sincronizarWidgets(): Promise<ZipWidget[]> {
  */
 export async function addZipWidget(widget: ZipWidget): Promise<ZipWidget[]> {
   const kind = widget.meta.kind;
-  const r = await fetch(`/widgets/${encodeURIComponent(kind)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      nombre: widget.meta.label ?? kind,
-      html: widget.html,
-      css: widget.css ?? '',
-      js: widget.js ?? '',
-      meta: widget.meta,
-    }),
-  });
-
-  if (!r.ok) {
-    let detalle = `Error ${r.status}`;
-    try {
-      detalle = (await r.json()).detail ?? detalle;
-    } catch {
-      /* respuesta sin JSON */
-    }
-    throw new Error(`No se pudo guardar en el servidor: ${detalle}`);
+  // Guardar un widget exige rol Administradores en el backend, así que la
+  // petición TIENE que llevar el token. Con `fetch` a secas llegaba anónima y
+  // el servidor respondía "necesitas iniciar sesión" por muy iniciada que
+  // estuviera — el usuario salía y volvía a entrar, y le pasaba lo mismo.
+  // fetchAuth pone la cabecera, el Content-Type y traduce el error.
+  try {
+    await fetchAuth(`/widgets/${encodeURIComponent(kind)}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        nombre: widget.meta.label ?? kind,
+        html: widget.html,
+        css: widget.css ?? '',
+        js: widget.js ?? '',
+        meta: widget.meta,
+      }),
+    });
+  } catch (e: any) {
+    throw new Error(
+      `No se pudo guardar en el servidor: ${e?.message ?? 'error desconocido'}`
+    );
   }
 
   const actuales = loadZipWidgets().filter((w) => w.meta.kind !== kind);
@@ -402,7 +470,7 @@ export async function addZipWidget(widget: ZipWidget): Promise<ZipWidget[]> {
 export async function removeZipWidget(kind: string): Promise<ZipWidget[]> {
   const limpio = kind.replace(/^custom:/, '');
   try {
-    await fetch(`/widgets/${encodeURIComponent(limpio)}`, { method: 'DELETE' });
+    await fetchAuth(`/widgets/${encodeURIComponent(limpio)}`, { method: 'DELETE' });
   } catch {
     // Si el servidor no responde se quita igualmente de la caché; la próxima
     // sincronización lo devolverá y quedará claro que no se borró de verdad.

@@ -29,7 +29,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import (ai_routes, alarm_routes, auth_routes, crud_routes,
                      db_routes, escritura_routes, export_routes,
-                     historian_routes, lock_routes, project_routes,
+                     historian_routes, internas_routes, lock_routes,
+                     project_routes,
                      proyecto_routes, rest_routes, sistema_routes,
                      variables_routes,
                      db_routes, export_routes, historian_routes, lock_routes,
@@ -54,6 +55,8 @@ from app.core.plc_manager import PlcManager
 from app.db.project_store import ProjectStore
 from app.db.proyecto_store import ProyectoStore
 from app.db.tema_store import TemaStore
+from app.db.internas_store import InternasStore
+from app.core.internas_handler import InternasHandler
 
 
 def _configurar_logging(nivel: str) -> None:
@@ -129,6 +132,13 @@ async def lifespan(app: FastAPI):
     # guardara su tema, dos paneles de la misma línea acabarían con colores
     # distintos y el rojo de alarma dejaría de significar lo mismo en todas.
     tema_store = TemaStore()
+    # Variables INTERNAS del HMI: las que no existen en ningún autómata (un
+    # modo de trabajo, una consigna de pantalla, algo que forzar para probar).
+    # Se montan como un PLC más —id `interno`— para que salgan en los mismos
+    # desplegables y se escriban por el mismo sitio que las de verdad. Ver
+    # app/core/internas_handler.py.
+    internas_store = InternasStore()
+    internas_handler = InternasHandler(internas_store, manager)
     # Identidad: las cuentas están en la tabla SQL `usuarios`, así que
     # este gestor necesita el DbManager para llegar a ellas.
     auth_manager = AuthManager(db_manager, settings)
@@ -154,6 +164,8 @@ async def lifespan(app: FastAPI):
     app.state.project_store = project_store
     app.state.proyecto_store = proyecto_store
     app.state.tema_store = tema_store
+    app.state.internas_store = internas_store
+    app.state.internas_handler = internas_handler
     app.state.auth_manager = auth_manager
     app.state.lock_manager = lock_manager
     app.state.auditoria = auditoria
@@ -164,6 +176,10 @@ async def lifespan(app: FastAPI):
                 settings.resolve_subnet())
     # El descubrimiento + supervisores corren en segundo plano: la API arranca
     # aunque ningún PLC esté disponible todavía.
+    # Antes de arrancar nada más: si un panel se conecta en el primer segundo,
+    # su snapshot ya tiene que traer las variables internas.
+    await plc_manager.registrar_interno(internas_handler)
+
     auditoria.start()
     auditoria.registrar("servicio.arranque", "", "",
                         {"auth_requerida": settings.auth_requerida})
@@ -515,6 +531,7 @@ app.include_router(proyecto_routes.router)
 app.include_router(project_routes.router)
 # Paleta y tipografías del proyecto (el Gestor de Temas).
 app.include_router(tema_routes.router)
+app.include_router(internas_routes.router)
 app.include_router(lock_routes.router)
 app.include_router(rest_routes.router, tags=["REST"])
 app.include_router(websocket_routes.router, tags=["WebSocket"])
