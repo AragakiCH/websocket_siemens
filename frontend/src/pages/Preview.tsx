@@ -402,40 +402,41 @@ export function Preview() {
   const [medida, setMedida] = useState({ ancho: 0, alto: 0 });
 
   /**
-   * Modo panel: el sinóptico se queda con la pantalla entera.
+   * Pantalla completa: se va el navegador, NO la barra de PsiCore.
    *
-   * No basta con pedirle pantalla completa al navegador. Con la barra de
-   * PsiCore puesta, un diseño de 1920x1080 en un monitor de 1920x1080 sigue
-   * sin caber: harían falta 1053 px de alto para pintarlo a todo lo ancho y
-   * sólo quedan 942. La barra tiene que irse también.
+   * Antes esta misma acción escondía también la barra, para que un diseño de
+   * 1920x1080 cupiera clavado en un monitor de 1920x1080. Era un mal negocio:
+   * la barra es la ÚNICA navegación del runtime —las pestañas de sección, el
+   * camino de dónde estás, el reloj y el «en vivo»—, así que escondiéndola el
+   * operario se quedaba a pantalla completa y sin poder cambiar de pantalla.
+   *
+   * Y lo que se ganaba era poco: el lienzo ya se escala solo al hueco que
+   * tenga, así que sin la barra ese diseño se ve al 100 % y con ella al 87 %.
+   * Ver un 13 % más pequeño se arregla acercándose; no poder navegar, no.
    */
-  const [modoPanel, setModoPanel] = useState(false);
+  const [pantallaCompleta, setPantallaCompleta] = useState(false);
 
-  // Salir con Esc lo gestiona el navegador, no esta aplicación: si no se
-  // escucha el cambio, al pulsar Esc se sale de la pantalla completa y la
-  // barra sigue escondida, con el operador sin saber cómo recuperarla.
+  // Salir con Esc lo gestiona el navegador, no esta aplicación. Sin escuchar
+  // el cambio, el botón se quedaría enseñando «salir» con la ventana ya
+  // restaurada.
   useEffect(() => {
-    const alCambiar = () => {
-      if (!document.fullscreenElement) setModoPanel(false);
-    };
+    const alCambiar = () => setPantallaCompleta(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', alCambiar);
     return () => document.removeEventListener('fullscreenchange', alCambiar);
   }, []);
 
-  const alternarPanel = useCallback(async () => {
+  const alternarPantallaCompleta = useCallback(async () => {
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
-        setModoPanel(false);
       } else {
-        // La pantalla completa puede fallar —un permiso, un navegador
-        // incrustado— y entonces se esconde la barra igualmente: se gana la
-        // altura de la barra aunque no la del navegador.
-        await document.documentElement.requestFullscreen().catch(() => {});
-        setModoPanel(true);
+        // Puede fallar —un permiso, un navegador incrustado—. Se ignora: el
+        // estado real lo pone `fullscreenchange`, así que si no entró, el
+        // botón sigue ofreciendo entrar en vez de mentir.
+        await document.documentElement.requestFullscreen();
       }
     } catch {
-      setModoPanel((v) => !v);
+      /* lo dice el navegador; aquí no hay nada que hacer */
     }
   }, []);
 
@@ -672,7 +673,6 @@ export function Preview() {
       {/* ── Barra de operación ────────────────────────────────────
           Sin un solo control: es informativa de principio a fin. Lo único
           que se puede tocar en esta vista es el HMI. */}
-      {!modoPanel && (
       <header className="shrink-0 border-b border-tema-borde-suave bg-tema-superficie px-4">
         {/* Dos columnas: el logotipo manda el ancho de la primera y los tres
             segmentos viven en la segunda. Así las pestañas caen alineadas con
@@ -734,17 +734,27 @@ export function Preview() {
 
           <PastillaEnVivo vivo={enVivo} />
 
-          {/* Como el ⛶ del proyecto de ejemplo, y además esconde esta barra:
-              es la única forma de que un diseño del tamaño del monitor quepa
-              entero. */}
+          {/* El ⛶ del proyecto de ejemplo. Quita el marco del navegador y
+              deja el sinóptico con todo el monitor; esta barra se queda,
+              porque es la única forma de navegar que tiene el operario. */}
           <button
             type="button"
-            onClick={() => void alternarPanel()}
-            title="Pantalla completa: el sinóptico ocupa todo el monitor (Esc para salir)"
-            aria-label="Pantalla completa"
+            onClick={() => void alternarPantallaCompleta()}
+            title={
+              pantallaCompleta
+                ? 'Salir de pantalla completa (Esc)'
+                : 'Pantalla completa (Esc para salir)'
+            }
+            aria-label={
+              pantallaCompleta ? 'Salir de pantalla completa' : 'Pantalla completa'
+            }
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-tema-sobre-superficie-alt transition hover:text-tema-primario"
           >
-            <MaximizeIcon className="h-4 w-4" />
+            {pantallaCompleta ? (
+              <MinimizeIcon className="h-4 w-4" />
+            ) : (
+              <MaximizeIcon className="h-4 w-4" />
+            )}
           </button>
 
           <Reloj />
@@ -766,21 +776,9 @@ export function Preview() {
         )}
         </div>
       </header>
-      )}
 
-      {/* La salida del modo panel. Discreta pero SIEMPRE visible: esconder la
-          barra sin dejar una puerta sería encerrar al operador. */}
-      {modoPanel && (
-        <button
-          type="button"
-          onClick={() => void alternarPanel()}
-          title="Salir de pantalla completa (Esc)"
-          aria-label="Salir de pantalla completa"
-          className="absolute right-3 top-3 z-50 flex h-8 w-8 items-center justify-center rounded-lg bg-navy/25 text-white opacity-40 transition hover:opacity-100"
-        >
-          <MinimizeIcon className="h-4 w-4" />
-        </button>
-      )}
+      {/* Ya no hace falta un botón flotante para salir: la barra sigue ahí y
+          su propio botón hace las dos cosas. */}
 
       {/* ── El lienzo ─────────────────────────────────────────────── */}
       {/* `overflow-hidden` y no `auto`: ahora el sinóptico SIEMPRE cabe, así
