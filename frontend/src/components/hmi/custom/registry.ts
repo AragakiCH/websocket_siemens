@@ -6,6 +6,7 @@ import { pantallaScreen } from './navegacion/PantallaScreen';
 import { trendWidget } from './trend/Trend';
 import { contenedorGrupo } from './contenedor/Contenedor';
 import { valorUnidad } from './lectura/ValorUnidad';
+import { alarmasWidget } from './alarmas/Alarmas';
 import { loadZipWidgets, fullKind, type ZipWidget } from '../../../services/zipWidgetLoader';
 // import { semaforoIndustrial } from './SemaforoIndustrial';
 
@@ -22,6 +23,9 @@ export const customWidgets: CustomWidgetDef[] = [
   contenedorGrupo,
   // Lectura suelta: el número del PLC con la unidad que escribas.
   valorUnidad,
+  // Las alarmas pendientes dentro del lienzo, filtrables por área, tag y
+  // gravedad. Consume lo mismo que la franja y la pantalla de Alarmas.
+  alarmasWidget,
   // semaforoIndustrial,   ← aquí agregas cada widget nuevo, punto
 ];
 

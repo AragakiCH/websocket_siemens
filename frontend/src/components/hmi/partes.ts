@@ -125,6 +125,12 @@ export const PARTES_POR_KIND: Record<string, DefParte[]> = {
   // siempre quieres el valor grande y la unidad discreta al lado.
   'custom:valor-unidad': [CAJA, VALOR, { ...TEXTO, label: 'Unidad' }],
 
+  // El color de cada fila NO se toca aquí: lo pone la severidad, con la
+  // misma paleta que la franja y la pantalla de Alarmas, y cambiarlo por
+  // pantalla haría que el rojo dejara de significar lo mismo en todas.
+  // Lo que sí se ajusta es la caja, el título y la tipografía de las filas.
+  'custom:alarmas': [CAJA, { ...VALOR, label: 'Título' }, TEXTO],
+
   // El color de cada línea NO se toca aquí: lo asigna la posición de la serie
   // desde una paleta validada para daltonismo. Lo que sí se ajusta es el
   // marco, la rejilla de referencia y la tipografía de ejes y leyenda.
