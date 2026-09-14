@@ -21,6 +21,7 @@
 // que otro acaba de hacer.
 // =========================================================================
 import { HmiWidget } from '../models/widget';
+import type { ConflictoVariable } from './proyectoStorage';
 import { fetchAuth } from '../services/authApi';
 import { PROYECTO_HMI_POR_DEFECTO } from './proyectoStorage';
 import { descargarJson, hoy, leerJsonDeFichero } from './descargas';
@@ -184,14 +185,44 @@ function claveCache(projectId: string): string {
   return `${DESIGN_KEY}.${projectId}`;
 }
 
+/**
+ * Tope de la copia local de UNA pantalla, en caracteres del JSON.
+ *
+ * `localStorage` da ~5 MB para TODO el origen, y ahi conviven el token de
+ * sesion, las preferencias y esta cache. Una pantalla con un par de imagenes
+ * en data-URI pasa del mega sin despeinarse; con varias pantallas asi, la
+ * cuota se agotaba y lo siguiente que intentara guardarse —el token de la
+ * sesion, por ejemplo— fallaba en silencio: "me pide login cada vez que
+ * abro". Por encima de esto no se cachea: el servidor la sirve igual, solo
+ * que sin el pintado instantaneo del primer render.
+ */
+const MAX_CACHE_PANTALLA = 1_000_000;
+
 export function saveDesign(
   design: SavedDesign,
   projectId: string = PANTALLA_POR_DEFECTO
 ): void {
+  const clave = claveCache(projectId);
   try {
-    localStorage.setItem(claveCache(projectId), JSON.stringify(design));
+    const json = JSON.stringify(design);
+    if (json.length > MAX_CACHE_PANTALLA) {
+      localStorage.removeItem(clave);
+      return;
+    }
+    localStorage.setItem(clave, json);
   } catch {
-    /* cuota llena o storage deshabilitado: no es crítico, es solo caché */
+    // Cuota llena (una pantalla con imagenes en data-URI puede pesar megas)
+    // o storage deshabilitado. No es critico: el servidor tiene la verdad.
+    //
+    // Pero NO se deja la copia anterior: si el `setItem` fallo, lo que hay
+    // bajo la clave es un diseno VIEJO, y al recargar se pintaria durante un
+    // instante —o del todo, si el servidor no responde— algo que ya no
+    // existe, sin ningun aviso. Mejor sin cache que con una cache mentirosa.
+    try {
+      localStorage.removeItem(clave);
+    } catch {
+      /* nada mas que hacer */
+    }
   }
 }
 
@@ -516,6 +547,8 @@ export interface PantallaExportada {
   proyecto_origen?: { proyecto_id: string; nombre: string };
   pantalla: { project_id: string; nombre: string; canvas: Lienzo; widgets: HmiWidget[] };
   widgets_personalizados: unknown[];
+  /** Variables internas enlazadas. Opcional: los ficheros viejos no la traen. */
+  variables_internas?: unknown[];
 }
 
 export interface ResultadoImportacionPantalla {
@@ -528,6 +561,10 @@ export interface ResultadoImportacionPantalla {
   widgets_importados: string[];
   widgets_ya_existentes: string[];
   widgets_con_error: string[];
+  variables_importadas: string[];
+  variables_ya_existentes: string[];
+  /** Existen aqui con OTRO tipo: se enlazan igual y enseñaran algo raro. */
+  variables_en_conflicto: ConflictoVariable[];
 }
 
 /** Pide el documento de la pantalla. Es el contenido del fichero. */
@@ -584,5 +621,8 @@ export async function importarPantalla(
     widgets_importados: d.widgets_importados ?? [],
     widgets_ya_existentes: d.widgets_ya_existentes ?? [],
     widgets_con_error: d.widgets_con_error ?? [],
+    variables_importadas: d.variables_importadas ?? [],
+    variables_ya_existentes: d.variables_ya_existentes ?? [],
+    variables_en_conflicto: d.variables_en_conflicto ?? [],
   };
 }

@@ -47,10 +47,12 @@ from app.api.intercambio import (
     FORMATO_VERSION,
     MAX_PANTALLAS_IMPORTADAS,
     id_libre,
+    importar_internas,
     importar_widgets,
     nombre_libre,
     remapear_pantallas,
     slug,
+    internas_para_exportar,
     widgets_para_exportar,
 )
 from app.db.proyecto_store import PROYECTO_POR_DEFECTO, validar_proyecto_id
@@ -369,6 +371,15 @@ class ProyectoExportado(BaseModel):
     proyecto: Dict[str, Any] = Field(default_factory=dict)
     pantallas: List[Dict[str, Any]] = Field(default_factory=list)
     widgets_personalizados: List[Dict[str, Any]] = Field(default_factory=list)
+    # `default_factory=list` no es un detalle: un fichero exportado ANTES de
+    # que las variables internas existieran no trae este campo, y tiene que
+    # seguir importándose sin error. Llega vacío y no se crea ninguna, que es
+    # exactamente lo que pasaba antes.
+    variables_internas: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Definición de las variables internas que enlazan los "
+                    "widgets. Las de PLC no viajan: existen porque existe el "
+                    "autómata.")
 
 
 @router.get(
@@ -376,8 +387,12 @@ class ProyectoExportado(BaseModel):
     tags=["Proyectos HMI"],
     summary="Exportar un proyecto a un fichero",
     description="Devuelve un `.json` con el proyecto, sus pantallas con todos "
-                "sus widgets y la definición de los widgets personalizados "
-                "que use, para poder llevárselo a otro equipo.\n\n"
+                "sus widgets, la definición de los widgets personalizados "
+                "que use y las **variables internas** a las que estén "
+                "enlazados, para poder llevárselo a otro equipo.\n\n"
+                "Las variables de PLC **no** viajan: existen porque existe el "
+                "autómata, y crearlas al importar sería inventarse un dato "
+                "que nadie puede leer.\n\n"
                 "**No incluye** alarmas, recetas, flujos ni conexiones a base "
                 "de datos: esos son de la instalación, no del diseño. Para "
                 "mover una instalación entera está "
@@ -413,6 +428,13 @@ async def exportar_proyecto(
         getattr(request.app.state, "widget_store", None), pantallas
     )
 
+    # Las variables internas que enlazan estos widgets. Sin ellas, el proyecto
+    # llega al otro equipo con los enlaces apuntando a variables que allí no
+    # existen: widgets en blanco y ni un error que lo explique.
+    internas = internas_para_exportar(
+        getattr(request.app.state, "internas_store", None), pantallas
+    )
+
     doc = {
         "formato": FORMATO_PROYECTO,
         "version": FORMATO_VERSION,
@@ -424,11 +446,13 @@ async def exportar_proyecto(
         },
         "pantallas": pantallas,
         "widgets_personalizados": personalizados,
+        "variables_internas": internas,
     }
 
     _auditar(request, "proyecto.exportado", sesion, proyecto_id,
              {"pantallas": len(pantallas),
-              "widgets_personalizados": len(personalizados)})
+              "widgets_personalizados": len(personalizados),
+              "variables_internas": len(internas)})
 
     nombre_fichero = f"proyecto-{slug(proyecto['nombre']) or proyecto_id}.json"
     return JSONResponse(
@@ -578,9 +602,18 @@ async def importar_proyecto(
         cuerpo.widgets_personalizados, quien,
     )
 
+    # Y las variables internas, con el mismo criterio: las que ya existan aquí
+    # se dejan como están —el widget se enlaza a la que hay, que es lo que su
+    # nombre dice— y solo se crean las que faltan.
+    v_nuevas, v_existentes, v_conflictos = importar_internas(
+        getattr(request.app.state, "internas_store", None),
+        getattr(cuerpo, "variables_internas", None) or [], quien,
+    )
+
     _auditar(request, "proyecto.importado", sesion, proyecto_id,
              {"pantallas": len(creadas), "widgets_nuevos": importados,
-              "widgets_ya_existentes": omitidos})
+              "widgets_ya_existentes": omitidos,
+              "variables_nuevas": v_nuevas})
     await _difundir(request, "proyecto.updated", proyecto_id, quien,
                     {"accion": "proyecto_importado",
                      "pantallas": len(creadas)})
@@ -597,6 +630,12 @@ async def importar_proyecto(
         "widgets_importados": importados,
         "widgets_ya_existentes": omitidos,
         "widgets_con_error": fallidos,
+        "variables_importadas": v_nuevas,
+        "variables_ya_existentes": v_existentes,
+        # Variables cuyo TIPO no coincide con el de aquí. Se enlazan igual
+        # —la clave es la misma— y el widget enseñará algo sin sentido sin dar
+        # error: es el único caso en que callarse haría daño.
+        "variables_en_conflicto": v_conflictos,
     }
 
 

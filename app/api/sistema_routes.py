@@ -45,7 +45,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from app.api.auth_routes import exigir_rol, usuario_de
-from app.config.rutas import describir, resolver_carpeta_datos
+from app.config.rutas import (describir, es_configuracion,
+                              resolver_carpeta_datos)
 from app.core.auth_manager import Sesion
 
 logger = logging.getLogger("sistema_routes")
@@ -134,10 +135,35 @@ async def descargar_backup() -> StreamingResponse:
     ruta = resolver_carpeta_datos()
     buffer = io.BytesIO()
 
+    # Solo la CONFIGURACIÓN. En la instalación empaquetada esta carpeta
+    # contiene además el perfil de WebView2 (`navegador/`) y el log del
+    # servicio, que no son configuración de nadie, pesan decenas de MB y
+    # —lo que rompía esto— están ABIERTOS por el proceso mientras la
+    # aplicación corre: comprimirlos lanzaba un PermissionError y el
+    # endpoint devolvía un 500. En desarrollo no pasaba nunca, porque esas
+    # carpetas solo existen en el .exe instalado.
+    omitidos: List[str] = []
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as z:
         for p in sorted(ruta.rglob("*")):
-            if p.is_file():
+            if not p.is_file() or not es_configuracion(p, ruta):
+                continue
+            try:
                 z.write(p, arcname=str(p.relative_to(ruta)))
+            except (PermissionError, OSError) as exc:
+                # Un fichero que alguien tiene abierto justo ahora no puede
+                # costar la copia entera. Se anota en el _LEEME y se sigue:
+                # una copia con 12 de 13 ficheros y la ausencia declarada es
+                # infinitamente mejor que ninguna copia.
+                logger.warning("No se pudo incluir %s en la copia: %s", p, exc)
+                omitidos.append(f"{p.relative_to(ruta)} ({exc.__class__.__name__})")
+        if omitidos:
+            z.writestr(
+                "_OMITIDOS.txt",
+                "Estos ficheros NO pudieron incluirse porque estaban en uso:\n\n"
+                + "\n".join(omitidos)
+                + "\n\nCierra PsiCore y vuelve a generar la copia si los "
+                  "necesitas.\n",
+            )
         z.writestr(
             "_LEEME.txt",
             "Copia de seguridad de la configuracion de PsiCore\n"
@@ -146,7 +172,9 @@ async def descargar_backup() -> StreamingResponse:
             "Contiene la clave de cifrado (.clave): tratalo como un fichero\n"
             "sensible. Sin ella, las contrasenas guardadas no se pueden leer.\n\n"
             "Para restaurarlo: Configuracion -> Carpeta de datos -> Restaurar,\n"
-            "y reinicia el servicio despues.\n",
+            "y reinicia el servicio despues.\n\n"
+            "NO contiene el perfil del navegador incrustado ni los registros:\n"
+            "no son configuracion, pesan mucho y el perfil incluye cookies.\n",
         )
 
     buffer.seek(0)
@@ -218,8 +246,18 @@ async def restaurar_backup(
     destino = resolver_carpeta_datos()
     respaldo = destino.parent / (
         f"datos_antes_de_restaurar_{datetime.now().strftime('%Y%m%d-%H%M%S')}")
+    # `ignore` con el MISMO criterio que la copia de seguridad, y por el mismo
+    # motivo: `copytree` sobre el perfil de WebView2 abierto falla, y fallar
+    # aquí aborta la restauración entera con el mensaje "no se pudo respaldar
+    # la configuración actual" — que es verdad, pero el fichero que lo impedía
+    # era una cookie.
+    def _ignorar(carpeta: str, nombres: List[str]) -> List[str]:
+        raiz_actual = Path(carpeta)
+        return [n for n in nombres
+                if not es_configuracion(raiz_actual / n, destino)]
+
     try:
-        shutil.copytree(destino, respaldo)
+        shutil.copytree(destino, respaldo, ignore=_ignorar)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             500, f"No se pudo respaldar la configuración actual antes de "

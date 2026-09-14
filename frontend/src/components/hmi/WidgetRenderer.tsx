@@ -4,7 +4,7 @@ import { PowerIcon } from "lucide-react";
 import { HmiWidget } from "../../models/widget";
 import { PlcVariable } from "../../models/plc";
 import { formatValue, valueFraction, isTruthy } from "../../utils/format";
-import { customByKind, zipByKind } from "./custom/registry";
+import { customByKind, zipByKind, zipCatalogoListo } from "./custom/registry";
 import { estiloDeParte } from "./partes";
 import { HtmlWidgetRenderer } from "./HtmlWidgetRenderer";
 import { leerConfigImagen } from "./inspectores";
@@ -72,6 +72,29 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
           style={style}
           interactivo={interactivo}
           onModal={setModalZip}
+        />
+      );
+    }
+
+    // UN `custom:` SIN DEFINICIÓN YA NO ES INVISIBLE.
+    //
+    // Aquí se caía al `switch` de abajo, que para un `custom:` devuelve
+    // `null`: la caja se pintaba solo con su fondo, que casi siempre es
+    // transparente. Eso es lo que se veía como «los widgets salen
+    // transparentes» al reabrir la aplicación de escritorio, y no había
+    // forma de distinguirlo de un widget bien dibujado pero vacío.
+    //
+    // Dos casos, y se pintan distinto a propósito:
+    //   · El catálogo aún no ha llegado (los primeros milisegundos tras
+    //     abrir): «cargando». Desaparece solo en cuanto llega.
+    //   · El catálogo llegó y este `kind` no está: el ZIP se borró del
+    //     servidor o el diseño se importó de otra instalación sin sus
+    //     widgets. Se dice cuál falta, para poder volver a importarlo.
+    if (widget.kind.startsWith("custom:")) {
+      return (
+        <WidgetSinDefinicion
+          kind={widget.kind}
+          cargando={!zipCatalogoListo()}
         />
       );
     }
@@ -441,6 +464,40 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
   return (
     <div className="h-full w-full" style={rootStyle}>
       {content()}
+    </div>
+  );
+}
+
+/**
+ * Marcador para un `custom:` que no se sabe dibujar. Ver el comentario en
+ * `content()`. `pointer-events: none` para que en el Diseñador se pueda
+ * seguir arrastrando y borrando como cualquier otro widget.
+ */
+function WidgetSinDefinicion({
+  kind,
+  cargando,
+}: {
+  kind: string;
+  cargando: boolean;
+}) {
+  const nombre = kind.replace(/^custom:/, "");
+  return (
+    <div
+      className={`pointer-events-none flex h-full w-full flex-col items-center justify-center gap-0.5 overflow-hidden rounded border border-dashed px-1 text-center ${
+        cargando
+          ? "border-slate-300 bg-slate-100/60 text-slate-400 dark:border-navy-slate dark:bg-navy-slate/30"
+          : "border-amber-400/70 bg-amber-50/70 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+      }`}
+      title={
+        cargando
+          ? `Cargando el widget «${nombre}»…`
+          : `El widget «${nombre}» no está en el servidor. Vuelve a importar su .zip desde el panel de widgets.`
+      }
+    >
+      <span className="text-[10px] font-semibold uppercase tracking-wide">
+        {cargando ? "Cargando…" : "Sin widget"}
+      </span>
+      <span className="max-w-full truncate font-mono text-[10px]">{nombre}</span>
     </div>
   );
 }

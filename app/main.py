@@ -28,6 +28,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import (ai_routes, alarm_routes, auth_routes, crud_routes,
+                     internas_routes,
                      db_routes, escritura_routes, export_routes,
                      historian_routes, lock_routes, project_routes,
                      proyecto_routes, rest_routes, sistema_routes,
@@ -42,6 +43,7 @@ from app.core.connection_manager import ConnectionManager
 from app.core.crud_manager import CrudManager
 from app.core.db_manager import DbManager
 from app.core.escritura_store import EscrituraStore
+from app.core.internas_store import InternasStore
 from app.core.variables_store import VariablesStore
 from app.db.historian import Historizador
 from app.db.widget_store import WidgetStore
@@ -104,6 +106,13 @@ async def lifespan(app: FastAPI):
     # PLC. No se crea nada en el autómata: se reclama un hueco y se le
     # pone nombre (ver app/core/variables_store.py).
     variables_store = VariablesStore()
+
+    # Variables que NO existen en ningún PLC: viven aquí y las ven todos los
+    # paneles. Se publican con `plc="interno"`, así que para los widgets son
+    # tags como cualquier otro (ver app/core/internas_store.py).
+    internas_store = InternasStore()
+    # Para que viajen en el snapshot del WebSocket junto a los tags de campo.
+    plc_manager.usar_internas(internas_store)
     # El historizador escucha el MISMO flujo de tags que el WebSocket:
     # no abre una segunda sesión OPC UA ni añade carga al PLC.
     historizador = Historizador(db_manager, db_manager.store)
@@ -149,6 +158,7 @@ async def lifespan(app: FastAPI):
     app.state.widget_store = widget_store
     app.state.escritura_store = escritura_store
     app.state.variables_store = variables_store
+    app.state.internas_store = internas_store
     app.state.historizador = historizador
     app.state.grabador = grabador
     app.state.project_store = project_store
@@ -520,6 +530,7 @@ app.include_router(rest_routes.router, tags=["REST"])
 app.include_router(websocket_routes.router, tags=["WebSocket"])
 app.include_router(db_routes.router)
 app.include_router(crud_routes.router)
+app.include_router(internas_routes.router)
 app.include_router(widget_routes.router)
 app.include_router(escritura_routes.router)
 app.include_router(variables_routes.router)

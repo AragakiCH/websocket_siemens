@@ -393,6 +393,14 @@ export function Preview() {
   const nombreActual =
     pantallas.find((p) => p.project_id === pantallaId)?.nombre ?? pantallaId;
 
+  // Variable de cada widget por id, en O(1) (igual que en el Diseñador): con
+  // muchos widgets y muchos tags, un `find` por widget en cada dato del PLC
+  // era la parte más cara de repintar la pantalla.
+  const variablePorId = useMemo(
+    () => new Map(variables.map((v) => [v.id, v])),
+    [variables]
+  );
+
   return (
     <div className="flex h-full w-full flex-col bg-slate-200 dark:bg-navy">
 
@@ -530,9 +538,7 @@ export function Preview() {
                   <WidgetRenderer
                     widget={w}
                     variable={
-                      w.variableId
-                        ? variables.find((v) => v.id === w.variableId)
-                        : undefined
+                      w.variableId ? variablePorId.get(w.variableId) : undefined
                     }
                     // Aquí el widget se OPERA: el trend escucha el arrastre
                     // para moverse en el tiempo. En el Diseñador no, porque

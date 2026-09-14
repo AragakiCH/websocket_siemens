@@ -201,12 +201,49 @@ export function PantallasBar({ puedeEditar }: Props) {
         );
       }
 
-      // Lo que no se va a poder dibujar, dicho por su nombre. Va al aviso de
-      // error: la pantalla está importada, pero se verá incompleta.
+      if (r.variables_importadas.length > 0) {
+        partes.push(
+          `${r.variables_importadas.length} ${t('projects.importedVars')}`
+        );
+      }
+      if (r.variables_ya_existentes.length > 0) {
+        partes.push(
+          `${r.variables_ya_existentes.length} ${t('projects.importedVarsKept')}`
+        );
+      }
+
+      // Los dos avisos de problema se juntan en UNO.
+      //
+      // Antes cada uno llamaba a `setError` por su cuenta, así que si una
+      // importación traía las dos cosas —widgets que faltan y una variable
+      // con el tipo cambiado— la segunda llamada borraba a la primera y el
+      // usuario solo veía la mitad de lo que le pasaba.
+      const problemas: string[] = [];
+
+      // Las variables de tipo distinto van aquí y no al aviso de «salió
+      // bien». El widget se enlaza igual —la clave es el nombre— y enseñará
+      // algo sin sentido sin dar ningún fallo: una consigna que allí era un
+      // decimal y aquí es un sí/no. Es el único caso en que callarse hace
+      // daño.
+      if (r.variables_en_conflicto.length > 0) {
+        const detalle = r.variables_en_conflicto
+          .map((c) =>
+            c.error
+              ? `${c.nombre} (${c.error})`
+              : `${c.nombre} (aquí ${c.tipo_aqui}, en el fichero ${c.tipo_del_fichero})`
+          )
+          .join(', ');
+        problemas.push(`${t('projects.importedVarsConflict')} ${detalle}.`);
+      }
+
+      // Lo que no se va a poder dibujar: la pantalla está importada, pero se
+      // verá incompleta.
       const faltan = kindsSinDefinicion((doc.pantalla?.widgets ?? []) as any[]);
       if (faltan.length > 0) {
-        setError(`${t('projects.importedMissing')} ${faltan.join(', ')}.`);
+        problemas.push(`${t('projects.importedMissing')} ${faltan.join(', ')}.`);
       }
+
+      if (problemas.length > 0) setError(problemas.join(' '));
       setAviso(partes.join(' '));
     });
   };

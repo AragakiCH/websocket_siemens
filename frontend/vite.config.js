@@ -66,7 +66,17 @@ export default defineConfig({
       // Exportaciones (CSV/XLSX) y el asistente de IA.
       '/export': BACKEND,
       '/ai': BACKEND,
-      '/widgets': BACKEND
+      '/widgets': BACKEND,
+      // Variables INTERNAS: las que viven en el servidor y no en ningun PLC.
+      // Es la cuarta vez que esta lista se queda corta y el sintoma es
+      // siempre el mismo y siempre desconcertante: la vista ensena un 404
+      // y en el log del backend NO APARECE la peticion, porque nunca sale
+      // de Vite. Si anades un router en app/api/, anade aqui su prefijo
+      // (o deja que lo avise `tools/dev.py`, que ahora lo comprueba solo).
+      '/internas': BACKEND,
+      // Escritura en el PLC y variables sobre huecos de reserva.
+      '/escritura': BACKEND,
+      '/variables': BACKEND
       
     },
   },

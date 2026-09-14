@@ -32,6 +32,7 @@ import signal
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import List, Optional
 
@@ -141,7 +142,7 @@ def comprobar_entorno() -> bool:
     Vite— y acto seguido el frontend arranca perfectamente y empieza a
     escupir cientos de `ECONNREFUSED` que sepultan la única línea que
     importaba. Quien lo lee acaba buscando un problema de red o de puertos,
-    cuando lo que pasa es que falta un `venv\Scripts\activate`.
+    cuando lo que pasa es que falta un `venv/Scripts/activate`.
 
     Se comprueba con `find_spec`, que NO ejecuta el módulo: es rápido y no
     puede fallar por un error del propio backend, que sería otro problema
@@ -185,6 +186,76 @@ def comprobar_entorno() -> bool:
     return False
 
 
+def comprobar_proxy(puerto: int) -> None:
+    """
+    Avisa de los prefijos del backend que el proxy de Vite NO reenvia.
+
+    POR QUE EXISTE ESTA COMPROBACION
+    --------------------------------
+    Es el fallo que mas veces ha costado una tarde en este proyecto, y su
+    sintoma no orienta a nada: la vista ensena un 404 —o peor, recibe el
+    index.html de la SPA donde esperaba JSON— y en el log del backend NO
+    APARECE la peticion, porque nunca sale de Vite. Se busca el error en el
+    endpoint, en los permisos o en el fetch, y lo que falta es una linea en
+    `vite.config.js`. Los comentarios de ese fichero documentan cuatro
+    incidentes distintos, todos iguales.
+
+    Se compara con `/openapi.json`, que da las rutas FINALES —con el prefijo
+    del router ya aplicado—, en vez de leer los decoradores: asi `/pendientes`
+    de `alarm_routes` se ve como lo que es, `/alarmas/pendientes`, y no como
+    un prefijo suelto que falta.
+
+    Solo AVISA. Tocar la configuracion de Vite mientras arranca seria peor
+    que el problema: el cambio no se aplicaria hasta el siguiente reinicio y
+    nadie entenderia por que.
+    """
+    import json
+    import re
+    import urllib.request
+
+    cfg = RAIZ / "frontend" / "vite.config.js"
+    if not cfg.is_file():
+        return
+    try:
+        proxy = set(re.findall(r"^\s*'(/[a-z_]+)'\s*:", cfg.read_text(encoding="utf-8"), re.M))
+    except Exception:  # noqa: BLE001
+        return
+
+    # El backend tarda un poco en levantar: se reintenta unas cuantas veces
+    # antes de rendirse. Si no responde, no se dice nada — de eso ya avisa
+    # `comprobar_entorno()`, y dos quejas por lo mismo son ruido.
+    datos = None
+    for _ in range(20):
+        try:
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{puerto}/openapi.json", timeout=1.5
+            ) as r:
+                datos = json.loads(r.read().decode("utf-8"))
+                break
+        except Exception:  # noqa: BLE001
+            time.sleep(0.5)
+    if not datos:
+        return
+
+    prefijos = {"/" + p.split("/")[1] for p in datos.get("paths", {})
+                if p.startswith("/") and len(p.split("/")) > 1 and p != "/"}
+    faltan = sorted(p for p in prefijos - proxy if not p.startswith("/{"))
+    if not faltan:
+        return
+
+    _log("", "")
+    _log("Estos endpoints del backend NO pasan por el proxy de Vite:", AMARILLO)
+    for p in faltan:
+        _log(f"    {p}", AMARILLO)
+    _log("Las peticiones a esas rutas no saldran de Vite: la vista recibira", GRIS)
+    _log("un 404 (o el index.html de la SPA) y en el log del backend no", GRIS)
+    _log("aparecera nada, porque la peticion nunca llega.", GRIS)
+    _log("Anadelas en frontend/vite.config.js -> server.proxy:", AMARILLO)
+    for p in faltan:
+        _log(f"    '{p}': BACKEND,", VERDE)
+    _log("", "")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Arranca backend y frontend juntos en una sola terminal."
@@ -215,6 +286,11 @@ def main() -> int:
         cwd=RAIZ, etiqueta="backend", color=AZUL,
     )
     procesos.append((backend, "backend"))
+
+    # En un hilo aparte: espera a que el backend responda y compara sus rutas
+    # con las que el proxy reenvia. No puede bloquear el arranque de Vite.
+    threading.Thread(target=comprobar_proxy, args=(args.puerto,),
+                     daemon=True).start()
 
     # ---------------- Frontend ---------------- #
     if not args.solo_backend:

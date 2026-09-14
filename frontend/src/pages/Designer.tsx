@@ -21,7 +21,8 @@ import {
   GroupIcon,
   UngroupIcon,
   PaletteIcon,
-  UsersIcon } from
+  UsersIcon,
+  VariableIcon } from
 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { HmiWidget, WidgetKind, defaultStyle } from '../models/widget';
@@ -56,6 +57,7 @@ import { useLock } from '../hooks/useLock';
 import { recursoDisenador } from '../services/lockApi';
 import { FlowEditor } from '../components/flows/FlowEditor';
 import { AlarmsEditor } from '../components/alarms/AlarmsEditor';
+import { VariablesInternas } from '../components/variables/VariablesInternas';
 import { RecipesEditor } from '../components/recipes/RecipesEditor';
 import { PanelExportar } from '../components/export/PanelExportar';
 import { PantallasBar } from '../components/hmi/PantallasBar';
@@ -74,7 +76,13 @@ import {
   VISTA_TODAS } from
 '../components/hmi/custom/navegacion/store';
 
-type DesignerTab = 'designer' | 'flows' | 'alarms' | 'recipes' | 'export';
+type DesignerTab =
+  | 'designer'
+  | 'flows'
+  | 'alarms'
+  | 'recipes'
+  | 'variables'
+  | 'export';
 
 let counter = 1;
 
@@ -332,13 +340,23 @@ export function Designer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cargada, lienzoDe, projectId]);
 
-  // Caché local, inmediata: si se recarga la página no se pierde nada.
+  // Caché local: si se recarga la página se pinta al instante lo último.
+  //
+  // Con un pequeño debounce, y no en cada render. Arrastrar un widget son
+  // decenas de cambios por segundo, y cada uno era un `JSON.stringify` del
+  // diseño ENTERO (con sus imágenes en data-URI dentro) más una escritura en
+  // `localStorage`. Con diez widgets no se nota; con cien y un fondo de
+  // imagen, el arrastre iba a tirones. El servidor ya se guarda con su
+  // propio debounce justo debajo; la caché no tiene por qué ir más deprisa.
   useEffect(() => {
     if (!listo) return;
-    saveDesign(
-      { widgets, canvas: { width: canvasW, height: canvasH, fondo: canvasBg || undefined } },
-      projectId
-    );
+    const id = setTimeout(() => {
+      saveDesign(
+        { widgets, canvas: { width: canvasW, height: canvasH, fondo: canvasBg || undefined } },
+        projectId
+      );
+    }, 250);
+    return () => clearTimeout(id);
   }, [listo, widgets, canvasW, canvasH, canvasBg, projectId]);
 
   // Guardado al SERVIDOR, con debounce de 400 ms: es lo que ven los demás.
@@ -534,6 +552,14 @@ export function Designer() {
     [widgets, seleccion]
   );
   const puedeAgrupar = puedeEditar && raicesSel.length >= 2;
+
+  // Variable de cada widget por id, en O(1). Antes era un `variables.find`
+  // por widget y por render: con cien widgets y dos mil tags del PLC son
+  // doscientas mil comparaciones cada vez que llega un dato.
+  const variablePorId = useMemo(
+    () => new Map(variables.map((v) => [v.id, v])),
+    [variables]
+  );
 
   // Desagrupar necesita UN contenedor con hijos, no una selección cualquiera.
   const contenedorSel =
@@ -930,6 +956,17 @@ export function Designer() {
             >
               <BookOpenIcon className="h-3.5 w-3.5" />
               Recetas
+            </button>
+            <button
+              onClick={() => setActiveTab('variables')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition ${
+                activeTab === 'variables'
+                  ? 'bg-white text-navy shadow-sm dark:bg-navy-slate dark:text-slate-100'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+              }`}
+            >
+              <VariableIcon className="h-3.5 w-3.5" />
+              Variables
             </button>
             <button
               onClick={() => setActiveTab('export')}
@@ -1376,6 +1413,8 @@ export function Designer() {
         <AlarmsEditor />
       ) : activeTab === 'recipes' ? (
         <RecipesEditor />
+      ) : activeTab === 'variables' ? (
+        <VariablesInternas />
       ) : activeTab === 'export' ? (
         <PanelExportar />
       ) : activeTab === 'designer' ? (
@@ -1438,11 +1477,7 @@ export function Designer() {
               title={suya ? undefined : `Pertenece a la sección «${w.vista}»`}>
             <CanvasWidget
               widget={w}
-              variable={
-              w.variableId ?
-              variables.find((v) => v.id === w.variableId) :
-              undefined
-              }
+              variable={w.variableId ? variablePorId.get(w.variableId) : undefined}
               selected={seleccion.includes(w.id)}
               onSelect={alSeleccionar}
               // Mover pasa SIEMPRE por moverSeleccion, tambien un widget

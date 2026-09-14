@@ -144,6 +144,22 @@ export function apiPatch<T = any>(ruta: string, cuerpo?: any): Promise<T> {
   });
 }
 
+/**
+ * PUT: sustituir un recurso por completo.
+ *
+ * Se usa donde la operacion REEMPLAZA en vez de retocar — el valor de una
+ * variable interna, por ejemplo: no se "parchea" un valor, se pone otro. Que
+ * ademas sea idempotente importa, porque estas llamadas salen de mover un
+ * interruptor y un doble clic no debe dejar nada a medias.
+ */
+export function apiPut<T = any>(ruta: string, cuerpo?: any): Promise<T> {
+  return pedir<T>(ruta, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(cuerpo ?? {}),
+  });
+}
+
 export function apiDelete<T = any>(ruta: string): Promise<T> {
   return pedir<T>(ruta, { method: 'DELETE' });
 }
