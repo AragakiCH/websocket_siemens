@@ -21,8 +21,9 @@
 // encontró. Elegir uno al azar sería peor: el widget cargaría con la mitad
 // equivocada y el autor no tendría forma de saberlo.
 //
-// Los widgets cargados se persisten en localStorage y se integran
-// automáticamente en el catálogo del Designer.
+// Los widgets cargados viven en el SERVIDOR; en esta pestaña se leen de
+// MEMORIA y se cachean en IndexedDB entre arranques (ver «Persistencia», más
+// abajo). Se integran automáticamente en el catálogo del Designer.
 //
 // El HTML recibe datos del PLC mediante CSS custom properties y
 // placeholders de texto:
@@ -60,9 +61,7 @@ import JSZip from 'jszip';
 import { DataType } from '../models/plc';
 import { TIPOS_VALIDOS, esTipoValido } from '../utils/widgetBinding';
 import { RE_NOMBRE_ENLACE, type DeclaracionEnlace } from '../utils/enlaces';
-import { fetchAuth } from './authApi';
-
-const STORAGE_KEY = 'hmi.custom-html-widgets';
+import { getToken } from './authApi';
 
 // ---- Tipos públicos --------------------------------------------------- //
 
@@ -93,14 +92,8 @@ export interface ZipWidgetMeta {
    * una sola variable no se puede girar a la velocidad de una mientras se
    * pinta de rojo por otra.
    *
-   * El Diseñador las pide una por una, con su nombre y filtrando por tipo, y
-   * llegan al widget como `WIDGET.vars.<id>` y como variables CSS
+   * Llegan al widget como `WIDGET.vars.<id>` y como variables CSS
    * `--w-<id>-on`, `--w-<id>-frac` y `--w-<id>-value`.
-   *
-   *   "variables": [
-   *     { "id": "velocidad", "label": "Velocidad", "accepts": ["double"] },
-   *     { "id": "fallo", "label": "Fallo", "accepts": ["bool"] }
-   *   ]
    *
    * Ausente = el widget solo usa la principal, como siempre.
    */
@@ -112,6 +105,13 @@ export interface ZipWidget {
   html: string;
   css: string;
   js: string;
+  /**
+   * Sello del servidor (`actualizado_en` del fichero JSON). Sirve para saber,
+   * al arrancar, si la copia en caché sigue siendo la buena sin bajarse el
+   * HTML otra vez. `undefined` en un widget recién importado desde aquí o
+   * venido de la caché antigua: se tratará como «hay que refrescarlo».
+   */
+  actualizado_en?: string;
 }
 
 // ---- Validación del widget.json --------------------------------------- //
@@ -339,21 +339,264 @@ export async function parseWidgetZip(file: File): Promise<ZipWidget> {
 
 // ---- Persistencia ------------------------------------------------------ //
 //
-// La fuente de verdad es el SERVIDOR (`/widgets`), no `localStorage`.
+// La fuente de verdad es el SERVIDOR (`/widgets`). En esta pestaña, la copia
+// que se lee es la MEMORIA (`catalogo`). Y la caché entre arranques es
+// IndexedDB. `localStorage` YA NO SE USA para esto.
 //
-// Antes vivían solo en `localStorage` y eso se rompía de tres formas:
-//   1. Al cerrar la aplicación de escritorio el widget aparecía vacío: el
-//      diseño venía del servidor (por eso la caja seguía ahí) pero la
-//      definición se había perdido con el almacenamiento del navegador.
-//   2. La vista previa abierta en otro navegador salía vacía: otro navegador
-//      es otro `localStorage`, y ahí esa definición nunca existió.
-//   3. Con varios usuarios, el widget que importaba uno era invisible para
-//      los demás.
+// POR QUÉ SE FUE DE localStorage — LOS «WIDGETS TRANSPARENTES»
 //
-// `localStorage` se conserva como CACHÉ, por dos motivos: el catálogo se lee
-// de forma SÍNCRONA en varios sitios (registry, widgetCatalog, sidebar) y
-// convertirlos a async sería un refactor grande; y además permite que el
-// diseñador siga dibujando si el servidor tarda o se cae un momento.
+// Aquí vivía el catálogo entero en UNA clave de `localStorage`:
+// `JSON.stringify(todos los widgets)`. Con dos o tres widgets, nada. Con 50
+// widgets (cada uno con su HTML, su CSS, su JS, sus SVG en línea...) más las
+// copias de las pantallas que también se guardan ahí, esa clave pasaba de
+// los ~5 MB que Chromium/WebView2 concede a TODO el origen. Y entonces
+// `setItem` lanzaba `QuotaExceededError`... dentro de un `catch {}` vacío.
+//
+// El efecto era exactamente el que se veía en planta: se cerraba la
+// aplicación de escritorio, se volvía a abrir, y los widgets salían
+// TRANSPARENTES. La caja seguía en su sitio (el diseño viene del servidor),
+// pero al arrancar `sincronizarWidgets()` no conseguía guardar el catálogo,
+// `loadZipWidgets()` leía una clave vacía o vieja, `zipByKind()` no
+// encontraba la definición y `WidgetRenderer` pintaba `null`: un hueco con el
+// fondo del widget, que casi siempre es transparente. Ni un error en ningún
+// sitio. Con 5 widgets no pasaba nunca y con 50 pasaba siempre, que es la
+// firma de una cuota.
+//
+// Encima, cada lectura (`zipByKind` en CADA render de CADA widget) hacía
+// `JSON.parse` del catálogo entero. Con 50 widgets y valores del PLC
+// llegando varias veces por segundo, eran cientos de parseos de megas por
+// segundo: por eso el Diseñador iba cada vez más a tirones al crecer.
+//
+// LO QUE HAY AHORA, POR CAPAS
+//
+//   MEMORIA    `catalogo: Map<kind, ZipWidget>`. Es lo que leen el registry,
+//              el catálogo del panel y el lienzo, de forma SÍNCRONA y en
+//              O(1). No hay cuota ni parseo.
+//   IndexedDB  Caché entre arranques. Su cuota se mide en cientos de MB, no
+//              en 5. Sirve para PINTAR AL INSTANTE al abrir (antes de que el
+//              servidor conteste) y para seguir dibujando si el servidor se
+//              cae un momento. Si falla (navegador raro, disco lleno), no
+//              pasa nada: el servidor sigue teniendo la verdad.
+//   SERVIDOR   Manda siempre. Al arrancar se pide el resumen (sin contenido,
+//              unos bytes por widget), se compara con la caché por
+//              `actualizado_en`, y solo se descargan los que cambiaron. Con
+//              100 widgets y ninguno cambiado, el arranque no mueve ni un KB
+//              de HTML por la red.
+//
+// Y si al final no hay definición para un `custom:` que está en el diseño,
+// `WidgetRenderer` ya no pinta `null`: pinta un marcador que dice cuál falta.
+// Un fallo que se ve se arregla; uno transparente se sufre.
+
+/** Base de datos y almacén de IndexedDB. Un solo registro con todo. */
+const IDB_NOMBRE = 'psi-core';
+const IDB_ALMACEN = 'widgets-zip';
+const IDB_CLAVE = 'catalogo';
+
+/**
+ * La clave de `localStorage` de ANTES. Solo se lee una vez, para migrar lo
+ * que hubiera, y se borra: liberar esos megas es parte del arreglo, porque
+ * la cuota es de todo el origen y esa clave se la comía.
+ */
+const STORAGE_KEY_ANTIGUA = 'hmi.custom-html-widgets';
+
+/** Sin prefijo `custom:`. Es la llave del mapa y del fichero en el servidor. */
+function kindLimpio(kind: string): string {
+  return (kind || '').replace(/^custom:/, '');
+}
+
+// ---- Memoria ------------------------------------------------------------ //
+
+let catalogo = new Map<string, ZipWidget>();
+
+/**
+ * `true` cuando ya se sabe lo que hay: contestó el servidor, o se leyó la
+ * caché, o las dos cosas fallaron y no hay más de dónde tirar. Mientras es
+ * `false`, un `custom:` sin definición está CARGANDO, no perdido — y el
+ * lienzo lo pinta distinto.
+ */
+let listo = false;
+
+/** Lee el catálogo en memoria. Síncrono y barato: es un `Map`. */
+export function loadZipWidgets(): ZipWidget[] {
+  return Array.from(catalogo.values());
+}
+
+/** Busca uno por `kind`, con o sin prefijo `custom:`. O(1). */
+export function zipWidgetPorKind(kind: string): ZipWidget | undefined {
+  return catalogo.get(kindLimpio(kind));
+}
+
+/** ¿Ya se sabe qué widgets hay? Ver `listo`. */
+export function catalogoListo(): boolean {
+  return listo;
+}
+
+/**
+ * Evento que se emite cada vez que cambia el catálogo de widgets
+ * personalizados.
+ *
+ * POR QUÉ HACE FALTA
+ * El catálogo se lee de MEMORIA de forma SÍNCRONA (`loadZipWidgets`) desde
+ * el registry, el catálogo del panel y el lienzo. Eso es lo que permite
+ * dibujar un widget importado sin esperas... y también lo que hace que React
+ * no se entere solo cuando el catálogo cambia a media sesión: un `Map` de
+ * módulo no es estado de React.
+ *
+ * Lo escuchan el AppStore (que sube `widgetsVersion` y con eso se repinta el
+ * lienzo entero) y el panel de widgets. Se dispara al llegar la caché, al
+ * contestar el servidor, al importar un `.zip`, al borrar uno y al importar
+ * un proyecto que trae los suyos.
+ */
+export const EVENTO_WIDGETS = 'hmi:widgets-personalizados';
+
+function avisar(): void {
+  try {
+    window.dispatchEvent(new CustomEvent(EVENTO_WIDGETS));
+  } catch {
+    /* sin `window` (pruebas, SSR): no hay a quién avisar */
+  }
+}
+
+function fijarCatalogo(widgets: ZipWidget[]): void {
+  const nuevo = new Map<string, ZipWidget>();
+  for (const w of widgets) {
+    const k = kindLimpio(w?.meta?.kind);
+    if (k) nuevo.set(k, w);
+  }
+  catalogo = nuevo;
+  listo = true;
+  avisar();
+}
+
+// ---- IndexedDB ----------------------------------------------------------- //
+
+function abrirIdb(): Promise<IDBDatabase | null> {
+  return new Promise((resolve) => {
+    try {
+      if (typeof indexedDB === 'undefined') return resolve(null);
+      const req = indexedDB.open(IDB_NOMBRE, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(IDB_ALMACEN)) {
+          db.createObjectStore(IDB_ALMACEN);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+      req.onblocked = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+async function leerCache(): Promise<ZipWidget[] | null> {
+  const db = await abrirIdb();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(IDB_ALMACEN, 'readonly');
+      const req = tx.objectStore(IDB_ALMACEN).get(IDB_CLAVE);
+      req.onsuccess = () => {
+        const v = req.result;
+        resolve(Array.isArray(v) ? (v as ZipWidget[]) : null);
+      };
+      req.onerror = () => resolve(null);
+      tx.oncomplete = () => db.close();
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+async function escribirCache(widgets: ZipWidget[]): Promise<void> {
+  const db = await abrirIdb();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    try {
+      const tx = db.transaction(IDB_ALMACEN, 'readwrite');
+      tx.objectStore(IDB_ALMACEN).put(widgets, IDB_CLAVE);
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
+
+/**
+ * Lo que hubiera en `localStorage` de la versión anterior. Se lee UNA vez y
+ * se borra la clave (ver `STORAGE_KEY_ANTIGUA`).
+ */
+function migrarCacheAntigua(): ZipWidget[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_ANTIGUA);
+    if (!raw) return [];
+    let lista: ZipWidget[] = [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) lista = parsed as ZipWidget[];
+    } catch {
+      /* JSON roto: se descarta, la caché nueva se rellenará del servidor */
+    }
+    localStorage.removeItem(STORAGE_KEY_ANTIGUA);
+    return lista;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Guarda el catálogo: memoria ahora, IndexedDB después. Avisa al resto de la
+ * aplicación (ver `EVENTO_WIDGETS`) aunque la caché fallara: lo que se acaba
+ * de recibir YA está en memoria, que es lo que se pinta.
+ */
+export function saveZipWidgets(widgets: ZipWidget[]): void {
+  fijarCatalogo(widgets);
+  void escribirCache(widgets);
+}
+
+// ---- Servidor ------------------------------------------------------------ //
+
+/**
+ * Cabeceras con el token de sesión, si lo hay.
+ *
+ * ANTES ESTAS PETICIONES IBAN SIN TOKEN. `GET /widgets` es público y no se
+ * notaba, pero `PUT` y `DELETE` exigen Administrador: en cuanto había cuentas
+ * creadas, importar un `.zip` devolvía «Necesitas iniciar sesión» aunque la
+ * sesión estuviera abierta. No se usa `fetchAuth` directamente porque ese
+ * helper convierte cualquier 401 en un cierre de sesión global, y un `GET`
+ * público que rebote no debería tumbar la sesión de nadie.
+ */
+function cabeceras(extra: Record<string, string> = {}): Record<string, string> {
+  const token = getToken();
+  const h: Record<string, string> = { ...extra };
+  if (token) h.Authorization = `Bearer ${token}`;
+  return h;
+}
+
+async function pedirJson(url: string, init: RequestInit = {}): Promise<any> {
+  const r = await fetch(url, {
+    ...init,
+    headers: cabeceras((init.headers as Record<string, string>) ?? {}),
+  });
+  if (!r.ok) {
+    let detalle = `Error ${r.status}`;
+    try {
+      detalle = (await r.json()).detail ?? detalle;
+    } catch {
+      /* respuesta sin JSON */
+    }
+    const err = new Error(detalle) as Error & { status?: number };
+    err.status = r.status;
+    throw err;
+  }
+  return r.json();
+}
 
 /** Convierte la respuesta del servidor al formato que usa el frontend. */
 function desdeServidor(w: any): ZipWidget {
@@ -362,74 +605,159 @@ function desdeServidor(w: any): ZipWidget {
     html: w.html ?? '',
     css: w.css ?? '',
     js: w.js ?? '',
+    actualizado_en: w.actualizado_en || undefined,
   } as ZipWidget;
 }
 
-/** Lee la caché local. Síncrono a propósito (ver comentario de arriba). */
-export function loadZipWidgets(): ZipWidget[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as ZipWidget[];
-  } catch {
-    return [];
-  }
-}
-
 /**
- * Evento que se emite cada vez que cambia el catálogo de widgets
- * personalizados.
- *
- * POR QUÉ HACE FALTA
- * El catálogo se lee de `localStorage` de forma SÍNCRONA (`loadZipWidgets`)
- * desde el registry, el catálogo del panel y el lienzo. Eso es lo que permite
- * dibujar un widget importado sin esperas... y también lo que hace que nadie
- * se entere cuando el catálogo cambia a media sesión: React no puede
- * suscribirse a `localStorage` de esta pestaña.
- *
- * Mientras el catálogo solo cambiaba al subir un `.zip` desde el propio panel
- * no se notaba: ese componente refrescaba su estado a mano, justo ahí. Pero al
- * IMPORTAR UN PROYECTO llegan widgets nuevos desde otro sitio, y sin este
- * aviso el resultado era desconcertante: el servidor los tenía, el proyecto
- * los usaba, y en pantalla salían cajas vacías hasta recargar la página.
+ * Cuántos widgets cambiados justifican pedirlos uno a uno. A partir de aquí
+ * (primer arranque, caché vacía, reinstalación) sale más a cuenta UNA
+ * petición con todo que cien pequeñas.
  */
-export const EVENTO_WIDGETS = 'hmi:widgets-personalizados';
+const MAX_PETICIONES_SUELTAS = 12;
 
-export function saveZipWidgets(widgets: ZipWidget[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets));
-  } catch {
-    // Cuota llena: no es fatal, el servidor sigue teniendo la verdad.
+/** Descargas en paralelo al pedir widgets sueltos. */
+const PARALELO = 6;
+
+/**
+ * Trae del servidor SOLO lo que no esté ya igual en memoria.
+ *
+ *   1. `GET /widgets` (resumen, sin contenido): kind + `actualizado_en`.
+ *   2. Lo que coincide con la memoria se reutiliza tal cual.
+ *   3. Lo demás se pide con `GET /widgets/{kind}`, unos cuantos a la vez; o
+ *      todo de golpe con `?con_contenido=true` si son muchos.
+ *
+ * Devuelve el catálogo completo tal y como debe quedar.
+ */
+async function traerDelServidor(): Promise<ZipWidget[]> {
+  const resumen = await pedirJson('/widgets');
+  const lista: any[] = resumen.widgets ?? [];
+
+  const resultado: ZipWidget[] = [];
+  const pendientes: string[] = [];
+  for (const r of lista) {
+    const k = kindLimpio(r.kind);
+    const enMemoria = catalogo.get(k);
+    if (
+      enMemoria &&
+      enMemoria.actualizado_en &&
+      r.actualizado_en &&
+      enMemoria.actualizado_en === r.actualizado_en
+    ) {
+      resultado.push(enMemoria);
+    } else {
+      pendientes.push(k);
+    }
   }
-  // Fuera del try: aunque no se haya podido guardar en la caché, los widgets
-  // que se acaban de recibir YA están en memoria del resto de la aplicación,
-  // y avisar es lo que hace que se pinten.
-  try {
-    window.dispatchEvent(new CustomEvent(EVENTO_WIDGETS));
-  } catch {
-    /* sin `window` (pruebas, SSR): no hay a quién avisar */
+
+  if (pendientes.length === 0) return resultado;
+
+  if (pendientes.length > MAX_PETICIONES_SUELTAS) {
+    const todo = await pedirJson('/widgets?con_contenido=true');
+    return (todo.widgets ?? []).map(desdeServidor);
   }
+
+  // Pocos: se piden sueltos, de `PARALELO` en `PARALELO`.
+  const cola = [...pendientes];
+  const traidos: ZipWidget[] = [];
+  await Promise.all(
+    Array.from({ length: Math.min(PARALELO, cola.length) }, async () => {
+      while (cola.length > 0) {
+        const k = cola.shift()!;
+        try {
+          const d = await pedirJson(`/widgets/${encodeURIComponent(k)}`);
+          if (d?.widget) traidos.push(desdeServidor(d.widget));
+        } catch (e) {
+          // Un 404 aquí es que lo borraron entre el resumen y ahora: fuera.
+          // Cualquier otra cosa: se conserva lo que hubiera en memoria antes
+          // que dejar un hueco.
+          const st = (e as { status?: number })?.status;
+          const previo = catalogo.get(k);
+          if (st !== 404 && previo) traidos.push(previo);
+        }
+      }
+    })
+  );
+  return [...resultado, ...traidos];
+}
+
+let hidratacion: Promise<void> | null = null;
+let sincronizacion: Promise<ZipWidget[]> | null = null;
+let escuchandoCambios = false;
+
+/**
+ * Primera carga desde la caché (IndexedDB, o el `localStorage` antiguo si es
+ * la primera vez tras actualizar). Solo tiene efecto una vez, y solo si el
+ * servidor no ha contestado ya: lo suyo es pintar al instante lo último
+ * conocido y dejar que el servidor lo corrija, no al revés.
+ */
+function hidratarDesdeCache(): Promise<void> {
+  if (!hidratacion) {
+    hidratacion = (async () => {
+      const antigua = migrarCacheAntigua();
+      let lista = await leerCache();
+      if ((!lista || lista.length === 0) && antigua.length > 0) {
+        lista = antigua;
+        void escribirCache(antigua);
+      }
+      // Si el servidor ya contestó mientras se leía el disco, manda él.
+      if (listo) return;
+      if (lista && lista.length > 0) fijarCatalogo(lista);
+    })();
+  }
+  return hidratacion;
 }
 
 /**
- * Trae los widgets del servidor y refresca la caché.
+ * Cuando OTRO cliente importa o borra un widget, el servidor difunde
+ * `config.updated` con `recurso: "widgets"` por el WebSocket (ver
+ * `widget_routes._avisar`). Sin esto, el diseñador de al lado seguiría con
+ * el catálogo viejo hasta recargar.
+ */
+function escucharCambiosRemotos(): void {
+  if (escuchandoCambios || typeof window === 'undefined') return;
+  escuchandoCambios = true;
+  window.addEventListener('hmi:ws', ((ev: CustomEvent) => {
+    const msg = ev.detail;
+    if (msg?.type === 'config.updated' && msg.recurso === 'widgets') {
+      void sincronizarWidgets();
+    }
+  }) as EventListener);
+}
+
+/**
+ * Pone el catálogo al día con el servidor.
  *
- * Se llama al arrancar el Diseñador y la Vista previa. Si el servidor no
- * responde se deja la caché como está: es mejor dibujar con lo último
- * conocido que quedarse en blanco.
+ * Se llama al arrancar (AppStore), al cambiar de proyecto y al importar uno.
+ * Varias llamadas a la vez comparten UNA petición. Si el servidor no
+ * responde se deja lo que haya (caché o memoria): es mejor dibujar con lo
+ * último conocido que quedarse en blanco — y si tampoco hay caché, se marca
+ * `listo` igualmente para que el lienzo deje de decir «cargando» y diga la
+ * verdad: que no hay definición.
  */
 export async function sincronizarWidgets(): Promise<ZipWidget[]> {
-  try {
-    // fetchAuth y no fetch: con PLC_AUTH_REQUERIDA=true el servidor rechaza
-    // una petición sin token, y sin esto el catálogo se quedaba en la caché
-    // local sin decir por qué.
-    const data = await fetchAuth('/widgets?con_contenido=true');
-    const widgets: ZipWidget[] = (data.widgets ?? []).map(desdeServidor);
-    saveZipWidgets(widgets);
-    return widgets;
-  } catch {
-    return loadZipWidgets();
-  }
+  escucharCambiosRemotos();
+  if (sincronizacion) return sincronizacion;
+
+  sincronizacion = (async () => {
+    // Primero lo que hay en disco, para pintar ya. Es rápido (una lectura
+    // local) y no bloquea la petición al servidor más que unos milisegundos.
+    await hidratarDesdeCache();
+    try {
+      const widgets = await traerDelServidor();
+      saveZipWidgets(widgets);
+      return widgets;
+    } catch {
+      if (!listo) {
+        listo = true;
+        avisar();
+      }
+      return loadZipWidgets();
+    } finally {
+      sincronizacion = null;
+    }
+  })();
+  return sincronizacion;
 }
 
 /**
@@ -438,46 +766,50 @@ export async function sincronizarWidgets(): Promise<ZipWidget[]> {
  * y volvería a perderlo al cerrar — que es justo el fallo que esto arregla.
  */
 export async function addZipWidget(widget: ZipWidget): Promise<ZipWidget[]> {
-  const kind = widget.meta.kind;
-  // Guardar un widget exige rol Administradores en el backend, así que la
-  // petición TIENE que llevar el token. Con `fetch` a secas llegaba anónima y
-  // el servidor respondía "necesitas iniciar sesión" por muy iniciada que
-  // estuviera — el usuario salía y volvía a entrar, y le pasaba lo mismo.
-  // fetchAuth pone la cabecera, el Content-Type y traduce el error.
-  try {
-    await fetchAuth(`/widgets/${encodeURIComponent(kind)}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        nombre: widget.meta.label ?? kind,
-        html: widget.html,
-        css: widget.css ?? '',
-        js: widget.js ?? '',
-        meta: widget.meta,
-      }),
-    });
-  } catch (e: any) {
-    throw new Error(
-      `No se pudo guardar en el servidor: ${e?.message ?? 'error desconocido'}`
-    );
+  const kind = kindLimpio(widget.meta.kind);
+  const r = await fetch(`/widgets/${encodeURIComponent(kind)}`, {
+    method: 'PUT',
+    headers: cabeceras({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      nombre: widget.meta.label ?? kind,
+      html: widget.html,
+      css: widget.css ?? '',
+      js: widget.js ?? '',
+      meta: widget.meta,
+    }),
+  });
+
+  if (!r.ok) {
+    let detalle = `Error ${r.status}`;
+    try {
+      detalle = (await r.json()).detail ?? detalle;
+    } catch {
+      /* respuesta sin JSON */
+    }
+    throw new Error(`No se pudo guardar en el servidor: ${detalle}`);
   }
 
-  const actuales = loadZipWidgets().filter((w) => w.meta.kind !== kind);
-  actuales.push(widget);
+  // Sin `actualizado_en` a propósito: la próxima sincronización lo verá como
+  // «distinto» y lo traerá del servidor con su fecha real. Es una petición
+  // de más, una vez, a cambio de no inventarse una fecha.
+  const actuales = loadZipWidgets().filter((w) => kindLimpio(w.meta.kind) !== kind);
+  actuales.push({ ...widget, actualizado_en: undefined });
   saveZipWidgets(actuales);
   return actuales;
 }
 
 export async function removeZipWidget(kind: string): Promise<ZipWidget[]> {
-  const limpio = kind.replace(/^custom:/, '');
+  const limpio = kindLimpio(kind);
   try {
-    await fetchAuth(`/widgets/${encodeURIComponent(limpio)}`, { method: 'DELETE' });
+    await fetch(`/widgets/${encodeURIComponent(limpio)}`, {
+      method: 'DELETE',
+      headers: cabeceras(),
+    });
   } catch {
     // Si el servidor no responde se quita igualmente de la caché; la próxima
     // sincronización lo devolverá y quedará claro que no se borró de verdad.
   }
-  const actuales = loadZipWidgets().filter(
-    (w) => w.meta.kind !== limpio && w.meta.kind !== kind
-  );
+  const actuales = loadZipWidgets().filter((w) => kindLimpio(w.meta.kind) !== limpio);
   saveZipWidgets(actuales);
   return actuales;
 }

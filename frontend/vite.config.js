@@ -67,13 +67,15 @@ export default defineConfig({
       '/export': BACKEND,
       '/ai': BACKEND,
       '/widgets': BACKEND,
-      // Escritura al PLC, variables internas del HMI y el catálogo de
-      // variables. Sin estas tres líneas, en `npm run dev` las peticiones se
-      // las queda Vite y responde el index.html de la SPA: el front recibe
-      // HTML donde espera JSON y parece que "no escribe", con el backend
-      // funcionando perfectamente. Es el mismo 404 que tuvo '/widgets'.
-      '/escritura': BACKEND,
+      // Variables INTERNAS: las que viven en el servidor y no en ningun PLC.
+      // Es la cuarta vez que esta lista se queda corta y el sintoma es
+      // siempre el mismo y siempre desconcertante: la vista ensena un 404
+      // y en el log del backend NO APARECE la peticion, porque nunca sale
+      // de Vite. Si anades un router en app/api/, anade aqui su prefijo
+      // (o deja que lo avise `tools/dev.py`, que ahora lo comprueba solo).
       '/internas': BACKEND,
+      // Escritura en el PLC y variables sobre huecos de reserva.
+      '/escritura': BACKEND,
       '/variables': BACKEND
       
     },

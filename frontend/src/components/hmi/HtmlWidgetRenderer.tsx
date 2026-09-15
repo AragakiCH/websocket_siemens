@@ -359,7 +359,30 @@ window.WIDGET = {
   // Escotilla para el autor del widget que prefiera decirlo explícitamente.
   window.WIDGET_MODAL = function (v) { avisar(!!v); };
 
-  new MutationObserver(pedirRevision).observe(document.documentElement, {
+  // Solo interesan los cambios que pueden hacer aparecer o desaparecer un
+  // elemento: atributos, o nodos ELEMENTO que entran o salen. Un cambio de
+  // texto (el bridge escribiendo el valor del PLC en un span, varias veces
+  // por segundo) no puede abrir un modal, y sin este filtro cada uno de esos
+  // cambios recorria hasta 500 nodos con getComputedStyle. Con un widget no
+  // se nota; con cien en la misma pantalla, si.
+  function relevante(registros) {
+    for (var i = 0; i < registros.length; i++) {
+      var m = registros[i];
+      if (m.type === 'attributes') return true;
+      var j;
+      for (j = 0; j < m.addedNodes.length; j++) {
+        if (m.addedNodes[j].nodeType === 1) return true;
+      }
+      for (j = 0; j < m.removedNodes.length; j++) {
+        if (m.removedNodes[j].nodeType === 1) return true;
+      }
+    }
+    return false;
+  }
+
+  new MutationObserver(function (registros) {
+    if (relevante(registros)) pedirRevision();
+  }).observe(document.documentElement, {
     subtree: true, childList: true, attributes: true,
     attributeFilter: ['hidden', 'style', 'class', 'open'],
   });

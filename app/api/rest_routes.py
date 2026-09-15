@@ -27,6 +27,7 @@ from typing import Optional
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app.core.internas_store import PLC_INTERNO
 from app.api.auth_routes import exigir_rol, usuario_de
 from app.core.auth_manager import Sesion
 
@@ -265,7 +266,24 @@ async def redescubrir(
     }}}}},
 )
 async def tags(request: Request, plc: Optional[str] = None) -> dict:
-    return {"plc": plc, "tags": request.app.state.plc_manager.get_tags(plc)}
+    lista = request.app.state.plc_manager.get_tags(plc)
+
+    # Las variables INTERNAS se mezclan aquí, y esta línea es la que hace que
+    # todo lo demás funcione sin tocarse.
+    #
+    # No existen en ningún PLC —viven en el servidor— pero se publican con
+    # `plc="interno"` y exactamente la misma forma que un tag de campo. Al
+    # entrar por `GET /tags`, el selector de variables del inspector, la
+    # tendencia, el motor de alarmas y cualquier widget subido por ZIP las
+    # ven y las tratan como a las demás, porque para ellos no hay diferencia.
+    #
+    # Se respeta el filtro `?plc=`: pedir los tags de `PLC_2` no debe traer
+    # variables internas, y pedir `?plc=interno` trae solo esas.
+    internas = getattr(request.app.state, "internas_store", None)
+    if internas is not None and plc in (None, PLC_INTERNO):
+        lista = lista + internas.tags()
+
+    return {"plc": plc, "tags": lista}
 
 
 @router.get(

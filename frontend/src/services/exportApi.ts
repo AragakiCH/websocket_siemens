@@ -28,6 +28,7 @@
 // el error que es, porque así reporta el backend casi todo.
 // =========================================================================
 import { getToken } from './authApi';
+import { descargarBlob } from '../utils/descargas';
 
 /**
  * Origen del backend. Vacío = rutas relativas, que es lo normal:
@@ -248,22 +249,11 @@ async function descargarXlsx(ruta: string, respaldo: string): Promise<string> {
   const blob = await resp.blob();
   const nombre = nombreDeCabecera(resp.headers.get('Content-Disposition')) || respaldo;
 
-  // El objeto URL se revoca SIEMPRE, aunque el clic falle: cada blob sin
-  // revocar se queda en memoria hasta que se recargue la pestaña, y un Excel
-  // de una grabación larga no son cuatro bytes.
-  const url = URL.createObjectURL(blob);
-  try {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = nombre;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-
-  return nombre;
+  // Por el helper comun. Antes revocaba el blob en un `finally`, es decir
+  // en la linea siguiente al clic: en el navegador funciona, pero en la
+  // aplicacion de escritorio hay un dialogo modal de "guardar como" de por
+  // medio y el Excel se escribia vacio. Ver `MS_ANTES_DE_SOLTAR`.
+  return descargarBlob(blob, nombre);
 }
 
 /** El Excel de una grabación en vivo. */

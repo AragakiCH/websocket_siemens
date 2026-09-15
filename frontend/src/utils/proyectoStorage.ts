@@ -177,6 +177,11 @@ export async function borrarProyectoHmi(proyectoId: string): Promise<string[]> {
 // dejaria cajas vacias donde habia un widget, sin ningun error que lo
 // explicara.
 //
+// SI viajan las variables INTERNAS enlazadas a los widgets: sin ellas el
+// diseno llega al otro equipo apuntando a variables que alli no existen, y
+// el sintoma es un widget en blanco sin ningun error. Las de PLC no viajan:
+// existen porque existe el automata.
+//
 // NO viajan alarmas, recetas, flujos ni conexiones a base de datos: son de la
 // instalacion, no del diseno. Para mover una instalacion entera esta la copia
 // de seguridad de Configuracion.
@@ -189,6 +194,21 @@ export interface ProyectoExportado {
   proyecto: { proyecto_id: string; nombre: string };
   pantallas: unknown[];
   widgets_personalizados: unknown[];
+  /**
+   * Las variables INTERNAS a las que estan enlazados los widgets.
+   *
+   * Opcional a proposito: un fichero exportado antes de que existieran no lo
+   * trae, y tiene que seguir importandose igual.
+   */
+  variables_internas?: unknown[];
+}
+
+/** Una variable del fichero cuyo tipo NO coincide con el de aqui. */
+export interface ConflictoVariable {
+  nombre: string;
+  tipo_aqui?: string;
+  tipo_del_fichero?: string;
+  error?: string;
 }
 
 export interface ResultadoImportacion {
@@ -200,6 +220,19 @@ export interface ResultadoImportacion {
   widgets_importados: string[];
   widgets_ya_existentes: string[];
   widgets_con_error: string[];
+  /** Variables internas que no habia aqui y se han creado. */
+  variables_importadas: string[];
+  /** Las que ya existian: se respeta la de este equipo, no se pisa. */
+  variables_ya_existentes: string[];
+  /**
+   * Las que existen aqui con OTRO tipo.
+   *
+   * Hay que ensenarlas. El widget se enlaza igual —la clave es el nombre— y
+   * mostrara algo sin sentido sin dar ningun error: una consigna que alli era
+   * un decimal y aqui es un si/no. Es el unico caso de la importacion en que
+   * callarse hace dano.
+   */
+  variables_en_conflicto: ConflictoVariable[];
 }
 
 /** Pide el documento del proyecto. Es el contenido del fichero. */
@@ -261,5 +294,8 @@ export async function importarProyecto(
     widgets_importados: d.widgets_importados ?? [],
     widgets_ya_existentes: d.widgets_ya_existentes ?? [],
     widgets_con_error: d.widgets_con_error ?? [],
+    variables_importadas: d.variables_importadas ?? [],
+    variables_ya_existentes: d.variables_ya_existentes ?? [],
+    variables_en_conflicto: d.variables_en_conflicto ?? [],
   };
 }

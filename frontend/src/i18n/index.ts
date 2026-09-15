@@ -176,6 +176,11 @@ const es: Dict = {
   'widgets personalizados ya estaban en este equipo y se han conservado.',
   'projects.importedMissing':
   'El proyecto usa widgets personalizados que no venían en el fichero ni están en este equipo, y saldrán como cajas vacías:',
+  'projects.importedVars': 'variables internas creadas.',
+  'projects.importedVarsKept':
+  'variables internas ya existían aquí y se han conservado tal cual.',
+  'projects.importedVarsConflict':
+  'Ojo: estas variables internas existen aquí con OTRO tipo, así que los widgets enlazados mostrarán algo que no encaja:',
   'projects.delete': 'Eliminar proyecto',
   'projects.cantDeleteMain':
   'El proyecto principal no se puede eliminar: siempre debe existir uno. Puedes vaciarlo.',
@@ -479,6 +484,11 @@ const en: Dict = {
   'custom widgets were already on this machine and were kept.',
   'projects.importedMissing':
   'The project uses custom widgets that were not in the file and are not on this machine; they will show as empty boxes:',
+  'projects.importedVars': 'internal variables created.',
+  'projects.importedVarsKept':
+  'internal variables already existed here and were kept as they are.',
+  'projects.importedVarsConflict':
+  'Careful: these internal variables exist here with a DIFFERENT type, so the widgets bound to them will show something that does not fit:',
   'projects.delete': 'Delete project',
   'projects.cantDeleteMain':
   'The main project cannot be deleted: there must always be one. You can empty it instead.',

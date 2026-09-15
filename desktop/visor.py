@@ -202,6 +202,11 @@ def main() -> None:
         # sin explicar nada sería lo peor: no deja ni pista de qué revisar.
         destino = {"html": _pagina_error(host, puerto)}
 
+    # Igual que en psi_core.py: pywebview cancela TODA descarga por defecto,
+    # sin avisar. Un visor descarga tan poco como quiera su usuario, pero
+    # "exportar a Excel no hace nada" es el mismo fallo mudo aquí que allí.
+    webview.settings['ALLOW_DOWNLOADS'] = True
+
     webview.create_window(titulo, width=ancho, height=alto, **destino)
 
     # ── private_mode=False: ESTO NO ES OPCIONAL ───────────────────────────

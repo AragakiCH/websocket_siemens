@@ -11,6 +11,7 @@
 // a cada uno le convenga.
 // =========================================================================
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { descargarBlob } from '../../utils/descargas';
 import {
   AlertCircleIcon,
   CheckCircle2Icon,
@@ -91,12 +92,10 @@ export function PanelCarpetaDatos() {
       const cd = r.headers.get('Content-Disposition') || '';
       const nombre =
         /filename="([^"]+)"/.exec(cd)?.[1] ?? 'psicore-config.zip';
-      const url = URL.createObjectURL(blob);
-      Object.assign(document.createElement('a'), {
-        href: url,
-        download: nombre,
-      }).click();
-      URL.revokeObjectURL(url);
+      // A traves del helper comun: creaba su propio enlace y revocaba el
+      // blob en la linea siguiente, que en la aplicacion de escritorio
+      // entrega un fichero vacio porque el dialogo de guardar es modal.
+      descargarBlob(blob, nombre);
       setMensaje(`Copia descargada: ${nombre}`);
     } catch (e: any) {
       setError(e?.message ?? 'No se pudo generar la copia.');

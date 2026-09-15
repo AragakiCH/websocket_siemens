@@ -43,6 +43,7 @@ from app.core.connection_manager import ConnectionManager
 from app.core.crud_manager import CrudManager
 from app.core.db_manager import DbManager
 from app.core.escritura_store import EscrituraStore
+from app.core.internas_store import InternasStore
 from app.core.variables_store import VariablesStore
 from app.db.historian import Historizador
 from app.db.widget_store import WidgetStore
@@ -55,8 +56,6 @@ from app.core.plc_manager import PlcManager
 from app.db.project_store import ProjectStore
 from app.db.proyecto_store import ProyectoStore
 from app.db.tema_store import TemaStore
-from app.db.internas_store import InternasStore
-from app.core.internas_handler import InternasHandler
 
 
 def _configurar_logging(nivel: str) -> None:
@@ -107,6 +106,13 @@ async def lifespan(app: FastAPI):
     # PLC. No se crea nada en el autómata: se reclama un hueco y se le
     # pone nombre (ver app/core/variables_store.py).
     variables_store = VariablesStore()
+
+    # Variables que NO existen en ningún PLC: viven aquí y las ven todos los
+    # paneles. Se publican con `plc="interno"`, así que para los widgets son
+    # tags como cualquier otro (ver app/core/internas_store.py).
+    internas_store = InternasStore()
+    # Para que viajen en el snapshot del WebSocket junto a los tags de campo.
+    plc_manager.usar_internas(internas_store)
     # El historizador escucha el MISMO flujo de tags que el WebSocket:
     # no abre una segunda sesión OPC UA ni añade carga al PLC.
     historizador = Historizador(db_manager, db_manager.store)
@@ -132,13 +138,6 @@ async def lifespan(app: FastAPI):
     # guardara su tema, dos paneles de la misma línea acabarían con colores
     # distintos y el rojo de alarma dejaría de significar lo mismo en todas.
     tema_store = TemaStore()
-    # Variables INTERNAS del HMI: las que no existen en ningún autómata (un
-    # modo de trabajo, una consigna de pantalla, algo que forzar para probar).
-    # Se montan como un PLC más —id `interno`— para que salgan en los mismos
-    # desplegables y se escriban por el mismo sitio que las de verdad. Ver
-    # app/core/internas_handler.py.
-    internas_store = InternasStore()
-    internas_handler = InternasHandler(internas_store, manager)
     # Identidad: las cuentas están en la tabla SQL `usuarios`, así que
     # este gestor necesita el DbManager para llegar a ellas.
     auth_manager = AuthManager(db_manager, settings)
@@ -159,13 +158,12 @@ async def lifespan(app: FastAPI):
     app.state.widget_store = widget_store
     app.state.escritura_store = escritura_store
     app.state.variables_store = variables_store
+    app.state.internas_store = internas_store
     app.state.historizador = historizador
     app.state.grabador = grabador
     app.state.project_store = project_store
     app.state.proyecto_store = proyecto_store
     app.state.tema_store = tema_store
-    app.state.internas_store = internas_store
-    app.state.internas_handler = internas_handler
     app.state.auth_manager = auth_manager
     app.state.lock_manager = lock_manager
     app.state.auditoria = auditoria
@@ -176,10 +174,6 @@ async def lifespan(app: FastAPI):
                 settings.resolve_subnet())
     # El descubrimiento + supervisores corren en segundo plano: la API arranca
     # aunque ningún PLC esté disponible todavía.
-    # Antes de arrancar nada más: si un panel se conecta en el primer segundo,
-    # su snapshot ya tiene que traer las variables internas.
-    await plc_manager.registrar_interno(internas_handler)
-
     auditoria.start()
     auditoria.registrar("servicio.arranque", "", "",
                         {"auth_requerida": settings.auth_requerida})
@@ -531,12 +525,12 @@ app.include_router(proyecto_routes.router)
 app.include_router(project_routes.router)
 # Paleta y tipografías del proyecto (el Gestor de Temas).
 app.include_router(tema_routes.router)
-app.include_router(internas_routes.router)
 app.include_router(lock_routes.router)
 app.include_router(rest_routes.router, tags=["REST"])
 app.include_router(websocket_routes.router, tags=["WebSocket"])
 app.include_router(db_routes.router)
 app.include_router(crud_routes.router)
+app.include_router(internas_routes.router)
 app.include_router(widget_routes.router)
 app.include_router(escritura_routes.router)
 app.include_router(variables_routes.router)

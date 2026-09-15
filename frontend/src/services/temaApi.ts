@@ -3,6 +3,7 @@
 // Hablar con `/temas`. Leer, guardar, restaurar, exportar e importar.
 // =========================================================================
 import { fetchAuth } from './authApi';
+import { descargarBlob } from '../utils/descargas';
 import type { DocumentoTemas, Tema } from '../models/tema';
 
 /** Los temas del servidor. No pide sesión: es el aspecto, no los datos. */
@@ -50,18 +51,13 @@ export function exportarTema(tema: Tema): void {
     exportado_en: new Date().toISOString(),
     tema,
   };
-  const blob = new Blob([JSON.stringify(paquete, null, 2)], {
-    type: 'application/json',
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${tema.id}${EXT}`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  // Sin esto el blob se queda en memoria hasta recargar la página.
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // El segundo de espera que habia aqui no basta en la aplicacion de
+  // escritorio: el dialogo de guardar es modal y elegir carpeta puede tardar
+  // lo que haga falta. El helper comun espera lo suficiente.
+  descargarBlob(
+    new Blob([JSON.stringify(paquete, null, 2)], { type: 'application/json' }),
+    `${tema.id}${EXT}`
+  );
 }
 
 /**

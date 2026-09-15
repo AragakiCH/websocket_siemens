@@ -83,6 +83,13 @@ class PlcManager:
         self._running = False
         self._rescan_task = None
 
+        # Las variables internas. Se INYECTA desde main.py en vez de crearse
+        # aquí para no atar el gestor de PLCs a un almacén que no es suyo: el
+        # PlcManager habla con autómatas, y lo único que hace con esto es
+        # dejar que viajen en el mismo snapshot. Si no se inyecta, todo sigue
+        # funcionando exactamente igual sin internas.
+        self._internas = None
+
         # MULTIUSUARIO: la lista de PLCs se persiste para que un reinicio del
         # servicio no borre el trabajo de todos los usuarios a la vez.
         # `_endpoints` guarda el endpoint original de cada PLC gestionado
@@ -298,8 +305,13 @@ class PlcManager:
 
         Con esto, un tag `interno|modo` sale en el snapshot, en `/tags`, en el
         árbol de exploración y en la escritura sin que ninguno de esos caminos
-        tenga que enterarse de que existe una segunda clase de variable. Ver
-        `app/core/internas_handler.py`.
+        tenga que enterarse de que existe una segunda clase de variable.
+
+        SIN USO HOY. Las variables internas se resuelven por `usar_internas()`
+        —el almacén se mezcla en `build_snapshot_message`— y no por un handler
+        que se registre como PLC. Este camino se deja porque no estorba y es
+        el que haría falta si algún día las internas necesitaran su propio
+        ciclo de vida (arranque, parada, reconexión) como un PLC de verdad.
         """
         self._handlers[handler.plc_id] = handler
         await handler.start()
@@ -385,6 +397,10 @@ class PlcManager:
             or ep.endpoint in incluir
         )
 
+    def usar_internas(self, store) -> None:
+        """Le dice al gestor dónde están las variables internas."""
+        self._internas = store
+
     def list_plc_ids(self) -> List[str]:
         """Ids de los PLCs gestionados (para el selector del cliente)."""
         return list(self._handlers.keys())
@@ -399,6 +415,20 @@ class PlcManager:
         """
         tags: Dict[str, dict] = {}
         plcs: Dict[str, dict] = {}
+
+        # Las variables INTERNAS entran en el mismo saco que los tags de
+        # campo. Es obligatorio, no una comodidad: el cliente reemplaza su
+        # lista entera con `msg.tags` en cada snapshot, así que una interna
+        # que no venga aquí desaparece de la vista en cuanto el WebSocket se
+        # reconecta — y los widgets enlazados a ella se quedan en blanco sin
+        # que nada indique por qué.
+        if self._internas is not None and plc in (None, "interno"):
+            try:
+                tags.update(self._internas.snapshot_entries())
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("No se pudieron añadir las internas al "
+                               "snapshot: %s", exc)
+
         for plc_id, h in self._handlers.items():
             if plc and plc_id != plc:
                 continue

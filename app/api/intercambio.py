@@ -13,6 +13,16 @@ viajan, qué se hace con los enlaces entre pantallas— y son exactamente las
 decisiones que se rompen cuando se copian y pegan: se arregla un caso, el otro
 se queda atrás, y nadie se entera hasta que alguien importa algo raro.
 
+Lo que viaja dentro de un fichero exportado, y por qué:
+
+  * las pantallas y sus widgets     -> es lo que se quiere llevar;
+  * los widgets personalizados      -> sin ellos quedan cajas vacías;
+  * las variables INTERNAS enlazadas -> sin ellas los widgets se enlazan
+    a algo que en el otro equipo no existe, y el síntoma es un widget en
+    blanco sin ningún error;
+  * las variables de PLC NO viajan  -> existen porque existe el autómata.
+    Crearlas al importar sería inventarse un dato que nadie puede leer.
+
 Nada de esto sabe de HTTP a propósito. Las rutas deciden códigos y mensajes;
 aquí solo vive la lógica que las dos comparten.
 """
@@ -50,6 +60,21 @@ MAX_PANTALLAS_IMPORTADAS = 200
 #: al id viejo llevaría a la pantalla de otro proyecto —o a ninguna— sin dar
 #: ningún error.
 CLAVES_DE_PANTALLA = ("pantalla", "project_id")
+
+#: Claves cuyo valor es la CLAVE DE UNA VARIABLE (`<plc>|<tag>`) enlazada a un
+#: widget. Se busca por nombre de clave y en profundidad, igual que
+#: `CLAVES_DE_PANTALLA`, porque el enlace no siempre está en el mismo sitio:
+#: la mayoría de widgets lo guardan en `widget.variableId`, pero la tendencia
+#: lleva una por serie, dentro de `config.series[].variableId`.
+#:
+#: Buscar la CLAVE en vez de una ruta fija es lo que hace que un widget nuevo
+#: que enlace variables funcione sin tocar esto — con la condición, escrita
+#: aquí para quien lo lea mañana, de que llame `variableId` a su campo.
+CLAVES_DE_VARIABLE = ("variableId",)
+
+#: Prefijo de las variables que viven en el servidor y no en un PLC. Tiene que
+#: coincidir con `PLC_INTERNO` en `app/core/internas_store.py`.
+PREFIJO_INTERNA = "interno|"
 
 
 def ahora_iso() -> str:
@@ -187,6 +212,137 @@ def importar_widgets(widget_store, lista: List[dict],
                            kind, exc)
             fallidos.append(kind)
     return importados, omitidos, fallidos
+
+
+def internas_usadas(pantallas: List[dict]) -> List[str]:
+    """
+    Nombres de las variables INTERNAS que enlazan estos widgets, sin repetir.
+
+    Recorre la estructura entera buscando las claves de `CLAVES_DE_VARIABLE`,
+    no una ruta fija: la tendencia guarda una variable por serie dentro de
+    `config`, y un enlace que no se encuentre aquí es un enlace que llegará
+    roto al otro equipo.
+
+    Solo devuelve las INTERNAS. Las de PLC no viajan y no deben: una variable
+    de campo existe porque existe el autómata, y "crearla" al importar sería
+    inventarse un dato que nadie puede leer. Si el PLC destino no la tiene, el
+    widget se queda sin valor y eso es lo correcto — el arreglo es conectar el
+    PLC, no falsificar la variable.
+    """
+    nombres: List[str] = []
+
+    def _recorrer(v: Any) -> None:
+        if isinstance(v, dict):
+            for clave, dentro in v.items():
+                if (clave in CLAVES_DE_VARIABLE and isinstance(dentro, str)
+                        and dentro.startswith(PREFIJO_INTERNA)):
+                    nombre = dentro[len(PREFIJO_INTERNA):]
+                    if nombre and nombre not in nombres:
+                        nombres.append(nombre)
+                else:
+                    _recorrer(dentro)
+        elif isinstance(v, list):
+            for x in v:
+                _recorrer(x)
+
+    for pantalla in pantallas:
+        _recorrer(pantalla.get("widgets", []))
+    return nombres
+
+
+def internas_para_exportar(internas_store, pantallas: List[dict]) -> List[dict]:
+    """
+    La DEFINICIÓN de las variables internas que usan estas pantallas.
+
+    Mismo razonamiento que `widgets_para_exportar()`: sin esto, abrir lo
+    exportado en otro equipo deja widgets enlazados a `interno|nivel` donde no
+    existe ninguna `nivel`, y el síntoma es un widget en blanco sin un solo
+    error que lo explique.
+
+    **No viaja el valor actual, sí el inicial.** El valor de ahora es estado
+    de ejecución de OTRA instalación: traerse un «modo manual» en `true`
+    porque alguien lo dejó puesto sería importar una decisión que nadie tomó
+    aquí. El `valor_inicial` sí es configuración —es con qué debe arrancar— y
+    es lo que se usa para darle valor a la variable recién creada.
+    """
+    if internas_store is None:
+        return []
+    salida: List[dict] = []
+    for nombre in internas_usadas(pantallas):
+        try:
+            v = internas_store.obtener(nombre)
+        except Exception:  # noqa: BLE001
+            # Enlazada a una variable que ya no existe. No es un error de la
+            # exportación: es un enlace roto que ya estaba roto aquí.
+            logger.warning("El diseño enlaza 'interno|%s', que no existe.",
+                           nombre)
+            continue
+        d = v.como_fila()
+        d.pop("valor", None)
+        d.pop("creado_en", None)
+        d.pop("actualizado_en", None)
+        salida.append(d)
+    return salida
+
+
+def importar_internas(internas_store, lista: List[dict],
+                      usuario: str = "") -> Tuple[List[str], List[str], List[dict]]:
+    """
+    Crea las variables internas del fichero que NO existan ya aquí.
+
+    Devuelve `(importadas, ya_existentes, conflictos)`.
+
+    **Una que ya existe se deja como está**, igual que con los widgets:
+    reemplazarla cambiaría el valor y los límites de una variable que otros
+    proyectos de este equipo pueden estar usando, y eso nadie lo ha pedido. El
+    widget importado se enlaza a la que ya hay, que es lo que su nombre dice.
+
+    **Salvo que el TIPO no coincida**, y entonces hay que decirlo. Una
+    `nivel` que aquí es Texto y allí era Decimal se va a enlazar igual —la
+    clave es la misma— y el widget enseñará algo que no tiene sentido sin dar
+    ningún error. Es el único caso en que callarse haría daño, así que se
+    devuelve en `conflictos` para que la vista lo nombre.
+
+    Una variable que no se deja crear no tumba la importación, por lo mismo
+    que un widget: el diseño ya está, y quedarse sin una variable es un
+    problema pequeño y visible.
+    """
+    importadas: List[str] = []
+    existentes: List[str] = []
+    conflictos: List[dict] = []
+    if internas_store is None:
+        return importadas, existentes, conflictos
+
+    for d in lista or []:
+        nombre = str(d.get("nombre") or "")
+        if not nombre:
+            continue
+        if internas_store.existe(nombre):
+            try:
+                actual = internas_store.obtener(nombre)
+                if actual.tipo != d.get("tipo"):
+                    conflictos.append({
+                        "nombre": nombre,
+                        "tipo_aqui": actual.tipo,
+                        "tipo_del_fichero": d.get("tipo"),
+                    })
+                else:
+                    existentes.append(nombre)
+            except Exception:  # noqa: BLE001
+                existentes.append(nombre)
+            continue
+        try:
+            # El valor arranca en el inicial: es lo único que el fichero trae
+            # y lo único que tiene sentido como punto de partida.
+            datos = dict(d)
+            datos["valor"] = d.get("valor_inicial")
+            internas_store.crear(datos)
+            importadas.append(nombre)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Variable interna '%s' del fichero no se pudo "
+                           "crear: %s", nombre, exc)
+            conflictos.append({"nombre": nombre, "error": str(exc)})
+    return importadas, existentes, conflictos
 
 
 def remapear_pantallas(valor: Any, mapa: Dict[str, str]) -> Any:

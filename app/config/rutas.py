@@ -227,6 +227,62 @@ def origen_de_la_ruta() -> str:
     return "carpeta del proyecto (modo desarrollo)"
 
 
+# ====================================================================== #
+# Qué de la carpeta de datos es CONFIGURACIÓN y qué es sobra de ejecución
+# ====================================================================== #
+# En la carpeta de datos no solo vive la configuración. Conviven con ella
+# cosas que el programa genera mientras corre y que NO son configuración de
+# nadie:
+#
+#   navegador/   el perfil de WebView2 (caché, cookies, localStorage). Lo
+#                pone `desktop/psi_core.py` ahí a propósito, para que se
+#                respalde y se borre con todo lo demás. Son decenas de MB y,
+#                mientras la aplicación está abierta, Windows mantiene sus
+#                ficheros BLOQUEADOS.
+#   registro/    el log del servicio, abierto por el propio proceso.
+#   datos_antes_de_restaurar_*  copias que deja el restaurador.
+#
+# Mezclarlos con la configuración tenía tres consecuencias, y las tres se
+# notaban solo en la aplicación instalada —nunca en desarrollo, donde esas
+# carpetas no existen—:
+#
+#   1. La copia de seguridad fallaba con un 500 al intentar comprimir un
+#      fichero que WebView2 tenía abierto.
+#   2. Cuando no fallaba, el .zip llevaba dentro las cookies y el historial
+#      de navegación del equipo. Un respaldo de configuración no debe
+#      contener eso.
+#   3. Configuración enseñaba "4.800 ficheros · 90 MB" donde la verdad son
+#      trece ficheros y 50 KB.
+CARPETAS_NO_CONFIG = ("navegador", "registro", "__pycache__")
+
+# Prefijo de las copias que deja el restaurador, dentro de la propia carpeta.
+PREFIJO_RESPALDO = "datos_antes_de_restaurar_"
+
+
+def es_configuracion(ruta: Path, raiz: Path) -> bool:
+    """
+    ¿Este fichero forma parte de la configuración que hay que respaldar?
+
+    Se mira el PRIMER tramo de la ruta relativa, no la ruta entera: lo que
+    decide es de qué carpeta cuelga, y así un fichero llamado `registro.json`
+    en la raíz sigue contando como configuración, mientras que cualquier cosa
+    dentro de `registro/` no.
+    """
+    try:
+        partes = ruta.relative_to(raiz).parts
+    except ValueError:
+        return False
+    if not partes:
+        return False
+    primero = partes[0]
+    if primero in CARPETAS_NO_CONFIG:
+        return False
+    if primero.startswith(PREFIJO_RESPALDO):
+        return False
+    # Ficheros sueltos que tampoco son configuración de nadie.
+    return not ruta.name.endswith((".log", ".lock"))
+
+
 def describir(carpeta: Optional[Path] = None) -> Dict[str, Any]:
     """
     Estado de la carpeta de datos, para enseñarlo en Configuración.
@@ -240,7 +296,7 @@ def describir(carpeta: Optional[Path] = None) -> Dict[str, Any]:
     total = 0
     try:
         for p in sorted(ruta.rglob("*")):
-            if p.is_file():
+            if p.is_file() and es_configuracion(p, ruta):
                 tam = p.stat().st_size
                 total += tam
                 ficheros.append({

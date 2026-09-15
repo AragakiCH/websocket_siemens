@@ -52,11 +52,13 @@ from app.api.intercambio import (
     FORMATO_PANTALLA,
     FORMATO_VERSION,
     id_libre,
+    importar_internas,
     importar_widgets,
     nombre_libre,
     remapear_pantallas,
     slug,
     soltar_enlaces_rotos,
+    internas_para_exportar,
     widgets_para_exportar,
 )
 from app.core.auth_manager import Sesion
@@ -571,6 +573,12 @@ class PantallaExportada(BaseModel):
     version: int = Field(default=0, examples=[FORMATO_VERSION])
     pantalla: Dict[str, Any] = Field(default_factory=dict)
     widgets_personalizados: List[Dict[str, Any]] = Field(default_factory=list)
+    # Vacío por defecto: un fichero exportado antes de que las variables
+    # internas existieran no trae este campo y tiene que seguir importándose.
+    variables_internas: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Definición de las variables internas que enlazan los "
+                    "widgets de esta pantalla.")
 
 
 @router.get(
@@ -623,10 +631,18 @@ async def exportar_pantalla(
         "widgets_personalizados": widgets_para_exportar(
             getattr(request.app.state, "widget_store", None), [pantalla]
         ),
+        # Las variables internas enlazadas. Al llevarse UNA pantalla importan
+        # todavía más que en un proyecto entero: es el caso típico de pasarle
+        # una pantalla a un compañero, y allí no hay nada del resto del diseño
+        # que pudiera haber creado esas variables por su cuenta.
+        "variables_internas": internas_para_exportar(
+            getattr(request.app.state, "internas_store", None), [pantalla]
+        ),
     }
 
     _auditar(request, "pantalla.exportada", sesion, project_id,
-             {"widgets": len(pantalla["widgets"])})
+             {"widgets": len(pantalla["widgets"]),
+              "variables_internas": len(salida["variables_internas"])})
 
     nombre_fichero = f"pantalla-{slug(doc['nombre']) or project_id}.json"
     return JSONResponse(
@@ -756,9 +772,16 @@ async def importar_pantalla(
         cuerpo.widgets_personalizados, quien,
     )
 
+    # ── 6. Variables internas ────────────────────────────────────
+    v_nuevas, v_existentes, v_conflictos = importar_internas(
+        getattr(request.app.state, "internas_store", None),
+        getattr(cuerpo, "variables_internas", None) or [], quien,
+    )
+
     _auditar(request, "pantalla.importada", sesion, nuevo_id,
              {"proyecto": proyecto, "widgets_nuevos": importados,
-              "enlaces_sueltos": enlaces_sueltos})
+              "enlaces_sueltos": enlaces_sueltos,
+              "variables_nuevas": v_nuevas})
     # Se difunde como una pantalla creada: es lo que hace que a los demás les
     # aparezca la pestaña sin recargar.
     doc = almacen.obtener(nuevo_id) or {"version": 1}
@@ -776,5 +799,8 @@ async def importar_pantalla(
         "enlaces_sueltos": enlaces_sueltos,
         "widgets_importados": importados,
         "widgets_ya_existentes": omitidos,
+        "variables_importadas": v_nuevas,
+        "variables_ya_existentes": v_existentes,
+        "variables_en_conflicto": v_conflictos,
         "widgets_con_error": fallidos,
     }

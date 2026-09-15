@@ -523,6 +523,32 @@ def abrir_ventana(puerto: int, url: str = "", titulo: str = "",
         print("[ventana] pywebview no está instalado (pip install pywebview).")
         return False
 
+    # ── ALLOW_DOWNLOADS: sin esto NINGUNA descarga funciona ─────────────
+    #
+    # pywebview trae `ALLOW_DOWNLOADS = False` de fábrica, y su manejador de
+    # WebView2 hace literalmente esto (webview/platforms/edgechromium.py):
+    #
+    #     def on_download_starting(self, sender, args):
+    #         if not webview_settings['ALLOW_DOWNLOADS']:
+    #             args.Cancel = True
+    #             return
+    #
+    # Es decir: cancela la descarga y no dice nada. Ni un error, ni un aviso,
+    # ni una línea en el log. Para quien usa el programa, pulsar "Exportar
+    # proyecto" o "Descargar copia" simplemente no hacía NADA — y en el
+    # navegador, con el mismo código, funcionaba. Eso convertía un ajuste de
+    # una línea en un fallo que parecía del frontend.
+    #
+    # Con el valor en True, pywebview abre un `SaveFileDialog` nativo de
+    # Windows: el explorador donde elegir carpeta y nombre, que es justo lo
+    # que se espera de una aplicación de escritorio. Afecta a todo lo que se
+    # descarga: exportar un proyecto, exportar una pantalla, la copia de
+    # seguridad de la configuración y los .xlsx de la pantalla de exportar.
+    #
+    # Se pone ANTES de create_window: la configuración se lee al construir la
+    # ventana, y cambiarla después no tiene efecto.
+    webview.settings['ALLOW_DOWNLOADS'] = True
+
     try:
         destino = ({"html": html} if html
                    else {"url": url or f"http://127.0.0.1:{puerto}"})

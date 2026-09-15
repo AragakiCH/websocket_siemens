@@ -10,7 +10,15 @@ import { contenedorGrupo } from './contenedor/Contenedor';
 import { valorUnidad } from './lectura/ValorUnidad';
 import { alarmasWidget } from './alarmas/Alarmas';
 import { simbolo } from './simbolos/Simbolo';
-import { loadZipWidgets, fullKind, type ZipWidget } from '../../../services/zipWidgetLoader';
+// El catálogo de ZIP pasó a resolverse por un índice (`zipWidgetPorKind`) en
+// vez de recorriendo la lista, y `catalogoListo` dice si ya llegó del
+// servidor — eso es lo que distingue «aún cargando» de «ese widget no está».
+import {
+  loadZipWidgets,
+  zipWidgetPorKind,
+  catalogoListo,
+  type ZipWidget,
+} from '../../../services/zipWidgetLoader';
 // import { semaforoIndustrial } from './SemaforoIndustrial';
 
 export const customWidgets: CustomWidgetDef[] = [
@@ -42,14 +50,32 @@ export const customByKind = (kind: string): CustomWidgetDef | undefined =>
 
 // ---- ZIP (HTML) widgets cargados por el usuario ----------------------- //
 
-/** Devuelve los widgets ZIP del localStorage */
+/** Devuelve los widgets ZIP del catálogo en memoria. */
 export function getZipWidgets(): ZipWidget[] {
   return loadZipWidgets();
 }
 
-/** Busca un ZIP widget por kind */
+/**
+ * Busca un ZIP widget por kind. O(1): es un `Map` en memoria.
+ *
+ * Antes esto era `loadZipWidgets().find(...)`, y `loadZipWidgets` hacía
+ * `JSON.parse` del catálogo ENTERO desde `localStorage`. Se llamaba en cada
+ * render de cada widget: con 50 widgets y datos del PLC llegando varias
+ * veces por segundo, eran megas parseados cientos de veces por segundo.
+ */
 export function zipByKind(kind: string): ZipWidget | undefined {
-  return loadZipWidgets().find(w => fullKind(w.meta.kind) === kind);
+  return zipWidgetPorKind(kind);
+}
+
+/**
+ * ¿Ya se sabe qué widgets ZIP existen?
+ *
+ * `false` durante los primeros milisegundos tras abrir la aplicación: la
+ * caché y el servidor todavía no han contestado. Un `custom:` sin definición
+ * en ese momento está CARGANDO, no roto, y el lienzo lo pinta distinto.
+ */
+export function zipCatalogoListo(): boolean {
+  return catalogoListo();
 }
 
 /**
