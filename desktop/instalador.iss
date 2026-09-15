@@ -126,6 +126,20 @@ Name: "escritorio"; Description: "Crear un acceso directo en el Escritorio"; \
 Name: "inicio"; Description: "Arrancar Psi Core al iniciar sesión en Windows"; \
     GroupDescription: "Opciones:"; Flags: unchecked
 
+[InstallDelete]
+; Al ACTUALIZAR se vacía `_internal` antes de copiar la versión nueva.
+;
+; Sin esto, `ignoreversion` sobreescribe lo que coincide pero deja lo que
+; sobra: los `frontend\distssets\index-<hash viejo>.js` de la versión
+; anterior seguían en disco. Y con ellos ahí, un `index.html` que WebView2
+; tuviera en caché encontraba sus assets viejos y la aplicación arrancaba
+; entera... en la versión anterior, sin un solo error. "Le pasé el
+; instalador y sigue viendo lo de antes" era esto.
+;
+; Solo `_internal`: el `.env` vive en la raíz de {app} y los datos en
+; ProgramData, así que ninguno de los dos se toca.
+Type: filesandordirs; Name: "{app}\_internal"
+
 [Files]
 ; Todo lo que produjo PyInstaller en modo carpeta.
 Source: "..\dist\PsiCore\*"; DestDir: "{app}"; \

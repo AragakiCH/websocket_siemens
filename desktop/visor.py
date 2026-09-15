@@ -224,6 +224,15 @@ def main() -> None:
     # intermitente — que es mucho peor de diagnosticar que si fallara siempre.
     perfil = _carpeta_perfil()
     if perfil:
+        # Caché HTTP fuera antes de abrir: si no, tras actualizar el SERVIDOR
+        # este visor puede seguir pintando el index.html de la versión
+        # anterior con sus assets viejos (ver desktop/cache_webview.py). La
+        # sesión iniciada se conserva.
+        try:
+            from desktop.cache_webview import limpiar_cache_webview
+        except ImportError:
+            from cache_webview import limpiar_cache_webview  # empaquetado
+        limpiar_cache_webview(perfil)
         webview.start(private_mode=False, storage_path=perfil)
     else:
         webview.start(private_mode=False)
