@@ -28,15 +28,11 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import (ai_routes, alarm_routes, auth_routes, crud_routes,
-                     internas_routes,
                      db_routes, escritura_routes, export_routes,
-                     historian_routes, lock_routes, project_routes,
-                     proyecto_routes, rest_routes, runtime_routes,
-                     sistema_routes, variables_routes,
-                     db_routes, export_routes, historian_routes, lock_routes,
-                     project_routes, rest_routes, sistema_routes,
-                     tema_routes,
-                     websocket_routes, widget_routes)
+                     historian_routes, internas_routes, lock_routes,
+                     project_routes, proyecto_routes, rest_routes,
+                     runtime_routes, sistema_routes, tema_routes,
+                     variables_routes, websocket_routes, widget_routes)
 from app.config.settings import get_settings
 from app.core.alarm_engine import MotorAlarmas
 from app.core.connection_manager import ConnectionManager

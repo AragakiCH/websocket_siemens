@@ -54,17 +54,29 @@ import {
   useState,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2Icon, AlertTriangleIcon, LogOutIcon } from 'lucide-react';
+import {
+  Loader2Icon,
+  AlertTriangleIcon,
+  MaximizeIcon,
+  MinimizeIcon,
+  LogOutIcon,
+} from 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { WidgetRenderer } from '../components/hmi/WidgetRenderer';
 import { Logo } from '../components/ui/Logo';
 import { RealPLCService } from '../services/RealPLCService';
+import CapaPopups from '../components/hmi/custom/faceplate/CapaPopups';
 import {
   useVistaActiva,
   useRutaDeVista,
+  publicarPantallas,
+  useEstructura,
+  hermanosDe,
+  setVistaActiva,
+  esNivel,
+  type Seccion,
   setPantalla,
   GRUPO_POR_DEFECTO,
-  type Seccion,
 } from '../components/hmi/custom/navegacion/store';
 
 import {
@@ -77,15 +89,16 @@ import {
   ResumenPantalla,
 } from '../utils/designStorage';
 import {
+  getUltimoProyecto,
+  listarProyectosHmi,
+  PROYECTO_HMI_POR_DEFECTO,
+} from '../utils/proyectoStorage';
+import {
   aplicarCambio,
   versionEncaja,
   type MensajeProjectUpdated,
 } from '../utils/aplicarCambio';
 import { fetchRuntime, type RuntimeChanged } from '../services/runtimeApi';
-import {
-  getUltimoProyecto,
-  PROYECTO_HMI_POR_DEFECTO,
-} from '../utils/proyectoStorage';
 
 // ─── Reloj ───────────────────────────────────────────────────────
 
@@ -146,7 +159,7 @@ function Separador() {
   return (
     <span
       aria-hidden="true"
-      className="h-6 w-px shrink-0 bg-slate-300 dark:bg-navy-slate"
+      className="h-6 w-px shrink-0 bg-tema-borde-suave"
     />
   );
 }
@@ -159,32 +172,125 @@ function Separador() {
  * pantalla no tiene navegación montada no se dibuja nada: un breadcrumb vacío
  * ocupa sitio para no decir nada.
  */
-function Ruta({ ruta }: { ruta: Seccion[] }) {
-  if (ruta.length === 0) return null;
-  const actual = ruta[ruta.length - 1];
+/**
+ * El camino hasta la vista abierta, y debajo dónde estás.
+ *
+ * Un SOLO camino, de fuera hacia dentro:
+ *
+ *     PROYECTO / PANTALLA / SECCIÓN / SUBSECCIÓN
+ *     Subsección
+ *
+ * Antes los mismos niveles estaban repartidos: el nombre de la pantalla como
+ * una etiqueta suelta y, tras un separador, la ruta de secciones. Nada decía
+ * que lo segundo colgara de lo primero, y el proyecto —que en esta versión es
+ * un nivel de verdad, un HMI distinto— no salía por ningún lado.
+ *
+ * Los niveles se van apagando hacia la izquierda y el último va en el color
+ * de marca: de un vistazo se ve cuánto has profundizado y por dónde llegaste.
+ */
+/**
+ * Los dos primeros segmentos de la barra.
+ *
+ *     PROYECTO / PANTALLA / NIVEL        <- dónde está la pestaña abierta
+ *     Vista · Nivel                      <- qué vista es, y de quién cuelga
+ *
+ * El camino NO repite la vista al final: termina en el nivel que la contiene,
+ * porque el nombre va justo debajo. Antes se leía dos veces lo mismo, una
+ * línea encima de la otra, y el camino no añadía nada al título.
+ *
+ * El «· Nivel» del título es lo que hace el ejemplo con la línea: el nombre
+ * solo («Lavado», «Detalles») se repite entre zonas, y saber de cuál cuelga
+ * es la mitad del dato.
+ */
+function Ruta({
+  direccion,
+  titulo,
+  nivel,
+}: {
+  direccion: string[];
+  titulo: string;
+  nivel: string;
+}) {
+  const camino = direccion.filter(Boolean);
+  if (!titulo && camino.length === 0) return null;
 
   return (
     <div className="flex min-w-0 flex-col justify-center leading-tight">
-      <span className="flex min-w-0 items-center gap-1 font-mono text-[10px] uppercase tracking-wider">
-        {ruta.map((s, i) => (
-          <span key={`${s.id}-${i}`} className="flex min-w-0 items-center gap-1">
+      {/* `mb-1.5` = los mismos 6 px que la rejilla deja hasta las pestañas.
+          Sin esto el camino y el título quedaban pegados y la tercera fila
+          muy por debajo: dos líneas juntas y una suelta. */}
+      <span className="mb-1.5 flex min-w-0 items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-tema-sobre-superficie-alt">
+        {camino.map((label, i) => (
+          <span key={`${label}-${i}`} className="flex min-w-0 items-center gap-1">
             {i > 0 && <span className="text-slate-300 dark:text-navy-slate">/</span>}
-            <span
-              className={`truncate ${
-                i === ruta.length - 1
-                  ? 'text-siemens'
-                  : 'text-slate-400 dark:text-slate-500'
-              }`}
-            >
-              {s.label || s.id}
-            </span>
+            <span className="truncate">{label}</span>
           </span>
         ))}
       </span>
-      <span className="truncate text-[13px] font-bold text-navy dark:text-slate-100">
-        {actual.label || actual.id}
+      <span className="flex min-w-0 items-baseline gap-1.5">
+        <span className="truncate text-[13px] font-bold text-tema-sobre-superficie">
+          {titulo}
+        </span>
+        {nivel && (
+          <span className="shrink-0 truncate text-[11px] text-tema-sobre-superficie-alt">
+            · {nivel}
+          </span>
+        )}
       </span>
     </div>
+  );
+}
+
+/**
+ * Tercer segmento: las secciones que están al MISMO nivel que la abierta.
+ *
+ * Pulsan el mismo `setVistaActiva` que el Menú Lateral, así que no son una
+ * segunda navegación compitiendo con él sino otro mando de la misma: al
+ * pulsar una pestaña se enciende también su botón en el menú.
+ *
+ * Con una sola hermana no se dibuja nada. Una pestaña suelta no es una
+ * elección: es una fila que le roba alto al sinóptico para no ofrecer nada.
+ */
+function Hermanas({
+  hermanas,
+  activa,
+  grupo,
+}: {
+  hermanas: Seccion[];
+  activa: string;
+  grupo: string;
+}) {
+  if (hermanas.length < 2) return null;
+
+  return (
+    <nav
+      aria-label="Secciones del mismo nivel"
+      className="flex min-w-0 items-stretch gap-5 overflow-x-auto"
+    >
+      {hermanas.map((s) => {
+        const esActiva = s.id === activa;
+        return (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => setVistaActiva(grupo, s.id)}
+            aria-current={esActiva ? 'page' : undefined}
+            title={s.label || s.id}
+            /* `-mb-px` monta el subrayado sobre la línea de la cabecera, en
+               vez de dejarlo flotando un píxel por encima. Es lo que hace el
+               proyecto de ejemplo con `border-bottom` en la fila y en el
+               botón activo. */
+            className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-0.5 pb-2 text-xs transition ${
+              esActiva
+                ? 'border-tema-primario font-semibold text-tema-primario'
+                : 'border-transparent text-tema-sobre-superficie-alt hover:text-tema-sobre-superficie'
+            }`}
+          >
+            {s.label || s.id}
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -198,14 +304,14 @@ function PastillaEnVivo({ vivo }: { vivo: boolean }) {
       }
       className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider transition ${
         vivo
-          ? 'border-state-ok/40 bg-state-ok/10 text-state-ok'
-          : 'border-state-error/40 bg-state-error/10 text-state-error'
+          ? 'border-tema-ok bg-tema-ok-fondo text-tema-sobre-ok-fondo'
+          : 'border-tema-error bg-tema-error-fondo text-tema-sobre-error-fondo'
       }`}
     >
       <span
         aria-hidden="true"
         className={`h-1.5 w-1.5 rounded-full ${
-          vivo ? 'animate-pulse bg-state-ok' : 'bg-state-error'
+          vivo ? 'animate-pulse bg-tema-ok' : 'bg-tema-error'
         }`}
       />
       {vivo ? 'En vivo' : 'Sin señal'}
@@ -220,7 +326,7 @@ function Reloj() {
       <span className="font-mono text-[15px] font-bold tabular-nums text-navy dark:text-slate-100">
         {hora}
       </span>
-      <span className="font-mono text-[10px] tabular-nums text-slate-400">
+      <span className="font-mono text-[10px] tabular-nums text-tema-sobre-superficie-alt">
         {fecha}
       </span>
     </div>
@@ -230,14 +336,30 @@ function Reloj() {
 // ─── La vista ────────────────────────────────────────────────────
 
 export function Preview() {
-  const { variables, isDark, esVisor, sesion, cerrarSesion } = useAppStore();
+  const { variables, esVisor, sesion, cerrarSesion } = useAppStore();
   const navigate = useNavigate();
+
+  /**
+   * Buscar una variable por su id.
+   *
+   * Se le pasa a cada widget para que resuelva sus variables CON NOMBRE. Va
+   * en un `useCallback` atado a `variables` y no suelto en el render: sin él
+   * cambiaría de identidad en cada dibujo y obligaría a rehacer la búsqueda
+   * de todos los widgets de la pantalla aunque no hubiera llegado ni una
+   * lectura nueva.
+   */
+  const resolverVariable = useCallback(
+    (id: string | null | undefined) =>
+      id ? variables.find((v) => v.id === id) : undefined,
+    [variables]
+  );
 
   // Vista abierta en la navegación. Al pulsar un botón del Menú Lateral
   // cambia, y este componente se vuelve a dibujar mostrando solo los widgets
   // de esa sección.
   const vistaActiva = useVistaActiva(GRUPO_POR_DEFECTO);
   const ruta = useRutaDeVista(GRUPO_POR_DEFECTO);
+  const estructura = useEstructura(GRUPO_POR_DEFECTO);
   const enVivo = useEnVivo();
 
   // ── Qué proyecto es este HMI ────────────────────────────────────
@@ -252,6 +374,10 @@ export function Preview() {
   // antes de que el servidor conteste) y como respaldo si el backend es
   // anterior a `/runtime` o no responde.
   const [proyecto, setProyecto] = useState<string>(() => getUltimoProyecto());
+
+  // El nombre legible del proyecto, para encabezar el camino. Viene con el
+  // runtime; si el servidor no contesta se cae en el id: un camino que
+  // empieza por «principal» en vez de «Planta Norte» se entiende igual.
   const [nombreProyecto, setNombreProyecto] = useState('');
 
   // ── Qué pantalla se abre ────────────────────────────────────────
@@ -269,17 +395,81 @@ export function Preview() {
   const arranque =
     proyecto === PROYECTO_HMI_POR_DEFECTO ? PANTALLA_POR_DEFECTO : '';
 
+  // ── Ajuste al hueco disponible ─────────────────────────────────
+  //
+  // El sinóptico se diseña en píxeles fijos, pero la pantalla donde se mira
+  // no siempre los tiene. Se mide el hueco y se escala lo que haga falta,
+  // hacia abajo (para que quepa) y hacia arriba (para que lo llene).
+  const hueco = useRef<HTMLDivElement>(null);
+  const [medida, setMedida] = useState({ ancho: 0, alto: 0 });
+
+  /**
+   * Pantalla completa: se va el navegador, NO la barra de PsiCore.
+   *
+   * Antes esta misma acción escondía también la barra, para que un diseño de
+   * 1920x1080 cupiera clavado en un monitor de 1920x1080. Era un mal negocio:
+   * la barra es la ÚNICA navegación del runtime —las pestañas de sección, el
+   * camino de dónde estás, el reloj y el «en vivo»—, así que escondiéndola el
+   * operario se quedaba a pantalla completa y sin poder cambiar de pantalla.
+   *
+   * Y lo que se ganaba era poco: el lienzo ya se escala solo al hueco que
+   * tenga, así que sin la barra ese diseño se ve al 100 % y con ella al 87 %.
+   * Ver un 13 % más pequeño se arregla acercándose; no poder navegar, no.
+   */
+  const [pantallaCompleta, setPantallaCompleta] = useState(false);
+
+  // Salir con Esc lo gestiona el navegador, no esta aplicación. Sin escuchar
+  // el cambio, el botón se quedaría enseñando «salir» con la ventana ya
+  // restaurada.
+  useEffect(() => {
+    const alCambiar = () => setPantallaCompleta(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', alCambiar);
+    return () => document.removeEventListener('fullscreenchange', alCambiar);
+  }, []);
+
+  const alternarPantallaCompleta = useCallback(async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        // Puede fallar —un permiso, un navegador incrustado—. Se ignora: el
+        // estado real lo pone `fullscreenchange`, así que si no entró, el
+        // botón sigue ofreciendo entrar en vez de mentir.
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      /* lo dice el navegador; aquí no hay nada que hacer */
+    }
+  }, []);
+
+  useEffect(() => {
+    const el = hueco.current;
+    if (!el) return;
+    // ResizeObserver y no el evento `resize` de la ventana: el hueco también
+    // cambia sin que la ventana se mueva —cuando aparece el banner de alarmas,
+    // por ejemplo—, y ahí `resize` no se dispara.
+    const ro = new ResizeObserver(([e]) => {
+      const r = e.contentRect;
+      setMedida({ ancho: r.width, alto: r.height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const [pantallaId, setPantallaId] = useState<string>(arranque);
   const [pantallas, setPantallas] = useState<ResumenPantalla[]>([]);
+
+  // El catálogo de pantallas hace falta también AQUÍ, no sólo en el
+  // Diseñador: lo lee todo el que tenga que poner el NOMBRE de una pantalla
+  // en vez de su id —la Tarjeta de Acceso, por ejemplo, que enseña a dónde
+  // lleva—. Sin esto se veía «acc_horno» donde debía poner «Horno».
+  useEffect(() => {
+    publicarPantallas(pantallas);
+  }, [pantallas]);
   const [design, setDesign] = useState<SavedDesign | null>(() =>
     arranque ? loadDesign(arranque) : null
   );
   const [cargando, setCargando] = useState(true);
-
-  // Versión de lo que hay pintado. 0 = desconocida (viene de la caché). Es
-  // lo que permite aplicar un `project.updated` encima sin volver a pedir la
-  // pantalla: solo si el evento es justo la versión siguiente.
-  const versionRef = useRef(0);
 
   // `true` mientras lo pintado venga de la caché del navegador y no del
   // servidor. Empieza en true porque el primer render ES la caché: hasta que
@@ -297,6 +487,24 @@ export function Preview() {
   // saber si esperar o avisar a alguien.
   const [sinCatalogo, setSinCatalogo] = useState(false);
 
+  /**
+   * Cuánto hay que escalar el sinóptico para que llene el hueco sin
+   * deformarse.
+   *
+   * Se toma el MENOR de los dos factores: el que quepa en los dos ejes. Usar
+   * cada eje por su cuenta estiraría el dibujo, y un depósito ovalado o un
+   * motor achatado es exactamente lo que no puede pasar en un sinóptico.
+   *
+   * Mientras no se ha medido (`ancho` en 0, el primer render) se deja en 1:
+   * pintar a escala 0 sería un parpadeo en negro en cada carga.
+   */
+  const escala = useMemo(() => {
+    if (!design || !medida.ancho || !medida.alto) return 1;
+    const { width, height } = design.canvas;
+    if (!width || !height) return 1;
+    return Math.min(medida.ancho / width, medida.alto / height);
+  }, [design, medida.ancho, medida.alto]);
+
   // ── Navegación por pantalla ─────────────────────────────────────
   // La navegación se guarda por pantalla: sin esto, dos pantallas
   // compartirían una sola y la segunda heredaría la sección abierta en la
@@ -304,6 +512,11 @@ export function Preview() {
   useLayoutEffect(() => {
     setPantalla(pantallaId);
   }, [pantallaId]);
+
+  // Versión de lo que hay pintado. 0 = desconocida (viene de la caché). Es
+  // lo que permite aplicar un `project.updated` encima sin volver a pedir la
+  // pantalla: solo si el evento es justo la versión siguiente.
+  const versionRef = useRef(0);
 
   // ── Aplicar un proyecto (el publicado, o el de respaldo) ────────
   //
@@ -333,8 +546,8 @@ export function Preview() {
   //
   // Se pide al montar y cada vez que el WebSocket vuelve (mientras estuvo
   // caído pudo cambiar). Si el backend no tiene `/runtime` (404: versión
-  // anterior) se cae al comportamiento de siempre: el proyecto local y su
-  // lista de pantallas.
+  // anterior) se cae al comportamiento de siempre: el proyecto local, su
+  // lista de pantallas y su nombre.
   const sincronizarRuntime = useCallback(async () => {
     try {
       const rt = await fetchRuntime();
@@ -352,7 +565,15 @@ export function Preview() {
     try {
       const local = getUltimoProyecto();
       const lista = await listarPantallas(local);
-      aplicarProyecto(local, lista);
+      let nombre = '';
+      try {
+        nombre =
+          (await listarProyectosHmi()).find((x) => x.proyecto_id === local)
+            ?.nombre ?? '';
+      } catch {
+        /* sin lista: el camino arranca por la pantalla */
+      }
+      aplicarProyecto(local, lista, nombre);
     } catch {
       // Sin lista se sigue con la suposición de arranque. Si no la había,
       // aquí se acaba el camino y hay que decirlo.
@@ -500,6 +721,14 @@ export function Preview() {
       window.removeEventListener('hmi:conexion', alCambiar as EventListener);
   }, [pantallaId, cargar, sincronizarRuntime]);
 
+  // Salir, solo en un VISOR. La ventana del servidor tiene el menú para
+  // eso; aquí no hay menú, y sin este botón la única forma de cambiar de
+  // cuenta sería borrar el perfil de WebView2 a mano.
+  const salir = useCallback(async () => {
+    await cerrarSesion();
+    navigate('/', { replace: true });
+  }, [cerrarSesion, navigate]);
+
   // Respaldo para el caso local: dos pestañas del MISMO navegador, con el
   // backend caído. El evento `storage` solo se dispara en las otras pestañas.
   //
@@ -517,16 +746,48 @@ export function Preview() {
     return () => window.removeEventListener('storage', onStorage);
   }, [pantallaId]);
 
-  // Salir, solo en un VISOR. La ventana del servidor tiene el menú para
-  // eso; aquí no hay menú, y sin este botón la única forma de cambiar de
-  // cuenta sería borrar el perfil de WebView2 a mano.
-  const salir = useCallback(async () => {
-    await cerrarSesion();
-    navigate('/', { replace: true });
-  }, [cerrarSesion, navigate]);
   const nombreActual =
     pantallas.find((p) => p.project_id === pantallaId)?.nombre ?? pantallaId;
 
+  /**
+   * Los tres segmentos de la barra.
+   *
+   *   `direccion` — dónde está la pestaña abierta: proyecto, pantalla y los
+   *                 niveles por los que se ha bajado. SIN la vista actual,
+   *                 que va en el segundo segmento.
+   *   `titulo`    — la vista abierta.
+   *   `nivel`     — de quién cuelga. El nivel más cercano por encima; si no
+   *                 hay ninguno, la pantalla, que es el contenedor de todo.
+   *   `hermanas`  — las secciones a su misma altura, para el tercer segmento.
+   *                 Se descartan los niveles: son encabezados, no se pulsan.
+   */
+  const cabecera = useMemo(() => {
+    const actual = ruta.length > 0 ? ruta[ruta.length - 1] : null;
+    const ancestros = ruta.slice(0, -1);
+    const nivelPadre = [...ancestros].reverse().find(esNivel);
+
+    const hermanas = actual
+      ? hermanosDe(estructura, actual.id)
+          .map((id) => estructura.find((s) => s.id === id))
+          .filter((s): s is Seccion => !!s && !esNivel(s))
+      : [];
+
+    return {
+      direccion: [
+        nombreProyecto,
+        nombreActual,
+        ...ancestros.map((s) => s.label || s.id),
+      ],
+      titulo: actual ? actual.label || actual.id : nombreActual,
+      nivel: actual
+        ? nivelPadre
+          ? nivelPadre.label || nivelPadre.id
+          : nombreActual
+        : '',
+      hermanas,
+      activa: actual?.id ?? '',
+    };
+  }, [nombreProyecto, nombreActual, ruta, estructura]);
   // Variable de cada widget por id, en O(1) (igual que en el Diseñador): con
   // muchos widgets y muchos tags, un `find` por widget en cada dato del PLC
   // era la parte más cara de repintar la pantalla.
@@ -536,35 +797,63 @@ export function Preview() {
   );
 
   return (
-    <div className="flex h-full w-full flex-col bg-slate-200 dark:bg-navy">
+    <div className="relative flex h-full w-full flex-col bg-tema-fondo">
+      {/* Las ventanas de faceplate. Van aqui, en la raiz del runtime, y no
+          dentro del lienzo: flotan sobre TODO —cabecera incluida— y no las
+          recorta ni las escala el `transform` del lienzo. */}
+      <CapaPopups />
 
       {/* ── Barra de operación ────────────────────────────────────
-          Informativa de principio a fin. Lo único que se puede tocar en
-          esta vista es el HMI — y, en un visor, el botón de salir. */}
-      <header className="flex shrink-0 items-center gap-3 border-b border-slate-300 bg-white px-4 py-2 dark:border-navy-slate dark:bg-navy-soft">
-        <Logo variante="barra" />
-
-        <Separador />
-
-        {/* En qué proyecto y en qué pantalla. Son datos, no selectores. */}
-        <span
-          className="shrink-0 truncate text-xs font-semibold text-slate-500 dark:text-slate-400"
-          title={nombreProyecto ? `Proyecto: ${nombreProyecto}` : undefined}
+          Sin un solo control: es informativa de principio a fin. Lo único
+          que se puede tocar en esta vista es el HMI. */}
+      <header className="shrink-0 border-b border-tema-borde-suave bg-tema-superficie px-4">
+        {/* Dos columnas: el logotipo manda el ancho de la primera y los tres
+            segmentos viven en la segunda. Así las pestañas caen alineadas con
+            el camino y el título sin medir nada ni escribir un ancho a mano,
+            que se quedaría desfasado el día que el logotipo cambie. */}
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3 gap-y-1.5">
+        {/* El aire de ARRIBA lo pone esta fila. El de abajo lo pone el propio
+            botón de pestaña: la cabecera no puede llevar `pb` o el subrayado
+            de la activa dejaría de caer sobre su línea inferior. */}
+        <div
+          className={`flex items-center gap-3 ${
+            cabecera.hermanas.length > 1 ? 'row-span-2' : 'pt-2'
+          }`}
         >
-          {nombreProyecto ? `${nombreProyecto} · ${nombreActual}` : nombreActual}
-        </span>
+          <Logo variante="barra" />
+          <Separador />
+        </div>
 
-        {ruta.length > 0 && <Separador />}
-        <Ruta ruta={ruta} />
+        {/* Segmentos 1 y 2: dónde está la pestaña abierta, y qué vista es
+            —con el nivel del que cuelga—.
 
-        <div className="ml-auto flex shrink-0 items-center gap-3">
+            `self-end` y no centrado: así el borde inferior de este bloque ES
+            el de la fila, y lo que queda hasta las pestañas es exactamente el
+            hueco de la rejilla. Centrado, el alto lo marcaban el logotipo y
+            los controles —más altos— y esos píxeles sobrantes se sumaban al
+            hueco, que salía de 9 px donde arriba había 6. */}
+        <div className="min-w-0 self-end pt-2">
+        <Ruta
+          direccion={cabecera.direccion}
+          titulo={cabecera.titulo}
+          nivel={cabecera.nivel}
+        />
+        </div>
+
+        {/* Tercera columna: los avisos y el reloj. Fuera de la celda de los
+            segmentos, que es lo que les devuelve el ritmo. */}
+        <div
+          className={`flex shrink-0 items-center gap-3 pt-2 ${
+            cabecera.hermanas.length > 1 ? 'row-span-2' : ''
+          }`}
+        >
           {/* Lo que se ve NO viene del servidor. Decirlo no es un adorno: sin
               este aviso, una pantalla en caché es indistinguible de una en
               vivo, y alguien puede decidir algo mirando un diseño que ya no
               existe. */}
           {desfasado && !sinSesion && (
             <span
-              className="flex items-center gap-1.5 rounded-md bg-amber-500/15 px-2 py-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400"
+              className="flex items-center gap-1.5 rounded-md bg-tema-aviso-fondo px-2 py-1 text-[11px] font-semibold text-tema-sobre-aviso-fondo"
               title="No se pudo contactar con el servidor. Se muestra la última copia guardada en este navegador, que puede estar desfasada."
             >
               <AlertTriangleIcon className="h-3.5 w-3.5" />
@@ -577,25 +866,75 @@ export function Preview() {
           )}
 
           <PastillaEnVivo vivo={enVivo} />
+
+          {/* El ⛶ del proyecto de ejemplo. Quita el marco del navegador y
+              deja el sinóptico con todo el monitor; esta barra se queda,
+              porque es la única forma de navegar que tiene el operario. */}
+          <button
+            type="button"
+            onClick={() => void alternarPantallaCompleta()}
+            title={
+              pantallaCompleta
+                ? 'Salir de pantalla completa (Esc)'
+                : 'Pantalla completa (Esc para salir)'
+            }
+            aria-label={
+              pantallaCompleta ? 'Salir de pantalla completa' : 'Pantalla completa'
+            }
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-tema-sobre-superficie-alt transition hover:text-tema-primario"
+          >
+            {pantallaCompleta ? (
+              <MinimizeIcon className="h-4 w-4" />
+            ) : (
+              <MaximizeIcon className="h-4 w-4" />
+            )}
+          </button>
+
           <Reloj />
 
-          {/* Solo en un visor con sesión: es su único control. */}
+          {/* Solo en un visor con sesión: es su único control aparte del
+              HMI. La ventana del servidor tiene el menú para salir. */}
           {esVisor && sesion && (
             <button
               type="button"
               onClick={() => void salir()}
               title={`Salir (${sesion.usuario})`}
               aria-label="Cerrar sesión"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 outline-none transition hover:bg-slate-100 hover:text-navy focus-visible:ring-2 focus-visible:ring-siemens/40 dark:hover:bg-navy-slate/40 dark:hover:text-slate-100"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-tema-sobre-superficie-alt transition hover:text-tema-primario"
             >
               <LogOutIcon className="h-4 w-4" />
             </button>
           )}
         </div>
+
+        {/* Segmento 3, en la MISMA columna que los otros dos: lo coloca solo
+            el reparto de la rejilla, porque el logotipo ya ocupa la columna
+            de la izquierda en las dos filas. Un relleno vacío aquí empujaría
+            las pestañas a una TERCERA fila —se probó, y descentraba el
+            logotipo aún más—. */}
+        {cabecera.hermanas.length > 1 && (
+          <>
+            <Hermanas
+              hermanas={cabecera.hermanas}
+              activa={cabecera.activa}
+              grupo={GRUPO_POR_DEFECTO}
+            />
+          </>
+        )}
+        </div>
       </header>
 
+      {/* Ya no hace falta un botón flotante para salir: la barra sigue ahí y
+          su propio botón hace las dos cosas. */}
+
       {/* ── El lienzo ─────────────────────────────────────────────── */}
-      <div className="mp-scroll mp-scroll-dark flex min-h-0 flex-1 items-center justify-center overflow-auto p-6">
+      {/* `overflow-hidden` y no `auto`: ahora el sinóptico SIEMPRE cabe, así
+          que una barra de desplazamiento aquí sólo podría significar que el
+          cálculo de escala se ha equivocado. Que se note. */}
+      <div
+        ref={hueco}
+        className="mp-scroll mp-scroll-dark flex min-h-0 flex-1 items-center justify-center overflow-hidden"
+      >
         {sinSesion ? (
           <div className="max-w-md text-center text-sm text-slate-500 dark:text-slate-400">
             <p className="font-semibold text-slate-700 dark:text-slate-200">
@@ -643,6 +982,16 @@ export function Preview() {
             )}
           </div>
         ) : (
+          /* El envoltorio ocupa el tamaño YA ESCALADO. Sin él, el navegador
+             seguiría reservando el tamaño original —`transform` no cambia la
+             caja de maquetación— y el centrado saldría torcido con barras de
+             desplazamiento fantasma. */
+          <div
+            style={{
+              width: design.canvas.width * escala,
+              height: design.canvas.height * escala,
+            }}
+          >
           <div
             // SIN `rounded-*`, igual que en el Diseñador: esto es la pantalla
             // del panel. Redondearla aquí y no allí, además, haría que el
@@ -651,12 +1000,16 @@ export function Preview() {
             // El fondo elegido en el Diseñador manda; si no hay ninguno se cae
             // en el color del tema.
             className={`relative shrink-0 overflow-hidden shadow-xl ${
-              design.canvas.fondo ? '' : isDark ? 'bg-navy-soft' : 'bg-white'
+              design.canvas.fondo ? '' : 'bg-tema-superficie'
             }`}
             style={{
               width: design.canvas.width,
               height: design.canvas.height,
-              background: design.canvas.fondo || undefined
+              background: design.canvas.fondo || undefined,
+              // El lienzo mantiene su tamaño CSS real y sólo se escala al
+              // pintar: los widgets siguen midiendo lo que se diseñó.
+              transform: `scale(${escala})`,
+              transformOrigin: 'top left',
             }}
           >
             {design.widgets
@@ -694,9 +1047,11 @@ export function Preview() {
                     // para moverse en el tiempo. En el Diseñador no, porque
                     // allí el arrastre sirve para colocarlo.
                     interactivo
+                    resolver={resolverVariable}
                   />
                 </div>
               ))}
+          </div>
           </div>
         )}
       </div>

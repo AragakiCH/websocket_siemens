@@ -5,6 +5,8 @@ import { WidgetRenderer } from './WidgetRenderer';
 interface Props {
   widget: HmiWidget;
   variable?: PlcVariable;
+  /** Para las variables con nombre. Ver `WidgetRenderer`. */
+  resolver?: (variableId: string | null | undefined) => PlcVariable | undefined;
   selected: boolean;
   /**
    * `aditivo` = venía con Ctrl (o Cmd) pulsado: se suma o se quita de la
@@ -42,6 +44,7 @@ interface Props {
 export function CanvasWidget({
   widget,
   variable,
+  resolver,
   selected,
   onSelect,
   onMove,
@@ -204,7 +207,7 @@ export function CanvasWidget({
       }}
       className={`group cursor-move touch-none select-none rounded-sm outline-offset-2 transition-shadow ${selected ? 'outline outline-2 outline-siemens' : 'outline-none hover:outline hover:outline-1 hover:outline-siemens/40'}`}>
       
-      <WidgetRenderer widget={widget} variable={variable} />
+      <WidgetRenderer widget={widget} variable={variable} resolver={resolver} />
 
       {selected &&
       <>

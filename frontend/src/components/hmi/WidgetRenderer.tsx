@@ -1,9 +1,14 @@
-import React, { useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { PowerIcon } from "lucide-react";
 import { HmiWidget } from "../../models/widget";
 import { PlcVariable } from "../../models/plc";
 import { formatValue, valueFraction, isTruthy } from "../../utils/format";
+import { leerAccion, tieneAccion, ejecutarAccion } from "./acciones";
+import { resolverEnlaces } from "../../utils/enlaces";
+import { evaluarDinamicas, aplicarDinamicas } from "../../utils/dinamicas";
+import { ContextoMapaTags } from "./custom/faceplate/contexto";
+import { useAppStore } from "../../context/AppStore";
 import { customByKind, zipByKind, zipCatalogoListo } from "./custom/registry";
 import { estiloDeParte } from "./partes";
 import { HtmlWidgetRenderer } from "./HtmlWidgetRenderer";
@@ -15,11 +20,114 @@ interface Props {
   live?: boolean; // whether values animate (Designer preview always live)
   /** true en la Vista previa (se opera), false/ausente en el Diseñador. */
   interactivo?: boolean;
+  /**
+   * Cómo se traduce un id de variable al valor que hay ahora.
+   *
+   * Hace falta para las variables CON NOMBRE del widget: la principal ya
+   * llega resuelta en `variable`, pero las demás las tiene que buscar alguien,
+   * y quién sabe hacerlo depende de dónde se esté dibujando — en la Vista
+   * Previa es buscar por id; dentro de un faceplate hay que cambiar antes
+   * `param:x` por el tag de esa instancia.
+   *
+   * Sin él, los enlaces con nombre se quedan sin resolver. No se inventa un
+   * respaldo que busque por id: en un faceplate acertaría a veces y a veces
+   * leería el tag de otro equipo, que es peor que no leer nada.
+   */
+  resolver?: (variableId: string | null | undefined) => PlcVariable | undefined;
 }
 
 // Pure visual renderer for a single HMI widget. Reused by canvas + preview.
-export function WidgetRenderer({ widget, variable, interactivo = false }: Props) {
-  const { style } = widget;
+export function WidgetRenderer({
+  widget,
+  variable,
+  interactivo = false,
+  resolver,
+}: Props) {
+  // Las variables con nombre. `useMemo` porque esto corre en cada tick de
+
+  // valores y por cada widget de la pantalla; sin él se reharía la búsqueda
+
+  // entera aunque no hubiera cambiado ni el widget ni las lecturas.
+
+  const enlacesResueltos = React.useMemo(
+
+    () => (resolver ? resolverEnlaces(widget, resolver) : undefined),
+
+    [widget, resolver]
+
+  );
+
+  /**
+   * El aspecto que mandan las dinámicas, y el widget ya repintado con él.
+   *
+   * Aquí y no en cada widget: por este componente pasan los 19 de fábrica,
+   * los custom en React y los importados en ZIP, así que una regla escrita
+   * una vez vale para los tres y ninguno tiene que enterarse de que las
+   * dinámicas existen.
+   *
+   * Sin reglas, `evaluarDinamicas` devuelve `null` y `aplicarDinamicas`
+   * devuelve el MISMO objeto: el camino de un widget normal queda igual que
+   * estaba, sin objetos nuevos ni comparaciones de estilo en cada lectura.
+   */
+  const efectos = React.useMemo(
+    () => evaluarDinamicas(widget, variable, enlacesResueltos),
+    [widget, variable, enlacesResueltos]
+  );
+  const pintado = React.useMemo(
+    () => aplicarDinamicas(widget, efectos),
+    [widget, efectos]
+  );
+
+  const { style } = pintado;
+
+  // ── Acciones ──────────────────────────────────────────────────
+  //
+  // Qué manda este widget al pulsarlo. Sólo en la Vista Previa: en el
+  // Diseñador el clic sirve para seleccionar y arrastrar, y escribir al PLC
+  // mientras se coloca un botón sería lo contrario de lo que uno espera.
+  // El modo de color vive en el contexto de la aplicación, así que no se
+  // puede importar: se le pasa a la acción. Ver `EntornoAccion`.
+  const { setTheme } = useAppStore();
+  // Los tags de la instancia que envuelve a este widget, si esta dentro de un
+  // faceplate. Sirve para que un boton de aqui dentro abra OTRO faceplate del
+  // mismo equipo sin volver a elegir los tags a mano. Fuera de una instancia
+  // es `undefined`, y entonces un `param:` no resuelve a nada.
+  const mapaTags = useContext(ContextoMapaTags);
+  const accion = leerAccion(widget.config);
+  const mandaAlgo = interactivo && tieneAccion(accion);
+
+  // El fallo tiene que VERSE. Sin esto, el operario pulsa, no pasa nada, y
+  // vuelve a pulsar — que con una orden a una máquina es justo lo que no
+  // debe ocurrir.
+  const [avisoAccion, setAvisoAccion] = useState('');
+  const relojAviso = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (relojAviso.current !== null) window.clearTimeout(relojAviso.current);
+    },
+    []
+  );
+  const [mandando, setMandando] = useState(false);
+
+  const pulsar = async () => {
+    if (!mandaAlgo || mandando) return;
+    setMandando(true);
+    const r = await ejecutarAccion(accion, variable, widget.text || widget.name, {
+      setModoColor: setTheme,
+      mapaTags,
+    });
+    setMandando(false);
+    // Cancelar en la confirmación no es un error: no se dice nada.
+    if (!r.ok && r.error) {
+      setAvisoAccion(r.error);
+      // El temporizador anterior se cancela antes de poner otro: si no, el
+      // reloj del aviso viejo borra el nuevo al vencer, y con dos fallos
+      // seguidos el segundo mensaje parpadea y desaparece sin que dé tiempo
+      // a leerlo.
+      if (relojAviso.current !== null) window.clearTimeout(relojAviso.current);
+      relojAviso.current = window.setTimeout(() => setAvisoAccion(''), 6000);
+    }
+  };
 
   /**
    * Un widget ZIP tiene abierta una capa a pantalla completa (un modal).
@@ -34,11 +142,14 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
   // Estilo de cada parte: la base del `style` de siempre con lo que se haya
   // ajustado por parte encima. Un widget sin ajustes se ve exactamente igual
   // que antes, así que ningún diseño guardado cambia de aspecto.
-  const pTexto = estiloDeParte(widget, "label");
-  const pCaja = estiloDeParte(widget, "box");
-  const pIcono = estiloDeParte(widget, "icon");
-  const pBoton = estiloDeParte(widget, "boton");
-  const pValor = estiloDeParte(widget, "valor");
+  // Sobre el widget REPINTADO: `estiloDeParte` mira dentro del widget, así
+  // que con el original las partes se quedarían con el color de diseño y una
+  // dinámica de color no se vería en la mitad de los widgets.
+  const pTexto = estiloDeParte(pintado, "label");
+  const pCaja = estiloDeParte(pintado, "box");
+  const pIcono = estiloDeParte(pintado, "icon");
+  const pBoton = estiloDeParte(pintado, "boton");
+  const pValor = estiloDeParte(pintado, "valor");
 
   const textStyle: React.CSSProperties = {
     fontSize: pTexto.fontSize,
@@ -58,7 +169,10 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
     // 👇 primero checa si es custom TSX, si sí lo delega al registry
     const custom = customByKind(widget.kind);
     if (custom) {
-      return custom.render({ widget, variable, style, on, frac, label, interactivo });
+      return custom.render({
+        widget: pintado, variable, style, on, frac, label, interactivo,
+        enlaces: enlacesResueltos,
+      });
     }
 
     // 👇 luego checa si es un widget HTML cargado por ZIP
@@ -67,8 +181,9 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
       return (
         <HtmlWidgetRenderer
           zipWidget={zip}
-          widget={widget}
+          widget={pintado}
           variable={variable}
+          enlaces={enlacesResueltos}
           style={style}
           interactivo={interactivo}
           onModal={setModalZip}
@@ -123,14 +238,36 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
       case "button":
         return (
           <div
+            role={mandaAlgo ? 'button' : undefined}
+            tabIndex={mandaAlgo ? 0 : undefined}
+            onClick={mandaAlgo ? () => void pulsar() : undefined}
+            onKeyDown={
+              mandaAlgo
+                ? (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      void pulsar();
+                    }
+                  }
+                : undefined
+            }
             className="flex h-full w-full items-center justify-center shadow-sm"
             style={{
+              cursor: mandaAlgo ? (mandando ? 'progress' : 'pointer') : 'default',
+              opacity: mandando ? 0.7 : undefined,
               // El fondo del botón sale de la parte «Botón». Por defecto
               // hereda `style.color`, que es lo que usaba antes.
               background: pBoton.background && pBoton.background !== "transparent"
                 ? pBoton.background
                 : style.color,
-              color: pBoton.color ?? "#fff",
+              // El rotulo, BLANCO salvo que se le haya puesto un color a
+              // proposito. `pBoton.color` no vale aqui: hereda de
+              // `style.color`, que es justo el color del FONDO del boton de
+              // dos lineas mas arriba, asi que el texto salia del mismo color
+              // que la caja y el boton se veia como un rectangulo liso. El
+              // `?? "#fff"` de antes no llegaba a entrar nunca, porque la
+              // herencia hace que ese campo nunca sea nulo.
+              color: widget.partes?.boton?.color ?? "#fff",
               fontSize: pBoton.fontSize,
               fontWeight: pBoton.bold ? 700 : 600,
               borderRadius: pBoton.borderRadius,
@@ -296,7 +433,24 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
 
       case "switch":
         return (
-          <div className="flex h-full w-full items-center justify-center">
+          <div
+            className="flex h-full w-full items-center justify-center"
+            role={mandaAlgo ? 'switch' : undefined}
+            aria-checked={mandaAlgo ? on : undefined}
+            tabIndex={mandaAlgo ? 0 : undefined}
+            onClick={mandaAlgo ? () => void pulsar() : undefined}
+            onKeyDown={
+              mandaAlgo
+                ? (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      void pulsar();
+                    }
+                  }
+                : undefined
+            }
+            style={{ cursor: mandaAlgo ? 'pointer' : 'default' }}
+          >
             <div
               className="flex h-8 w-16 items-center rounded-full p-1 transition-colors"
               style={{
@@ -448,8 +602,18 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
   //
   // Así que mientras dure el modal se quitan los tres. Es exactamente cuando
   // no hacen falta: el widget está tapado por el modal de todas formas.
+  /**
+   * Una dinámica lo ha escondido.
+   *
+   * Se quita de en medio SOLO donde se opera. En el Diseñador se queda a la
+   * vista, atenuado: si desapareciera del lienzo no habría forma de volver a
+   * seleccionarlo para cambiarle la regla que lo esconde, y la única salida
+   * sería borrarlo desde otro sitio.
+   */
+  const oculto = !!efectos && !efectos.visible;
+
   const rootStyle: React.CSSProperties = {
-    opacity: modalZip ? 1 : style.opacity,
+    opacity: modalZip ? 1 : oculto ? style.opacity * 0.3 : style.opacity,
     transform: modalZip ? "none" : `rotate(${style.rotation}deg)`,
     filter: modalZip ? "none" : widget.enabled ? "none" : "grayscale(0.6)",
     borderRadius: isCircle ? "50%" : style.borderRadius,
@@ -461,9 +625,32 @@ export function WidgetRenderer({ widget, variable, interactivo = false }: Props)
       rootStyle.border = `${style.borderWidth}px solid ${style.borderColor}`;
     }
   }
+  if (oculto && interactivo) return null;
+
   return (
-    <div className="h-full w-full" style={rootStyle}>
+    <div
+      // El parpadeo, solo donde se opera: un lienzo lleno de widgets
+      // parpadeando mientras se coloca el de al lado es inservible.
+      className={`relative h-full w-full${
+        efectos?.parpadea && interactivo ? " psi-parpadeo" : ""
+      }`}
+      style={rootStyle}
+    >
       {content()}
+
+      {/* El fallo de una orden tiene que VERSE, y encima del propio mando:
+          si el aviso saliera en una esquina de la pantalla, en un sinóptico
+          lleno nadie lo relaciona con el botón que acaba de pulsar.
+
+          `pointer-events-none` para que no bloquee el siguiente intento. */}
+      {avisoAccion && (
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-20 rounded-b bg-state-error px-1.5 py-1 text-[10px] font-semibold leading-tight text-white"
+          title={avisoAccion}
+        >
+          {avisoAccion}
+        </div>
+      )}
     </div>
   );
 }

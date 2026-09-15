@@ -52,6 +52,32 @@ export interface HmiWidget {
   variableId: string | null;
 
   /**
+   * Variables ADICIONALES, cada una con su nombre: `{ fallo: 'plc1|DB.f' }`.
+   *
+   * `variableId` sigue siendo la principal —la que el widget pinta— y esto no
+   * la sustituye. Con una sola variable no se puede representar un equipo: una
+   * bomba es marcha, fallo, manual y velocidad a la vez, y lo que hay que ver
+   * de un vistazo es la combinación.
+   *
+   * Opcional a propósito. Un diseño guardado no lo trae, se lee como vacío y
+   * se comporta igual que siempre. Ver `utils/enlaces.ts`.
+   */
+  enlaces?: Record<string, string>;
+
+  /**
+   * Reglas que cambian el ASPECTO del widget según lo que lee: se ve o no se
+   * ve, de qué color, si parpadea.
+   *
+   * Es lo que hace que un sinóptico esté vivo — la bomba en rojo cuando
+   * falla, el aviso que sale solo cuando hay que hacer algo. En TIA Portal
+   * son las Animaciones.
+   *
+   * Opcional. Un widget sin reglas se pinta exactamente como antes, y ni
+   * siquiera se evalúa nada. Ver `utils/dinamicas.ts`.
+   */
+  dinamicas?: import('../utils/dinamicas').Dinamica[];
+
+  /**
    * A qué vista de la navegación pertenece este widget.
    *
    * Vacío o ausente = se ve SIEMPRE, en todas las vistas. Es lo que quieres
@@ -103,7 +129,7 @@ export interface HmiWidget {
 }
 
 /** Sub-elementos que puede tener un widget. */
-export type ParteId = 'box' | 'label' | 'icon' | 'boton' | 'valor';
+export type ParteId = 'box' | 'label' | 'icon' | 'boton' | 'valor' | 'scroll';
 
 /**
  * Propiedades estilizables de una parte.

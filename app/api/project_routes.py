@@ -250,9 +250,26 @@ class RenombrarProyecto(BaseModel):
 
 
 class ProyectoCompleto(BaseModel):
-    """Cuerpo de PUT /pantallas/{id}."""
+    """
+    Cuerpo de PUT /pantallas/{id}.
 
-    widgets: List[Dict[str, Any]] = Field(default_factory=list)
+    **`widgets` es obligatorio, y no tiene valor por defecto a proposito.**
+    Con `default_factory=list`, cualquier cuerpo que no lo trajera —un `{}` de
+    una prueba, un cliente viejo, una peticion mal montada— significaba
+    "reemplaza la pantalla por cero widgets", y el servidor respondia 200 tan
+    tranquilo. Se comprobo en una instalacion real: `PUT` con `{"sin":
+    "sentido"}` devolvia 200 y dejaba una pantalla de 3 widgets en 0.
+
+    Ahora falta el campo y Pydantic responde 422 sin tocar nada. Vaciar una
+    pantalla sigue siendo posible —se manda `"widgets": []`—, pero hay que
+    escribirlo.
+    """
+
+    widgets: List[Dict[str, Any]] = Field(
+        ...,
+        description="La lista COMPLETA de widgets. Obligatorio: se reemplaza "
+                    "todo lo que haya. Para vaciar la pantalla, manda [].",
+    )
     canvas: Optional[Dict[str, Any]] = Field(
         default=None, description="Medidas del lienzo. Si se omite, no se toca."
     )
@@ -260,6 +277,18 @@ class ProyectoCompleto(BaseModel):
         default=None,
         description="Versión sobre la que editaste. `null` fuerza la "
                     "escritura sin comprobar conflictos.",
+    )
+    forzar: bool = Field(
+        default=False,
+        description="Confirma que quieres escribir SIN comprobar la versión. "
+                    "Sin esto, un cuerpo sin `version` se rechaza con 400.",
+    )
+    faceplate: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Declaración de TIPO de faceplate: `es_tipo` y la lista "
+                    "de `parametros`. Omitirlo NO la borra — se deja como "
+                    "estaba, para que un cliente que no conozca los "
+                    "faceplates no se lleve por delante la declaración.",
     )
 
 
@@ -371,6 +400,7 @@ async def crear_pantalla(
     responses={
         409: {"description": "Otro usuario guardó antes: versión desactualizada."},
         404: {"description": "No existe esa pantalla."},
+        400: {"description": "Falta `version` y no se pidió `forzar`."},
     },
 )
 async def guardar_proyecto(
@@ -379,6 +409,19 @@ async def guardar_proyecto(
     cuerpo: ProyectoCompleto,
     sesion: Optional[Sesion] = Depends(sesion_actual),
 ) -> dict:
+    # Sin `version` esto pisa lo que haya sin mirar. Se permite —el cliente lo
+    # necesita tras resolver un 409, y una pantalla recién creada no tiene
+    # trabajo de nadie que pisar— pero hay que pedirlo a la cara. Dejarlo como
+    # comportamiento por omisión convierte el control de versiones en algo que
+    # se salta quien no sabe que existe.
+    if cuerpo.version is None and not cuerpo.forzar:
+        raise HTTPException(
+            400,
+            "Falta 'version'. Manda la versión sobre la que editaste, o "
+            "añade 'forzar': true si de verdad quieres sobrescribir lo que "
+            "haya guardado otro.",
+        )
+
     _exigir_lapiz(request, project_id, sesion)
     # Copia de lo que había ANTES, para difundir solo la diferencia. Se toma
     # aquí, fuera del lock del store: `guardar_todo` reemplaza la lista del
@@ -392,7 +435,7 @@ async def guardar_proyecto(
     try:
         doc = await _store(request).guardar_todo(
             project_id, cuerpo.widgets, cuerpo.canvas,
-            cuerpo.version, usuario_de(sesion),
+            cuerpo.version, usuario_de(sesion), cuerpo.faceplate,
         )
     except ConflictoDeVersion as exc:
         raise _conflicto(exc)

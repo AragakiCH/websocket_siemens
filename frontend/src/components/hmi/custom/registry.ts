@@ -3,10 +3,16 @@ import type { CustomWidgetDef } from './types';
 import { motorHidraulico } from './motor/MotorTrifasico';
 import { sidebarNavegacion } from './navegacion/SidebarNavegacion';
 import { pantallaScreen } from './navegacion/PantallaScreen';
+import { accesoSeccion } from './navegacion/AccesoSeccion';
+import { faceplate } from './faceplate/Faceplate';
 import { trendWidget } from './trend/Trend';
 import { contenedorGrupo } from './contenedor/Contenedor';
 import { valorUnidad } from './lectura/ValorUnidad';
 import { alarmasWidget } from './alarmas/Alarmas';
+import { simbolo } from './simbolos/Simbolo';
+// El catálogo de ZIP pasó a resolverse por un índice (`zipWidgetPorKind`) en
+// vez de recorriendo la lista, y `catalogoListo` dice si ya llegó del
+// servidor — eso es lo que distingue «aún cargando» de «ese widget no está».
 import {
   loadZipWidgets,
   zipWidgetPorKind,
@@ -21,6 +27,9 @@ export const customWidgets: CustomWidgetDef[] = [
   // activa, y cada widget del lienzo dice a cuál pertenece.
   sidebarNavegacion,
   pantallaScreen,
+  accesoSeccion,
+  // Instancia de un tipo de faceplate: se define una vez, se coloca muchas.
+  faceplate,
   // Tendencia en vivo: varias variables numéricas contra el tiempo.
   trendWidget,
   // Agrupa widgets para moverlos en bloque. Nada que ver con la
@@ -31,6 +40,8 @@ export const customWidgets: CustomWidgetDef[] = [
   // Las alarmas pendientes dentro del lienzo, filtrables por área, tag y
   // gravedad. Consume lo mismo que la franja y la pantalla de Alarmas.
   alarmasWidget,
+  // Biblioteca de símbolos de proceso: válvulas, y lo que se vaya añadiendo.
+  simbolo,
   // semaforoIndustrial,   ← aquí agregas cada widget nuevo, punto
 ];
 

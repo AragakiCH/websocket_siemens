@@ -296,8 +296,38 @@ class PlcManager:
                 "vendor": vendor,
                 "mensaje": f"PLC {plc_id} ({vendor}) añadido; conectando..."}
 
+    # ------------------------------------------------------------------ #
+    # El "PLC" de las variables internas
+    # ------------------------------------------------------------------ #
+    async def registrar_interno(self, handler) -> None:
+        """
+        Mete las variables internas en la misma mesa que los PLCs.
+
+        Con esto, un tag `interno|modo` sale en el snapshot, en `/tags`, en el
+        árbol de exploración y en la escritura sin que ninguno de esos caminos
+        tenga que enterarse de que existe una segunda clase de variable.
+
+        SIN USO HOY. Las variables internas se resuelven por `usar_internas()`
+        —el almacén se mezcla en `build_snapshot_message`— y no por un handler
+        que se registre como PLC. Este camino se deja porque no estorba y es
+        el que haría falta si algún día las internas necesitaran su propio
+        ciclo de vida (arranque, parada, reconexión) como un PLC de verdad.
+        """
+        self._handlers[handler.plc_id] = handler
+        await handler.start()
+        logger.info("Variables internas registradas como PLC '%s'.", handler.plc_id)
+
     async def remove_plc(self, plc_id: str) -> dict:
         """Detiene y elimina un PLC gestionado."""
+        # Las variables internas no son un PLC que se pueda quitar: son parte
+        # del proyecto. Borrarlas de un golpe dejaría sin lectura a todos los
+        # widgets enlazados a ellas, y encima desde la pantalla de PLCs, que
+        # no es donde nadie las buscaría.
+        if getattr(self._handlers.get(plc_id), "es_interno", False):
+            return {"ok": False,
+                    "mensaje": "Las variables internas no se quitan desde "
+                               "aquí. Se administran una a una en su panel."}
+
         handler = self._handlers.pop(plc_id, None)
         if handler is None:
             return {"ok": False, "mensaje": f"No existe el PLC '{plc_id}'."}
@@ -409,6 +439,10 @@ class PlcManager:
                 "endpoint": h.endpoint,
                 "estado": h.estado_conexion,
                 "conectado": h.is_plc_connected(),
+                # Para que la vista no lo enseñe como un autómata más en la
+                # pantalla de conexiones: no tiene IP, ni se reconecta, ni
+                # tiene sentido "probar la conexión" con él.
+                "interno": getattr(h, "es_interno", False),
                 "sampling_interval_ms": self._settings.sampling_interval_ms,
                 "publishing_interval_ms": self._settings.publishing_interval_ms,
             }
@@ -529,7 +563,16 @@ class PlcManager:
             # real del tag: comparar la cadena "95" contra un máximo de 90
             # daría un resultado sin sentido en Python.
             valor_convertido = convertir(valor, info.data_type)
-            if permitidos is not None:
+            # LA LISTA BLANCA NO SE APLICA A LAS VARIABLES INTERNAS.
+            #
+            # Existe para que nadie mande por accidente una orden a una
+            # máquina: por eso un tag del PLC hay que habilitarlo a mano, con
+            # sus límites. Detrás de una variable interna no hay máquina —
+            # forzarla es justo para lo que está—, así que exigir el mismo
+            # trámite solo conseguiría que nadie las usara. El rol y la
+            # auditoría sí se mantienen: sigue haciendo falta permiso de
+            # escritura y queda registrado quién la cambió.
+            if permitidos is not None and not getattr(handler, "es_interno", False):
                 permitidos.validar(plc_id, info.full_name, valor_convertido)
 
             plan.append({"plc_id": plc_id, "handler": handler, "info": info,

@@ -12,17 +12,45 @@
 // se envían por postMessage, y un listener dentro del iframe actualiza las
 // CSS custom properties + el objeto WIDGET + llama a window.onWidgetUpdate()
 // si el usuario lo definió en su widget.js.
+//
+// VARIAS VARIABLES, NO UNA
+// Además de la principal, el widget recibe las que haya declarado en su
+// `widget.json` y que el Diseñador le haya enlazado. Llegan como
+// `WIDGET.vars.<id>` y, sobre todo, como variables CSS
+// —`--w-<id>-on`, `--w-<id>-frac`, `--w-<id>-value`—, que es lo que permite
+// animar sin escribir una línea de JavaScript: un motor que gira a una
+// velocidad sacada de `--w-velocidad-frac` es una regla de CSS.
+//
+// Con una sola variable no se puede representar un equipo. Un motor es
+// marcha, fallo y velocidad A LA VEZ, y lo que el operario lee de un vistazo
+// es la combinación.
+//
+// Y PUEDE ESCRIBIR
+// `escribir(valor, 'variable')` manda al PLC. No escribe él: se lo pide al
+// anfitrión, que usa el MISMO `POST /escritura` que todo lo demás — con su
+// lista blanca, sus límites y su auditoría. Un widget importado es código de
+// fuera; que pudiera hablar con el autómata por su cuenta sería justo lo que
+// no debe pasar. Y en el Diseñador no escribe nunca: allí el clic es para
+// colocarlo.
 // =========================================================================
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { HmiWidget, WidgetStyle } from '../../models/widget';
 import type { PlcVariable } from '../../models/plc';
 import type { ZipWidget } from '../../services/zipWidgetLoader';
 import { formatValue, valueFraction, isTruthy } from '../../utils/format';
+import { escribir, partirId } from '../../services/escrituraApi';
 
 interface Props {
   zipWidget: ZipWidget;
   widget: HmiWidget;
   variable?: PlcVariable;
+  /**
+   * Las variables CON NOMBRE que declara el widget, ya resueltas.
+   *
+   * Dentro de un faceplate llegan traducidas a los tags de esa instancia, así
+   * que el widget nunca ve un `param:` — ni tiene que saber que existen.
+   */
+  enlaces?: Record<string, PlcVariable | undefined>;
   style: WidgetStyle;
   /**
    * true = se está OPERANDO (Vista previa): el widget recibe los clics.
@@ -39,7 +67,7 @@ interface Props {
 }
 
 export function HtmlWidgetRenderer({
-  zipWidget, widget, variable, style, interactivo = false, onModal,
+  zipWidget, widget, variable, enlaces, style, interactivo = false, onModal,
 }: Props) {
   const frac = valueFraction(variable);
   const on = isTruthy(variable);
@@ -57,14 +85,84 @@ export function HtmlWidgetRenderer({
    */
   const [modalAbierto, setModalAbierto] = useState(false);
 
+  /**
+   * Lo que el manejador de mensajes necesita saber AHORA.
+   *
+   * El listener se registra una sola vez —añadir y quitar un oyente de
+   * `message` en cada lectura, por cada widget de la pantalla, es ruido que
+   * no hace falta—, y con `[]` se quedaría con los valores del primer
+   * render. Esta referencia es la que lo mantiene al día.
+   */
+  const vivo = useRef({ interactivo, variable, enlaces, widget });
   useEffect(() => {
+    vivo.current = { interactivo, variable, enlaces, widget };
+  });
+
+  useEffect(() => {
+    const responder = (cuerpo: Record<string, unknown>) => {
+      try {
+        iframeRef.current?.contentWindow?.postMessage(cuerpo, '*');
+      } catch {
+        /* el iframe se fue */
+      }
+    };
+
+    /** El widget pide escribir en el PLC. */
+    const escrituraPedida = async (d: any) => {
+      const nombre = typeof d.variable === 'string' ? d.variable : '';
+      const fin = (ok: boolean, error = '') =>
+        responder({ type: 'widget-escrito', ok, error, variable: nombre });
+
+      const ctx = vivo.current;
+      // En el lienzo NO. Allí el puntero sirve para colocar el widget, y una
+      // orden a una máquina mientras se diseña la pantalla es lo contrario de
+      // lo que espera cualquiera.
+      if (!ctx.interactivo) return fin(false, 'En el Diseñador no se escribe.');
+
+      // Qué tag: el de la variable con nombre que pida, o el principal. Se usa
+      // la variable YA RESUELTA para que dentro de un faceplate escriba en el
+      // tag de SU instancia y no en el de la plantilla.
+      const v = nombre ? ctx.enlaces?.[nombre] : ctx.variable;
+      const enCrudo = String(ctx.widget.variableId ?? '');
+      const id =
+        v?.id ?? (!nombre && !enCrudo.startsWith('param:') ? enCrudo : '');
+      if (!id) {
+        return fin(
+          false,
+          nombre
+            ? `La variable «${nombre}» no está enlazada a ningún tag.`
+            : 'Este widget no tiene variable asociada.'
+        );
+      }
+
+      const { plc_id, tag } = partirId(id);
+      if (!plc_id) return fin(false, `«${id}» no identifica un PLC.`);
+
+      try {
+        // El mismo camino que todo lo demás: lista blanca, límites, tipo y
+        // auditoría los comprueba el servidor. Aquí no se duplica ninguna de
+        // esas reglas — un widget importado no puede saltárselas porque no es
+        // él quien llama.
+        await escribir([{ plc_id, tag, valor: d.valor }]);
+        fin(true);
+      } catch (e: any) {
+        fin(false, e?.message ?? 'No se pudo escribir.');
+      }
+    };
+
     const alMensaje = (e: MessageEvent) => {
       // Solo se escucha a NUESTRO iframe. Con varios widgets ZIP en la misma
       // pantalla, sin esta comprobación el modal de uno agrandaría a todos.
       if (e.source !== iframeRef.current?.contentWindow) return;
       const d = e.data;
-      if (!d || d.type !== 'widget-modal') return;
-      setModalAbierto(!!d.abierto);
+      if (!d) return;
+      if (d.type === 'widget-modal') {
+        setModalAbierto(!!d.abierto);
+        return;
+      }
+      if (d.type === 'widget-escribir') {
+        void escrituraPedida(d);
+      }
     };
     window.addEventListener('message', alMensaje);
     return () => window.removeEventListener('message', alMensaje);
@@ -125,6 +223,19 @@ window.addEventListener('message', function(e) {
   r.setProperty('--w-bold', d.widget.bold ? 'bold' : 'normal');
   r.setProperty('--w-opacity', String(d.widget.opacity));
 
+  // Las variables CON NOMBRE, cada una con las suyas. Con esto se anima en
+  // CSS puro: rotar con --w-velocidad-frac es una regla, no un script.
+  var vars = d.widget.vars || {};
+  for (var k in vars) {
+    if (!Object.prototype.hasOwnProperty.call(vars, k)) continue;
+    r.setProperty('--w-' + k + '-on', vars[k].on ? '1' : '0');
+    r.setProperty('--w-' + k + '-frac', String(vars[k].frac));
+    r.setProperty('--w-' + k + '-value', String(vars[k].value));
+    document.querySelectorAll('[data-w-var="' + k + '"]').forEach(function (el) {
+      el.textContent = String(vars[k].label);
+    });
+  }
+
   // Reemplazar textos dinámicos
   var els;
   els = document.querySelectorAll('[data-w-label]');
@@ -139,6 +250,35 @@ window.addEventListener('message', function(e) {
     window.onWidgetUpdate(d.widget);
   }
 });
+
+// Respuesta a una escritura pedida por el widget.
+window.addEventListener('message', function (e) {
+  var d = e.data;
+  if (!d || d.type !== 'widget-escrito') return;
+  if (typeof window.onWidgetEscrito === 'function') {
+    window.onWidgetEscrito(d);
+  }
+});
+
+/**
+ * Manda un valor al PLC.
+ *
+ *   escribir(1)                 -> a la variable principal
+ *   escribir(true, 'marcha')    -> a la variable con nombre 'marcha'
+ *
+ * No escribe aqui: se lo pide al anfitrion, que pasa por el endpoint de
+ * siempre con su lista blanca y su auditoria. La respuesta llega a
+ * window.onWidgetEscrito({ ok, error, variable }) si la defines.
+ */
+window.escribir = function (valor, variable) {
+  try {
+    parent.postMessage({
+      type: 'widget-escribir',
+      variable: variable || '',
+      valor: valor
+    }, '*');
+  } catch (e) {}
+};
 </script>`;
 
     // Script de inicialización con datos placeholder (se pisan con el primer postMessage)
@@ -146,7 +286,8 @@ window.addEventListener('message', function(e) {
 window.WIDGET = {
   value: '', on: false, frac: 0, label: '', name: '',
   color: '#009999', bg: 'transparent', borderColor: '#94a3b8',
-  fontSize: 14, bold: false, opacity: 1
+  fontSize: 14, bold: false, opacity: 1,
+  vars: {}
 };
 </script>`;
 
@@ -324,6 +465,19 @@ ${userScript}
     const payload = {
       type: 'widget-update',
       widget: {
+        // Las variables con nombre, ya masticadas igual que la principal: el
+        // widget no tiene que saber formatear ni normalizar nada.
+        vars: Object.fromEntries(
+          Object.entries(enlaces ?? {}).map(([k, v]) => [
+            k,
+            {
+              value: v?.value ?? '',
+              on: isTruthy(v),
+              frac: valueFraction(v),
+              label: v ? formatValue(v) : '—',
+            },
+          ])
+        ),
         value: rawValue,
         on,
         frac,
@@ -349,7 +503,7 @@ ${userScript}
     send();
     iframe.addEventListener('load', send);
     return () => iframe.removeEventListener('load', send);
-  }, [rawValue, on, frac, label, widget.name,
+  }, [enlaces, rawValue, on, frac, label, widget.name,
       style.color, style.background, style.borderColor,
       style.fontSize, style.bold, style.opacity]);
 
@@ -357,7 +511,23 @@ ${userScript}
     <iframe
       ref={iframeRef}
       srcDoc={srcDoc}
-      sandbox={hasJs ? 'allow-scripts' : ''}
+      /**
+       * SIEMPRE con scripts, lleve el ZIP su .js o no.
+       *
+       * El puente que reparte los valores —las variables CSS, `WIDGET`,
+       * `escribir()`— es NUESTRO y va en el srcDoc, así que sin
+       * `allow-scripts` no corre. Antes se ataba a que el autor hubiera
+       * incluido un `widget.js`, y el resultado era que un motor animado en
+       * CSS puro no recibía ni un valor: se quedaba clavado en su estado
+       * inicial sin decir por qué. El mismo widget funcionaba o no según
+       * llevara un fichero que ni siquiera usaba.
+       *
+       * Lo que de verdad aísla sigue puesto: SIN `allow-same-origin`, el
+       * iframe vive en un origen opaco. No puede leer la sesión, ni el
+       * almacenamiento, ni llamar a la API por su cuenta; para escribir en el
+       * PLC tiene que pedírselo al anfitrión, que es quien decide.
+       */
+      sandbox="allow-scripts"
       style={{
         // A pantalla completa mientras el widget tenga un modal abierto. Es
         // el único modo de que su `position: fixed` cubra de verdad: el

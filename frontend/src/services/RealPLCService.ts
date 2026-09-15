@@ -20,7 +20,7 @@
 // =========================================================================
 import { PlcVariable } from '../models/plc';
 import { toPlcVariables } from './plcAdapter';
-import { tokenParaWs } from './authApi';
+import { getToken, tokenParaWs } from './authApi';
 
 const RETRY_MS = 3000;
 const SELECTION_KEY = 'hmi.plc.selection'; // localStorage
@@ -141,6 +141,16 @@ class RealPLCServiceImpl {
   private openSocket() {
     if (this.ws && this.ws.readyState <= WebSocket.OPEN) return; // ya abierto/abriendo
     this.manualClose = false;
+
+    // Sin token no se intenta siquiera. Con la autenticación activada el
+    // backend cierra el socket nada más abrirlo, y el reintento automático
+    // convertía eso en un martilleo constante contra una puerta cerrada —se
+    // midió: cuatro conexiones rechazadas seguidas en la pantalla de acceso—.
+    // Al entrar, `hmi:sesion-iniciada` vuelve a llamar aquí.
+    if (!getToken()) {
+      this.retryTimer = setTimeout(() => this.openSocket(), RETRY_MS);
+      return;
+    }
 
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
     // El token va en el query string porque la API de WebSocket del

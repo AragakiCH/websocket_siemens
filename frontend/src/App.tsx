@@ -79,20 +79,33 @@ export function App() {
                   </RutaProtegida>
                 } />
 
+              {/* Configuración es herramienta de DISEÑO, no de operación: su
+                  propio subtítulo dice "prepare las variables que estarán
+                  disponibles en el diseñador". Enseña las IP de los PLC, las
+                  bases de datos y un botón "Agregar PLC" que el backend
+                  rechazaría — topología de planta que un operario no necesita
+                  y no debe ver. */}
               <Route
                 path="/config"
                 element={
-                <RutaProtegida>
+                <RutaProtegida rolMinimo="Administradores">
                     <Page>
                       <Configuracion />
                     </Page>
                   </RutaProtegida>
                 } />
               
+              {/* El Diseñador pide el MISMO rol que el backend exige para
+                  guardar (`editar_diseño` = Administradores). Sin esto, un
+                  operario llegaba escribiendo la URL, veía la paleta entera y
+                  hasta podía arrastrar widgets: el backend rechazaba el
+                  guardado con 403, así que no se perdía nada, pero se le
+                  ofrecía una herramienta que no le toca y sólo lo descubría al
+                  intentar guardar. */}
               <Route
                 path="/designer"
                 element={
-                <RutaProtegida>
+                <RutaProtegida rolMinimo="Administradores">
                     <Page>
                       <Designer />
                     </Page>
@@ -108,7 +121,7 @@ export function App() {
               <Route
                 path="/temas"
                 element={
-                <RutaProtegida>
+                <RutaProtegida rolMinimo="Administradores">
                     <Page>
                       <GestorTemas />
                     </Page>
@@ -160,13 +173,19 @@ export function App() {
                   </RutaProtegida>
                 } />
 
-                <Route
-            path="/preview"
-            element={
-            <Page>
-                <Preview />
-              </Page>
-            } />
+              {/* La vista de planta pide sesión, como todo lo demás: sin
+                  esto, cualquiera que alcanzara la red veía el proceso entero
+                  sin teclear una contraseña. No pide rol: es lo que un
+                  operario tiene que ver, y es su pantalla de trabajo. */}
+              <Route
+                path="/preview"
+                element={
+                <RutaProtegida>
+                    <Page>
+                      <Preview />
+                    </Page>
+                  </RutaProtegida>
+                } />
               
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

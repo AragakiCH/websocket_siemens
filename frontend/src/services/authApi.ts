@@ -11,7 +11,7 @@
 // Por eso existe `tokenParaWs()`.
 // =========================================================================
 
-const TOKEN_KEY = 'hmi.auth.token';
+export const TOKEN_KEY = 'hmi.auth.token';
 
 export type Rol = 'Supervisor' | 'Administradores' | 'Usuarios' | 'Invitado';
 

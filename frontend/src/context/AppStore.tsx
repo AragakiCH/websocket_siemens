@@ -22,6 +22,7 @@ import { sincronizarWidgets, EVENTO_WIDGETS } from '../services/zipWidgetLoader'
 import { createTranslator, widgetLabel as widgetLabelFn, TFn } from '../i18n';
 import { customByKind, zipByKind } from '../components/hmi/custom/registry';
 import {
+  TOKEN_KEY,
   me as fetchMe,
   logout as apiLogout,
   UsuarioSesion,
@@ -320,9 +321,14 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   // Se traen una vez al arrancar y se dejan en la caché local, que es lo que
   // leen de forma síncrona el catálogo, el registry y el lienzo. Sin esto,
   // un widget importado desde otra máquina o en otra sesión no aparecería.
+  //
+  // Depende de la SESIÓN, no sólo del montaje: este contexto se monta en la
+  // pantalla de acceso, cuando todavía no hay token, y esa primera llamada se
+  // queda sin permiso. Sin volver a pedirlo al entrar, el catálogo se quedaba
+  // vacío toda la sesión y los widgets propios no aparecían en la paleta.
   useEffect(() => {
     void sincronizarWidgets();
-  }, []);
+  }, [sesion?.usuario]);
 
   // El catálogo puede cambiar a media sesión: al subir un `.zip`, al borrar
   // uno, o al importar un proyecto que trae los suyos. Repintar entonces es
@@ -347,6 +353,25 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     window.addEventListener('hmi:sesion-caducada', alCaducar);
     return () => window.removeEventListener('hmi:sesion-caducada', alCaducar);
   }, []);
+
+  // Otra pestaña del MISMO navegador puede entrar con otra cuenta. El token
+  // vive en `localStorage`, que es compartido por todo el origen, así que esta
+  // pestaña empieza a hablar con el servidor como el usuario nuevo sin
+  // enterarse: se vio en pruebas con el Diseñador abierto y editable mientras
+  // el token ya era el de un operario, y el primer guardado fallando con 403.
+  //
+  // `storage` sólo llega a las OTRAS pestañas —nunca a la que escribió—, que
+  // son exactamente las que hay que avisar. Al refrescar la sesión se
+  // recalculan los permisos, y las rutas protegidas reaccionan solas.
+  useEffect(() => {
+    const alCambiarToken = (e: StorageEvent) => {
+      // `key === null` es un `localStorage.clear()`: afecta al token también.
+      if (e.key !== null && e.key !== TOKEN_KEY) return;
+      void refrescarSesion();
+    };
+    window.addEventListener('storage', alCambiarToken);
+    return () => window.removeEventListener('storage', alCambiarToken);
+  }, [refrescarSesion]);
 
   // ================================================================ //
   // MULTIUSUARIO: proyecto compartido

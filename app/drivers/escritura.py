@@ -61,6 +61,47 @@ TEXTO_VERDADERO = {"true", "1", "on", "si", "sí", "verdadero", "activo", "high"
 TEXTO_FALSO = {"false", "0", "off", "no", "falso", "inactivo", "low"}
 
 
+# ===================================================================== #
+# Dos vocabularios para los mismos tipos
+# ===================================================================== #
+# El driver de Rexroth guarda el tipo en nomenclatura IEC 61131 —BOOL, REAL,
+# DINT…— porque es la que el programador lee en el ctrlX, y que la interfaz
+# diga lo mismo que su proyecto vale más que la coherencia interna. El de
+# Siemens deja el nombre OPC UA tal cual: Boolean, Float, Int32.
+#
+# Este módulo habla OPC UA, así que la traducción se hace AQUÍ, a la entrada de
+# `convertir()` y de `es_escribible()`, y no en cada llamador. Hacerlo en el
+# llamador es justo lo que falló: `GET /escritura/candidatos` preguntaba si
+# "REAL" era escribible, la respuesta era que no, y un ctrlX entero se quedaba
+# sin un solo tag habilitable — sin ningún error, solo una lista vacía. Con la
+# traducción en un sitio, el próximo que valide un tipo la hereda sin saberlo.
+#
+# No se toca `TIPOS_IEC` del driver: ahí el nombre IEC es lo correcto. Lo que
+# faltaba era el puente, no cambiar ninguna de las dos orillas.
+ALIAS_IEC = {
+    "BOOL": "Boolean",
+    "SINT": "SByte",    "USINT": "Byte",    "BYTE": "Byte",
+    "INT": "Int16",     "UINT": "UInt16",   "WORD": "UInt16",
+    "DINT": "Int32",    "UDINT": "UInt32",  "DWORD": "UInt32",
+    "LINT": "Int64",    "ULINT": "UInt64",  "LWORD": "UInt64",
+    "REAL": "Float",    "LREAL": "Double",
+    "STRING": "String", "WSTRING": "String",
+}
+
+
+def normalizar_tipo(data_type: str) -> str:
+    """
+    Nombre OPC UA del tipo, venga escrito en OPC UA o en IEC 61131.
+
+    Se busca en MAYÚSCULAS y solo se sustituye si hay entrada, así que los
+    nombres OPC UA pasan intactos: "Float".upper() es "FLOAT", que no está en
+    la tabla, y sale tal cual. Un tipo desconocido también se devuelve sin
+    tocar, para que el mensaje de error nombre lo que de verdad llegó.
+    """
+    tipo = (data_type or "").strip()
+    return ALIAS_IEC.get(tipo.upper(), tipo)
+
+
 class ErrorDeTipo(ValueError):
     """El valor no encaja con el tipo del tag. Lleva un mensaje accionable."""
 
@@ -71,8 +112,11 @@ def convertir(valor: Any, data_type: str) -> Any:
 
     Lanza `ErrorDeTipo` con una explicación en castellano si no encaja. Nunca
     adivina: ante la duda, falla.
+
+    `data_type` se acepta en cualquiera de los dos vocabularios: "Float" o
+    "REAL" son el mismo tipo y las dos formas funcionan (ver `normalizar_tipo`).
     """
-    tipo = (data_type or "").strip()
+    tipo = normalizar_tipo(data_type)
 
     # ---------------------------------------------------------------- #
     # Booleanos
@@ -184,7 +228,7 @@ def convertir(valor: Any, data_type: str) -> Any:
 
 def es_escribible(data_type: str) -> bool:
     """¿Sabe este módulo convertir a ese tipo? Para avisar al configurar."""
-    tipo = (data_type or "").strip()
+    tipo = normalizar_tipo(data_type)
     return (
         tipo == "Boolean"
         or tipo in RANGOS_ENTEROS
