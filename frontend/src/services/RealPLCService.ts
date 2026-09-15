@@ -150,6 +150,10 @@ class RealPLCServiceImpl {
     this.ws = ws;
 
     ws.onopen = () => this.marcarConexion(true);
+    // El resto del sistema escucha `hmi:conexion` para RESINCRONIZAR al
+    // volver: mientras el socket estuvo caído se perdieron los eventos de
+    // proyecto y de runtime, y el snapshot que manda el servidor al conectar
+    // solo cubre los valores de los tags, no el diseño.
 
     ws.onmessage = (ev) => {
       let msg: any;
@@ -169,20 +173,24 @@ class RealPLCServiceImpl {
           Object.entries(this.tags).filter(([, t]) => t.plc !== id)
         );
         this.emitNow();
-      } else if (
-        msg.type === 'project.updated' ||
-        msg.type === 'project.removed' ||
-        msg.type === 'config.updated' ||
-        msg.type === 'presence'
-      ) {
-        // Canal de PROYECTO: baja frecuencia. Este servicio no los
-        // interpreta, pero es el único que tiene el socket abierto, así
-        // que los reemite como eventos del navegador y quien quiera los
-        // escucha (AppStore, barra de presencia...). Evita abrir un
-        // segundo WebSocket solo para esto.
-        window.dispatchEvent(new CustomEvent('hmi:ws', { detail: msg }));
       } else if (msg.type === 'status') {
         // Estado de conexión de un PLC (no afecta a las variables). Se ignora.
+      } else if (typeof msg.type === 'string') {
+        // Canal de PROYECTO / CONFIGURACIÓN: baja frecuencia. Este servicio
+        // no los interpreta, pero es el único que tiene el socket abierto,
+        // así que los reemite como eventos del navegador y quien quiera los
+        // escucha (AppStore, Vista Previa, presencia...). Evita abrir un
+        // segundo WebSocket solo para esto.
+        //
+        // SE REEMITE TODO lo que traiga `type` y no sea un dato de PLC.
+        // Antes había una lista cerrada de cuatro tipos (`project.updated`,
+        // `project.removed`, `config.updated`, `presence`) y todo lo demás
+        // se tiraba en silencio: `lock.changed` (el lápiz), `tema.updated`,
+        // `proyecto.updated`/`proyecto.removed`, `alarma.*`... con código
+        // escuchándolos en `useLock`, `TemaProvider`, `AppStore` y el widget
+        // de alarmas que nunca llegaba a enterarse. Cada tipo nuevo del
+        // backend obligaba a acordarse de venir aquí, y nadie se acordaba.
+        window.dispatchEvent(new CustomEvent('hmi:ws', { detail: msg }));
       } else if (msg.tag) {
         // Cambio de valor de un tag en tiempo real.
         const clave = `${msg.plc}|${msg.tag}`;

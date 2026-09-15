@@ -35,6 +35,7 @@ import {
   setUltimaPantalla,
   ResumenPantalla } from
 '../utils/designStorage';
+import { aplicarCambio, versionEncaja } from '../utils/aplicarCambio';
 import {
   listarProyectosHmi,
   getUltimoProyecto,
@@ -82,6 +83,16 @@ interface AppStore {
   authRequerida: boolean;
   /** True mientras se resuelve quién soy, al arrancar. */
   comprobandoSesion: boolean;
+  /**
+   * ¿Esta pantalla es un VISOR (otro equipo de la red) o la ventana del
+   * propio servidor?
+   *
+   * Lo dice el SERVIDOR mirando por dónde entra la petición (ver
+   * `app/api/origen.py`); aquí no se decide nada. Un visor va directo al
+   * runtime al entrar y no ve el menú ni las pantallas de administración.
+   * `null` mientras no se ha preguntado.
+   */
+  esVisor: boolean | null;
   cerrarSesion: () => Promise<void>;
   /** Quién más está mirando ahora mismo. */
   presentes: {usuario: string;categoria: string;}[];
@@ -190,6 +201,7 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   // recargar la página con una sesión válida las rutas protegidas rebotan
   // al login durante el instante en que `sesion` todavía es null.
   const [comprobandoSesion, setComprobandoSesion] = useState(true);
+  const [esVisor, setEsVisor] = useState<boolean | null>(null);
   const [presentes, setPresentes] = useState<{usuario: string;categoria: string;}[]>([]);
   // El último proyecto y la última pantalla se recuerdan por navegador: al
   // recargar vuelves a donde estabas, no al principio. La pantalla se guarda
@@ -288,6 +300,9 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
       if (typeof d.auth_requerida === 'boolean') {
         setAuthRequerida(d.auth_requerida);
       }
+      // Un backend anterior no manda el campo: se asume servidor, que es el
+      // comportamiento de siempre (todo visible).
+      setEsVisor(d.es_visor === true);
     } catch {
       setSesion(null);
       setPermisos(null);
@@ -496,6 +511,14 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     };
   }, [projectId]);
 
+  // Lo último conocido, en refs: el manejador del WebSocket de abajo se
+  // registra una vez por dependencias y no puede leer `widgets` ni
+  // `projectVersion` de su closure sin volver a suscribirse en cada render.
+  const widgetsRef = useRef(widgets);
+  widgetsRef.current = widgets;
+  const projectVersionRef = useRef(projectVersion);
+  projectVersionRef.current = projectVersion;
+
   // Cambios hechos por OTRA persona. Llegan por el WebSocket, reenviados por
   // RealPLCService como evento del navegador.
   useEffect(() => {
@@ -560,26 +583,28 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
           return;
         }
 
-        const cambio = msg.cambio ?? {};
-        if (cambio.accion === 'widget_guardado' && cambio.datos) {
-          // Aplicación quirúrgica: solo el widget que cambió.
-          setWidgets((prev) => {
-            const i = prev.findIndex((w) => w.id === cambio.datos.id);
-            if (i < 0) return [...prev, cambio.datos];
-            const copia = [...prev];
-            copia[i] = cambio.datos;
-            return copia;
-          });
-        } else if (cambio.accion === 'widget_borrado') {
-          setWidgets((prev) => prev.filter((w) => w.id !== cambio.widget));
+        // Aplicación quirúrgica: solo lo que cambió (un widget del PATCH, el
+        // id del DELETE o el `diff` del PUT), sin volver a pedir la pantalla.
+        // Solo si la versión del evento es la siguiente a la mía: con un
+        // hueco (el socket estuvo caído) se recarga entero, que es lo único
+        // que garantiza no quedarse a medias.
+        const aplicado = versionEncaja(projectVersionRef.current, msg.version)
+          ? aplicarCambio({ widgets: widgetsRef.current, canvas: { width: 0, height: 0 } }, msg)
+          : null;
+        if (aplicado) {
+          setWidgets(aplicado.widgets);
         } else {
-          // Cambio grande (PUT, proyecto nuevo): se recarga entero.
-          // Con try/catch porque esto corre dentro de un manejador de evento:
-          // una promesa rechazada aquí no la recoge nadie y se pierde en la
-          // consola como "unhandled rejection".
+          // Cambio grande sin diff, backend antiguo o versión desfasada: se
+          // recarga entero. Con try/catch porque esto corre dentro de un
+          // manejador de evento: una promesa rechazada aquí no la recoge
+          // nadie y se pierde en la consola como "unhandled rejection".
           try {
             const p = await cargarProyecto(projectId);
-            if (p) setWidgets(p.widgets);
+            if (p) {
+              setWidgets(p.widgets);
+              setProjectVersion(p.version);
+              return;
+            }
           } catch (e) {
             console.warn('[proyecto] no se pudo recargar tras un cambio:', e);
           }
@@ -665,6 +690,7 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     cerrarSesion,
     authRequerida,
     comprobandoSesion,
+    esVisor,
     presentes,
     estadoPantallas,
     proyectoId,

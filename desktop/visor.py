@@ -9,6 +9,10 @@ central. No habla con los PLCs ni guarda nada: solo muestra la vista React y
 recibe los datos por WebSocket. Todo —pantallas, widgets, conexiones,
 usuarios, histórico— vive en el servidor.
 
+Al entrar, un visor va DIRECTO al runtime del proyecto que el supervisor tiene
+abierto en el servidor (no al menú), y lo sigue en vivo. Eso lo decide el
+servidor por la IP de origen, no este fichero: ver docs/VISOR_RUNTIME.md.
+
 Es deliberadamente un cliente FINO, y no importa nada de `app/`: así el .exe
 del visor pesa una fracción y actualizar la lógica del HMI no obliga a
 reinstalar en todos los puestos, solo en el servidor.

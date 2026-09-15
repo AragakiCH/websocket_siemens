@@ -152,6 +152,56 @@ async def _difundir(request: Request, project_id: str, doc: dict,
     })
 
 
+#: Tamaño máximo (en caracteres de JSON) del diff que viaja dentro de
+#: `project.updated`. Por encima, se manda solo el aviso y los clientes
+#: vuelven a pedir la pantalla, como antes. Un widget con una imagen grande
+#: en data-URI puede pesar más que esto él solo; en ese caso es más barato
+#: que cada cliente la pida por HTTP (cacheable, comprimible) que meterla en
+#: un broadcast a diez sockets.
+MAX_DIFF_BROADCAST = 200_000
+
+
+def diff_de_widgets(antes: List[dict], despues: List[dict],
+                    canvas_antes: Optional[dict],
+                    canvas_despues: Optional[dict]) -> Optional[dict]:
+    """
+    Qué cambió entre dos versiones de una pantalla, para que los visores lo
+    apliquen SIN volver a pedir el documento.
+
+    Antes, cada PUT del Diseñador (uno cada 400 ms mientras se arrastra)
+    hacía que TODOS los clientes conectados pidieran `GET /pantallas/<id>`
+    a la vez. Con diez visores eran diez descargas de la pantalla entera por
+    cada movimiento del ratón. Con esto viaja solo el widget que se movió.
+
+    Devuelve `None` si el diff no cabe en `MAX_DIFF_BROADCAST`: los clientes
+    recargan por HTTP, que es el camino de siempre.
+    """
+    import json as _json
+
+    por_id_antes = {str(w.get("id")): w for w in antes if w.get("id")}
+    por_id_despues = {str(w.get("id")): w for w in despues if w.get("id")}
+
+    cambiados = [w for wid, w in por_id_despues.items()
+                 if por_id_antes.get(wid) != w]
+    borrados = [wid for wid in por_id_antes if wid not in por_id_despues]
+    # El orden de la lista es el orden de pintado (z-order). Se manda entero
+    # solo como ids: es barato y evita que un "traer al frente" pase
+    # desapercibido para quien aplica el diff.
+    orden = list(por_id_despues.keys())
+
+    diff: Dict[str, Any] = {"widgets": cambiados, "borrados": borrados,
+                            "orden": orden}
+    if canvas_antes != canvas_despues:
+        diff["canvas"] = canvas_despues
+
+    try:
+        if len(_json.dumps(diff, ensure_ascii=False)) > MAX_DIFF_BROADCAST:
+            return None
+    except (TypeError, ValueError):
+        return None
+    return diff
+
+
 def _conflicto(exc: ConflictoDeVersion) -> HTTPException:
     """Traduce el conflicto a un 409 con los datos para que el cliente decida."""
     return HTTPException(
@@ -330,6 +380,15 @@ async def guardar_proyecto(
     sesion: Optional[Sesion] = Depends(sesion_actual),
 ) -> dict:
     _exigir_lapiz(request, project_id, sesion)
+    # Copia de lo que había ANTES, para difundir solo la diferencia. Se toma
+    # aquí, fuera del lock del store: `guardar_todo` reemplaza la lista del
+    # documento en sitio, así que después ya no habría con qué comparar.
+    try:
+        previo = _store(request).obtener(project_id) or {}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    widgets_antes = list(previo.get("widgets") or [])
+    canvas_antes = previo.get("canvas")
     try:
         doc = await _store(request).guardar_todo(
             project_id, cuerpo.widgets, cuerpo.canvas,
@@ -342,9 +401,13 @@ async def guardar_proyecto(
     except ValueError as exc:
         raise HTTPException(400, str(exc))
 
-    await _difundir(request, project_id, doc, usuario_de(sesion),
-                    {"accion": "proyecto_reemplazado",
-                     "num_widgets": len(doc["widgets"])})
+    cambio: Dict[str, Any] = {"accion": "proyecto_reemplazado",
+                              "num_widgets": len(doc["widgets"])}
+    diff = diff_de_widgets(widgets_antes, doc["widgets"],
+                           canvas_antes, doc.get("canvas"))
+    if diff is not None:
+        cambio["diff"] = diff
+    await _difundir(request, project_id, doc, usuario_de(sesion), cambio)
     return {"ok": True, "version": doc["version"],
             "actualizado_en": doc["actualizado_en"]}
 

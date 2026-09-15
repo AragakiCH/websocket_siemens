@@ -318,6 +318,8 @@ export async function me(): Promise<{
   sesion?: UsuarioSesion;
   permisos?: Permisos;
   auth_requerida?: boolean;
+  /** `true` si esta pantalla es un visor (otra IP). Lo decide el servidor. */
+  es_visor?: boolean;
 }> {
   return fetchAuth('/auth/me');
 }

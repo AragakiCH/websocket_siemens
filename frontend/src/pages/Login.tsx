@@ -107,7 +107,7 @@ type Errores = Record<string, string>;
 
 export function Login() {
   const navigate = useNavigate();
-  const { t, refrescarSesion } = useAppStore();
+  const { t, refrescarSesion, sesion, comprobandoSesion } = useAppStore();
   const sinMovimiento = useReducedMotion();
 
   const [pestana, setPestana] = useState<Pestana>('entrar');
@@ -194,6 +194,15 @@ export function Login() {
       vivo = false;
     };
   }, [dbId, recarga]);
+
+  // Un visor que ya tiene sesión (la guarda WebView2 entre arranques) no
+  // tiene que volver a escribir nada: abrir el .exe es abrir el runtime.
+  // Solo en visores: en el servidor, volver a `/` es la forma de cambiar de
+  // cuenta, y saltarse el login la quitaría.
+  useEffect(() => {
+    if (comprobandoSesion || !sesion || !estado?.es_visor) return;
+    navigate('/preview', { replace: true });
+  }, [comprobandoSesion, sesion, estado?.es_visor, navigate]);
 
   // Un solo objeto para los dos formularios: los campos compartidos (usuario,
   // contraseña) no se pierden al cambiar de pestaña.
@@ -318,7 +327,10 @@ export function Login() {
         await login(form.usuario.trim(), form.password, form.recordarme, dbId);
       }
       await refrescarSesion();
-      navigate('/menu');
+      // Un VISOR entra directo al runtime: en un puesto de operación no hay
+      // nada que elegir, el HMI que toca ver lo decide el supervisor desde el
+      // servidor. La ventana del servidor sigue yendo al menú.
+      navigate(estado?.es_visor ? '/preview' : '/menu');
     } catch (err: any) {
       // El backend ya manda mensajes redactados y en español (credenciales
       // incorrectas, cuenta inactiva, usuario repetido...). Se muestran tal

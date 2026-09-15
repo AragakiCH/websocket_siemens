@@ -324,6 +324,16 @@ async def borrar_proyecto(
              {"pantallas": borradas})
     await _difundir(request, "proyecto.removed", pid, usuario_de(sesion),
                     {"accion": "proyecto_borrado", "pantallas": borradas})
+
+    # Si era el proyecto que están viendo los VISORES, no pueden quedarse
+    # mirando algo que ya no existe: se vuelve al proyecto por defecto y se
+    # les avisa por el mismo canal, para que salten sin recargar.
+    runtime = getattr(request.app.state, "runtime_store", None)
+    if runtime is not None and runtime.proyecto_id == pid:
+        from app.api.runtime_routes import difundir_runtime
+        await runtime.publicar(PROYECTO_POR_DEFECTO, usuario_de(sesion))
+        await difundir_runtime(request, usuario_de(sesion),
+                               motivo="proyecto_borrado")
     return {"ok": True, "proyecto_id": pid, "pantallas_borradas": borradas,
             "mensaje": f"Proyecto '{pid}' eliminado con "
                        f"{len(borradas)} pantalla(s)."}

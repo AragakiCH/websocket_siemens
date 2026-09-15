@@ -26,10 +26,11 @@
 // «Línea 2» te enseñaría el HMI del proyecto de al lado, sin ningún aviso y
 // con una pinta perfectamente normal.
 //
-// El proyecto sale de la preferencia local que deja el Diseñador
-// (`hmi.proyecto.ultimo`) y, a falta de ella, del proyecto por defecto. El
-// día que un equipo de planta tenga que arrancar siempre por un proyecto
-// concreto, ese ajuste va justo aquí.
+// El proyecto sale del SERVIDOR (`GET /runtime`): es el que el supervisor
+// tiene abierto en el Diseñador del equipo servidor, y cuando lo cambia
+// llega `runtime.changed` por el WebSocket y esta vista salta con él. La
+// preferencia local (`hmi.proyecto.ultimo`) queda solo para el primer
+// pintado desde la caché y como respaldo si el backend no responde.
 //
 // LA BARRA DE ARRIBA ES DEL OPERADOR, NO DEL DISEÑADOR
 // Por eso enseña lo que hace falta en planta y nada más: la marca, en qué
@@ -49,9 +50,11 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
-import { Loader2Icon, AlertTriangleIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Loader2Icon, AlertTriangleIcon, LogOutIcon } from 'lucide-react';
 import { useAppStore } from '../context/AppStore';
 import { WidgetRenderer } from '../components/hmi/WidgetRenderer';
 import { Logo } from '../components/ui/Logo';
@@ -68,10 +71,17 @@ import {
   cargarProyecto,
   listarPantallas,
   loadDesign,
+  saveDesign,
   PANTALLA_POR_DEFECTO,
   SavedDesign,
   ResumenPantalla,
 } from '../utils/designStorage';
+import {
+  aplicarCambio,
+  versionEncaja,
+  type MensajeProjectUpdated,
+} from '../utils/aplicarCambio';
+import { fetchRuntime, type RuntimeChanged } from '../services/runtimeApi';
 import {
   getUltimoProyecto,
   PROYECTO_HMI_POR_DEFECTO,
@@ -220,7 +230,8 @@ function Reloj() {
 // ─── La vista ────────────────────────────────────────────────────
 
 export function Preview() {
-  const { variables, isDark } = useAppStore();
+  const { variables, isDark, esVisor, sesion, cerrarSesion } = useAppStore();
+  const navigate = useNavigate();
 
   // Vista abierta en la navegación. Al pulsar un botón del Menú Lateral
   // cambia, y este componente se vuelve a dibujar mostrando solo los widgets
@@ -229,11 +240,19 @@ export function Preview() {
   const ruta = useRutaDeVista(GRUPO_POR_DEFECTO);
   const enVivo = useEnVivo();
 
-  // Qué proyecto es este HMI. Se lee UNA sola vez, al montar: la vista previa
-  // vive en su propia pestaña, y que cambiara de proyecto bajo los pies del
-  // operador porque alguien toca el Diseñador en otra ventana sería lo último
-  // que uno espera de una pantalla de planta.
-  const proyecto = useMemo(() => getUltimoProyecto(), []);
+  // ── Qué proyecto es este HMI ────────────────────────────────────
+  //
+  // EL QUE ESTÁ PUBLICADO EN EL SERVIDOR (`GET /runtime`), no el de la
+  // preferencia local. Es lo que hace que un visor recién instalado abra el
+  // proyecto que el supervisor tiene delante, y que si el supervisor cambia
+  // de proyecto en el Diseñador, todos los puestos salten con él —llega por
+  // el WebSocket como `runtime.changed`, sin recargar.
+  //
+  // La preferencia local solo sirve para el PRIMER pintado (desde la caché,
+  // antes de que el servidor conteste) y como respaldo si el backend es
+  // anterior a `/runtime` o no responde.
+  const [proyecto, setProyecto] = useState<string>(() => getUltimoProyecto());
+  const [nombreProyecto, setNombreProyecto] = useState('');
 
   // ── Qué pantalla se abre ────────────────────────────────────────
   //
@@ -256,6 +275,11 @@ export function Preview() {
     arranque ? loadDesign(arranque) : null
   );
   const [cargando, setCargando] = useState(true);
+
+  // Versión de lo que hay pintado. 0 = desconocida (viene de la caché). Es
+  // lo que permite aplicar un `project.updated` encima sin volver a pedir la
+  // pantalla: solo si el evento es justo la versión siguiente.
+  const versionRef = useRef(0);
 
   // `true` mientras lo pintado venga de la caché del navegador y no del
   // servidor. Empieza en true porque el primer render ES la caché: hasta que
@@ -281,36 +305,64 @@ export function Preview() {
     setPantalla(pantallaId);
   }, [pantallaId]);
 
-  // ── Catálogo de pantallas ───────────────────────────────────────
+  // ── Aplicar un proyecto (el publicado, o el de respaldo) ────────
   //
-  // Ya no alimenta ningún selector: sirve para saber CUÁL es la primera y
-  // para poder decir su nombre en la barra en vez de su id.
-  //
-  // Filtrado por proyecto EN EL SERVIDOR. Pedirlas todas y quedarse con la
-  // primera daría la primera pantalla del primer proyecto de la instalación,
-  // que casi nunca es la de este HMI.
-  useEffect(() => {
-    let vivo = true;
-    void (async () => {
-      try {
-        const lista = await listarPantallas(proyecto);
-        if (!vivo) return;
-        setSinCatalogo(false);
-        setPantallas(lista);
-        const primera = lista[0]?.project_id;
-        // Con la forma funcional: este efecto corre una sola vez y leer
-        // `pantallaId` de su closure daría siempre el valor inicial.
-        if (primera) setPantallaId((prev) => (prev === primera ? prev : primera));
-      } catch {
-        // Sin lista se sigue con la suposición de arranque. Si no la había,
-        // aquí se acaba el camino y hay que decirlo.
-        if (vivo) setSinCatalogo(true);
+  // Recibe el id y sus pantallas y deja la vista en la primera. Sirve tanto
+  // para la carga inicial como para el salto en vivo cuando el supervisor
+  // cambia de proyecto: en los dos casos la regla es la misma, «la primera
+  // pantalla del proyecto».
+  const aplicarProyecto = useCallback(
+    (id: string, lista: ResumenPantalla[], nombre = '') => {
+      setSinCatalogo(false);
+      setProyecto(id);
+      setNombreProyecto(nombre);
+      setPantallas(lista);
+      const primera = lista[0]?.project_id ?? '';
+      setPantallaId((prev) => (prev === primera ? prev : primera));
+      if (!primera) {
+        // Proyecto sin pantallas (no debería pasar: el servidor no deja
+        // borrar la última). Mejor vacío que con el HMI del proyecto anterior.
+        setDesign(null);
+        setCargando(false);
       }
-    })();
-    return () => {
-      vivo = false;
-    };
-  }, [proyecto]);
+    },
+    []
+  );
+
+  // ── El proyecto publicado ───────────────────────────────────────
+  //
+  // Se pide al montar y cada vez que el WebSocket vuelve (mientras estuvo
+  // caído pudo cambiar). Si el backend no tiene `/runtime` (404: versión
+  // anterior) se cae al comportamiento de siempre: el proyecto local y su
+  // lista de pantallas.
+  const sincronizarRuntime = useCallback(async () => {
+    try {
+      const rt = await fetchRuntime();
+      aplicarProyecto(rt.proyecto_id, rt.pantallas, rt.nombre);
+      return;
+    } catch (e) {
+      const status = (e as { status?: number })?.status;
+      if (status === 401 || status === 403) {
+        setSinSesion(true);
+        return;
+      }
+      // 404 = backend antiguo sin /runtime; sin status = no responde. En
+      // los dos casos, lo de siempre.
+    }
+    try {
+      const local = getUltimoProyecto();
+      const lista = await listarPantallas(local);
+      aplicarProyecto(local, lista);
+    } catch {
+      // Sin lista se sigue con la suposición de arranque. Si no la había,
+      // aquí se acaba el camino y hay que decirlo.
+      setSinCatalogo(true);
+    }
+  }, [aplicarProyecto]);
+
+  useEffect(() => {
+    void sincronizarRuntime();
+  }, [sincronizarRuntime]);
 
   // ── Carga del diseño ────────────────────────────────────────────
   //
@@ -325,11 +377,13 @@ export function Preview() {
       if (p) {
         setDesign({ widgets: p.widgets, canvas: p.canvas });
         setDesfasado(p.desdeCache === true);
+        versionRef.current = p.desdeCache ? 0 : p.version;
       } else {
         // null = la pantalla ya no existe en el servidor. Antes se quedaba
         // lo que hubiera pintado, que es como enseñar algo ya borrado.
         setDesign(null);
         setDesfasado(false);
+        versionRef.current = 0;
       }
     } catch (e) {
       const status = (e as { status?: number })?.status;
@@ -342,6 +396,7 @@ export function Preview() {
       } else {
         setDesfasado(true);
       }
+      versionRef.current = 0;
     } finally {
       setCargando(false);
     }
@@ -354,24 +409,96 @@ export function Preview() {
     if (!pantallaId) return;
     // Se pinta la caché al instante y se reconcilia con el servidor: no debe
     // quedar un hueco en blanco mientras llega el fetch.
+    versionRef.current = 0;
     setDesign(loadDesign(pantallaId));
     void cargar(pantallaId);
   }, [pantallaId, cargar]);
+
+  // El diseño en una ref, para que el manejador de abajo lo lea sin tener
+  // que volver a suscribirse en cada repintado.
+  const designRef = useRef(design);
+  designRef.current = design;
 
   // ── Cambios de otros, en vivo ───────────────────────────────────
   //
   // Llegan por el WebSocket que ya tiene abierto el RealPLCService, reemitidos
   // como evento del navegador. Es lo que hace que mover un widget en el
   // Diseñador se vea aquí sin recargar, incluso desde otro equipo.
+  //
+  // SIN VOLVER A PEDIR LA PANTALLA cuando se puede evitar: el evento trae
+  // el widget que cambió (o el diff del guardado completo) y se aplica en
+  // sitio. Con diez visores, que cada uno descargara la pantalla entera por
+  // cada movimiento del ratón era lo que hacía que el arrastre se viera a
+  // saltos en los puestos. Solo se recarga cuando el evento no trae datos o
+  // la versión no encaja (se perdió alguno con el socket caído).
   useEffect(() => {
     const alEvento = (ev: Event) => {
       const msg = (ev as CustomEvent).detail;
-      if (msg?.type !== 'project.updated' || msg.project_id !== pantallaId) return;
-      void cargar(pantallaId);
+      if (!msg?.type) return;
+
+      // El supervisor cambió de proyecto (o se borró el que se veía).
+      if (msg.type === 'runtime.changed') {
+        const rt = msg as RuntimeChanged;
+        if (!rt.proyecto_id) return;
+        aplicarProyecto(rt.proyecto_id, rt.pantallas ?? [], rt.nombre ?? '');
+        return;
+      }
+
+      // Cambió la lista de pantallas de MI proyecto (una nueva, un nombre):
+      // se refresca el catálogo. Barato y poco frecuente.
+      if (
+        msg.type === 'project.updated' &&
+        (msg.cambio?.accion === 'proyecto_creado' ||
+          msg.cambio?.accion === 'proyecto_renombrado')
+      ) {
+        void sincronizarRuntime();
+        if (msg.project_id !== pantallaId) return;
+      }
+
+      // Se borró la pantalla que se estaba viendo: se vuelve a la primera
+      // que quede (el servidor no deja borrar la última del proyecto).
+      if (msg.type === 'project.removed') {
+        if (msg.project_id === pantallaId) void sincronizarRuntime();
+        return;
+      }
+
+      if (msg.type !== 'project.updated' || msg.project_id !== pantallaId) return;
+
+      const aplicado = versionEncaja(versionRef.current, msg.version)
+        ? aplicarCambio(designRef.current, msg as MensajeProjectUpdated)
+        : null;
+      if (aplicado) {
+        versionRef.current = msg.version;
+        setDesign(aplicado);
+        setDesfasado(false);
+        // La caché local también, o al recargar se pintaría lo de antes.
+        saveDesign(aplicado, pantallaId);
+      } else {
+        void cargar(pantallaId);
+      }
     };
     window.addEventListener('hmi:ws', alEvento as EventListener);
     return () => window.removeEventListener('hmi:ws', alEvento as EventListener);
-  }, [pantallaId, cargar]);
+  }, [pantallaId, cargar, aplicarProyecto, sincronizarRuntime]);
+
+  // ── Al volver el enlace, RESINCRONIZAR ──────────────────────────
+  //
+  // Mientras el WebSocket estuvo caído se perdieron los eventos: el
+  // supervisor pudo cambiar de proyecto o mover veinte widgets. El snapshot
+  // que manda el servidor al reconectar solo cubre los valores de los tags,
+  // no el diseño, así que aquí se vuelve a pedir el runtime y la pantalla.
+  // Sin esto, un visor que perdió la red medio minuto se quedaba con un HMI
+  // viejo y el cartel «En vivo» encendido.
+  useEffect(() => {
+    const alCambiar = (ev: Event) => {
+      if (!(ev as CustomEvent).detail?.vivo) return;
+      void sincronizarRuntime();
+      if (pantallaId) void cargar(pantallaId);
+    };
+    window.addEventListener('hmi:conexion', alCambiar as EventListener);
+    return () =>
+      window.removeEventListener('hmi:conexion', alCambiar as EventListener);
+  }, [pantallaId, cargar, sincronizarRuntime]);
 
   // Respaldo para el caso local: dos pestañas del MISMO navegador, con el
   // backend caído. El evento `storage` solo se dispara en las otras pestañas.
@@ -390,6 +517,13 @@ export function Preview() {
     return () => window.removeEventListener('storage', onStorage);
   }, [pantallaId]);
 
+  // Salir, solo en un VISOR. La ventana del servidor tiene el menú para
+  // eso; aquí no hay menú, y sin este botón la única forma de cambiar de
+  // cuenta sería borrar el perfil de WebView2 a mano.
+  const salir = useCallback(async () => {
+    await cerrarSesion();
+    navigate('/', { replace: true });
+  }, [cerrarSesion, navigate]);
   const nombreActual =
     pantallas.find((p) => p.project_id === pantallaId)?.nombre ?? pantallaId;
 
@@ -405,16 +539,19 @@ export function Preview() {
     <div className="flex h-full w-full flex-col bg-slate-200 dark:bg-navy">
 
       {/* ── Barra de operación ────────────────────────────────────
-          Sin un solo control: es informativa de principio a fin. Lo único
-          que se puede tocar en esta vista es el HMI. */}
+          Informativa de principio a fin. Lo único que se puede tocar en
+          esta vista es el HMI — y, en un visor, el botón de salir. */}
       <header className="flex shrink-0 items-center gap-3 border-b border-slate-300 bg-white px-4 py-2 dark:border-navy-slate dark:bg-navy-soft">
         <Logo variante="barra" />
 
         <Separador />
 
-        {/* En qué pantalla. Es un dato, no un selector. */}
-        <span className="shrink-0 truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
-          {nombreActual}
+        {/* En qué proyecto y en qué pantalla. Son datos, no selectores. */}
+        <span
+          className="shrink-0 truncate text-xs font-semibold text-slate-500 dark:text-slate-400"
+          title={nombreProyecto ? `Proyecto: ${nombreProyecto}` : undefined}
+        >
+          {nombreProyecto ? `${nombreProyecto} · ${nombreActual}` : nombreActual}
         </span>
 
         {ruta.length > 0 && <Separador />}
@@ -441,6 +578,19 @@ export function Preview() {
 
           <PastillaEnVivo vivo={enVivo} />
           <Reloj />
+
+          {/* Solo en un visor con sesión: es su único control. */}
+          {esVisor && sesion && (
+            <button
+              type="button"
+              onClick={() => void salir()}
+              title={`Salir (${sesion.usuario})`}
+              aria-label="Cerrar sesión"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 outline-none transition hover:bg-slate-100 hover:text-navy focus-visible:ring-2 focus-visible:ring-siemens/40 dark:hover:bg-navy-slate/40 dark:hover:text-slate-100"
+            >
+              <LogOutIcon className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </header>
 
