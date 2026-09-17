@@ -300,6 +300,9 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
       setPermisos(d.permisos ?? null);
       if (typeof d.auth_requerida === 'boolean') {
         setAuthRequerida(d.auth_requerida);
+        // El servicio del WebSocket necesita saberlo para decidir si abre el
+        // socket sin token (instalación sin inicio de sesión).
+        MockPLCService.setAuthRequerida(d.auth_requerida);
       }
       // Un backend anterior no manda el campo: se asume servidor, que es el
       // comportamiento de siempre (todo visible).

@@ -54,6 +54,34 @@ def _error(exc: ErrorInterna) -> HTTPException:
     return HTTPException(exc.codigo, exc.mensaje)
 
 
+async def _difundir_snapshot(request: Request) -> None:
+    """
+    Reenvía a todas las vistas la lista COMPLETA de tags (PLCs + internas).
+
+    POR QUÉ ADEMÁS DEL VALOR. `_difundir_valor` manda el cambio de UNA
+    variable como si fuera un tag de PLC, y con eso una interna nueva aparece
+    en las vistas abiertas. Pero hay dos casos que un mensaje de valor no
+    puede cubrir:
+
+      * BORRAR: no hay valor que mandar, y la vista no quita tags por un
+        `config.updated`. La interna borrada seguía en los desplegables
+        hasta cerrar y abrir el programa.
+      * RENOMBRAR: el nombre ES la clave del tag (`interno|<nombre>`). El
+        mensaje de valor crea la clave nueva, pero la vieja se queda: dos
+        entradas para la misma variable.
+
+    El snapshot reemplaza la lista entera en la vista, así que deja
+    exactamente lo que hay. Es el mismo mensaje que se manda al conectar el
+    WebSocket; solo se adelanta al momento en que hace falta.
+    """
+    try:
+        pm = getattr(request.app.state, "plc_manager", None)
+        if pm is not None:
+            await request.app.state.manager.broadcast(pm.build_snapshot_message())
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudo difundir el snapshot de internas: %s", exc)
+
+
 async def _difundir_valor(request: Request, variable) -> None:
     """
     Publica el cambio como si viniera de un PLC.
@@ -176,6 +204,7 @@ async def crear(
         raise _error(exc)
 
     await _difundir_valor(request, v)
+    await _difundir_snapshot(request)
     _auditar(request, "creada", sesion, {"nombre": v.nombre, "tipo": v.tipo})
     try:
         await request.app.state.manager.difundir_config(
@@ -223,6 +252,7 @@ async def actualizar(
         raise _error(exc)
 
     await _difundir_valor(request, v)
+    await _difundir_snapshot(request)
     _auditar(request, "editada", sesion, {"nombre": v.nombre})
     try:
         await request.app.state.manager.difundir_config(
@@ -305,6 +335,9 @@ async def borrar(
         raise _error(exc)
 
     _auditar(request, "borrada", sesion, {"nombre": nombre})
+    # Sin esto la variable borrada seguía en los desplegables de los widgets
+    # hasta reabrir el programa: ver `_difundir_snapshot`.
+    await _difundir_snapshot(request)
     try:
         await request.app.state.manager.difundir_config(
             "internas", usuario_de(sesion), "borrada")

@@ -219,6 +219,9 @@ class PlcManager:
             endpoint=ep.endpoint,
             plc_nombre=ep.nombre,
             vendor=ep.vendor,
+            # Para que, al terminar de conectar, difunda los tags a las
+            # vistas ya abiertas (ver SubscriptionHandler._conectar_y_suscribir).
+            snapshot_global=self.build_snapshot_message,
         )
         self._handlers[plc_id] = handler
         self._endpoints[plc_id] = ep

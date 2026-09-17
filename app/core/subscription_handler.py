@@ -50,10 +50,16 @@ class SubscriptionHandler:
         endpoint: str = "",
         plc_nombre: str = "",
         vendor: str = "siemens",
+        snapshot_global=None,
     ) -> None:
         self._driver = driver
         self._manager = manager
         self._settings = settings
+        # Función que construye el snapshot de TODOS los PLCs (la de
+        # PlcManager). Se difunde al terminar de conectar; ver
+        # `_conectar_y_suscribir` para el porqué. Opcional para no romper a
+        # quien construya el handler a mano (pruebas).
+        self._snapshot_global = snapshot_global
 
         # Identidad del PLC (para etiquetar mensajes y agregación multi-PLC).
         self.plc_id = plc_id
@@ -332,6 +338,38 @@ class SubscriptionHandler:
 
         # Cargar un snapshot inicial leyendo el valor actual de cada tag.
         await self._cargar_snapshot_inicial()
+
+        # ── DIFUNDIR LOS TAGS A LAS VISTAS QUE YA ESTÁN ABIERTAS ──────
+        #
+        # EL FALLO QUE HABÍA AQUÍ. El snapshot completo se difundía al DAR DE
+        # ALTA el PLC (`add_plc`), cuando todavía no se había conectado y no
+        # tenía ni un tag. Al terminar de conectar —aquí— solo se mandaba el
+        # `status: conectado`, que la vista ignora a propósito porque no
+        # trae variables. Así que las vistas abiertas solo se enteraban de un
+        # tag cuando ese tag CAMBIABA de valor (mensaje de data-change).
+        #
+        # Con un PLC virtual que mueve todos sus valores cada segundo no se
+        # notaba. Con un Siemens de verdad, donde la mayoría de tags son
+        # consignas y reservas que no cambian en toda la jornada, el síntoma
+        # era exacto: "aparece como conectado pero no salen los tags; al
+        # cerrar y abrir el programa, sí" — porque abrir el programa abre un
+        # WebSocket nuevo, y ESE sí recibe el snapshot con todo.
+        #
+        # Se difunde el snapshot GLOBAL y no solo el de este PLC porque la
+        # vista reemplaza su lista entera con `msg.tags` en cada snapshot:
+        # uno parcial borraría de pantalla los tags de los demás PLCs y las
+        # variables internas.
+        #
+        # Vale también para las RECONEXIONES: esta función corre otra vez
+        # cuando el watchdog detecta la caída, así que tras reiniciar el
+        # PLC los tags vuelven a las vistas sin tocar nada.
+        if self._snapshot_global is not None:
+            try:
+                await self._manager.broadcast(self._snapshot_global())
+            except Exception as exc:  # noqa: BLE001
+                self._log(logging.WARNING,
+                          "No se pudo difundir el snapshot al conectar: %s",
+                          exc)
 
         # Notificar a los clientes WS que este PLC está conectado.
         await self._manager.broadcast(

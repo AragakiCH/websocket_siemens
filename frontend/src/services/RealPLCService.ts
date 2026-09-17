@@ -39,6 +39,31 @@ class RealPLCServiceImpl {
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private manualClose = false;
 
+  /**
+   * ¿El servidor exige sesión para el WebSocket?
+   *
+   *   true   -> sin token no se intenta (el servidor lo cerraría).
+   *   false  -> se abre SIN token: el servidor lo acepta como anónimo.
+   *   null   -> todavía no se sabe; se espera al token, como siempre.
+   *
+   * Lo dice el AppStore en cuanto `GET /auth/me` responde (`auth_requerida`).
+   * Sin esto, una instalación sin inicio de sesión —el valor por defecto de
+   * `PLC_AUTH_REQUERIDA`, y el habitual en el escritorio— no abría nunca el
+   * socket: el guardia de "sin token no se intenta" no distinguía entre "aún
+   * no ha entrado" y "aquí no hay que entrar". La vista se quedaba con lo
+   * que hubiera y no se movía un valor hasta reabrir el programa.
+   */
+  private authRequerida: boolean | null = null;
+
+  setAuthRequerida(valor: boolean) {
+    const antes = this.authRequerida;
+    this.authRequerida = valor;
+    // Si acaba de saberse que NO hace falta sesión y el socket estaba
+    // esperando un token que nunca iba a llegar, se abre ya, sin esperar al
+    // siguiente reintento.
+    if (antes !== false && valor === false) this.openSocket();
+  }
+
   private rate = 1000;
   private dirty = false;
   private running = false;
@@ -142,12 +167,16 @@ class RealPLCServiceImpl {
     if (this.ws && this.ws.readyState <= WebSocket.OPEN) return; // ya abierto/abriendo
     this.manualClose = false;
 
-    // Sin token no se intenta siquiera. Con la autenticación activada el
-    // backend cierra el socket nada más abrirlo, y el reintento automático
-    // convertía eso en un martilleo constante contra una puerta cerrada —se
-    // midió: cuatro conexiones rechazadas seguidas en la pantalla de acceso—.
-    // Al entrar, `hmi:sesion-iniciada` vuelve a llamar aquí.
-    if (!getToken()) {
+    // Sin token no se intenta siquiera... SALVO que el servidor haya dicho
+    // que no exige sesión. Con la autenticación activada el backend cierra el
+    // socket nada más abrirlo, y el reintento automático convertía eso en un
+    // martilleo constante contra una puerta cerrada —se midió: cuatro
+    // conexiones rechazadas seguidas en la pantalla de acceso—. Pero con la
+    // autenticación desactivada el servidor acepta el socket sin token, y
+    // esperar uno que nunca va a llegar dejaba la vista sin datos en vivo
+    // (ver `authRequerida`). Cuando alguien entra, el siguiente reintento ve
+    // el token y conecta.
+    if (!getToken() && this.authRequerida !== false) {
       this.retryTimer = setTimeout(() => this.openSocket(), RETRY_MS);
       return;
     }
