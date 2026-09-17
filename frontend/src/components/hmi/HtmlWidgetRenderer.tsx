@@ -64,10 +64,29 @@ interface Props {
    * rectángulo del widget en vez de a la ventana.
    */
   onModal?: (abierto: boolean) => void;
+  /**
+   * Alguien pulsó dentro del widget.
+   *
+   * ── POR QUÉ NO SE EJECUTA LA ACCIÓN AQUÍ ─────────────────────────────
+   * Un iframe SE COME los eventos de ratón: el `onClick` del contenedor de
+   * fuera no se entera de nada de lo que pasa dentro. Por eso el clic tiene
+   * que salir por el puente de `postMessage`, como ya salen `escribir()` y el
+   * aviso de modal.
+   *
+   * Pero una vez fuera, ejecutar la acción es exactamente lo mismo que hace
+   * un botón normal: misma función, misma confirmación, mismo aviso de error.
+   * Duplicarlo aquí habría sido tener dos sitios donde arreglar el mismo
+   * fallo. Así que esto solo AVISA, y `WidgetRenderer` —que ya tiene el
+   * `pulsar()` del botón montado— hace el trabajo.
+   */
+  onClic?: () => void;
+  /** Hay acción configurada: el puntero dentro del iframe pasa a ser mano. */
+  clicable?: boolean;
 }
 
 export function HtmlWidgetRenderer({
   zipWidget, widget, variable, enlaces, style, interactivo = false, onModal,
+  onClic, clicable = false,
 }: Props) {
   const frac = valueFraction(variable);
   const on = isTruthy(variable);
@@ -93,9 +112,9 @@ export function HtmlWidgetRenderer({
    * no hace falta—, y con `[]` se quedaría con los valores del primer
    * render. Esta referencia es la que lo mantiene al día.
    */
-  const vivo = useRef({ interactivo, variable, enlaces, widget });
+  const vivo = useRef({ interactivo, variable, enlaces, widget, onClic });
   useEffect(() => {
-    vivo.current = { interactivo, variable, enlaces, widget };
+    vivo.current = { interactivo, variable, enlaces, widget, onClic };
   });
 
   useEffect(() => {
@@ -162,6 +181,14 @@ export function HtmlWidgetRenderer({
       }
       if (d.type === 'widget-escribir') {
         void escrituraPedida(d);
+        return;
+      }
+      if (d.type === 'widget-clic') {
+        // En el Diseñador NO. Allí el puntero sirve para colocar el widget, y
+        // el iframe ya va con `pointerEvents: none`; esto es el segundo
+        // cerrojo, por si alguien cambia aquello algún día.
+        if (!vivo.current.interactivo) return;
+        vivo.current.onClic?.();
       }
     };
     window.addEventListener('message', alMensaje);
@@ -258,6 +285,36 @@ window.addEventListener('message', function (e) {
   if (typeof window.onWidgetEscrito === 'function') {
     window.onWidgetEscrito(d);
   }
+});
+
+/**
+ * EL CLIC, HACIA FUERA.
+ *
+ * Va sobre el DOCUMENTO y en fase de CAPTURA, las dos cosas a proposito.
+ *
+ * Sobre el documento porque muchos widgets llevan pointer-events:none en su
+ * contenido para no estorbar, y entonces el clic no tiene ningun elemento
+ * como destino: aterriza en el body. Escuchando aqui se recoge igual, lleve
+ * el widget lo que lleve dentro.
+ *
+ * En captura para enterarse ANTES que cualquier manejador propio del widget,
+ * y aunque ese manejador pare la propagacion.
+ *
+ * Lo que sale es solo un aviso de "me han pulsado". Ni que accion, ni que
+ * valor: eso lo decide el anfitrion, que es el unico que conoce la
+ * configuracion y el unico que puede hablar con el PLC.
+ */
+document.addEventListener('click', function () {
+  try { parent.postMessage({ type: 'widget-clic' }, '*'); } catch (e) {}
+}, true);
+
+/* El puntero: mano si hay accion configurada, el de siempre si no. */
+window.addEventListener('message', function (e) {
+  var d = e.data;
+  if (!d || d.type !== 'widget-update') return;
+  var cur = d.clicable ? 'pointer' : '';
+  document.documentElement.style.cursor = cur;
+  if (document.body) document.body.style.cursor = cur;
 });
 
 /**
@@ -464,6 +521,10 @@ ${userScript}
 
     const payload = {
       type: 'widget-update',
+      // Fuera de `widget` porque no es un dato del proceso: es cómo se
+      // comporta el puntero. Si fuera dentro, aparecería en `WIDGET.clicable`
+      // y parecería algo que el autor del ZIP puede usar.
+      clicable: clicable && interactivo,
       widget: {
         // Las variables con nombre, ya masticadas igual que la principal: el
         // widget no tiene que saber formatear ni normalizar nada.
@@ -505,7 +566,8 @@ ${userScript}
     return () => iframe.removeEventListener('load', send);
   }, [enlaces, rawValue, on, frac, label, widget.name,
       style.color, style.background, style.borderColor,
-      style.fontSize, style.bold, style.opacity]);
+      style.fontSize, style.bold, style.opacity,
+      clicable, interactivo]);
 
   return (
     <iframe

@@ -61,6 +61,33 @@ export const ACCIONES_DE_PLC: TipoAccion[] = ['escribir', 'alternar', 'increment
 export interface EntornoAccion {
   setModoColor?: (modo: 'light' | 'dark' | 'auto') => void;
   /**
+   * Traduce un id de variable al valor que tiene AHORA.
+   *
+   * ── POR QUÉ HIZO FALTA ───────────────────────────────────────────────
+   * «Alternar» y «Sumar o restar» leen antes de escribir. Hasta ahora ese
+   * valor de partida era el de la variable PRINCIPAL del widget, que es lo
+   * que tenía a mano quien llamaba. Y casi siempre coincidía con el tag de la
+   * acción, así que funcionaba… casi siempre.
+   *
+   * El día que no coincide —variable principal `A`, tag de la acción `B`— el
+   * botón invertía el valor de `A` y lo escribía en `B`. Sin error, sin
+   * aviso: el bit se quedaba donde estaba y volvías a pulsar. Justo lo que no
+   * puede pasar con un mando de planta.
+   *
+   * Y con un widget importado en ZIP el problema deja de ser raro y pasa a
+   * ser el caso NORMAL: un widget decorativo (`accepts: []`) no tiene
+   * variable principal, así que no habría valor de partida nunca.
+   *
+   * Con esto, el valor de partida se busca por el tag AL QUE SE VA A
+   * ESCRIBIR, que es el único que tiene sentido. Va en el entorno y no como
+   * parámetro porque quién sabe resolver un id depende de dónde se dibuje:
+   * en la Vista previa es buscar por id, y dentro de un faceplate hay que
+   * cambiar antes `param:x` por el tag de esa instancia.
+   *
+   * Ausente = se usa el valor que llegue en `actual`, como siempre.
+   */
+  resolver?: (variableId: string | null | undefined) => PlcVariable | undefined;
+  /**
    * Los tags de la instancia de faceplate que envuelve a este widget, si la
    * hay. Es lo que permite que un boton DENTRO de un faceplate abra otro
    * pasandole los mismos tags. Ver `faceplate/contexto.ts`.
@@ -264,9 +291,17 @@ export async function ejecutarAccion(
   //
   // `confirm` y no un modal propio: es una orden, y el diálogo del navegador
   // bloquea de verdad; uno casero se esquiva con un segundo clic.
+  // El valor de partida de las acciones que leen antes de escribir. Se busca
+  // por el tag DE LA ACCIÓN; ver `EntornoAccion.resolver`. Si no hay
+  // resolutor, o el tag no está entre las variables leídas, se cae a `actual`,
+  // que es el comportamiento de siempre.
+  const base = ACCIONES_DE_PLC.includes(accion.tipo)
+    ? entorno.resolver?.(accion.tag) ?? actual
+    : actual;
+
   if (accion.confirmar && accion.tipo !== 'aviso') {
     const previo = ACCIONES_DE_PLC.includes(accion.tipo)
-      ? valorAEscribir(accion, actual)
+      ? valorAEscribir(accion, base)
       : null;
     if (!window.confirm(textoConfirmacion(accion, previo, etiqueta))) {
       return { ok: false, error: '' };
@@ -353,7 +388,7 @@ export async function ejecutarAccion(
   }
 
   // ── Las que escriben en el PLC ───────────────────────────────
-  const valor = valorAEscribir(accion, actual);
+  const valor = valorAEscribir(accion, base);
   if (valor === null) {
     return {
       ok: false,

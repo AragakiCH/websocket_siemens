@@ -115,6 +115,10 @@ export function WidgetRenderer({
     const r = await ejecutarAccion(accion, variable, widget.text || widget.name, {
       setModoColor: setTheme,
       mapaTags,
+      // Con esto, «alternar» y «sumar o restar» leen el valor de partida del
+      // tag AL QUE VAN A ESCRIBIR, y no de la variable principal del widget.
+      // Ver `EntornoAccion.resolver`.
+      resolver,
     });
     setMandando(false);
     // Cancelar en la confirmación no es un error: no se dice nada.
@@ -187,6 +191,12 @@ export function WidgetRenderer({
           style={style}
           interactivo={interactivo}
           onModal={setModalZip}
+          /* Un widget importado manda lo mismo que un botón. El clic no puede
+             salir del iframe por su cuenta, así que llega por el puente y se
+             ejecuta AQUÍ, con el mismo `pulsar()` del botón: misma acción,
+             misma confirmación, y el mismo aviso rojo de abajo si falla. */
+          onClic={pulsar}
+          clicable={mandaAlgo}
         />
       );
     }
