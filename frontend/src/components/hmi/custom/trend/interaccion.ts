@@ -43,8 +43,17 @@ import type uPlot from 'uplot';
 
 /** Zoom máximo: no tiene sentido bajar de un segundo de ventana. */
 export const SPAN_MINIMO = 1;
-/** Zoom mínimo: tampoco tiene sentido pasar de un día. */
-export const SPAN_MAXIMO = 86400;
+/**
+ * Zoom mínimo: el ancho máximo de ventana.
+ *
+ * Eran 24 h, que valía cuando el widget solo enseñaba lo que cabe en memoria.
+ * Con el modo HISTÓRICO se puede pedir «últimos 7 días», y con el tope en un
+ * día `encajar()` recortaba la ventana a 24 h en cuanto alguien intentaba
+ * alejar: el gesto parecía no funcionar. 31 días cubre cualquier rango que se
+ * consulte de verdad, y en modo vivo no cambia nada porque ahí manda el rango
+ * del búfer, que como mucho son 6 h.
+ */
+export const SPAN_MAXIMO = 31 * 86400;
 /** Píxeles de arrastre a partir de los cuales se considera un gesto. */
 const UMBRAL_PX = 4;
 /** Margen para considerar que la vista está pegada al último dato. */
@@ -158,6 +167,27 @@ export function ajustar(u: uPlot, o: OpcionesInteraccion): void {
 
 // ─── El plugin ────────────────────────────────────────────────────
 
+/**
+ * EL CURSOR EN REPOSO: UNA CRUZ, NO UNA MANITA.
+ *
+ * La manita (`grab`) decía bien lo que se puede hacer —arrastrar para moverse
+ * en el tiempo— pero es un icono GRANDE y ASIMÉTRICO: su punto activo está
+ * arriba a la izquierda, en la base de los dedos, mientras que el bulto que el
+ * ojo lee como «el cursor» es la palma, dibujada abajo y a la derecha. Sobre un
+ * gráfico con una regla que marca un instante exacto, eso se ve como si la
+ * línea estuviera desplazada respecto al puntero, aunque caiga en el píxel
+ * correcto.
+ *
+ * `crosshair` es simétrica alrededor de su punto activo: el centro de la cruz
+ * ES la posición. No hay desfase que percibir. Es también lo que usa cualquier
+ * herramienta de tendencias, por el mismo motivo.
+ *
+ * La manita cerrada (`grabbing`) se mantiene MIENTRAS se arrastra: ahí ya no se
+ * está señalando nada, se está moviendo el gráfico, y conviene que se note.
+ */
+const CURSOR_REPOSO = 'crosshair';
+const CURSOR_ARRASTRE = 'grabbing';
+
 export function pluginInteraccion(o: OpcionesInteraccion): uPlot.Plugin {
   return {
     hooks: {
@@ -166,7 +196,7 @@ export function pluginInteraccion(o: OpcionesInteraccion): uPlot.Plugin {
         // Sin esto el navegador se queda el gesto para hacer scroll de la
         // página y el arrastre nunca llega al gráfico en un panel táctil.
         over.style.touchAction = 'none';
-        over.style.cursor = 'grab';
+        over.style.cursor = CURSOR_REPOSO;
 
         // ---- Rueda: zoom ------------------------------------------- //
         const alaRueda = (e: WheelEvent) => {
@@ -215,7 +245,7 @@ export function pluginInteraccion(o: OpcionesInteraccion): uPlot.Plugin {
           if (punteros.size === 1) {
             inicio = { x: e.clientX, min, max };
             gesto = false;
-            over.style.cursor = 'grabbing';
+            over.style.cursor = CURSOR_ARRASTRE;
           } else if (punteros.size === 2) {
             const [a, b] = Array.from(punteros.values());
             pellizco = { dist: Math.abs(a.x - b.x) || 1, min, max };
@@ -270,7 +300,7 @@ export function pluginInteraccion(o: OpcionesInteraccion): uPlot.Plugin {
           if (punteros.size === 0) {
             inicio = null;
             gesto = false;
-            over.style.cursor = 'grab';
+            over.style.cursor = CURSOR_REPOSO;
           }
         };
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeftIcon,
@@ -21,6 +21,7 @@ import {
   Link2Icon,
   RefreshCwIcon,
   MonitorIcon,
+  PencilIcon,
   type LucideIcon,
 } from 'lucide-react';
 import { useAppStore } from '../context/AppStore';
@@ -29,6 +30,8 @@ import { formatValue } from '../utils/format';
 import { fetchRexrothPrograms } from '../services/rexrothApi';
 import { PanelBasesDatos } from '../components/bd/PanelBasesDatos';
 import { PanelCarpetaDatos } from '../components/sistema/PanelCarpetaDatos';
+import { PanelEscritura, type EstadoEscritura } from '../components/escritura/PanelEscritura';
+import { listarPermitidos } from '../services/escrituraApi';
 
 // =========================================================================
 // LA VISTA DE CONFIGURACIÓN, EN TRES SECCIONES
@@ -54,7 +57,10 @@ import { PanelCarpetaDatos } from '../components/sistema/PanelCarpetaDatos';
 // reorganiza la superficie, no el motor.
 // =========================================================================
 
-type Seccion = 'controladores' | 'bd' | 'sistema';
+// «escritura» es la lista blanca: qué tags del PLC puede tocar el HMI. Va
+// junto a «controladores» y no en «sistema» porque es una decisión SOBRE el
+// PLC, no un ajuste de esta vista.
+type Seccion = 'controladores' | 'bd' | 'sistema' | 'escritura';
 
 /**
  * Color del tipo de dato.
@@ -426,10 +432,51 @@ export function Configuracion() {
   // Qué sección se está viendo, qué controlador está elegido y qué se
   // escribió en el buscador. Nada de esto sale al backend ni cambia lo
   // que se guarda: es dónde está mirando el usuario, no qué hay.
-  const [seccion, setSeccion] = useState<Seccion>('controladores');
+  // De dónde se llega. El Diseñador manda aquí con `?seccion=escritura&tag=…`
+  // cuando alguien pulsa «Habilitar este tag» sobre un tag que no lo está: se
+  // abre la sección correcta con el buscador ya puesto, en vez de soltar a la
+  // persona en la primera pantalla a que lo encuentre otra vez.
+  //
+  // Se lee UNA vez, al montar: si se siguiera mirando, cambiar de sección a
+  // mano te devolvería a «escritura» en el siguiente render, y la URL manda
+  // sobre lo que estás pulsando — que es exactamente al revés de lo que hace
+  // falta.
+  const [params] = useSearchParams();
+  const [seccionInicial] = useState<Seccion>(() =>
+  params.get('seccion') === 'escritura' ? 'escritura' : 'controladores'
+  );
+  const [tagBuscado] = useState(() => params.get('tag') ?? '');
+
+  const [seccion, setSeccion] = useState<Seccion>(seccionInicial);
   const [plcSel, setPlcSel] = useState<string>('');
   const [buscaVar, setBuscaVar] = useState('');
   const [bdCuenta, setBdCuenta] = useState({ total: 0, conectadas: 0 });
+
+  // Cuántos tags hay habilitados para escritura, para la insignia del menú.
+  //
+  // Se pide al entrar y NO al abrir la sección: una lista blanca vacía es
+  // justo lo que hay que ver desde fuera —significa que ningún widget puede
+  // escribir— y esperar a que alguien entre para contarlo lo esconde. Es una
+  // sola petición y el panel la devuelve actualizada cuando cambia algo.
+  const [escrituraCuenta, setEscrituraCuenta] = useState<EstadoEscritura>({
+    habilitados: 0,
+    candidatos: 0
+  });
+
+  useEffect(() => {
+    let vivo = true;
+    listarPermitidos().
+    then((l) => {
+      if (vivo) setEscrituraCuenta((p) => ({ ...p, habilitados: l.length }));
+    }).
+    catch(() => {
+      // Sin permiso (403) o sin backend: la insignia se queda en 0 y la
+      // sección ya explica lo que pasa al abrirla.
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
   const selectedCount = variables.filter((v) => v.selected).length;
 
   // ---------- PLCs desde GET /health ----------
@@ -734,6 +781,13 @@ export function Configuracion() {
             label={t('config.plcConnection')}
             badge={plcs.length ? `${plcsEnLinea}/${plcs.length}` : '0'}
             alerta={plcs.length > 0 && plcsEnLinea < plcs.length}
+          />
+          <ItemNav
+            activo={seccion === 'escritura'}
+            onClick={() => setSeccion('escritura')}
+            icon={PencilIcon}
+            label="Escritura"
+            badge={String(escrituraCuenta.habilitados)}
           />
           <ItemNav
             activo={seccion === 'bd'}
@@ -1141,6 +1195,26 @@ export function Configuracion() {
                   </div>
                 </div>
               )}
+            </>
+          )}
+
+          {/* ═════════════ ESCRITURA ═════════════ */}
+          {seccion === 'escritura' && (
+            <>
+              <CabeceraSeccion
+                icon={<PencilIcon className="h-4.5 w-4.5" />}
+                titulo="Escritura en el PLC"
+                descripcion="El HMI solo escribe en los tags dados de alta aquí, y dentro de los límites que les pongas. Todo lo demás se rechaza aunque el PLC lo permita."
+              />
+              <PanelEscritura
+                plcs={plcs.map((p) => ({
+                  id: p.plc,
+                  nombre: p.nombre || p.plc,
+                  conectado: p.conectado
+                }))}
+                onEstado={setEscrituraCuenta}
+                buscaInicial={tagBuscado}
+              />
             </>
           )}
 

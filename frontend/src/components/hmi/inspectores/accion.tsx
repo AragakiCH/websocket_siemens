@@ -28,7 +28,12 @@ import {
 import { useSecciones, GRUPO_POR_DEFECTO } from '../custom/navegacion/store';
 import { leerTemas } from '../../../services/temaApi';
 import type { Tema } from '../../../models/tema';
-import { listarPermitidos, unirId, type TagPermitido } from '../../../services/escrituraApi';
+import {
+  permitidosCacheados,
+  EVENTO_PERMITIDOS,
+  unirId,
+  type TagPermitido } from
+'../../../services/escrituraApi';
 import { useTipos } from '../custom/faceplate/Faceplate';
 import { useAppStore } from '../../../context/AppStore';
 import { PREFIJO_PARAM } from '../../../utils/designStorage';
@@ -150,11 +155,29 @@ export function InspectorAccion({
     };
   }, [accion.tipo]);
 
+  // Sube cuando un administrador toca la lista blanca. Solo dispara el efecto
+  // de abajo: el dato sale de la cache compartida.
+  const [revision, setRevision] = useState(0);
+
+  useEffect(() => {
+    const alCambiar = () => setRevision((n) => n + 1);
+    window.addEventListener(EVENTO_PERMITIDOS, alCambiar);
+    return () => window.removeEventListener(EVENTO_PERMITIDOS, alCambiar);
+  }, []);
+
+  // `permitidosCacheados` y no `listarPermitidos`: la lista la comparten este
+  // panel, el Valor con Unidad y la pantalla de Configuracion. Con una
+  // peticion por panel, seleccionar un boton disparaba un GET nuevo — y, peor,
+  // habilitar un tag dejaba este desplegable con la lista vieja hasta recargar.
   useEffect(() => {
     let vivo = true;
-    listarPermitidos()
+    setCargando(true);
+    permitidosCacheados()
       .then((l) => {
-        if (vivo) setPermitidos(l);
+        if (vivo) {
+          setPermitidos(l);
+          setError('');
+        }
       })
       .catch((e: any) => {
         if (vivo) setError(e?.message ?? 'No se pudo leer la lista de escritura.');
@@ -165,7 +188,7 @@ export function InspectorAccion({
     return () => {
       vivo = false;
     };
-  }, []);
+  }, [revision]);
 
   const set = (parche: Partial<AccionWidget>) =>
     setConfig({ ...config, accion: { ...accion, ...parche } });

@@ -41,10 +41,12 @@ import { useEffect, useRef, useState } from 'react';
 import { GaugeIcon, PencilIcon, Loader2Icon } from 'lucide-react';
 import type { CustomWidgetDef, RenderCtx, InspectorCtx } from '../types';
 import type { PlcVariable } from '../../../../models/plc';
+import { useNavigate } from 'react-router-dom';
 import { estiloDeParte } from '../../partes';
 import {
   escribir,
-  listarPermitidos,
+  permitidosCacheados,
+  EVENTO_PERMITIDOS,
   partirId,
   type TagPermitido,
 } from '../../../../services/escrituraApi';
@@ -97,38 +99,31 @@ function soloValor(variable?: PlcVariable): string {
   return variable.type === 'double' ? num.toFixed(1) : String(num);
 }
 
-// ─── La lista blanca, una sola vez ───────────────────────────────
+// ─── La lista blanca ─────────────────────────────────────────────
 //
-// Un sinóptico puede llevar veinte campos de entrada. Sin caché serían veinte
-// peticiones idénticas al abrir la pantalla, en la misma red por la que viajan
-// los datos del proceso. Se pide una vez y la comparten todos.
+// La caché vive en `escrituraApi`, no aquí. Aquí empezó —este fue el primer
+// widget que la necesitó— y funcionaba, hasta que hubo un SEGUNDO sitio que
+// leía la misma lista: la pantalla de Configuración, que además la CAMBIA.
+// Con una copia por fichero, habilitar un tag dejaba a este widget diciendo
+// «no admite escritura» sobre un tag recién habilitado hasta que alguien
+// recargaba, y el fallo parecía del backend, que era el único que estaba bien.
 //
-// Se queda cacheada mientras dure la pestaña: la lista blanca la cambia un
-// administrador de vez en cuando, no el proceso. Y aunque quedara vieja, el
-// servidor vuelve a validar cada escritura — lo único que se perdería es el
-// aviso anticipado.
-
-let cachePermitidos: TagPermitido[] | null = null;
-let enVuelo: Promise<TagPermitido[]> | null = null;
-
-function traerPermitidos(): Promise<TagPermitido[]> {
-  if (cachePermitidos) return Promise.resolve(cachePermitidos);
-  if (!enVuelo) {
-    enVuelo = listarPermitidos()
-      .then((l) => {
-        cachePermitidos = l;
-        return l;
-      })
-      .finally(() => {
-        enVuelo = null;
-      });
-  }
-  return enVuelo;
-}
+// Ahora hay una sola copia y `olvidarPermitidos()` la tira avisando por
+// `window`. Este widget escucha ese aviso y vuelve a preguntar.
 
 /** Lo que el servidor admite para ESTE tag, o `null` si no está habilitado. */
 function usePermitido(idTag: string, activo: boolean): TagPermitido | null {
   const [entrada, setEntrada] = useState<TagPermitido | null>(null);
+
+  // Sube cada vez que un administrador toca la lista blanca. Solo sirve para
+  // volver a disparar el efecto: el dato sale de `permitidosCacheados()`.
+  const [revision, setRevision] = useState(0);
+
+  useEffect(() => {
+    const alCambiar = () => setRevision((n) => n + 1);
+    window.addEventListener(EVENTO_PERMITIDOS, alCambiar);
+    return () => window.removeEventListener(EVENTO_PERMITIDOS, alCambiar);
+  }, []);
 
   useEffect(() => {
     if (!activo || !idTag) {
@@ -137,7 +132,7 @@ function usePermitido(idTag: string, activo: boolean): TagPermitido | null {
     }
     let vivo = true;
     const { plc_id, tag } = partirId(idTag);
-    traerPermitidos()
+    permitidosCacheados()
       .then((l) => {
         if (vivo) setEntrada(l.find((x) => x.plc_id === plc_id && x.tag === tag) ?? null);
       })
@@ -149,7 +144,7 @@ function usePermitido(idTag: string, activo: boolean): TagPermitido | null {
     return () => {
       vivo = false;
     };
-  }, [idTag, activo]);
+  }, [idTag, activo, revision]);
 
   return entrada;
 }
@@ -476,6 +471,7 @@ function ValorUnidad({ widget, variable, interactivo }: RenderCtx) {
 // ─── Panel del Inspector ─────────────────────────────────────────
 
 function InspectorValorUnidad({ widget, config, setConfig }: InspectorCtx) {
+  const navigate = useNavigate();
   const cfg = leerConfigValorUnidad(config);
   const enCrudo = String(widget.variableId ?? '');
   const esParametro = enCrudo.startsWith('param:');
@@ -485,7 +481,7 @@ function InspectorValorUnidad({ widget, config, setConfig }: InspectorCtx) {
   useEffect(() => {
     if (cfg.modo !== 'escritura') return;
     let vivo = true;
-    traerPermitidos().finally(() => vivo && setListo(true));
+    permitidosCacheados().finally(() => vivo && setListo(true));
     return () => {
       vivo = false;
     };
@@ -558,8 +554,28 @@ function InspectorValorUnidad({ widget, config, setConfig }: InspectorCtx) {
             ) : (
               <>
                 <b>Ese tag no está habilitado para escritura</b>, así que el
-                servidor va a rechazar el valor. Se habilita en la lista blanca
-                de escritura ({partirId(enCrudo).tag || enCrudo}).
+                servidor va a rechazar el valor.
+                {/* Un aviso que solo describe el problema obliga a salir,
+                    acordarse del nombre exacto, entrar en Configuración y
+                    buscarlo a mano. El botón hace las tres cosas.
+
+                    Navega en la MISMA pestaña, a propósito: así sigue siendo
+                    la misma aplicación cargada, y al volver el aviso ya se ha
+                    enterado por `EVENTO_PERMITIDOS`. En una pestaña nueva la
+                    caché de ésta se quedaría vieja igual. */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `/config?seccion=escritura&tag=${encodeURIComponent(
+                        partirId(enCrudo).tag || enCrudo
+                      )}`
+                    )
+                  }
+                  className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-siemens px-2.5 py-1.5 text-[11px] font-semibold text-white outline-none transition hover:bg-siemens-600 focus-visible:ring-2 focus-visible:ring-siemens/50"
+                >
+                  Habilitar «{partirId(enCrudo).tag || enCrudo}»
+                </button>
               </>
             )}
           </div>

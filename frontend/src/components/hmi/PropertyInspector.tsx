@@ -8,6 +8,11 @@ import {
   Trash2Icon } from
 'lucide-react';
 import { HmiWidget } from '../../models/widget';
+import {
+  permitidosCacheados,
+  EVENTO_PERMITIDOS,
+  unirId } from
+'../../services/escrituraApi';
 import { PlcVariable, DataType } from '../../models/plc';
 import {
   leerEnlaces,
@@ -466,6 +471,52 @@ function TarjetaDinamica({
 
 }
 
+/**
+ * Los ids de variable que el servidor acepta ESCRIBIR.
+ *
+ * POR QUÉ MARCARLAS EN EL DESPLEGABLE Y NO FILTRARLO
+ * Este desplegable lo usan TODOS los widgets, y la mayoría solo lee: un
+ * tanque, un LED, una tendencia. Filtrarlo a lo escribible les quitaría casi
+ * todas sus variables. Y un grupo aparte tampoco vale — los `<optgroup>` no se
+ * anidan, así que meter ahí una variable la sacaría del grupo «compatibles», y
+ * la compatibilidad de TIPO es la que le importa al 90% de los widgets.
+ *
+ * Una marca discreta al final del nombre añade el dato sin quitar ninguno. Lo
+ * que resuelve: hasta ahora, al enlazar un Valor con Unidad en modo escritura
+ * no sabías cuál de las 208 variables estaba habilitada — el aviso llegaba
+ * DESPUÉS de elegir, cuando ya te habías equivocado.
+ */
+function useEscribibles(): Set<string> {
+  const [ids, setIds] = useState<Set<string>>(new Set());
+  const [revision, setRevision] = useState(0);
+
+  // Un administrador acaba de habilitar (o quitar) un tag: la marca cambia
+  // sola, sin recargar el Diseñador.
+  useEffect(() => {
+    const alCambiar = () => setRevision((n) => n + 1);
+    window.addEventListener(EVENTO_PERMITIDOS, alCambiar);
+    return () => window.removeEventListener(EVENTO_PERMITIDOS, alCambiar);
+  }, []);
+
+  useEffect(() => {
+    let vivo = true;
+    permitidosCacheados()
+      .then((l) => {
+        if (vivo) setIds(new Set(l.map((x) => unirId(x.plc_id, x.tag))));
+      })
+      .catch(() => {
+        // Sin lista, sin marcas. El Inspector sigue sirviendo para todo lo
+        // demás: quedarse en blanco por no poder pintar un adorno sería peor.
+        if (vivo) setIds(new Set());
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [revision]);
+
+  return ids;
+}
+
 export function PropertyInspector({
   widget,
   selectedVariables,
@@ -474,6 +525,7 @@ export function PropertyInspector({
   onDelete
 }: Props) {
   const { t, widgetLabel, pantallas, projectId } = useAppStore();
+  const escribibles = useEscribibles();
 
   // Secciones que declara el Menú Lateral del lienzo. Llena el desplegable
   // de "Vista".
@@ -574,8 +626,11 @@ export function PropertyInspector({
   const leeVariables = usaVariable(acepta);
   const { compatibles, otras } = repartirPorCompatibilidad(selectedVariables, acepta);
 
+  // El lapicero marca «este tag se puede escribir». Va al final y no delante
+  // para que los nombres sigan alineados y la lista se lea igual de rápido
+  // cuando lo único que buscas es leer un valor.
   const opcion = (v: PlcVariable) => ({
-    label: `${v.name} (${v.type})`,
+    label: `${v.name} (${v.type})${escribibles.has(v.id) ? '  \u270E' : ''}`,
     value: v.id
   });
 
@@ -818,6 +873,19 @@ export function PropertyInspector({
         <div className="flex items-center gap-1.5 rounded-lg bg-siemens-50 px-2.5 py-2 text-[11px] text-siemens-700 dark:bg-siemens/10 dark:text-siemens-200">
             <Link2Icon className="h-3.5 w-3.5" />
             {compatibles.length}/{selectedVariables.length} {t('insp.varsCompatibleCount')}
+          </div>
+        }
+
+        {/* La leyenda del lapicero. Solo si hay alguna marcada: explicar un
+            símbolo que no aparece en la lista es ruido, y con la lista blanca
+            vacía —que es como arranca toda instalación— no aparece ninguno. */}
+        {leeVariables && escribibles.size > 0 &&
+        <div className="flex items-start gap-1.5 px-0.5 text-[10px] leading-relaxed text-slate-400">
+            <span className="shrink-0 font-bold">&#9998;</span>
+            <span className="min-w-0">
+              Habilitada para <b>escritura</b>. Las demás sólo se leen; se dan
+              de alta en Configuración → Escritura.
+            </span>
           </div>
         }
       </Section>

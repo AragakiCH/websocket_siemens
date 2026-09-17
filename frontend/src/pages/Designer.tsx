@@ -21,6 +21,10 @@ import {
   ChevronsDownIcon,
   GroupIcon,
   UngroupIcon,
+  CopyIcon,
+  ClipboardIcon,
+  Undo2Icon,
+  Redo2Icon,
   PaletteIcon,
   UsersIcon } from
 'lucide-react';
@@ -45,6 +49,12 @@ import {
   KIND_CONTENEDOR,
   type AccionOrden } from
 '../components/hmi/grupo';
+import {
+  copiar as copiarAlPortapapeles,
+  pegar as pegarDelPortapapeles,
+  leerPortapapeles } from
+'../components/hmi/portapapeles';
+import { useHistorial, type Instantanea } from '../components/hmi/historial';
 import { PropertyInspector } from '../components/hmi/PropertyInspector';
 import { UPDATE_RATE_OPTIONS } from '../models/plc';
 import {
@@ -460,6 +470,50 @@ export function Designer() {
   // punto ámbar aunque esté cerrado.
   const hayAviso = !!errorGuardado || (!lock.cargando && !lock.puedeEditar);
 
+  // ── DESHACER / REHACER ────────────────────────────────────────
+  //
+  // La selección va por ref y no como dependencia: marcar un widget NO es
+  // editar, y un Ctrl+Z que deshiciera «haber hecho clic» sería un castigo.
+  // Aun así se guarda en la instantánea, para que al deshacer vuelva marcado
+  // lo que cambió y se vea qué pasó.
+  const seleccionRef = useRef<string[]>(seleccion);
+  seleccionRef.current = seleccion;
+
+  /**
+   * Vuelca una instantánea en el lienzo.
+   *
+   * Se escribe todo aunque no haya cambiado: los `useState` de React ya
+   * descartan solos un valor idéntico, así que no cuesta nada y evita tener
+   * que decidir aquí qué partes tocar.
+   */
+  const aplicarInstantanea = useCallback((s: Instantanea) => {
+    setWidgets(s.widgets);
+    setCanvasW(s.canvasW);
+    setCanvasH(s.canvasH);
+    setCanvasBg(s.canvasBg);
+    setSeleccion(s.seleccion);
+    setMenuOrden(null);
+  }, [setWidgets]);
+
+  const historial = useHistorial({
+    // `listo` es la señal de que la pantalla terminó de hidratarse. Antes de
+    // eso `widgets` todavía puede traer lo de la pantalla anterior, y
+    // registrar ESO haría que el primer Ctrl+Z saltara a otro diseño.
+    activo: listo && puedeEditar,
+    clave: projectId,
+    widgets,
+    canvasW,
+    canvasH,
+    canvasBg,
+    seleccionRef,
+    aplicar: aplicarInstantanea
+  });
+
+  // El listener de teclado lo lee por ref: así ve siempre el historial al día
+  // sin tener que volver a engancharse en cada render.
+  const historialRef = useRef(historial);
+  historialRef.current = historial;
+
   // ── Teclado del lienzo ────────────────────────────────────────
   //
   // ¿Lo último que pulsó el ratón cayó DENTRO del lienzo?
@@ -524,6 +578,50 @@ export function Designer() {
         return;
       }
 
+      // ── Ctrl+C COPIA · Ctrl+X CORTA · Ctrl+V PEGA · Ctrl+D DUPLICA ──
+      //
+      // Piden lo mismo que Suprimir: que lo último que tocara el ratón fuera
+      // el lienzo. La guarda de `INPUT`/`TEXTAREA` de arriba no basta, porque
+      // si el campo en el que escribías DESAPARECE el foco cae al <body> y la
+      // tecla llega aquí como si vinieras del lienzo. Sin esto, un Ctrl+C
+      // dentro del Inspector dejaría de copiar texto y copiaría el widget.
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+        const k = e.key.toLowerCase();
+
+        // ── Ctrl+Z DESHACE · Ctrl+Y / Ctrl+Shift+Z REHACEN ──
+        //
+        // Estos NO exigen que el ratón estuviera en el lienzo, al revés que
+        // copiar o borrar. El motivo: la edición que más falta hace deshacer
+        // suele venir del Inspector —un color, un tamaño, una variable— y
+        // obligar a volver al lienzo antes de poder arrepentirse no tendría
+        // ningún sentido. La guarda de campos de texto de arriba ya protege
+        // lo importante: dentro de un `input`, Ctrl+Z deshace el texto.
+        if (k === 'z' || k === 'y') {
+          e.preventDefault();
+          if (k === 'y' || e.shiftKey) historialRef.current.rehacer();
+          else historialRef.current.deshacer();
+          return;
+        }
+
+        if (k === 'c' || k === 'x' || k === 'd') {
+          if (!ratonEnLienzo.current || seleccion.length === 0) return;
+          e.preventDefault();
+          if (k === 'd') {
+            duplicarSeleccion();
+          } else if (copiarSeleccion() && k === 'x') {
+            borrarSeleccion();
+          }
+          return;
+        }
+
+        if (k === 'v') {
+          if (!ratonEnLienzo.current) return;
+          e.preventDefault();
+          pegarEnLienzo();
+          return;
+        }
+      }
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (seleccion.length === 0) return;
         // Venías de un panel, no del lienzo: la tecla no es para borrar nada.
@@ -544,7 +642,12 @@ export function Designer() {
     // árbol viejo. Volver a enganchar un listener es barato; equivocarse de
     // widgets, no.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, seleccion, widgets, puedeEditar, projectId]);
+    // `vistaActiva`, el tamaño del lienzo y las secciones entran porque de
+    // ellos depende DÓNDE cae lo pegado: con la lista vieja, pegar tras
+    // cambiar de sección metería el widget en la sección anterior.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, seleccion, widgets, puedeEditar, projectId,
+      vistaActiva, canvasW, canvasH, secciones]);
 
   // ── Meter en el lienzo lo que se haya quedado fuera ───────────
   //
@@ -851,6 +954,87 @@ export function Designer() {
    * estaba seleccionado, cae en su propia vuelta del bucle. Sale de aquí un
    * árbol coherente sea cual sea la mezcla de padres e hijos marcados.
    */
+  // ── COPIAR / PEGAR / DUPLICAR ─────────────────────────────────
+  //
+  // El portapapeles es propio, no el del sistema. El porqué está en
+  // `portapapeles.ts`; en resumen: el del navegador es asíncrono, pide
+  // permiso, y pisaría el Ctrl+C de texto del Inspector.
+  //
+  // Cuántas veces se ha pegado DESDE la última copia. Es lo que hace que
+  // pegar tres veces deje tres copias en escalera y no tres exactamente
+  // encima, que parecerían una sola y harían pensar que no funcionó.
+  const pegadas = useRef(0);
+  const [hayCopia, setHayCopia] = useState(() => leerPortapapeles() !== null);
+
+  /** Separación de cada pegada respecto a la anterior, en px. */
+  const DESFASE = 20;
+
+  // Los ids los genera el Diseñador, no el portapapeles: así comparten el
+  // mismo contador que el resto del lienzo y no puede salir un duplicado.
+  const nuevoIdWidget = () => `w_${Date.now()}_${counter++}`;
+
+  const copiarSeleccion = (): boolean => {
+    if (seleccion.length === 0) return false;
+    // Se copia aunque el lienzo esté bloqueado: copiar no modifica nada, y
+    // poder llevarse un widget de una pantalla que no puedes tocar a otra que
+    // sí es justo para lo que sirve esto.
+    const doc = copiarAlPortapapeles(widgets, seleccion, projectId);
+    if (!doc) return false;
+    pegadas.current = 0;
+    setHayCopia(true);
+    return true;
+  };
+
+  /**
+   * Pega lo copiado.
+   *
+   * `desdeDoc` permite reutilizar todo esto para DUPLICAR sin pasar por el
+   * portapapeles: duplicar no debe borrar lo que tuvieras copiado.
+   */
+  const pegarEnLienzo = (desdeDoc?: ReturnType<typeof copiarAlPortapapeles>) => {
+    if (!puedeEditar) return;
+    const doc = desdeDoc ?? leerPortapapeles();
+    if (!doc) return;
+
+    // Pegar en OTRA pantalla va en la posición original: allí no hay nada que
+    // solapar y respetar el sitio es lo que uno espera al mover un bloque de
+    // una pantalla a otra. En la MISMA, cae desplazado para que se vea que son
+    // dos cosas distintas.
+    const mismaPantalla = doc.origen === projectId;
+    const salto = desdeDoc
+      ? DESFASE
+      : (mismaPantalla ? pegadas.current + 1 : pegadas.current) * DESFASE;
+
+    const nuevos = pegarDelPortapapeles(doc, {
+      nuevoId: nuevoIdWidget,
+      x: doc.ancla.x + salto,
+      y: doc.ancla.y + salto,
+      lienzo: { width: canvasW, height: canvasH },
+      seccionesValidas: new Set(secciones.map((x) => x.id)),
+      vistaActiva,
+      vistaTodas: VISTA_TODAS,
+      esNavegacion: esWidgetDeNavegacion,
+      nombresUsados: new Set(widgets.map((w) => w.name))
+    });
+    if (nuevos.length === 0) return;
+
+    if (!desdeDoc) pegadas.current += 1;
+
+    // Al final del array = encima de todo. Lo recién pegado tiene que verse.
+    setWidgets((prev) => [...prev, ...nuevos]);
+    // Queda seleccionado lo pegado, para poder arrastrarlo al sitio sin tener
+    // que ir a buscarlo. Solo las RAÍCES: los hijos se mueven con su grupo.
+    setSeleccion(nuevos.filter((w) => !w.padre).map((w) => w.id));
+    setMenuOrden(null);
+  };
+
+  /** Ctrl+D: copia y pega de un tirón, sin tocar el portapapeles. */
+  const duplicarSeleccion = () => {
+    if (!puedeEditar || seleccion.length === 0) return;
+    const doc = copiarAlPortapapeles(widgets, seleccion, projectId);
+    if (doc) pegarEnLienzo(doc);
+  };
+
   const borrarSeleccion = () => {
     if (!puedeEditar || seleccion.length === 0) return;
     const bajas = [...seleccion];
@@ -1205,6 +1389,39 @@ export function Designer() {
             </button>
           </div>
           }
+
+          {/* ── DESHACER / REHACER ──────────────────────────────
+              Siempre visibles, aunque estén apagados. Un botón que aparece y
+              desaparece obliga a mirar dónde está cada vez; uno que está
+              siempre en el mismo sitio se pulsa sin pensar, que es lo que se
+              hace con deshacer. Apagado ya dice que no hay nada que deshacer.
+          */}
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={historial.deshacer}
+              disabled={!historial.puedeDeshacer}
+              title={
+              historial.puedeDeshacer ?
+              `Deshacer el último cambio (Ctrl+Z) · ${historial.pasos} paso(s) guardado(s)` :
+              'No hay nada que deshacer'
+              }
+              className="rounded-md p-1.5 text-slate-500 outline-none transition hover:bg-slate-100 hover:text-navy disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent dark:text-slate-400 dark:hover:bg-navy-slate dark:hover:text-slate-100">
+              <Undo2Icon className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={historial.rehacer}
+              disabled={!historial.puedeRehacer}
+              title={
+              historial.puedeRehacer ?
+              'Rehacer (Ctrl+Y)' :
+              'No hay nada que rehacer'
+              }
+              className="rounded-md p-1.5 text-slate-500 outline-none transition hover:bg-slate-100 hover:text-navy disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent dark:text-slate-400 dark:hover:bg-navy-slate dark:hover:text-slate-100">
+              <Redo2Icon className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div className="mx-0.5 h-4 w-px bg-slate-200 dark:bg-navy-slate" />
 
           {/* ── AGRUPAR / DESAGRUPAR, A LA VISTA ────────────────
               El menú del clic derecho ya lo ofrece, pero esconderlo ahí tiene
@@ -1709,7 +1926,11 @@ export function Designer() {
           // Que no se salga por el borde. Un menú medio fuera de pantalla
           // con la última opción cortada es peor que no tenerlo.
           const ANCHO = 208;
-          const ALTO = 190 + (puedeAgrupar ? 30 : 0) + (puedeDesagrupar ? 30 : 0);
+          const ALTO =
+            190 + 92 +
+            (puedeAgrupar ? 30 : 0) +
+            (puedeDesagrupar ? 30 : 0) +
+            (hayCopia ? 0 : -30);
           const x = Math.min(menuOrden.x, window.innerWidth - ANCHO - 8);
           const y = Math.min(menuOrden.y, window.innerHeight - ALTO - 8);
 
@@ -1756,6 +1977,42 @@ export function Designer() {
                     </button>);
 
                 })}
+
+                {/* ── COPIAR / DUPLICAR / PEGAR ──
+                    Van en el menú además de en el teclado por lo de siempre:
+                    un atajo que nadie te ha contado no existe. Y aquí se ve
+                    escrito cuál es, que es como se aprenden. */}
+                <div className="mt-1 border-t border-slate-100 pt-1 dark:border-navy-slate">
+                  <button
+                    onClick={() => { copiarSeleccion(); setMenuOrden(null); }}
+                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-slate-600 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-navy-slate/50">
+                    <CopyIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <span className="flex-1">
+                      Copiar{seleccion.length > 1 ? ` ${raicesSel.length}` : ''}
+                    </span>
+                    <kbd className="text-[9px] text-slate-400">Ctrl+C</kbd>
+                  </button>
+                  <button
+                    disabled={!puedeEditar}
+                    onClick={() => { duplicarSeleccion(); setMenuOrden(null); }}
+                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-navy-slate/50">
+                    <CopyIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <span className="flex-1">Duplicar</span>
+                    <kbd className="text-[9px] text-slate-400">Ctrl+D</kbd>
+                  </button>
+                  {/* «Pegar» solo aparece si hay algo copiado. Un botón que no
+                      puede hacer nada solo sirve para hacer dudar. */}
+                  {hayCopia &&
+                  <button
+                    disabled={!puedeEditar}
+                    onClick={() => pegarEnLienzo()}
+                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-navy-slate/50">
+                    <ClipboardIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <span className="flex-1">Pegar</span>
+                    <kbd className="text-[9px] text-slate-400">Ctrl+V</kbd>
+                  </button>
+                  }
+                </div>
 
                 {/* ── AGRUPAR / DESAGRUPAR ──
                     Separadas del bloque de orden por una línea: son de otra
