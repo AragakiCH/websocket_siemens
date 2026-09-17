@@ -506,15 +506,19 @@ def _excel_tabla_plana(filas: list, columnas: list, titulo: str,
 
     from openpyxl import Workbook
 
-    from app.export.excel import (BORDE, CENTRADO, FUENTE_CABECERA,
-                                  RELLENO_BANDA, RELLENO_CABECERA, _auto_ancho,
-                                  _hoja_info)
+    from app.export.excel import (BORDE, CENTRADO, FORMATO_FECHA,
+                                  FUENTE_CABECERA, RELLENO_BANDA,
+                                  RELLENO_CABECERA, _a_datetime, _auto_ancho,
+                                  _hoja_info, _nombre_zona, _zona)
 
     wb = Workbook()
     wb.remove(wb.active)
 
+    zona = _zona()
     todos = list(campos) + [
-        ("Generado", datetime.now().replace(microsecond=0)),
+        # Misma zona que las fechas de las filas (ver `_a_datetime`).
+        ("Generado", datetime.now(zona).replace(microsecond=0, tzinfo=None)),
+        ("Zona horaria", _nombre_zona()),
     ]
     _hoja_info(wb, {"titulo": f"Consulta: {titulo}", "campos": todos,
                     "tags": columnas})
@@ -531,9 +535,18 @@ def _excel_tabla_plana(filas: list, columnas: list, titulo: str,
     for f, fila in enumerate(filas, start=2):
         for i, col in enumerate(columnas, start=1):
             valor = fila.get(col)
+            # Una fecha de la base de datos llega en UTC (con o sin zona,
+            # según el motor). Se enseña en hora local, como en el resto de
+            # exportaciones; escribirla tal cual sería el mismo desfase de
+            # cinco horas que hubo en las grabaciones, y una fecha CON zona
+            # ni siquiera la acepta openpyxl.
+            if isinstance(valor, datetime):
+                valor = _a_datetime(valor, zona)
             celda = hoja.cell(f, i, valor)
             celda.border = BORDE
-            if isinstance(valor, bool):
+            if isinstance(valor, datetime):
+                celda.number_format = FORMATO_FECHA
+            elif isinstance(valor, bool):
                 celda.value = "SÍ" if valor else "NO"
                 celda.alignment = CENTRADO
         if f % 2 == 0:

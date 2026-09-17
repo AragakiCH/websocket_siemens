@@ -38,6 +38,8 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from openpyxl import Workbook
 from openpyxl.chart import LineChart, Reference
+
+from app.config.settings import get_settings
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
@@ -75,8 +77,44 @@ MAX_FILAS = 500_000
 # ====================================================================== #
 # Utilidades
 # ====================================================================== #
-def _a_datetime(valor: Any) -> Optional[datetime]:
-    """Convierte a datetime NAIVE (Excel no maneja zonas horarias)."""
+def _zona():
+    """
+    La zona horaria de VISUALIZACIÓN (`PLC_TIMEZONE`, por defecto America/Lima).
+
+    Es la misma que usa el historizador para calcular `ts_local`: el Excel
+    tiene que decir la misma hora que la pantalla, o alguien va a comparar
+    los dos y creer que uno de ellos miente.
+    """
+    return get_settings().zona_horaria()
+
+
+def _a_datetime(valor: Any, zona=None) -> Optional[datetime]:
+    """
+    Convierte a datetime NAIVE **en hora local**, que es lo que Excel sabe
+    mostrar.
+
+    EL FALLO QUE HABÍA AQUÍ. Antes se pasaba a UTC antes de quitar la zona,
+    "porque Excel no entiende tzinfo". Cierto lo segundo, falso lo primero: el
+    resultado era una grabación hecha a las 10:29 en Lima que el Excel
+    enseñaba a las 15:29, sin ninguna marca de que fuera UTC. La fecha salía
+    bien y la hora no, que es la peor combinación: parece un dato correcto.
+
+    LA REGLA, LA MISMA QUE EN TODO EL SISTEMA. Los datos se guardan SIEMPRE en
+    UTC (el SourceTimestamp de OPC UA lo es por especificación, y el grabador,
+    el historizador y los dos drivers —Siemens y Rexroth— sellan con
+    `datetime.now(timezone.utc)`). Al MOSTRAR se convierte a `PLC_TIMEZONE`,
+    como hace el historizador con `ts_local`. Esta función es el "al mostrar"
+    del Excel, así que convierte a esa zona y no a UTC.
+
+    Por eso vale para cualquier PLC: la zona no se adivina a partir del
+    origen del dato, se aplica al final sobre un instante que ya es UTC.
+
+    UN VALOR SIN ZONA SE TOMA COMO UTC. Es lo que devuelven las bases de datos
+    (DATETIME2 en SQL Server y TEXT en SQLite no llevan zona) y lo que dice el
+    contrato de almacenamiento. Dejarlo tal cual, como antes, habría enseñado
+    UTC en las exportaciones del histórico aunque las de grabación en vivo
+    salieran bien.
+    """
     if valor is None:
         return None
     if isinstance(valor, datetime):
@@ -90,10 +128,20 @@ def _a_datetime(valor: Any) -> Optional[datetime]:
                 dt = datetime.strptime(texto[:19], "%Y-%m-%d %H:%M:%S")
             except ValueError:
                 return None
-    # Excel no entiende tzinfo: se pasa a UTC y se quita.
-    if dt.tzinfo is not None:
-        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
-    return dt
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    # Excel no entiende tzinfo: se lleva a la hora local y se quita.
+    return dt.astimezone(zona or _zona()).replace(tzinfo=None)
+
+
+def _nombre_zona() -> str:
+    """`America/Lima (UTC-05:00)`: el nombre IANA y el desfase de hoy."""
+    zona = _zona()
+    ahora = datetime.now(zona)
+    desfase = ahora.strftime("%z")            # -0500
+    legible = f"UTC{desfase[:3]}:{desfase[3:]}" if desfase else "UTC"
+    nombre = getattr(zona, "key", None) or str(zona)
+    return f"{nombre} ({legible})"
 
 
 def _nombre_hoja(nombre: str) -> str:
@@ -141,9 +189,13 @@ def pivotar(
     columnas: Dict[str, None] = {}   # dict para conservar el orden de aparición
     nombres_por_tag: Dict[str, set] = {}
 
+    # Una vez por exportación, no una por muestra: `get_settings()` es barato
+    # pero con medio millón de filas se nota.
+    zona = _zona()
+
     filas: List[Tuple[datetime, str, str, Any]] = []
     for m in muestras:
-        ts = _a_datetime(m.get(columna_ts))
+        ts = _a_datetime(m.get(columna_ts), zona)
         if ts is None:
             continue
         tag = str(m.get(columna_tag) or "")
@@ -230,8 +282,10 @@ def _hoja_datos(
     """
     hoja = wb.create_sheet(_nombre_hoja(nombre))
 
-    # Cabecera
-    hoja.cell(1, 1, "Fecha y hora")
+    # Cabecera. Lleva la zona en el nombre para que un Excel que lleve meses
+    # en una carpeta, o que se abra en otro país, no deje lugar a dudas: la
+    # hora es la de la instalación, no UTC ni la del PC que lo abre.
+    hoja.cell(1, 1, f"Fecha y hora · {_nombre_zona()}")
     for i, col in enumerate(columnas, start=2):
         hoja.cell(1, i, col)
     for i in range(1, len(columnas) + 2):
@@ -426,7 +480,12 @@ def construir_excel(
         ("Variables exportadas", len(columnas)),
         ("Primer registro", instantes[0] if instantes else "—"),
         ("Último registro", instantes[-1] if instantes else "—"),
-        ("Generado", datetime.now().replace(microsecond=0)),
+        # En la MISMA zona que las filas. Antes era `datetime.now()` a secas,
+        # la hora del sistema operativo del servidor: coincide con la de las
+        # filas solo si el servidor está en la zona de la planta, y un
+        # servidor en la nube suele estar en UTC.
+        ("Generado", datetime.now(_zona()).replace(microsecond=0, tzinfo=None)),
+        ("Zona horaria", _nombre_zona()),
     ])
     _hoja_info(wb, {"titulo": titulo, "campos": campos, "tags": columnas})
 
