@@ -323,14 +323,44 @@ def _serializable(valor: Any) -> Any:
     """
     Convierte tipos de BD a algo que `json.dumps` acepte.
 
-    Las fechas se emiten en ISO 8601 para que el frontend las parsee con
-    `new Date(...)` sin ambigüedad de formato.
+    Las fechas se emiten en ISO 8601 **con zona**, para que el frontend las
+    parsee con `new Date(...)` sin ambigüedad.
+
+    EL FALLO QUE HABÍA AQUÍ. Un `DATETIME2` de SQL Server (o `DATETIME` de
+    MySQL) vuelve de la base como datetime NAIVE: contiene la hora UTC —así se
+    escribió, ver `ts_para_motor`— pero no lo dice. `isoformat()` de eso da
+    `2026-09-17T15:29:10`, sin `Z` ni offset, y el estándar de JavaScript
+    dice que una fecha-hora SIN offset se interpreta como hora LOCAL del
+    navegador. En Perú son cinco horas de desplazamiento silencioso: una
+    alarma recién saltada salía como «hace 0 s» durante cinco horas, y la
+    fecha de creación de una receta, cinco horas tarde.
+
+    El historizador se había protegido por su cuenta (`_añadir_hora_local`
+    reescribe `ts` con `Z`), y el trend lleva un cinturón para lo mismo. Pero
+    todo lo que va por el CRUD genérico —alarmas, recetas, usuarios,
+    auditoría en tabla— pasaba por aquí sin protección. Arreglarlo en este
+    punto lo arregla para todos a la vez, hoy y para la tabla que se cree
+    mañana.
+
+    LA REGLA: un datetime sin zona que sale de la base ES UTC, porque así se
+    escribió (todas las escrituras pasan por `ts_para_motor` / `a_utc` o por
+    `_ahora`, que sella con `datetime.now(timezone.utc)`). Se le pone la zona
+    que le falta y se emite con `+00:00`. Un datetime que ya trae zona
+    (PostgreSQL, `TIMESTAMPTZ`) se emite tal cual. SQLite guarda texto con
+    `+00:00` y llega como `str`, así que ni pasa por aquí.
+
+    `date` y `time` sueltos no llevan zona por definición y se dejan como
+    están: una fecha de calendario no es un instante.
     """
     if valor is None or isinstance(valor, (str, int, float, bool)):
         return valor
     if isinstance(valor, Decimal):
         return float(valor)
-    if isinstance(valor, (datetime, date, dtime)):
+    if isinstance(valor, datetime):
+        if valor.tzinfo is None:
+            valor = valor.replace(tzinfo=timezone.utc)
+        return valor.isoformat()
+    if isinstance(valor, (date, dtime)):
         return valor.isoformat()
     if isinstance(valor, UUID):
         return str(valor)
