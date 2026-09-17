@@ -53,6 +53,11 @@ import { Loader2Icon, MonitorXIcon, AlertTriangleIcon } from 'lucide-react';
 import type { HmiWidget } from '../../../../models/widget';
 import { useAppStore } from '../../../../context/AppStore';
 import { cargarProyecto, type SavedDesign } from '../../../../utils/designStorage';
+import {
+  aplicarCambio,
+  versionEncaja,
+  type MensajeProjectUpdated,
+} from '../../../../utils/aplicarCambio';
 import { WidgetRenderer } from '../../WidgetRenderer';
 import { ContextoEmbebido, esWidgetDeNavegacion } from './store';
 import { ContextoMapaTags } from '../faceplate/contexto';
@@ -80,6 +85,10 @@ export type ModoAjuste = 'ajustar' | 'estirar' | 'real';
 
 const cache = new Map<string, SavedDesign>();
 const enVuelo = new Map<string, Promise<SavedDesign | null>>();
+// Versión de lo que hay en `cache`, por pantalla. Es lo que permite aplicar
+// un `project.updated` encima sin volver a pedir la pantalla: solo si el
+// evento es justo la versión siguiente. 0 o ausente = desconocida.
+const versiones = new Map<string, number>();
 
 async function traer(projectId: string): Promise<SavedDesign | null> {
   let pendiente = enVuelo.get(projectId);
@@ -94,6 +103,7 @@ async function traer(projectId: string): Promise<SavedDesign | null> {
         }
         const design: SavedDesign = { widgets: doc.widgets, canvas: doc.canvas };
         cache.set(projectId, design);
+        versiones.set(projectId, doc.desdeCache ? 0 : doc.version);
         return design;
       })
       .finally(() => enVuelo.delete(projectId));
@@ -211,11 +221,29 @@ function usePantallaEmpotrada(projectId: string): EstadoCarga {
         // estado, el siguiente montaje del panel volvería a pintar el diseño
         // borrado desde el módulo — el fantasma otra vez.
         cache.delete(projectId);
+        versiones.delete(projectId);
         if (vivo) setEstado({ design: null, cargando: false, error: 'no_existe' });
         return;
       }
 
-      if (msg.type === 'project.updated') pedir(projectId, () => vivo);
+      if (msg.type === 'project.updated') {
+        // Primero se intenta aplicar lo que trae el evento (el widget del
+        // PATCH o el diff del PUT) sobre lo cacheado, sin ir al servidor.
+        // Con diez visores, que cada panel descargara la pantalla entera
+        // por cada movimiento del ratón era el pico que no hacía falta.
+        // Si no encaja (sin datos, versión con hueco), se pide como antes.
+        const actual = cache.get(projectId) ?? null;
+        const aplicado = versionEncaja(versiones.get(projectId) ?? 0, msg.version)
+          ? aplicarCambio(actual, msg as MensajeProjectUpdated)
+          : null;
+        if (aplicado) {
+          cache.set(projectId, aplicado);
+          versiones.set(projectId, msg.version);
+          if (vivo) setEstado({ design: aplicado, cargando: false, error: '' });
+        } else {
+          pedir(projectId, () => vivo);
+        }
+      }
     };
 
     window.addEventListener('hmi:ws', alEvento as EventListener);

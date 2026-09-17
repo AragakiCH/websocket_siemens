@@ -100,9 +100,11 @@ en la vista no es seguridad: cualquiera puede llamar al endpoint con `curl`.
   preferencias del navegador, no configuración compartida. Si se quiere que
   sigan a la persona entre equipos, el sitio es una tabla `preferencias`
   con FK a `usuarios`.
-- **Selector de proyectos en la vista.** El backend ya soporta varios
-  (`datos/proyectos/<id>.json`, `GET /pantallas`), pero el frontend abre
-  siempre `principal`. Añadir el desplegable es media hora.
+- ~~**Selector de proyectos en la vista.**~~ Resuelto de otra forma el 15 sep
+  2026: la vista abre el proyecto **publicado** en el servidor (`/runtime`),
+  que es el que el supervisor tiene abierto en el Diseñador, y salta con él
+  en vivo. Un visor entra directo a ese runtime, sin menú. Ver
+  [VISOR_RUNTIME.md](VISOR_RUNTIME.md).
 - **Edición colaborativa real** (CRDT, opción C de la Fase 4). Solo se
   justifica si varias personas construyen pantallas a la vez como trabajo
   habitual. Con el lápiz, el caso real está cubierto.

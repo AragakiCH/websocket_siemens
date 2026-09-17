@@ -75,6 +75,7 @@ import { RecipesEditor } from '../components/recipes/RecipesEditor';
 import { PanelExportar } from '../components/export/PanelExportar';
 import { PantallasBar } from '../components/hmi/PantallasBar';
 import { ProyectoSelector } from '../components/hmi/ProyectoSelector';
+import { publicarRuntime } from '../services/runtimeApi';
 import {
   useVistaActiva,
   useSecciones,
@@ -157,8 +158,35 @@ export function Designer() {
     selectedVariables,
     config,
     isDark,
-    t
+    t,
+    proyectoId,
+    esVisor
   } = useAppStore();
+
+  // ── LO QUE VEN LOS VISORES ES LO QUE HAY AQUÍ ABIERTO ─────────
+  //
+  // Al abrir un proyecto en el Diseñador del SERVIDOR se publica como el
+  // proyecto en pantalla (`PUT /runtime`), y todos los visores saltan a su
+  // runtime al instante por el WebSocket. Sin botón a propósito: "lo que el
+  // supervisor tiene delante" es exactamente lo que se quiere publicar, y
+  // un paso aparte sería el que alguien olvidaría.
+  //
+  // Desde un visor NO se publica (el backend lo rechazaría salvo a un
+  // Supervisor): que un Administrador mire otro proyecto desde un portátil
+  // no debe cambiar lo que ven los demás puestos. `esVisor === null` es
+  // "todavía no se sabe": se espera, no se adivina.
+  useEffect(() => {
+    if (esVisor !== false) return;
+    if (permisos && !permisos.editar_diseño) return;
+    if (!proyectoId) return;
+    let vivo = true;
+    void publicarRuntime(proyectoId).catch((e) => {
+      if (vivo) console.warn('[runtime] no se pudo publicar el proyecto:', e);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [proyectoId, esVisor, permisos]);
 
   /**
    * Buscar una variable por su id.

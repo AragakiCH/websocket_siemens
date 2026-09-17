@@ -339,6 +339,82 @@ async def escenario(tmp: Path) -> None:
         check("tras liberar, luis lo vuelve a tomar",
               r.json()["concedido"] is True)
 
+        # ---- 8b. Runtime de los visores ------------------------------ #
+        titulo("8b · Runtime: el proyecto que ven los visores")
+        r = await c.get("/runtime", headers=ANA)
+        check("GET /runtime responde a un 'Usuarios'", r.status_code == 200)
+        check("arranca publicando 'principal'",
+              r.json().get("proyecto_id") == "principal")
+        check("trae las pantallas del proyecto",
+              isinstance(r.json().get("pantallas"), list) and
+              len(r.json()["pantallas"]) >= 1)
+
+        r = await c.post("/proyectos", headers=LUIS, json={
+            "proyecto_id": "linea_2", "nombre": "Línea 2",
+            "pantalla_nombre": "Vista general"})
+        check("luis crea el proyecto 'linea_2'", r.status_code == 200,
+              f"(HTTP {r.status_code})")
+
+        r = await c.put("/runtime", headers=ANA, json={"proyecto_id": "linea_2"})
+        check("'Usuarios' NO puede publicar -> 403", r.status_code == 403)
+        r = await c.put("/runtime", headers=LUIS, json={"proyecto_id": "no_existe"})
+        check("publicar un proyecto inexistente -> 404", r.status_code == 404)
+
+        rec_ana.clear()
+        r = await c.put("/runtime", headers=LUIS, json={"proyecto_id": "linea_2"})
+        check("un Administrador (desde el servidor) publica 'linea_2'",
+              r.status_code == 200 and r.json().get("cambio") is True,
+              f"(HTTP {r.status_code})")
+        await asyncio.sleep(1.2)
+        ev_rt = [m for m in rec_ana if m.get("type") == "runtime.changed"]
+        check("a ANA (visor) le llega runtime.changed al instante",
+              len(ev_rt) > 0 and ev_rt[-1].get("proyecto_id") == "linea_2")
+        check("el evento trae las pantallas para abrir la primera sin más peticiones",
+              len(ev_rt) > 0 and len(ev_rt[-1].get("pantallas") or []) == 1)
+
+        rec_ana.clear()
+        r = await c.put("/runtime", headers=LUIS, json={"proyecto_id": "linea_2"})
+        check("volver a publicar el mismo no cambia nada",
+              r.status_code == 200 and r.json().get("cambio") is False)
+        await asyncio.sleep(0.6)
+        check("y no difunde ningún evento (diez visores agradecidos)",
+              not any(m.get("type") == "runtime.changed" for m in rec_ana))
+
+        # El PUT de la pantalla lleva el DIFF dentro del evento
+        r = await c.get("/pantallas/principal", headers=LUIS)
+        doc = r.json()
+        v_put = doc["version"]
+        nuevos = [w for w in doc["widgets"] if w.get("id") != "w_otro"]
+        nuevos.append({"id": "w_nuevo", "tipo": "texto", "x": 1, "y": 2})
+        rec_ana.clear()
+        # Con LUIS: es quien tiene el lápiz en este punto de la prueba.
+        r = await c.put("/pantallas/principal", headers=LUIS, json={
+            "widgets": nuevos, "canvas": doc.get("canvas"), "version": v_put})
+        check("luis guarda la pantalla completa (PUT)", r.status_code == 200,
+              f"(HTTP {r.status_code}: {r.text[:120]})")
+        await asyncio.sleep(1.2)
+        ev_put = [m for m in rec_ana if m.get("type") == "project.updated"
+                  and m.get("cambio", {}).get("accion") == "proyecto_reemplazado"]
+        diff = ev_put[-1]["cambio"].get("diff") if ev_put else None
+        check("project.updated lleva el diff (no hay que volver a pedir la pantalla)",
+              isinstance(diff, dict))
+        check("el diff trae solo el widget nuevo",
+              bool(diff) and [w["id"] for w in diff.get("widgets", [])] == ["w_nuevo"])
+        check("y el orden de pintado completo",
+              bool(diff) and diff.get("orden") == [w["id"] for w in nuevos])
+
+        # Borrar el proyecto publicado devuelve a los visores a 'principal'
+        rec_ana.clear()
+        r = await c.delete("/proyectos/linea_2", headers=SUP)
+        check("el Supervisor borra 'linea_2'", r.status_code == 200)
+        await asyncio.sleep(1.2)
+        ev_rt = [m for m in rec_ana if m.get("type") == "runtime.changed"]
+        check("los visores vuelven solos a 'principal'",
+              len(ev_rt) > 0 and ev_rt[-1].get("proyecto_id") == "principal"
+              and ev_rt[-1].get("motivo") == "proyecto_borrado")
+        r = await c.get("/runtime")
+        check("GET /runtime lo confirma", r.json().get("proyecto_id") == "principal")
+
         t1.cancel(); t2.cancel()
         await asyncio.sleep(0.4)
 
@@ -381,6 +457,7 @@ async def comprobar_persistencia(tmp: Path) -> None:
               len(doc["widgets"]) > 0 and doc["version"] > 1,
               f"(v{doc['version']}, {len(doc['widgets'])} widget(s))")
     check("existe la auditoría", (datos / "auditoria.jsonl").is_file())
+    check("existe datos/runtime.json", (datos / "runtime.json").is_file())
     check("la clave de cifrado está creada", (datos / ".clave").is_file())
 
 

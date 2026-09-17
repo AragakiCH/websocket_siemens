@@ -510,12 +510,19 @@ async def logout(request: Request, tok: Optional[str] = Depends(token_de)) -> di
 async def yo(
     request: Request, sesion: Optional[Sesion] = Depends(sesion_actual)
 ) -> dict:
+    # ¿Es un VISOR (otra IP) o la ventana del propio servidor? Va también
+    # aquí, y no solo en /auth/estado, porque es lo primero que pregunta la
+    # aplicación al arrancar: con esto decide si la persona va al menú o
+    # directa al runtime, y qué rutas se le cierran (ver RutaProtegida.tsx).
+    visor = not es_local(request)
     if sesion is None:
         return {"ok": True, "autenticado": False,
+                "es_visor": visor,
                 "auth_requerida": request.app.state.settings.auth_requerida}
     return {
         "ok": True,
         "autenticado": True,
+        "es_visor": visor,
         "sesion": sesion.publico(),
         "permisos": {
             "ver": True,

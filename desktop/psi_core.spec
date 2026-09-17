@@ -59,6 +59,9 @@ a = Analysis(
     ],
     hiddenimports=[
         "app.main",
+        # Limpieza de la caché de WebView2 al arrancar; se importa dentro de
+        # una función y con dos nombres posibles, así que se declara aquí.
+        "cache_webview",
         # uvicorn resuelve estos por nombre en tiempo de ejecución, así que
         # PyInstaller no los ve al analizar los imports.
         "uvicorn.logging",
