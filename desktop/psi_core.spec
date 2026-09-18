@@ -62,6 +62,8 @@ a = Analysis(
         # Limpieza de la caché de WebView2 al arrancar; se importa dentro de
         # una función y con dos nombres posibles, así que se declara aquí.
         "cache_webview",
+        # Apaga el autorrelleno de Edge en la ventana (mismo patrón de import).
+        "autofill_webview",
         # uvicorn resuelve estos por nombre en tiempo de ejecución, así que
         # PyInstaller no los ve al analizar los imports.
         "uvicorn.logging",

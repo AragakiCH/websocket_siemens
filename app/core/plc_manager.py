@@ -34,6 +34,72 @@ from app.drivers.opcua_driver import OpcUaDriver
 from app.drivers.plc_driver import PlcDriver
 from app.drivers.rexroth_driver import RexrothDriver
 
+
+class _InternasComoPlc:
+    """
+    Las variables internas con la cara de un PLC, para `escribir_tags`.
+
+    POR QUÉ EXISTE. Un widget que escribe (Switch, Botón, «Sumar») manda
+    `{"plc_id": "interno", "tag": "modo", "valor": true}` por `/escritura`, y
+    `escribir_tags` buscaba el handler de `interno` en `_handlers`… donde no
+    hay ninguno: las internas viven en `InternasStore`, no en un handler. El
+    resultado era un error seco —«No hay ningún PLC con id 'interno'»— y una
+    variable interna que se podía LEER desde cualquier widget pero no ESCRIBIR
+    desde ninguno. El código de abajo ya esperaba un handler con `es_interno`
+    (ahí está el comentario de "la lista blanca no se aplica a las internas");
+    esto es la pieza que faltaba.
+
+    Implementa solo lo que `escribir_tags` toca: buscar el tag, leer el valor
+    previo (para poder deshacer), escribir, y decir que sí sabe escribir y que
+    sí está "conectado". No se registra en `_handlers` a propósito: allí
+    saldría también en `/plcs`, en el snapshot (duplicando las internas, que
+    ya se mezclan aparte) y en el descubrimiento.
+
+    Escribir difunde el cambio con el MISMO mensaje que usa la pantalla de
+    Variables (`como_mensaje`), así que el widget que lo pulsó y todos los
+    demás paneles lo ven moverse al instante.
+    """
+
+    es_interno = True
+
+    def __init__(self, store, manager: ConnectionManager) -> None:
+        self._store = store
+        self._manager = manager
+
+    # -- lo que consulta la fase de validación --------------------------
+    def soporta_escritura(self) -> bool:
+        return True
+
+    def is_plc_connected(self) -> bool:
+        return True
+
+    def buscar_tag(self, tag: str):
+        from types import SimpleNamespace
+        from app.core.internas_store import TIPOS, ErrorInterna
+        try:
+            v = self._store.obtener(tag)
+        except ErrorInterna:
+            return None
+        return SimpleNamespace(
+            full_name=v.nombre, node_id=v.nombre,
+            data_type=TIPOS[v.tipo]["opc"],
+        )
+
+    # -- lo que usan las fases de lectura y escritura --------------------
+    async def leer(self, node_id: str):
+        from types import SimpleNamespace
+        return SimpleNamespace(value=self._store.obtener(node_id).valor)
+
+    async def escribir(self, node_id: str, valor):
+        from types import SimpleNamespace
+        v = self._store.fijar_valor(node_id, valor)
+        try:
+            await self._manager.broadcast(v.como_mensaje())
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Interna '%s' escrita pero no difundida: %s",
+                           node_id, exc)
+        return SimpleNamespace(value=v.valor)
+
 logger = logging.getLogger("plc_manager")
 
 # Marcas soportadas.
@@ -543,6 +609,10 @@ class PlcManager:
                 raise ValueError(f"Entrada {i}: hacen falta 'plc_id' y 'tag'.")
 
             handler = self._handlers.get(plc_id)
+            # Las variables internas no tienen handler: se atienden con un
+            # adaptador sobre su almacén (ver `_InternasComoPlc`).
+            if handler is None and plc_id == "interno" and self._internas is not None:
+                handler = _InternasComoPlc(self._internas, self._manager)
             if handler is None:
                 raise KeyError(
                     f"No hay ningún PLC con id '{plc_id}'. Los conectados son: "

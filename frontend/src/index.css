@@ -283,3 +283,33 @@ html.dark .input-field:focus {
   height: 100%;
   display: block;
 }
+
+/* === Autorrelleno del navegador (Chrome / Edge / WebView2) ===
+ *
+ * Cuando el navegador autorrellena o SUGIERE en un campo, lo pinta con su
+ * propio fondo (blanco o azul claro) y su propio color de texto, por encima
+ * de cualquier clase. En el tema oscuro del login se ve como una caja que
+ * "se pone blanca de golpe" con el texto casi invisible. No se puede
+ * sobreescribir `background` en ese estado —el navegador lo fuerza—, pero
+ * sí taparlo con una sombra interior del color del campo y fijar el color
+ * del texto, que es el truco habitual. La transición larguísima evita el
+ * parpadeo del fondo del navegador antes de que entre la sombra.
+ *
+ * En la ventana de escritorio, además, el autorrelleno se APAGA en el motor
+ * (desktop/autofill_webview.py); esto cubre el navegador normal.
+ */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+  -webkit-text-fill-color: #0f172a;
+  caret-color: #0f172a;
+  transition: background-color 600000s 0s;
+}
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #1e293b inset;
+  -webkit-text-fill-color: #f1f5f9;
+  caret-color: #f1f5f9;
+}

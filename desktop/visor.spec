@@ -9,7 +9,7 @@ a = Analysis(
     binaries=[],
     datas=[],
     hiddenimports=["webview.platforms.edgechromium", "webview.platforms.winforms",
-                   "cache_webview"],
+                   "cache_webview", "autofill_webview"],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],

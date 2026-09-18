@@ -26,10 +26,20 @@
 // LO QUE SÍ SERÍA INVENTAR: DIBUJAR DURANTE UN CORTE
 // Si el WebSocket se cae, `variables` se queda con los últimos valores y una
 // línea recta seguiría avanzando como si el proceso siguiera reportando. Eso
-// es mentira. Por eso hay un latido que vigila la frescura: mientras llegan
-// datos repite el valor vigente (la traza avanza suave aunque nada cambie), y
-// en cuanto se pasa `UMBRAL_SIN_DATOS` sin recibir nada escribe `null`, que
-// uPlot dibuja como HUECO. Un corte se ve como un corte.
+// es mentira. Por eso hay un latido: mientras la CONEXIÓN está viva repite el
+// valor vigente (la traza avanza suave aunque nada cambie), y si el socket o
+// el PLC de esa serie están caídos escribe `null`, que uPlot dibuja como
+// HUECO. Un corte se ve como un corte.
+//
+// LA FRESCURA SE MIDE POR LA CONEXIÓN, NO POR LOS CAMBIOS. Antes el latido
+// cortaba la traza si en 4 s no había llegado NINGÚN valor nuevo. Parecía
+// razonable y era un error de concepto: OPC UA solo avisa cuando un valor
+// cambia, y una variable interna a la que le pones un número fijo no cambia
+// nunca. Resultado: cada serie estable se cortaba a los 4 s de su último
+// cambio y "reaparecía" al siguiente, como si la señal fuera intermitente.
+// Un valor que no cambia es una línea recta, no un hueco. Lo que dice si
+// esa recta es verdad es si el servidor sigue conectado y si el PLC de la
+// serie sigue reportando — y eso lo sabe `RealPLCService.plcDisponible`.
 //
 // LOS HUECOS SON NULL, NO CEROS
 // Guardar 0 sería mentir: una temperatura que desaparece no es 0 °C.
@@ -40,12 +50,10 @@
 // =========================================================================
 import { useEffect, useRef } from 'react';
 import type { PlcVariable } from '../../../../models/plc';
+import { RealPLCService } from '../../../../services/RealPLCService';
 
 /** Tope duro de muestras. Protege la memoria del navegador. */
 export const MAX_PUNTOS = 120_000;
-
-/** Sin recibir nada durante esto, la traza se corta en vez de seguir plana. */
-export const UMBRAL_SIN_DATOS_MS = 4000;
 
 /** Cada cuánto late el muestreo cuando el PLC no reporta cambios. */
 const LATIDO_MS = 1000;
@@ -182,7 +190,6 @@ export function useBufferTrend(
 
   // Lo último que se sabe, para que el latido pueda repetirlo.
   const vigentes = useRef(new Map<string, number | null>());
-  const ultimoDato = useRef(0);
   const ultimoPush = useRef(0);
 
   const clave = ids.join('|');
@@ -222,7 +229,6 @@ export function useBufferTrend(
     if (!alguno) return;
 
     vigentes.current = valores;
-    ultimoDato.current = Date.now();
     muestrear.current(valores);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variables, clave, retencionSeg]);
@@ -235,17 +241,19 @@ export function useBufferTrend(
       // Si acaba de entrar una muestra por el efecto de arriba, no se duplica.
       if (ahora - ultimoPush.current < LATIDO_MS * 0.9) return;
 
-      if (ahora - ultimoDato.current > UMBRAL_SIN_DATOS_MS) {
-        // Corte: se escribe un hueco. Una línea plana durante una caída del
-        // WebSocket diría que el proceso sigue reportando, y no es verdad.
-        const huecos = new Map<string, number | null>();
-        for (const k of ids) huecos.set(k, null);
-        muestrear.current(huecos);
-      } else {
-        // Sin cambios en el PLC: el valor vigente SIGUE siendo el valor. Se
-        // repite para que la traza avance en el tiempo en vez de congelarse.
-        muestrear.current(vigentes.current);
+      // Serie a serie: la de un PLC caído se corta (hueco), las demás
+      // siguen. Sin cambios en el PLC, el valor vigente SIGUE siendo el
+      // valor: se repite para que la traza avance en el tiempo en vez de
+      // congelarse. Una línea plana durante una caída del WebSocket o del
+      // PLC diría que el proceso sigue reportando, y no es verdad.
+      const fila = new Map<string, number | null>();
+      for (const k of ids) {
+        const plc = k.slice(0, k.indexOf('|'));
+        fila.set(k, RealPLCService.plcDisponible(plc)
+          ? (vigentes.current.get(k) ?? null)
+          : null);
       }
+      muestrear.current(fila);
     }, LATIDO_MS);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps

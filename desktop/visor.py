@@ -211,6 +211,18 @@ def main() -> None:
     # "exportar a Excel no hace nada" es el mismo fallo mudo aquí que allí.
     webview.settings['ALLOW_DOWNLOADS'] = True
 
+    # ── Autorrelleno de Edge APAGADO ─────────────────────────────────────
+    #
+    # Con él activo, escribir el usuario en el login iba a saltos: el
+    # desplegable de sugerencias de Edge se comía letras y pintaba el campo
+    # de blanco. Detalle completo en desktop/autofill_webview.py. Se aplica
+    # antes de create_window porque envuelve el arranque del motor.
+    try:
+        from desktop.autofill_webview import desactivar_autofill_webview
+    except ImportError:
+        from autofill_webview import desactivar_autofill_webview  # empaquetado
+    desactivar_autofill_webview()
+
     webview.create_window(titulo, width=ancho, height=alto, **destino)
 
     # ── private_mode=False: ESTO NO ES OPCIONAL ───────────────────────────

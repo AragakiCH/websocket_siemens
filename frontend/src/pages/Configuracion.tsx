@@ -495,8 +495,29 @@ export function Configuracion() {
 
   useEffect(() => {
     refreshPlcs();
+    // El sondeo cada 5 s es la red de seguridad. Lo normal es que el estado
+    // cambie por el WebSocket: al conectar o perder un PLC el backend manda
+    // `status`, y al alta/baja un `snapshot` o `plc_removed`. Con eso se
+    // refresca en el acto, y «0/1 PLC en línea» pasa a «1/1» cuando pasa,
+    // no hasta 5 s después. También al recuperar el propio socket
+    // (`hmi:conexion`), que es cuando lo que se ve puede estar más viejo.
     const id = setInterval(refreshPlcs, 5000);
-    return () => clearInterval(id);
+    const porWs = (ev: Event) => {
+      const t = (ev as CustomEvent).detail?.type;
+      if (t === 'status' || t === 'snapshot' || t === 'plc_removed') {
+        void refreshPlcs();
+      }
+    };
+    const porConexion = (ev: Event) => {
+      if ((ev as CustomEvent).detail?.vivo) void refreshPlcs();
+    };
+    window.addEventListener('hmi:ws', porWs);
+    window.addEventListener('hmi:conexion', porConexion);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('hmi:ws', porWs);
+      window.removeEventListener('hmi:conexion', porConexion);
+    };
   }, [refreshPlcs]);
 
   // ---------- Modal "Agregar PLC" ----------
@@ -894,7 +915,7 @@ export function Configuracion() {
               <CabeceraSeccion
                 icon={<CpuIcon className="h-4.5 w-4.5" />}
                 titulo={t('config.plcConnection')}
-                descripcion="Elige un PLC para ver y marcar sus variables. El estado se refresca solo cada 5 segundos."
+                descripcion="Elige un PLC para ver y marcar sus variables. El estado y los valores se actualizan en el acto, en cuanto cambian en el PLC."
                 acciones={
                   <button
                     onClick={openModal}

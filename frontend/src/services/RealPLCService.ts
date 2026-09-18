@@ -67,6 +67,8 @@ class RealPLCServiceImpl {
   private rate = 1000;
   private dirty = false;
   private running = false;
+  // `Date.now()` de la última emisión a los suscriptores (ver el throttle).
+  private ultimaEmision = 0;
 
   // ---- localStorage helpers ------------------------------------------- //
   private loadSelection(): Map<string, boolean> {
@@ -154,6 +156,32 @@ class RealPLCServiceImpl {
     return this.vivo;
   }
 
+  /**
+   * Estado de conexión de cada PLC, según lo último que dijo el servidor.
+   *
+   * Se alimenta del `plcs` del snapshot y de los mensajes `status` que el
+   * backend manda al conectar, al perder la conexión y al reconectar. Hasta
+   * ahora esos mensajes se tiraban ("no afectan a las variables"), y sí
+   * afectan a una cosa: a saber si un valor que no se mueve es un valor
+   * ESTABLE o un valor CONGELADO por un PLC caído. El trend necesita esa
+   * diferencia para dibujar una línea plana o un hueco.
+   */
+  private plcConectado = new Map<string, boolean>();
+
+  /**
+   * ¿Se puede confiar en el último valor de este PLC ahora mismo?
+   *
+   * Sí cuando el socket está vivo y el PLC no se ha reportado caído. Un PLC
+   * del que no se sabe nada (todavía no vino en ningún snapshot) se da por
+   * bueno: inventar un hueco es peor que no inventarlo. Las internas no
+   * tienen conexión que perder: mientras haya socket, están.
+   */
+  plcDisponible(plcId: string): boolean {
+    if (!this.vivo) return false;
+    if (plcId === 'interno') return true;
+    return this.plcConectado.get(plcId) ?? true;
+  }
+
   private marcarConexion(vivo: boolean) {
     if (this.vivo === vivo) return; // sin cambio, sin evento
     this.vivo = vivo;
@@ -205,15 +233,81 @@ class RealPLCServiceImpl {
       if (msg.type === 'snapshot') {
         // Reemplaza todo el estado con lo del snapshot.
         this.tags = msg.tags ?? {};
+        // Y el estado de conexión de cada PLC, que viene en el mismo mensaje.
+        this.plcConectado.clear();
+        for (const [id, p] of Object.entries<any>(msg.plcs ?? {})) {
+          this.plcConectado.set(id, p?.conectado !== false);
+        }
         this.emitNow(); // refresco inmediato al conectar / al agregar PLC
+        // Y se avisa al resto (Configuración refresca su lista de PLCs al
+        // instante en vez de esperar a su siguiente sondeo).
+        window.dispatchEvent(new CustomEvent('hmi:ws', { detail: msg }));
       } else if (msg.type === 'plc_removed') {
         const id = msg.plc_removed;
         this.tags = Object.fromEntries(
           Object.entries(this.tags).filter(([, t]) => t.plc !== id)
         );
+        this.plcConectado.delete(id);
         this.emitNow();
+        window.dispatchEvent(new CustomEvent('hmi:ws', { detail: msg }));
       } else if (msg.type === 'status') {
-        // Estado de conexión de un PLC (no afecta a las variables). Se ignora.
+        // Estado de conexión de un PLC. No cambia ningún valor, pero sí si
+        // se puede CONFIAR en los valores de ese PLC (ver `plcDisponible`).
+        if (typeof msg.plc === 'string' && typeof msg.status === 'string') {
+          this.plcConectado.set(msg.plc, msg.status === 'conectado');
+        }
+        // Se reemite como evento del sistema: la página de Conexión PLC
+        // pinta «conectado / reconectando» en cuanto pasa, no 5 s después.
+        window.dispatchEvent(new CustomEvent('hmi:ws', { detail: msg }));
+      } else if (msg.tag !== undefined && msg.plc !== undefined) {
+        // ── CAMBIO DE VALOR DE UN TAG, EN TIEMPO REAL ──────────────────
+        //
+        // ESTA RAMA TIENE QUE IR ANTES QUE LA GENÉRICA DE ABAJO. Los mensajes
+        // de valor también traen `type`: es el tipo de dato OPC («Float»,
+        // «Boolean», «Int32»), tanto en los del PLC como en los de las
+        // variables internas. Cuando la rama genérica pasó de una lista
+        // cerrada de cuatro tipos a "todo lo que traiga `type`", se tragó
+        // también estos, y NINGÚN valor volvió a llegar a los widgets: solo
+        // el snapshot al abrir el socket.
+        //
+        // El síntoma era exactamente "solo se actualiza al cerrar y volver
+        // a abrir": el interruptor de una interna no cambiaba (cada clic
+        // invertía el valor del servidor sobre una pantalla congelada), un
+        // texto escrito "volvía" al anterior, y un PLC que conectaba después
+        // de abrir la vista no enseñaba sus tags.
+        //
+        // Lo que distingue un valor de un evento del sistema no es `type`
+        // sino `tag` + `plc`: ningún evento de proyecto, lock, tema o alarma
+        // los lleva arriba del todo (las alarmas van dentro de `alarma`).
+        const clave = `${msg.plc}|${msg.tag}`;
+        this.tags[clave] = { ...(this.tags[clave] ?? {}), ...msg };
+        if (msg.plc === 'interno') {
+          // Una interna la acaba de mover una persona, y espera verla
+          // moverse YA: en la tabla de Variables y en el widget que la
+          // enseña. Son pocas y no llegan a ráfagas, así que se emite al
+          // instante, sin pasar por el throttle.
+          this.emitNow();
+        } else if (Date.now() - this.ultimaEmision >= this.rate) {
+          // ── THROTTLE «DE BORDE DE SUBIDA» PARA LOS VALORES DEL PLC ──
+          //
+          // Antes todo valor de PLC esperaba al siguiente tic del flush
+          // (`rate`: 1 s por defecto, hasta 5 s si el usuario eligió esa
+          // frecuencia en Configuración). Para un PLC virtual que mueve
+          // todo cada 100 ms da igual: siempre hay un tic cerca. Para un
+          // Siemens de verdad no: sus variables cambian de tarde en tarde,
+          // de una en una, y cada cambio llegaba a la pantalla con hasta
+          // `rate` de retraso mientras la interna de al lado se movía al
+          // instante. Eso es lo que se veía como "las del PLC van lentas".
+          //
+          // Ahora, si desde la última emisión ya pasó `rate`, el cambio
+          // se pinta YA. Si llegan en ráfaga (varios dentro del mismo
+          // `rate`), el primero se pinta y el resto se acumula hasta el
+          // siguiente tic: la frecuencia elegida sigue siendo el TECHO de
+          // repintados por segundo, que es para lo que existe.
+          this.emitNow();
+        } else {
+          this.dirty = true; // ráfaga: se emitirá en el próximo flush
+        }
       } else if (typeof msg.type === 'string') {
         // Canal de PROYECTO / CONFIGURACIÓN: baja frecuencia. Este servicio
         // no los interpreta, pero es el único que tiene el socket abierto,
@@ -221,8 +315,9 @@ class RealPLCServiceImpl {
         // escucha (AppStore, Vista Previa, presencia...). Evita abrir un
         // segundo WebSocket solo para esto.
         //
-        // SE REEMITE TODO lo que traiga `type` y no sea un dato de PLC.
-        // Antes había una lista cerrada de cuatro tipos (`project.updated`,
+        // SE REEMITE TODO lo que traiga `type` y no sea un dato de PLC (los
+        // datos de PLC se reconocen por `tag` + `plc`, arriba). Antes había
+        // una lista cerrada de cuatro tipos (`project.updated`,
         // `project.removed`, `config.updated`, `presence`) y todo lo demás
         // se tiraba en silencio: `lock.changed` (el lápiz), `tema.updated`,
         // `proyecto.updated`/`proyecto.removed`, `alarma.*`... con código
@@ -230,11 +325,6 @@ class RealPLCServiceImpl {
         // de alarmas que nunca llegaba a enterarse. Cada tipo nuevo del
         // backend obligaba a acordarse de venir aquí, y nadie se acordaba.
         window.dispatchEvent(new CustomEvent('hmi:ws', { detail: msg }));
-      } else if (msg.tag) {
-        // Cambio de valor de un tag en tiempo real.
-        const clave = `${msg.plc}|${msg.tag}`;
-        this.tags[clave] = { ...(this.tags[clave] ?? {}), ...msg };
-        this.dirty = true; // se emitirá en el próximo flush (throttle)
       }
     };
 
@@ -258,6 +348,7 @@ class RealPLCServiceImpl {
 
   private emitNow() {
     this.dirty = false;
+    this.ultimaEmision = Date.now();
     const snapshot = this.getVariables();
     this.listeners.forEach((l) => l(snapshot));
   }

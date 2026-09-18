@@ -33,6 +33,10 @@ from app.drivers.plc_driver import (
 
 logger = logging.getLogger("opcua_driver")
 
+# Nodos por petición `Read` en `read_tags`. Muy por debajo del límite
+# habitual del S7-1500 (MaxNodesPerRead ≈ 1000) para no rozarlo nunca.
+LOTE_LECTURA = 250
+
 # Nombres de nodos internos / metadata que NO son variables de datos reales.
 NODOS_IGNORADOS = {"Icon", "InputArguments", "OutputArguments"}
 
@@ -117,6 +121,20 @@ class _SubHandler:
         except Exception as exc:  # noqa: BLE001
             logger.warning("Error procesando datachange: %s", exc)
 
+    def status_change_notification(self, status) -> None:
+        """
+        El servidor avisa de que la subscription cambió de estado. En la
+        práctica llega UNA vez, cuando la da por caducada (`BadTimeout`: el
+        cliente no envió Publish a tiempo, p. ej. tras una pausa del equipo)
+        o la cierra por su cuenta. La SESIÓN sigue viva, así que el watchdog
+        de sesión no ve nada raro; sin esto, el PLC quedaba "conectado" y sin
+        entregar un solo cambio hasta reiniciar el programa. Se marca aquí y
+        el SubscriptionHandler la recrea en su siguiente vuelta.
+        """
+        logger.warning("La subscription cambió de estado: %s. Se recreará.",
+                       status)
+        self._driver.subscription_caida = True
+
 
 class OpcUaDriver(PlcDriver):
     """Driver OPC UA basado en asyncua."""
@@ -128,6 +146,10 @@ class OpcUaDriver(PlcDriver):
         self._handles: List[int] = []
         self._connected: bool = False
         self._ns_index: Optional[int] = None
+
+        # La subscription dejó de valer (StatusChangeNotification del
+        # servidor). La lee `subscription_viva()`; la limpia `subscribe()`.
+        self.subscription_caida: bool = False
 
         # Estado compartido con el handler.
         self.tag_por_nodeid: Dict[str, TagInfo] = {}
@@ -335,6 +357,7 @@ class OpcUaDriver(PlcDriver):
             return
 
         await self._cerrar_subscription()
+        self.subscription_caida = False
 
         handler = _SubHandler(self, callback)
         # period = intervalo de publicación (cada cuánto el server envía lotes).
@@ -368,9 +391,46 @@ class OpcUaDriver(PlcDriver):
                 except Exception as e2:  # noqa: BLE001
                     logger.warning("No se pudo suscribir %s: %s", info.full_name, e2)
 
+    def subscription_viva(self) -> bool:
+        return not self.subscription_caida
+
     # ==================================================================== #
     # Lectura puntual
     # ==================================================================== #
+    async def read_tags(self, node_ids: List[str]) -> List[Optional[TagValue]]:
+        """
+        Lee varios tags con UNA petición `Read` por lote (el S7-1500 admite
+        cientos de nodos por petición; se trocea por si el programa es
+        grande). Si un lote entero falla, sus posiciones quedan en `None` y
+        se sigue con el siguiente: una lectura de contraste no puede tumbar
+        la conexión.
+        """
+        if self._client is None:
+            raise RuntimeError("read_tags llamado sin conexión activa.")
+        salida: List[Optional[TagValue]] = []
+        ahora = _ahora_iso()
+        for i in range(0, len(node_ids), LOTE_LECTURA):
+            lote = node_ids[i:i + LOTE_LECTURA]
+            try:
+                valores = await self._client.read_values(
+                    [self._client.get_node(n) for n in lote]
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Lectura en bloque fallida (%d nodos): %s",
+                             len(lote), exc)
+                salida.extend([None] * len(lote))
+                continue
+            for node_id, valor in zip(lote, valores):
+                info = self.tag_por_nodeid.get(node_id)
+                salida.append(TagValue(
+                    tag=info.full_name if info else node_id,
+                    value=_a_serializable(valor),
+                    data_type=info.data_type if info else type(valor).__name__,
+                    timestamp=ahora,
+                    node_id=node_id,
+                ))
+        return salida
+
     async def read_tag(self, node_id: str) -> TagValue:
         if self._client is None:
             raise RuntimeError("read_tag llamado sin conexión activa.")
