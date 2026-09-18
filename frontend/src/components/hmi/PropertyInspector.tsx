@@ -45,7 +45,7 @@ import {
 './partes';
 import type { ParteId } from '../../models/widget';
 import { customByKind, zipByKind } from './custom/registry';
-import { panelBuiltIn } from './inspectores';
+import { panelBuiltIn, InspectorAccion } from './inspectores';
 import {
   useSecciones,
   esWidgetDeNavegacion,
@@ -584,7 +584,23 @@ export function PropertyInspector({
   const custom = customByKind(widget.kind);
   const propio = custom?.inspector
     ? { titulo: custom.label, render: custom.inspector }
-    : panelBuiltIn(widget.kind);
+    : panelBuiltIn(widget.kind) ??
+      // ── LOS WIDGETS IMPORTADOS TAMBIÉN MANDAN ──
+      //
+      // `panelBuiltIn` es un mapa de tres entradas fijas (imagen, botón,
+      // interruptor). Un ZIP nunca está en él, así que su autor veía el
+      // Inspector sin la sección «Acción» y no tenía forma de configurar
+      // nada: el widget quedaba condenado a ser decorativo.
+      //
+      // Y no es un problema del ZIP — la maquinaria de las doce acciones ya
+      // existía entera. Solo faltaba el sitio donde elegirlas.
+      //
+      // Se da a TODOS los importados, no a una lista: un widget que se dibuja
+      // en el lienzo y recibe clics puede mandar, y quién quiera usarlo lo
+      // decide quien monta la pantalla dejando la acción en «Ninguna».
+      (zipByKind(widget.kind)
+        ? { titulo: 'Acción', render: InspectorAccion }
+        : undefined);
 
   // Mayuscula a proposito: se renderiza como <PanelPropio />, NO se llama
   // como propio.render(...).
@@ -1142,4 +1158,4 @@ export function PropertyInspector({
       </Section>
     </aside>);
 
-}
+}
