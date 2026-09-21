@@ -31,6 +31,7 @@ from app.api import (ai_routes, alarm_routes, auth_routes, crud_routes,
                      db_routes, escritura_routes, export_routes,
                      historian_routes, internas_routes, lock_routes,
                      project_routes,
+                     categoria_routes,
                      proyecto_routes, rest_routes, sistema_routes,
                      variables_routes,
                      db_routes, export_routes, historian_routes, lock_routes,
@@ -47,6 +48,7 @@ from app.core.internas_store import InternasStore
 from app.core.variables_store import VariablesStore
 from app.db.historian import Historizador
 from app.db.widget_store import WidgetStore
+from app.db.categorias_store import CategoriasStore
 from app.export.grabador import Grabador
 from app.ai.agent import Agente
 from app.core.auditoria import Auditoria
@@ -98,6 +100,11 @@ async def lifespan(app: FastAPI):
     # Widgets personalizados: la definición vive en el servidor, no en
     # el localStorage del navegador (ver app/db/widget_store.py).
     widget_store = WidgetStore()
+    # CÓMO se ordena la paleta de widgets, por proyecto. El catálogo es
+    # global —un ZIP subido está en todas partes— pero las secciones no: las
+    # de una envasadora no le sirven a quien monta un tablero de bombeo.
+    # Mover un widget NO toca su definición (ver app/db/categorias_store.py).
+    categorias_store = CategoriasStore()
     # Lista blanca de escritura: QUÉ tags del PLC se pueden escribir y con qué
     # límites. Nada es escribible hasta que alguien lo habilita a mano — ver
     # app/core/escritura_store.py para por qué la regla va al revés aquí.
@@ -156,6 +163,7 @@ async def lifespan(app: FastAPI):
     app.state.db_manager = db_manager
     app.state.crud_manager = crud_manager
     app.state.widget_store = widget_store
+    app.state.categorias_store = categorias_store
     app.state.escritura_store = escritura_store
     app.state.variables_store = variables_store
     app.state.internas_store = internas_store
@@ -532,6 +540,8 @@ app.include_router(db_routes.router)
 app.include_router(crud_routes.router)
 app.include_router(internas_routes.router)
 app.include_router(widget_routes.router)
+# Las secciones de la paleta de widgets, por proyecto.
+app.include_router(categoria_routes.router)
 app.include_router(escritura_routes.router)
 app.include_router(variables_routes.router)
 app.include_router(historian_routes.router)

@@ -320,6 +320,18 @@ async def borrar_proyecto(
     borradas = await _pantallas(request).borrar_pantallas_de(pid)
     await _proyectos(request).borrar(pid)
 
+    # Y su paleta. Sin esto, crear otro proyecto con el mismo id heredaría
+    # las secciones del anterior — que parece magia negra cuando aparecen
+    # categorías que nadie creó. Va en un try aparte a propósito: el
+    # proyecto y sus pantallas ya no están, y fallar aquí no puede
+    # convertir un borrado hecho en un error para quien lo pidió.
+    try:
+        cats = getattr(request.app.state, 'categorias_store', None)
+        if cats is not None:
+            cats.olvidar_proyecto(pid)
+    except Exception:  # noqa: BLE001
+        logger.warning('No se pudieron borrar las categorías de %s.', pid)
+
     _auditar(request, "proyecto.borrado", sesion, pid,
              {"pantallas": borradas})
     await _difundir(request, "proyecto.removed", pid, usuario_de(sesion),

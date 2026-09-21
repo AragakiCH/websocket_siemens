@@ -24,6 +24,20 @@ export interface FlowConnection {
   toPort: 'input';
 }
 
+/**
+ * La tabla donde graba el historizador cuando nadie dice otra cosa.
+ *
+ * `plc_prg` es la del esquema del HMI (`sql/esquema_hmi_<motor>.sql`), la que
+ * ya existe en las bases dadas de alta. Antes ponía `historico_tags`, que es
+ * la otra tabla válida: quien no tocaba este campo acababa grabando en una
+ * tabla distinta de la que consultaba después, sin enterarse.
+ *
+ * Se exporta porque el mismo nombre hace falta en cuatro sitios —el config por
+ * defecto, el marcador del formulario, el resumen del nodo y el cuerpo del
+ * POST—. Escrito cuatro veces, cambiarlo es cambiarlo tres.
+ */
+export const TABLA_HISTORICO_POR_DEFECTO = 'plc_prg';
+
 // ─── Catálogo de nodos ─────────────────────────────────────────
 export interface NodeCatalogEntry {
   type: NodeType;
@@ -72,7 +86,7 @@ export const NODE_CATALOG: NodeCatalogEntry[] = [
       // Solo vive en el frontend: NO viaja en el POST.
       modo_tags: 'todos',
       tags: [],
-      tabla: 'historico_tags',
+      tabla: TABLA_HISTORICO_POR_DEFECTO,
       nombre: '',
       activo: true,
       banda_muerta: 0,

@@ -9,7 +9,16 @@ import type { DeclaracionEnlace } from '../../../utils/enlaces';
 export interface CustomWidgetDef {
   kind: `custom:${string}`;                        // siempre con prefix 'custom:'
   label: string;                                    // lo que sale en el sidebar
-  category: 'Básicos' | 'Indicadores' | 'Equipos' | 'Datos';
+  /**
+   * La categoría que DECLARA esta definición. Es el defecto, no la última
+   * palabra: encima va la asignación del proyecto, que es la que decide en
+   * qué sección se pinta (ver `categoriaEfectiva` en `services/categoriasApi`).
+   *
+   * Era una unión cerrada de cuatro valores. Se abrió a texto porque cada
+   * proyecto puede crear sus propias secciones, y un ZIP puede declarar una
+   * que aún no existe — antes eso hacía que el ZIP entero se rechazara.
+   */
+  category: string;
   icon: LucideIcon;
   defaultWidth: number;
   defaultHeight: number;

@@ -8,7 +8,7 @@ import {
   AlertCircleIcon,
   Loader2Icon,
 } from 'lucide-react';
-import { FlowNodeData } from './types';
+import { FlowNodeData, TABLA_HISTORICO_POR_DEFECTO } from './types';
 
 const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
   Database: DatabaseIcon,
@@ -216,7 +216,7 @@ export function FlowNode({
         {node.type === 'historian' && (
           <>
             <p className="truncate text-[10px] text-slate-500 dark:text-slate-400">
-              {node.config.grupo_id || 'Sin grupo'} → {node.config.tabla || 'historico_tags'}
+              {node.config.grupo_id || 'Sin grupo'} → {node.config.tabla || TABLA_HISTORICO_POR_DEFECTO}
             </p>
             {/* Estado EN VIVO del servidor, no el resultado del último Guardar. */}
             {estadoGrupo && (

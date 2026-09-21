@@ -37,6 +37,10 @@ export default defineConfig({
       // pestañas se veía vacía con un 404 que parecía del backend.
       '/proyectos': BACKEND,
       '/pantallas': BACKEND,
+      // Las secciones de la paleta de widgets. Sin esta línea el GET
+      // /categorias no sale de Vite: responde el index.html de la SPA y la
+      // barra de widgets se queda con las cuatro de fábrica sin decir por qué.
+      '/categorias': BACKEND,
       // Paleta y tipografías (el Gestor de Temas). SIN esta línea el GET
       // /temas no sale de Vite: el servidor de desarrollo responde el
       // index.html de la aplicación, así que el fetch recibe HTML donde

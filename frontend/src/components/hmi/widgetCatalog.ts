@@ -26,6 +26,7 @@ import {
   NINGUNO,
 } from '../../utils/widgetBinding';
 import { customWidgets } from './custom/registry';
+import { categoriaEfectiva } from '../../services/categoriasApi';
 import { loadZipWidgets, fullKind } from '../../services/zipWidgetLoader';
 import { PuzzleIcon } from 'lucide-react';
 
@@ -35,7 +36,25 @@ export interface CatalogItem {
   icon: LucideIcon;
   defaultWidth: number;
   defaultHeight: number;
-  category: 'Básicos' | 'Indicadores' | 'Equipos' | 'Datos';
+  /**
+   * La categoría que DECLARA esta definición. Es el defecto, no la última
+   * palabra: encima va la asignación del proyecto, que es la que decide en
+   * qué sección se pinta (ver `categoriaEfectiva` en `services/categoriasApi`).
+   *
+   * Era una unión cerrada de cuatro valores. Se abrió a texto porque cada
+   * proyecto puede crear sus propias secciones, y un ZIP puede declarar una
+   * que aún no existe — antes eso hacía que el ZIP entero se rechazara.
+   */
+  category: string;
+  /**
+   * En qué sección se pinta HOY, en el proyecto abierto. Ya resuelta.
+   *
+   * Se calcula aquí y no en quien dibuja para que la regla de precedencia
+   * viva en un solo sitio: la paleta, el buscador y cualquier otro que
+   * agrupe widgets tienen que coincidir, y repetir la regla es garantizar
+   * que algún día no coincidan.
+   */
+  categoriaId: string;
   /**
    * Tipos de variable que este widget sabe representar.
    *
@@ -52,7 +71,11 @@ export interface CatalogItem {
 }
 
 // Widgets built-in del sistema (los 18 originales).
-const builtInCatalog: CatalogItem[] = [
+//
+// Sin `categoriaId`: la sección efectiva depende del proyecto abierto y aquí
+// todavía no se sabe cuál es. Se resuelve en `getWidgetCatalog()`, que es
+// quien se llama cuando ya hay proyecto.
+const builtInCatalog: Omit<CatalogItem, 'categoriaId'>[] = [
 {
   kind: 'text',
   label: 'Texto',
@@ -276,12 +299,16 @@ export function getWidgetCatalog(): CatalogItem[] {
     defaultWidth: z.meta.defaultWidth,
     defaultHeight: z.meta.defaultHeight,
     category: z.meta.category,
+    categoriaId: categoriaEfectiva(fullKind(z.meta.kind), z.meta.category),
     // Viene del widget.json. `undefined` si el ZIP se subió antes de que el
     // campo existiera: se trata como "acepta todo" y no se le rompe nada.
     accepts: z.meta.accepts,
   }));
   return [
-    ...builtInCatalog,
+    ...builtInCatalog.map((w) => ({
+      ...w,
+      categoriaId: categoriaEfectiva(w.kind, w.category),
+    })),
     // Los retirados no se ofrecen, pero siguen dibujándose donde ya
     // estaban: ver `oculto` en custom/types.ts.
     ...customWidgets.filter((w) => !w.oculto).map((w) => ({
@@ -291,6 +318,7 @@ export function getWidgetCatalog(): CatalogItem[] {
       defaultWidth: w.defaultWidth,
       defaultHeight: w.defaultHeight,
       category: w.category,
+      categoriaId: categoriaEfectiva(w.kind, w.category),
       accepts: ACCEPTS_TSX[w.kind],
     })),
     ...zipItems,

@@ -7,7 +7,7 @@ import {
   PencilIcon,
   ListChecksIcon,
 } from 'lucide-react';
-import { FlowNodeData } from '../types';
+import { FlowNodeData, TABLA_HISTORICO_POR_DEFECTO } from '../types';
 import {
   ConexionRemota,
   TagRemoto,
@@ -520,11 +520,17 @@ export function HistorianForm({ config, connectionNodes, onChange }: Props) {
       )}
 
       {/* Tabla */}
+      {/* `?? ''` y no `|| TABLA_...`: con `||`, borrar la última letra deja
+          la cadena vacía —que es falsa— y el campo se rellenaba solo con el
+          nombre por defecto en la misma pulsación. Vaciarlo era imposible. El
+          valor por defecto se enseña como marcador y lo pone el POST al
+          guardar, que es donde de verdad hace falta. */}
       <Field label="Tabla destino">
         <input
           type="text"
-          value={config.tabla || 'historico_tags'}
+          value={config.tabla ?? ''}
           onChange={(e) => onChange({ tabla: e.target.value })}
+          placeholder={TABLA_HISTORICO_POR_DEFECTO}
           className="input-field"
         />
       </Field>
