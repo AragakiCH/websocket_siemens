@@ -57,6 +57,8 @@ logger = logging.getLogger("migraciones")
 # una migrada acabarían con la misma restricción bajo dos nombres distintos
 # y cualquier script que la busque por nombre fallaría en una de las dos.
 COLUMNAS_AÑADIDAS: Dict[str, Tuple[Tuple[str, str, str, str], ...]] = {
+    # La hora de la planta al lado de la UTC. Ver `ts_local_para_motor`.
+    "plc_prg": (("ts_local", "ts_local", "", ""),),
     # Quién configuró la regla de alarma. Ver la nota larga en
     # `CrudManager._sellar_autor()`: la identidad no se pide, se deduce del
     # token.

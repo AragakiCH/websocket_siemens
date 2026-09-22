@@ -129,7 +129,11 @@ def _a_datetime(valor: Any, zona=None) -> Optional[datetime]:
             except ValueError:
                 return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        # Sin zona = está en la hora del almacén (ver `zona_almacen`). Antes
+        # se asumía UTC y, con el almacén en hora local, se sumaban cinco
+        # horas de más.
+        from app.db.sql_driver import zona_almacen
+        dt = dt.replace(tzinfo=zona_almacen())
     # Excel no entiende tzinfo: se lleva a la hora local y se quita.
     return dt.astimezone(zona or _zona()).replace(tzinfo=None)
 

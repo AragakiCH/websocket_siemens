@@ -41,7 +41,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from app.db.sql_driver import a_utc, ts_para_motor
+from app.db.sql_driver import a_utc, tipos_motor, ts_local_para_motor, ts_para_motor
 
 logger = logging.getLogger("historian")
 
@@ -358,11 +358,17 @@ class Historizador:
                             grupo.tabla, grupo.db_id,
                             ", ".join(grupo._mapa.values()))
 
-            # Normalizar las marcas de tiempo al tipo del motor, SIEMPRE en
-            # UTC. Sin esto, MySQL reinterpretaría el offset de la cadena ISO
-            # según el `time_zone` de su sesión y la hora guardada dependería
-            # de la configuración del servidor.
+            # Normalizar las marcas de tiempo al tipo del motor, en la hora
+            # del ALMACÉN (`PLC_HISTORICO_HORA`: la de la planta por defecto).
+            # Se convierte aquí y no en el motor: MySQL reinterpretaría el
+            # offset de la cadena ISO según el `time_zone` de su sesión.
+            # `ts_local` solo se rellena si la tabla la tiene (esquemas
+            # nuevos); con `ts` ya en hora local dice lo mismo.
+            from app.config.settings import get_settings
+            zona = get_settings().zona_horaria()
             for fila in lote:
+                if "ts_local" in grupo._mapa:
+                    fila["ts_local"] = ts_local_para_motor(fila["ts"], driver.motor, zona)
                 fila["ts"] = ts_para_motor(fila["ts"], driver.motor)
 
             # Ajustar cada fila al mapa: se descartan los campos que la tabla

@@ -78,8 +78,42 @@ class Settings(BaseSettings):
     opcua_password: Optional[str] = Field(default=None)
 
     # ------------------------------------------------------------------ #
+    # Siemens sin OPC UA: S7comm (snap7) por el puerto 102
+    # ------------------------------------------------------------------ #
+    # 'opcua'  -> OpcUaDriver (S7-1500; S7-1200 con FW >= 4.4 + servidor OPC
+    #             UA activado y licenciado). Descubre los DB solo.
+    # 's7comm' -> S7CommDriver: S7-1200 (cualquier FW), S7-300/400, ET 200SP.
+    #             Sin descubrimiento: la lista de tags la da el usuario.
+    #             Exige PUT/GET permitido y DBs sin acceso optimizado.
+    siemens_transporte: str = Field(default="opcua")
+    s7_rack: int = Field(default=0)
+    s7_slot: int = Field(default=1, description="1 en S7-1200/1500, 2 en S7-300.")
+    s7_connect_timeout: float = Field(default=5.0)
+    s7_poll_interval_ms: int = Field(default=250)
+    # Lista de tags (una por línea): nombre;DB1;offset;TIPO
+    s7_tags: str = Field(default="")
+
+    # ------------------------------------------------------------------ #
     # Bosch Rexroth ctrlX CORE (solo aplica si vendor='rexroth')
     # ------------------------------------------------------------------ #
+    # CÓMO se habla con el ctrlX:
+    #   'datalayer' -> CtrlxDatalayerDriver: API REST del Data Layer por HTTPS
+    #                  (JWT del identity-manager, bulk-read, eventos SSE).
+    #                  Sin OPC UA, sin certificado de cliente. ES EL DEFECTO.
+    #   'opcua'     -> RexrothDriver: el camino OPC UA de antes (asyncua,
+    #                  cascada de seguridad, certificado autofirmado).
+    rexroth_transporte: str = Field(
+        default="datalayer",
+        description="Transporte con el ctrlX: 'datalayer' (REST/HTTPS) u 'opcua'.")
+    # Puerto HTTPS del ctrlX: 443 en hardware, 8443 en un COREvirtual con
+    # port-forwarding. Solo aplica al transporte 'datalayer'.
+    rexroth_https_port: int = Field(default=443)
+    # El ctrlX trae un certificado autofirmado; por defecto se acepta. Con
+    # PKI propia en planta, ponlo en true.
+    rexroth_verify_ssl: bool = Field(default=False)
+    # Cuántos nodos por petición de bulk-read.
+    rexroth_bulk_max: int = Field(default=200)
+
     # El ctrlX SIEMPRE pide usuario y contraseña (no admite anónimo).
     rexroth_username: Optional[str] = Field(
         default=None, description="Usuario del ctrlX (ej. 'boschrexroth').")
@@ -118,6 +152,25 @@ class Settings(BaseSettings):
     rexroth_poll_interval_ms: int = Field(default=100)
     # Saltarse el intento de subscription e ir directo a polling.
     rexroth_force_polling: bool = Field(default=False)
+
+    # ------------------------------------------------------------------ #
+    # Allen-Bradley / Rockwell Logix por EtherNet/IP (vendor='allenbradley')
+    # ------------------------------------------------------------------ #
+    # No hay usuario ni contraseña: CIP no autentica. La ruta es <ip>/<slot>.
+    ab_slot: int = Field(default=0, description="Slot del procesador en el chasis (0 en CompactLogix).")
+    ab_micro800: bool = Field(default=False, description="Micro800: sin slot y CIP simplificado.")
+    ab_connect_timeout: float = Field(default=5.0)
+    # EtherNet/IP explícito NO tiene subscription: siempre es polling.
+    ab_poll_interval_ms: int = Field(default=250)
+    ab_bulk_max: int = Field(default=100, description="Tags por lectura multi-service.")
+    # Upload de tags: incluir los de programa (Program:Main.x) además de los
+    # del controlador; profundidad al aplanar UDTs y tope de elementos por array.
+    ab_incluir_programas: bool = Field(default=True)
+    ab_browse_depth: int = Field(default=3)
+    ab_max_elementos_array: int = Field(default=64)
+    # Lista manual (coma, ; o salto de línea). Si se indica, NO se sube la
+    # lista del controlador: útil en Micro800 antiguos o para acotar.
+    ab_tags: str = Field(default="")
 
     # ------------------------------------------------------------------ #
     # Parámetros de las subscriptions (tiempo real, sin polling)
@@ -205,9 +258,20 @@ class Settings(BaseSettings):
     # 'UTC' desactiva la conversión (ts_local == ts).
     timezone: str = Field(
         default="America/Lima",
-        description="Zona horaria para mostrar las marcas de tiempo "
-                    "(nombre IANA). Los datos se guardan siempre en UTC.",
+        description="Zona horaria de la planta (nombre IANA). Es la hora que "
+                    "se muestra y, con PLC_HISTORICO_HORA=local, la que se "
+                    "guarda en la base de datos.",
     )
+    # EN QUÉ HORA SE ESCRIBE `ts` EN LA BASE DE DATOS.
+    #   'local' -> la de PLC_TIMEZONE. Es lo que una persona espera ver al
+    #              abrir la tabla en SSMS o en Excel: la hora del reloj de la
+    #              pared. (Defecto.)
+    #   'utc'   -> UTC, como se hacía antes. Solo si la base la comparten
+    #              plantas en zonas distintas.
+    # Se aplica a TODO lo que se escribe (histórico, alarmas, recetas,
+    # último acceso) y a todo lo que se lee: una columna sin zona se
+    # interpreta siempre en esta misma hora, así que no se desplaza dos veces.
+    historico_hora: str = Field(default="local")
 
     # ------------------------------------------------------------------ #
     # Descubrimiento de PLCs y modo multi-PLC
@@ -337,24 +401,31 @@ class Settings(BaseSettings):
         vez de tumbar el servicio: una zona mal escrita no debe impedir
         historizar.
         """
-        from datetime import timezone as _tz
+        from datetime import datetime as _dt, timezone as _tz
 
-        nombre = (self.timezone or "UTC").strip()
-        if not nombre or nombre.upper() == "UTC":
+        nombre = (self.timezone or "").strip()
+        if nombre.upper() == "UTC":
             return _tz.utc
-        try:
-            from zoneinfo import ZoneInfo
+        if nombre:
+            try:
+                from zoneinfo import ZoneInfo
 
-            return ZoneInfo(nombre)
-        except Exception:  # noqa: BLE001
-            import logging
+                return ZoneInfo(nombre)
+            except Exception:  # noqa: BLE001
+                import logging
 
-            logging.getLogger("settings").warning(
-                "Zona horaria '%s' no disponible; se usa UTC. En Windows "
-                "puede faltar el paquete 'tzdata' (pip install tzdata).",
-                nombre,
-            )
-            return _tz.utc
+                logging.getLogger("settings").warning(
+                    "Zona horaria '%s' no disponible (en Windows suele faltar "
+                    "el paquete 'tzdata': pip install tzdata). Se usa la zona "
+                    "del sistema operativo.", nombre,
+                )
+        # SIN tzdata (o sin nombre): la zona del propio equipo. Antes aquí se
+        # caía a UTC, y el resultado era un Excel y un SQL cinco horas por
+        # delante del reloj de la pared, sin ningún error a la vista. La hora
+        # del sistema es lo que ve quien está delante: es la respuesta
+        # correcta cuando no hay otra.
+        local = _dt.now().astimezone().tzinfo
+        return local or _tz.utc
 
     def load_static_endpoints(self) -> List[str]:
         """

@@ -103,7 +103,7 @@ class _InternasComoPlc:
 logger = logging.getLogger("plc_manager")
 
 # Marcas soportadas.
-VENDORS = ("siemens", "rexroth")
+VENDORS = ("siemens", "rexroth", "allenbradley")
 
 
 def _ahora_iso() -> str:
@@ -259,13 +259,38 @@ class PlcManager:
                 "rexroth_app": ep.app or self._settings.rexroth_app,
                 "rexroth_program": ep.programa or self._settings.rexroth_program,
             })
+        elif ep.vendor == "allenbradley":
+            update["ab_slot"] = int(ep.slot or 0)
+        elif ep.vendor == "siemens":
+            transporte = (ep.transporte or self._settings.siemens_transporte
+                          or "opcua").strip().lower()
+            update["siemens_transporte"] = transporte
+            if transporte == "s7comm":
+                update.update({
+                    "s7_rack": int(ep.rack or 0),
+                    "s7_slot": int(ep.slot if ep.slot else self._settings.s7_slot),
+                    "s7_tags": ep.s7_tags or self._settings.s7_tags,
+                })
         return self._settings.model_copy(update=update)
 
     @staticmethod
     def _crear_driver(vendor: str, settings_plc: Settings) -> PlcDriver:
         """Instancia el driver que corresponde a la marca del PLC."""
+        if vendor == "allenbradley":
+            from app.drivers.ethernetip_driver import EthernetIpDriver
+            return EthernetIpDriver(settings_plc)
+        if vendor == "siemens" and (getattr(settings_plc, "siemens_transporte", "")
+                                    or "").strip().lower() == "s7comm":
+            from app.drivers.s7comm_driver import S7CommDriver
+            return S7CommDriver(settings_plc)
         if vendor == "rexroth":
-            return RexrothDriver(settings_plc)
+            # Data Layer REST (nuevo, por defecto) u OPC UA (el de antes).
+            transporte = (getattr(settings_plc, "rexroth_transporte", "datalayer")
+                          or "datalayer").strip().lower()
+            if transporte == "opcua":
+                return RexrothDriver(settings_plc)
+            from app.drivers.ctrlx_datalayer_driver import CtrlxDatalayerDriver
+            return CtrlxDatalayerDriver(settings_plc)
         return OpcUaDriver(settings_plc)
 
     async def _añadir_plc(self, ep: EndpointPlc) -> str:
@@ -308,9 +333,16 @@ class PlcManager:
         password: str = "",
         app: str = "",
         programa: str = "",
+        slot: int = 0,
+        rack: int = 0,
+        transporte: str = "",
+        s7_tags: str = "",
     ) -> dict:
         """
         Añade un PLC escrito por el usuario (IP, host o endpoint completo).
+
+        Para `vendor='allenbradley'` basta la IP y el `slot` del procesador
+        (0 en CompactLogix): EtherNet/IP no tiene credenciales.
 
         Para `vendor='siemens'` basta la IP (conexión anónima, como siempre).
         Para `vendor='rexroth'` solo son obligatorios `usuario` y `password`:
@@ -339,10 +371,65 @@ class PlcManager:
             # `app` y `programa` son OPCIONALES: si no llegan, el driver los
             # descubre solo navegando plc/app/<app>/sym/<programa>.
 
-        if host.startswith("opc.tcp://"):
+        transporte_dl = (vendor == "rexroth" and
+                         (getattr(self._settings, "rexroth_transporte", "datalayer")
+                          or "datalayer").strip().lower() != "opcua")
+        transporte = (transporte or "").strip().lower()
+        if vendor == "siemens" and transporte == "s7comm":
+            # S7comm: s7://host:102/<rack>/<slot>. Sin OPC UA. La lista de
+            # tags es obligatoria porque S7comm no descubre nada.
+            from app.drivers.s7comm_driver import PUERTO_S7, parsear_tags
+            if host.startswith("s7://"):
+                resto = host[5:].split("/")
+                host_solo = resto[0].split(":")[0]
+                try:
+                    rack = int(resto[1]); slot = int(resto[2])
+                except (IndexError, ValueError):
+                    pass
+            else:
+                host_solo = host.split("://")[-1].split("/")[0].split(":")[0]
+            rack = int(rack or 0)
+            slot = int(slot) if slot else int(self._settings.s7_slot)
+            try:
+                lista = parsear_tags(s7_tags)
+            except ValueError as exc:
+                return {"ok": False, "mensaje": f"Lista de tags: {exc}"}
+            if not lista:
+                return {"ok": False,
+                        "mensaje": "S7comm necesita la lista de tags (nombre;DB1;"
+                                   "offset;TIPO, una por línea): no puede "
+                                   "descubrirlos solo como el OPC UA."}
+            puerto = PUERTO_S7
+            endpoint = f"s7://{host_solo}:{PUERTO_S7}/{rack}/{slot}"
+        elif vendor == "allenbradley":
+            # EtherNet/IP: enip://host:44818/<slot>. Un `enip://` completo
+            # trae el slot; una IP pelada usa el que llega aparte.
+            from app.drivers.ethernetip_driver import (
+                PUERTO_ENIP, endpoint_enip, host_de, slot_de,
+            )
+            host_solo = host_de(host)
+            if host.startswith("enip://"):
+                slot = slot_de(host, slot)
+            slot = int(slot or 0)
+            if not puerto or puerto in (4840, 443):
+                puerto = PUERTO_ENIP
+            endpoint = endpoint_enip(host_solo, slot, puerto)
+        elif host.startswith("opc.tcp://"):
             endpoint = host
             from app.core.plc_discovery import _host_puerto
             host_solo, puerto = _host_puerto(endpoint)
+        elif transporte_dl:
+            # Rexroth por Data Layer: el endpoint es HTTPS. La vista sigue
+            # mandando 4840 por costumbre del OPC UA; ese puerto no significa
+            # nada aquí, así que se sustituye por el HTTPS configurado.
+            from app.drivers.ctrlx_datalayer_driver import host_de, puerto_de
+            host_solo = host_de(host)
+            p_expl = puerto_de(host, 0)
+            if p_expl:
+                puerto = p_expl
+            elif not puerto or puerto == 4840:
+                puerto = int(getattr(self._settings, "rexroth_https_port", 443))
+            endpoint = f"https://{host_solo}:{puerto}"
         else:
             host_solo = host
             endpoint = f"opc.tcp://{host}:{puerto}"
@@ -356,7 +443,9 @@ class PlcManager:
         ep = EndpointPlc(endpoint=endpoint, host=host_solo, port=puerto,
                          nombre="", origen="manual", vendor=vendor,
                          usuario=usuario, password=password,
-                         app=app, programa=programa)
+                         app=app, programa=programa, slot=int(slot or 0),
+                         rack=int(rack or 0), transporte=transporte,
+                         s7_tags=s7_tags or "")
         plc_id = await self._añadir_plc(ep)
         self._persistir()
         # Refrescar a todos los clientes conectados con un snapshot nuevo.

@@ -22,7 +22,7 @@ mandando host + usuario + password: el driver los descubre solo.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -63,9 +63,24 @@ class NuevoPlc(BaseModel):
     )
     vendor: str = Field(
         default="siemens",
-        description="Marca del PLC: `siemens` (S7-1500) o `rexroth` (ctrlX CORE).",
-        examples=["siemens", "rexroth"],
+        description="Marca del PLC: `siemens` (S7-1500), `rexroth` (ctrlX "
+                    "CORE) o `allenbradley` (Logix por EtherNet/IP).",
+        examples=["siemens", "rexroth", "allenbradley"],
     )
+    slot: int = Field(
+        default=0, ge=0, le=31,
+        description="Allen-Bradley: slot del procesador en el chasis. "
+                    "Siemens por S7comm: slot de la CPU (1 en 1200/1500, 2 en 300).")
+    rack: int = Field(default=0, ge=0, le=7, description="Solo Siemens por S7comm.")
+    transporte: str = Field(
+        default="",
+        description="Solo Siemens: `opcua` (defecto) o `s7comm` (puerto 102, "
+                    "para S7-1200 sin OPC UA, S7-300/400).")
+    s7_tags: str = Field(
+        default="",
+        description="Solo S7comm: lista de tags, una por línea: "
+                    "`nombre;DB1;offset;TIPO` (p. ej. `temperatura;DB1;0;REAL`, "
+                    "`marcha;DB1;4.0;BOOL`, `texto;DB1;6;STRING[20]`).")
     usuario: str = Field(
         default="", description="Solo Rexroth: usuario del ctrlX.")
     password: str = Field(
@@ -88,6 +103,8 @@ class CredencialesRexroth(BaseModel):
         description="IP, hostname o endpoint completo del ctrlX.",
         examples=["192.168.1.1"],
     )
+    # 4840 = "el de siempre": con el transporte Data Layer (defecto) se
+    # sustituye por el puerto HTTPS del ctrlX (PLC_REXROTH_HTTPS_PORT, 443).
     puerto: int = Field(default=4840, ge=1, le=65535)
     usuario: str = Field(..., examples=["boschrexroth"])
     password: str = Field(...)
@@ -204,6 +221,10 @@ async def agregar_plc(
         password=cuerpo.password,
         app=cuerpo.app,
         programa=cuerpo.programa,
+        slot=cuerpo.slot,
+        rack=cuerpo.rack,
+        transporte=cuerpo.transporte,
+        s7_tags=cuerpo.s7_tags,
     )
 
 
@@ -307,8 +328,309 @@ async def browse(request: Request, plc: Optional[str] = None) -> dict:
 
 
 # ====================================================================== #
+# Siemens: ¿qué CPU es y por dónde se puede hablar con ella?
+# ====================================================================== #
+class SondeoSiemens(BaseModel):
+    host: str = Field(..., examples=["192.168.0.10"])
+    rack: int = Field(default=0, ge=0, le=7)
+    slot: Optional[int] = Field(default=None, ge=0, le=31,
+                                description="Vacío = probar 1, 2 y 0.")
+
+
+@router.post(
+    "/siemens/identificar",
+    summary="Identificar una CPU Siemens y decir por qué transporte conectar",
+    description="Pregunta la identidad de la CPU por S7comm (puerto 102, que "
+                "responde en cualquier S7 aunque el OPC UA no exista) y "
+                "comprueba si hay servidor OPC UA en el 4840. Con eso dice el "
+                "modelo (CPU 1214C, CPU 1516-3...) y qué transporte usar.",
+    responses={
+        200: {"content": {"application/json": {"example": {
+            "ok": True, "modelo": "CPU 1214C DC/DC/Rly", "familia": "S7-1200",
+            "nombre": "PLC_2", "estado": "Run", "rack": 0, "slot": 1,
+            "opcua": False, "transporte_sugerido": "s7comm",
+            "mensaje": "Es un S7-1200 y no responde en el 4840: ...",
+        }}}},
+        502: {"description": "No responde ni en el 102 ni en el 4840."},
+    },
+)
+async def siemens_identificar(cuerpo: SondeoSiemens) -> dict:
+    import asyncio as _asyncio
+    from app.drivers.s7comm_driver import identificar
+
+    host = (cuerpo.host or "").strip().split("://")[-1].split("/")[0].split(":")[0]
+    if not host:
+        raise HTTPException(400, "Indica la IP del PLC.")
+
+    # ¿Hay algo escuchando en el 4840? Solo el socket: abrir sesión OPC UA
+    # tarda y aquí solo hace falta saber si existe.
+    async def hay_opcua() -> bool:
+        try:
+            _r, w = await _asyncio.wait_for(
+                _asyncio.open_connection(host, 4840), timeout=2.0)
+            w.close()
+            try:
+                await w.wait_closed()
+            except Exception:  # noqa: BLE001
+                pass
+            return True
+        except Exception:  # noqa: BLE001
+            return False
+
+    tarea_opcua = _asyncio.create_task(hay_opcua())
+    info: dict = {}
+    error_s7 = ""
+    try:
+        info = await identificar(host, cuerpo.rack, cuerpo.slot)
+    except Exception as exc:  # noqa: BLE001
+        error_s7 = str(exc)
+    opcua = await tarea_opcua
+
+    # Sin el paquete no se ha sondeado nada: decirlo como "el PLC no
+    # responde" mandaría a revisar cables cuando lo que falta es un pip.
+    if "No module named 'snap7'" in error_s7 or "ModuleNotFoundError" in error_s7:
+        raise HTTPException(
+            500,
+            "Falta el paquete 'python-snap7' en el entorno del backend: "
+            "ejecuta  pip install python-snap7  y reinicia el servicio. Sin "
+            "él no se puede hablar S7comm (puerto 102) con ningún Siemens.",
+        )
+
+    if not info and not opcua:
+        raise HTTPException(
+            502,
+            f"{host} no responde ni por S7comm (puerto 102) ni por OPC UA "
+            f"(4840). Revisa la IP y la red (¿hace ping?). Detalle: {error_s7}",
+        )
+
+    familia = info.get("familia", "S7")
+    modelo = info.get("modelo", "")
+    if info and not modelo:
+        # Conecta por el 102 pero no dice su modelo: típico del S7-1200.
+        modelo = "CPU Siemens (responde por S7comm; no publica su modelo, " \
+                 "típico del S7-1200)"
+    if opcua:
+        sugerido = "opcua"
+        mensaje = (f"{modelo or 'La CPU'} tiene servidor OPC UA activo: se "
+                   f"conecta por OPC UA y descubre los DB solo.")
+    elif familia == "S7-1200":
+        sugerido = "s7comm"
+        mensaje = (f"{modelo} es un S7-1200 y no responde en el 4840: o el "
+                   f"firmware es anterior a 4.4 o el servidor OPC UA no está "
+                   f"activado (Propiedades → OPC UA → Servidor, con licencia). "
+                   f"Conecta por S7comm: en TIA marca 'Permitir acceso PUT/GET' "
+                   f"en la CPU, desmarca 'Acceso optimizado' en los DB que "
+                   f"quieras leer, y escribe aquí la lista de tags.")
+    elif familia in ("S7-300", "S7-400"):
+        sugerido = "s7comm"
+        mensaje = f"{modelo}: sin OPC UA. Conecta por S7comm (slot {info.get('slot')})."
+    else:
+        sugerido = "s7comm"
+        mensaje = (f"{modelo or 'La CPU'} no responde en el 4840. Activa el "
+                   f"servidor OPC UA en TIA Portal o conecta por S7comm.")
+    return {"ok": True, **info, "opcua": opcua, "transporte_sugerido": sugerido,
+            "mensaje": mensaje, "error_s7comm": error_s7}
+
+
+class FuenteTia(BaseModel):
+    nombre: str = Field(..., description="Nombre del fichero (.db, .udt, .scl).")
+    contenido: str = Field(..., max_length=4_000_000)
+
+
+class ImportarSiemens(BaseModel):
+    host: str = Field(default="", description="IP del PLC para sondear qué DB "
+                                             "existen. Vacío = no se sondea.")
+    rack: int = Field(default=0, ge=0, le=7)
+    slot: int = Field(default=1, ge=0, le=31)
+    fuentes: List[FuenteTia] = Field(..., min_length=1, max_length=50)
+
+
+@router.post(
+    "/siemens/importar",
+    summary="Calcular los tags de S7comm a partir de las fuentes de TIA Portal",
+    description="Recibe los ficheros que genera TIA con «Generate source from "
+                "blocks» (.db, .udt, .scl), calcula el offset de cada variable "
+                "con las reglas de un DB de acceso estándar, y —si llega la IP— "
+                "sondea el PLC para saber qué DB existen y de qué tamaño, para "
+                "emparejar cada bloque con su número. Es lo que evita que nadie "
+                "tenga que escribir offsets a mano.",
+    responses={200: {"content": {"application/json": {"example": {
+        "ok": True,
+        "bloques": [{"nombre": "Data_block_1", "clase": "global", "optimizado": False,
+                     "tamano": 10, "db": 1, "db_como": "tamaño",
+                     "tags": [{"nombre": "prueba_variable", "offset": 0, "bit": 0,
+                               "tipo": "BOOL", "linea": "prueba_variable;DB1;0.0;BOOL"}],
+                     "avisos": []}],
+        "dbs_plc": {"1": 10, "7": 56},
+        "avisos": [],
+    }}}}},
+)
+async def siemens_importar(cuerpo: ImportarSiemens) -> dict:
+    from app.drivers.s7_fuentes import numero_en_nombre, parsear_fuentes
+    from app.drivers.s7comm_driver import sondear_dbs
+
+    bloques, avisos = parsear_fuentes([(f.nombre, f.contenido) for f in cuerpo.fuentes])
+
+    # Qué DB hay de verdad en el PLC, y de qué tamaño.
+    dbs_plc: Dict[int, int] = {}
+    host = (cuerpo.host or "").strip().split("://")[-1].split("/")[0].split(":")[0]
+    if host:
+        candidatos = set(range(1, 41))
+        for b in bloques:
+            n = numero_en_nombre(b.nombre)
+            if n:
+                candidatos.add(n)
+        try:
+            dbs_plc = await sondear_dbs(host, cuerpo.rack, cuerpo.slot, sorted(candidatos))
+        except Exception as exc:  # noqa: BLE001
+            avisos.append(f"No se pudo sondear los DB del PLC ({exc}); asigna el "
+                          f"número de DB a mano.")
+
+    # Emparejar cada bloque con un número de DB:
+    #   1) el nombre lo dice ("Data_block_1", "DB7_x") y ese DB existe;
+    #   2) hay UN solo DB en el PLC con exactamente su tamaño;
+    #   3) el nombre lo dice aunque no se haya podido sondear;
+    #   4) nada: que lo elija el usuario.
+    usados: set = set()
+    salida_bloques = []
+    for b in bloques:
+        db: Optional[int] = None
+        como = ""
+        por_nombre = numero_en_nombre(b.nombre) if b.clase != "pegado" else None
+        if por_nombre and por_nombre in dbs_plc and por_nombre not in usados:
+            db, como = por_nombre, "nombre"
+        elif dbs_plc and b.tamano:
+            iguales = [n for n, t in dbs_plc.items() if t == b.tamano and n not in usados]
+            if len(iguales) == 1:
+                db, como = iguales[0], "tamaño"
+        if db is None and por_nombre and not dbs_plc:
+            db, como = por_nombre, "nombre (sin sondear)"
+        if db is not None:
+            usados.add(db)
+            if dbs_plc and b.tamano and dbs_plc.get(db) not in (None, b.tamano):
+                b.avisos.append(
+                    f"El DB{db} del PLC mide {dbs_plc[db]} bytes y la fuente calcula "
+                    f"{b.tamano}: puede que el PLC tenga otra versión del bloque "
+                    f"(compila y carga) o que la fuente no sea de este proyecto.")
+        salida_bloques.append({
+            "nombre": b.nombre, "clase": b.clase, "base": b.base,
+            "optimizado": b.optimizado, "tamano": b.tamano,
+            "db": db, "db_como": como,
+            "tags": [{"nombre": t.nombre, "offset": t.offset, "bit": t.bit,
+                      "tipo": t.tipo, "longitud": t.longitud,
+                      "linea": t.linea(db or 0)} for t in b.tags],
+            "avisos": b.avisos,
+        })
+    return {"ok": True, "bloques": salida_bloques,
+            "dbs_plc": {str(k): v for k, v in sorted(dbs_plc.items())},
+            "avisos": avisos}
+
+
+# ====================================================================== #
+# Allen-Bradley: identificar el controlador antes de darlo de alta
+# ====================================================================== #
+class SondeoAllenBradley(BaseModel):
+    host: str = Field(..., examples=["192.168.1.10"])
+    slot: int = Field(default=0, ge=0, le=31)
+
+
+@router.post(
+    "/allenbradley/identificar",
+    summary="Identificar un PLC Allen-Bradley por EtherNet/IP",
+    description="Abre una sesión CIP temporal y devuelve la identidad del "
+                "controlador: nombre del proyecto, modelo, revisión y posición "
+                "del selector. No hay credenciales: EtherNet/IP no autentica.",
+    responses={
+        200: {"content": {"application/json": {"example": {
+            "ok": True, "endpoint": "enip://192.168.1.10:44818/0",
+            "nombre": "Linea_2", "producto": "1769-L33ER/A LOGIX5333ER",
+            "revision": {"major": 32, "minor": 11}, "modo": "REMOTE RUN",
+        }}}},
+        502: {"description": "No responde en 44818 o el slot no tiene CPU."},
+    },
+)
+async def allenbradley_identificar(cuerpo: SondeoAllenBradley) -> dict:
+    from app.config.settings import get_settings
+    from app.drivers.ethernetip_driver import endpoint_enip, host_de, probar
+
+    host = host_de(cuerpo.host)
+    if not host:
+        raise HTTPException(400, "Indica la IP del PLC.")
+    estado, info = await probar(
+        host, cuerpo.slot,
+        float(getattr(get_settings(), "ab_connect_timeout", 5.0)))
+    if estado != "OK":
+        raise HTTPException(
+            502,
+            f"No se pudo contactar con el PLC en {host} (slot {cuerpo.slot}) "
+            f"por EtherNet/IP. Revisa la IP, que el puerto 44818 esté abierto "
+            f"y el slot del procesador. Detalle: {info.get('error', '')}",
+        )
+    return {"ok": True, "endpoint": endpoint_enip(host, cuerpo.slot), **info}
+
+
+# ====================================================================== #
 # Bosch Rexroth ctrlX: exploración previa al alta del PLC
 # ====================================================================== #
+def _usa_datalayer() -> bool:
+    """¿El transporte Rexroth configurado es el Data Layer REST (defecto)?"""
+    from app.config.settings import get_settings
+    t = (getattr(get_settings(), "rexroth_transporte", "datalayer") or "datalayer")
+    return t.strip().lower() != "opcua"
+
+
+def _puerto_https(host: str, puerto: int) -> int:
+    """
+    Puerto HTTPS del ctrlX para el Data Layer. La vista manda 4840 por
+    costumbre del OPC UA; aquí no significa nada y se cae al configurado.
+    """
+    from app.config.settings import get_settings
+    from app.drivers.ctrlx_datalayer_driver import puerto_de
+    explicito = puerto_de(host, 0)
+    if explicito:
+        return explicito
+    if not puerto or puerto == 4840:
+        return int(getattr(get_settings(), "rexroth_https_port", 443))
+    return puerto
+
+
+async def _explorar_datalayer(cuerpo: CredencialesRexroth, listar, *args):
+    """
+    Igual que `_explorar_ctrlx`, pero por el Data Layer REST: login con JWT,
+    sin certificado que aceptar. Distingue credenciales malas (401) de equipo
+    caído (502), que es lo que la pantalla necesita para decir qué revisar.
+    """
+    from app.config.settings import get_settings
+    from app.drivers.ctrlx_datalayer_driver import (
+        ErrorCredenciales, abrir_sesion, host_de,
+    )
+
+    if not cuerpo.usuario or not cuerpo.password:
+        raise HTTPException(400, "El ctrlX necesita usuario y contraseña.")
+    host = host_de(cuerpo.host)
+    puerto = _puerto_https(cuerpo.host, cuerpo.puerto)
+    try:
+        cliente = await abrir_sesion(host, puerto, cuerpo.usuario,
+                                     cuerpo.password, get_settings())
+    except ErrorCredenciales as exc:
+        raise HTTPException(401, str(exc))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            502,
+            f"No se pudo contactar con el ctrlX en https://{host}:{puerto}. "
+            f"Revisa la IP, que el equipo esté encendido y el puerto HTTPS "
+            f"({puerto}). Detalle: {exc}",
+        )
+    try:
+        return await listar(cliente, *args)
+    except RuntimeError as exc:
+        raise HTTPException(404, str(exc))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"{type(exc).__name__}: {exc}")
+    finally:
+        await cliente.close()
+
+
 async def _explorar_ctrlx(cuerpo: CredencialesRexroth, listar, *args):
     """
     Abre una sesión temporal contra el ctrlX, ejecuta `listar` y cierra.
@@ -316,6 +638,9 @@ async def _explorar_ctrlx(cuerpo: CredencialesRexroth, listar, *args):
     Se conecta y desconecta en cada llamada a propósito: esto ocurre en la
     pantalla de login, antes de que el PLC exista como tal, así que no hay
     ningún driver ni sesión persistente que reutilizar.
+
+    Es el camino OPC UA (`PLC_REXROTH_TRANSPORTE=opcua`). El defecto es el
+    Data Layer, en `_explorar_datalayer`.
     """
     # Import local: `cryptography` solo se necesita para PLCs Rexroth.
     from app.config.settings import get_settings
@@ -374,11 +699,27 @@ async def rexroth_apps(
         "usuario": "boschrexroth", "password": "boschrexroth",
     }]),
 ) -> dict:
+    if _usa_datalayer():
+        async def _apps_dl(cliente):
+            apps = await cliente.listar_apps()
+            if not apps:
+                raise RuntimeError(
+                    "El ctrlX no publica ninguna aplicación PLC bajo "
+                    "'plc/app'. ¿Está cargado y en RUN el proyecto?")
+            return apps
+        apps = await _explorar_datalayer(cuerpo, _apps_dl)
+        from app.drivers.ctrlx_datalayer_driver import host_de
+        return {"ok": True, "transporte": "datalayer",
+                "endpoint": f"https://{host_de(cuerpo.host)}:"
+                            f"{_puerto_https(cuerpo.host, cuerpo.puerto)}",
+                "apps": apps}
+
     from app.drivers.rexroth_driver import listar_apps
 
     apps = await _explorar_ctrlx(cuerpo, listar_apps)
     return {
         "ok": True,
+        "transporte": "opcua",
         "endpoint": _endpoint_desde(cuerpo.host, cuerpo.puerto),
         "apps": apps,
     }
@@ -406,6 +747,29 @@ async def rexroth_programas(
         "usuario": "boschrexroth", "password": "boschrexroth",
     }]),
 ) -> dict:
+    if _usa_datalayer():
+        async def _listar_dl(cliente):
+            app_sel = (cuerpo.app or "").strip()
+            if not app_sel:
+                apps = await cliente.listar_apps()
+                if not apps:
+                    raise RuntimeError(
+                        "El ctrlX no publica ninguna aplicación PLC bajo "
+                        "'plc/app'. ¿Está cargado y en RUN el proyecto?")
+                app_sel = "Application" if "Application" in apps else apps[0]
+            programas = await cliente.listar_programas(app_sel)
+            if not programas:
+                raise RuntimeError(
+                    f"'plc/app/{app_sel}/sym' no tiene programas. Publica los "
+                    f"símbolos del proyecto (Symbol Configuration) en el ctrlX.")
+            return app_sel, programas
+        app_sel, programas = await _explorar_datalayer(cuerpo, _listar_dl)
+        from app.drivers.ctrlx_datalayer_driver import host_de
+        return {"ok": True, "transporte": "datalayer",
+                "endpoint": f"https://{host_de(cuerpo.host)}:"
+                            f"{_puerto_https(cuerpo.host, cuerpo.puerto)}",
+                "app": app_sel, "programas": programas}
+
     from app.drivers.rexroth_driver import listar_apps, listar_programas
 
     async def _listar(cliente):
@@ -418,6 +782,7 @@ async def rexroth_programas(
     app_sel, programas = await _explorar_ctrlx(cuerpo, _listar)
     return {
         "ok": True,
+        "transporte": "opcua",
         "endpoint": _endpoint_desde(cuerpo.host, cuerpo.puerto),
         "app": app_sel,
         "programas": programas,

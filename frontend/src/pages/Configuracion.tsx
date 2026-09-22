@@ -22,11 +22,13 @@ import {
   RefreshCwIcon,
   MonitorIcon,
   PencilIcon,
+  UploadIcon,
+  AlertTriangleIcon,
   type LucideIcon,
 } from 'lucide-react';
 import { useAppStore } from '../context/AppStore';
-import { UPDATE_RATE_OPTIONS, DataType, PlcVendor } from '../models/plc';
-import { formatValue } from '../utils/format';
+import { UPDATE_RATE_OPTIONS, DataType, PlcVendor, VENDOR_LABEL } from '../models/plc';
+import { formatValue, formatValueFull } from '../utils/format';
 import { fetchRexrothPrograms } from '../services/rexrothApi';
 import { PanelBasesDatos } from '../components/bd/PanelBasesDatos';
 import { PanelCarpetaDatos } from '../components/sistema/PanelCarpetaDatos';
@@ -92,16 +94,25 @@ interface PlcInfo {
   estado_conexion: string;
   num_tags: number;
   modo_lectura: string;
+  /** Modelo de la CPU si el driver lo leyó ("CPU 1214C DC/DC/Rly"). */
+  modelo?: string;
+  /** Por qué está desconectado, si lo está. */
+  ultimo_error?: string;
   sampling_interval_ms: number;
   publishing_interval_ms: number;
 }
 
-/** IP legible a partir del endpoint OPC UA. */
+/**
+ * IP legible a partir del endpoint, sea cual sea el esquema:
+ *   opc.tcp://192.168.0.1:4840   (Siemens, Rexroth por OPC UA)
+ *   https://192.168.0.1:443      (Rexroth por Data Layer)
+ *   enip://192.168.0.1:44818/0   (Allen-Bradley; /0 es el slot)
+ */
 const ipDe = (endpoint: string) =>
-  endpoint.replace('opc.tcp://', '').replace(/:.*$/, '');
+  (endpoint || '').replace(/^[a-z.+-]+:\/\//i, '').replace(/[:/].*$/, '');
 
 const marcaDe = (vendor: string) =>
-  vendor === 'rexroth' ? 'Bosch Rexroth ctrlX' : 'Siemens S7-1500';
+  VENDOR_LABEL[vendor] ?? VENDOR_LABEL.siemens;
 
 // =========================================================================
 // Piezas del sistema visual
@@ -533,8 +544,27 @@ export function Configuracion() {
   const [adding, setAdding] = useState(false);
   const [modalError, setModalError] = useState('');
   const [modalHint, setModalHint] = useState('');
+  // Allen-Bradley: slot del procesador. EtherNet/IP no tiene credenciales.
+  const [slot, setSlot] = useState('0');
+  // Siemens: por dónde hablar con la CPU. Un S7-1200 sin OPC UA (FW < 4.4
+  // o servidor sin activar) solo se puede leer por S7comm, y ahí los tags
+  // no se descubren: se escriben a mano con su DB y su offset.
+  const [s7Transporte, setS7Transporte] = useState<'opcua' | 's7comm'>('opcua');
+  const [s7Rack, setS7Rack] = useState('0');
+  const [s7Slot, setS7Slot] = useState('1');
+  const [s7Tags, setS7Tags] = useState('');
+  // Importación desde las fuentes de TIA (`Generate source from blocks`):
+  // la app calcula los offsets; el usuario solo marca qué variables quiere.
+  const [s7Bloques, setS7Bloques] = useState<BloqueTia[]>([]);
+  const [s7Importando, setS7Importando] = useState(false);
+  const [s7Manual, setS7Manual] = useState(false);
+  const [s7Arrastrando, setS7Arrastrando] = useState(false);
+  const [s7Pegado, setS7Pegado] = useState('');
+  const s7FicherosRef = React.useRef<HTMLInputElement>(null);
 
   const isRexroth = vendor === 'rexroth';
+  const isAllenBradley = vendor === 'allenbradley';
+  const isSiemens = vendor === 'siemens';
   const credsReady =
     newIp.trim() !== '' && newUser.trim() !== '' && newPass !== '';
 
@@ -550,6 +580,11 @@ export function Configuracion() {
   const resetForm = () => {
     setVendor('siemens');
     setNewIp('');
+    setSlot('0');
+    setS7Transporte('opcua');
+    setS7Rack('0');
+    setS7Slot('1');
+    setS7Tags('');
     setNewUser('');
     setNewPass('');
     setApp('');
@@ -559,7 +594,99 @@ export function Configuracion() {
     setModalHint('');
     setSearching(false);
     setAdding(false);
+    setS7Bloques([]);
+    setS7Manual(false);
+    setS7Pegado('');
   };
+
+  // ---- Siemens/S7comm: importar las fuentes de TIA ----
+  //
+  // Se leen los ficheros en el navegador y se mandan como texto: el backend
+  // calcula los offsets y sondea el PLC para saber qué DB existen. Lo que
+  // vuelve se enseña como una lista de variables con casillas; la lista
+  // "nombre;DB;offset;TIPO" se genera sola al agregar.
+  const importarFuentesTia = useCallback(async (lista: FileList | File[] | string) => {
+    // Texto pegado del editor del DB, o ficheros .db: el backend distingue.
+    const fuentes: { nombre: string; contenido: string }[] = [];
+    if (typeof lista === 'string') {
+      if (lista.trim() === '') return;
+      fuentes.push({ nombre: `Pegado ${s7Bloques.length + 1}`, contenido: lista });
+    } else {
+      const ficheros = Array.from(lista);
+      if (ficheros.length === 0) return;
+      fuentes.push(
+        ...(await Promise.all(
+          ficheros.map(async (f) => ({ nombre: f.name, contenido: await f.text() })),
+        )),
+      );
+    }
+    setS7Importando(true);
+    setModalError('');
+    try {
+      const r = await fetch('/siemens/importar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          host: newIp.trim(),
+          rack: Number(s7Rack) || 0,
+          slot: Number(s7Slot) || 1,
+          fuentes,
+        }),
+      });
+      const data = await r.json().catch(() => null);
+      if (!r.ok) {
+        throw new Error(
+          typeof data?.detail === 'string' ? data.detail : `HTTP ${r.status}`,
+        );
+      }
+      const nuevos: BloqueTia[] = (data?.bloques ?? []).map((b: any) => ({
+        nombre: b.nombre,
+        clase: b.clase,
+        optimizado: !!b.optimizado,
+        tamano: b.tamano ?? 0,
+        db: b.db ?? null,
+        dbComo: b.db_como ?? '',
+        avisos: b.avisos ?? [],
+        tags: (b.tags ?? []).map((t: any) => ({
+          nombre: t.nombre,
+          offset: t.offset,
+          bit: t.bit,
+          tipo: t.tipo,
+          longitud: t.longitud ?? 0,
+          marcado: true,
+        })),
+      }));
+      // Se acumulan: subir el UDT después del DB tiene que funcionar igual.
+      setS7Bloques((prev) => {
+        const porNombre = new Map(prev.map((b) => [b.nombre, b]));
+        for (const b of nuevos) porNombre.set(b.nombre, b);
+        return Array.from(porNombre.values());
+      });
+      const avisos: string[] = data?.avisos ?? [];
+      if (avisos.length) setModalHint(avisos.join(' '));
+      if (typeof lista === 'string') setS7Pegado('');
+    } catch (e: any) {
+      setModalError(e?.message ?? String(e));
+    } finally {
+      setS7Importando(false);
+      if (s7FicherosRef.current) s7FicherosRef.current.value = '';
+    }
+  }, [newIp, s7Rack, s7Slot, s7Bloques.length]);
+
+  // La lista que va al backend, en el formato que entiende el driver.
+  const s7TagsDesdeBloques = useCallback((): string => {
+    const lineas: string[] = [];
+    for (const b of s7Bloques) {
+      if (b.optimizado || b.db === null) continue;
+      for (const tg of b.tags) {
+        if (!tg.marcado) continue;
+        const off = tg.tipo === 'BOOL' ? `${tg.offset}.${tg.bit}` : String(tg.offset);
+        const tipo = tg.tipo === 'STRING' ? `STRING[${tg.longitud}]` : tg.tipo;
+        lineas.push(`${tg.nombre};DB${b.db};${off};${tipo}`);
+      }
+    }
+    return lineas.join('\n');
+  }, [s7Bloques]);
 
   const openModal = () => {
     resetForm();
@@ -599,10 +726,89 @@ export function Configuracion() {
     }
   }, [credsReady, newIp, newUser, newPass, t]);
 
+  // ---- Siemens: ¿qué CPU es y por dónde se le puede hablar? ----
+  //
+  // Pregunta por S7comm (puerto 102, responde cualquier S7 aunque el OPC UA
+  // no exista) y mira si hay algo en el 4840. Con eso dice el modelo real
+  // —"CPU 1214C", no "S7-1500" por defecto— y preselecciona el transporte.
+  const identificarSiemens = useCallback(async () => {
+    if (newIp.trim() === '') return;
+    setSearching(true);
+    setModalError('');
+    setModalHint('');
+    try {
+      const r = await fetch('/siemens/identificar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host: newIp.trim(), rack: Number(s7Rack) || 0 }),
+      });
+      const data = await r.json().catch(() => null);
+      if (!r.ok) {
+        throw new Error(
+          typeof data?.detail === 'string' ? data.detail : `HTTP ${r.status}`,
+        );
+      }
+      if (data?.transporte_sugerido === 's7comm' || data?.transporte_sugerido === 'opcua') {
+        setS7Transporte(data.transporte_sugerido);
+      }
+      if (typeof data?.slot === 'number') setS7Slot(String(data.slot));
+      const cabecera = [data?.modelo, data?.nombre ? `«${data.nombre}»` : '', data?.estado]
+        .filter(Boolean)
+        .join(' · ');
+      setModalHint(`${cabecera ? cabecera + '. ' : ''}${data?.mensaje ?? ''}`);
+    } catch (e: any) {
+      setModalError(e?.message ?? String(e));
+    } finally {
+      setSearching(false);
+    }
+  }, [newIp, s7Rack]);
+
+  // ---- Allen-Bradley: identificar el controlador antes de darlo de alta ----
+  //
+  // No hay nada que "buscar" como en Rexroth (los tags se suben solos al
+  // conectar): esto solo confirma que en esa IP y ese slot hay un Logix y
+  // dice cuál es, que es lo que evita dar de alta un PLC que no responde.
+  const identificarAb = useCallback(async () => {
+    if (newIp.trim() === '') return;
+    setSearching(true);
+    setModalError('');
+    setModalHint('');
+    try {
+      const r = await fetch('/allenbradley/identificar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host: newIp.trim(), slot: Number(slot) || 0 }),
+      });
+      const data = await r.json().catch(() => null);
+      if (!r.ok) {
+        throw new Error(
+          typeof data?.detail === 'string' ? data.detail : `HTTP ${r.status}`,
+        );
+      }
+      const rev = data?.revision;
+      const revTxt =
+        rev && typeof rev === 'object' ? ` v${rev.major}.${rev.minor}` : '';
+      setModalHint(
+        `${data?.producto || 'Logix'}${revTxt} · proyecto «${data?.nombre || '?'}» · ${data?.modo || ''}`,
+      );
+    } catch (e: any) {
+      setModalError(e?.message ?? String(e));
+    } finally {
+      setSearching(false);
+    }
+  }, [newIp, slot]);
+
   // ---- Agregar PLC (POST /plcs) ----
   const agregarPlc = async () => {
     if (isRexroth && !program) {
       setModalError(t('login.needProgram'));
+      return;
+    }
+    const tagsS7 = isSiemens && s7Transporte === 's7comm'
+      ? (s7Manual ? s7Tags : s7TagsDesdeBloques())
+      : '';
+    if (isSiemens && s7Transporte === 's7comm' && tagsS7.trim() === '') {
+      setModalError(t('login.needTags'));
       return;
     }
     setModalError('');
@@ -610,7 +816,8 @@ export function Configuracion() {
     try {
       const body: Record<string, unknown> = {
         host: newIp.trim(),
-        puerto: 4840,
+        // Rexroth: puerto HTTPS del Data Layer, no el 4840 de OPC UA.
+        puerto: isRexroth ? 443 : 4840,
         vendor,
       };
       if (isRexroth) {
@@ -618,6 +825,19 @@ export function Configuracion() {
         body.password = newPass;
         body.app = app || 'Application';
         body.programa = program;
+      }
+      if (isAllenBradley) {
+        body.puerto = 44818;
+        body.slot = Number(slot) || 0;
+      }
+      if (isSiemens) {
+        body.transporte = s7Transporte;
+        if (s7Transporte === 's7comm') {
+          body.puerto = 102;
+          body.rack = Number(s7Rack) || 0;
+          body.slot = Number(s7Slot) || 1;
+          body.s7_tags = tagsS7;
+        }
       }
       const r = await fetch('/plcs', {
         method: 'POST',
@@ -655,6 +875,7 @@ export function Configuracion() {
     (p) => p.vendor === 'siemens' || !p.vendor,
   );
   const rexrothPlcs = plcs.filter((p) => p.vendor === 'rexroth');
+  const allenBradleyPlcs = plcs.filter((p) => p.vendor === 'allenbradley');
 
   const canAdd = !adding && newIp.trim() !== '' && (!isRexroth || !!program);
 
@@ -670,13 +891,8 @@ export function Configuracion() {
     }
     return Array.from(map.entries()).map(([plcId, vars]) => {
       const info = plcs.find((p) => p.plc === plcId);
-      const vendorLabel =
-        info?.vendor === 'rexroth'
-          ? 'Bosch Rexroth ctrlX'
-          : 'Siemens S7-1500';
-      const ip = info
-        ? info.endpoint.replace('opc.tcp://', '').replace(/:.*$/, '')
-        : plcId;
+      const vendorLabel = marcaDe(info?.vendor ?? 'siemens');
+      const ip = info ? ipDe(info.endpoint) : plcId;
       return {
         plcId,
         label: `${vendorLabel} — ${ip}`,
@@ -957,8 +1173,9 @@ export function Configuracion() {
                   {/* ── Lista de controladores ── */}
                   <div className="space-y-4">
                     {[
-                      { titulo: 'Bosch Rexroth ctrlX', lista: rexrothPlcs },
-                      { titulo: 'Siemens S7-1500', lista: siemensPlcs },
+                      { titulo: VENDOR_LABEL.rexroth, lista: rexrothPlcs },
+                      { titulo: VENDOR_LABEL.allenbradley, lista: allenBradleyPlcs },
+                      { titulo: VENDOR_LABEL.siemens, lista: siemensPlcs },
                     ]
                       .filter((g) => g.lista.length > 0)
                       .map((g) => (
@@ -1076,20 +1293,32 @@ export function Configuracion() {
                                       aria-label={`${t('config.selectVar')} ${v.name}`}
                                     />
                                   </td>
-                                  <td className="px-4 py-2 font-mono text-[12.5px] font-medium text-navy dark:text-slate-100">
+                                  <td
+                                    className="max-w-[18rem] truncate px-4 py-2 font-mono text-[12.5px] font-medium text-navy dark:text-slate-100"
+                                    title={v.name}
+                                  >
                                     {v.name}
                                   </td>
                                   <td className="px-4 py-2">
                                     <span
                                       className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ${typeColor[v.type]}`}
                                     >
-                                      {v.type}
+                                      {Array.isArray(v.value)
+                                        ? `${v.type}[${v.value.length}]`
+                                        : v.type}
                                     </span>
                                   </td>
                                   {/* tabular-nums: sin esto las cifras bailan
                                       de fila en fila y la columna deja de
-                                      leerse como una columna. */}
-                                  <td className="px-4 py-2 text-right font-mono text-xs tabular-nums text-slate-600 dark:text-slate-300">
+                                      leerse como una columna.
+                                      `max-w` + `truncate`: la celda NUNCA
+                                      decide el ancho de la tabla. Un valor
+                                      largo (un array, un texto) se corta y
+                                      el completo va en el tooltip. */}
+                                  <td
+                                    className="max-w-[14rem] truncate px-4 py-2 text-right font-mono text-xs tabular-nums text-slate-600 dark:text-slate-300"
+                                    title={formatValueFull(v)}
+                                  >
                                     {formatValue(v)}
                                   </td>
                                 </tr>
@@ -1133,6 +1362,11 @@ export function Configuracion() {
                             />
                           </FilaDato>
                           <FilaDato etiqueta="Marca">{marcaDe(plcInfoSel.vendor)}</FilaDato>
+                          {plcInfoSel.modelo && (
+                            <FilaDato etiqueta="Modelo">
+                              <span className="font-mono text-[12px]">{plcInfoSel.modelo}</span>
+                            </FilaDato>
+                          )}
                           <FilaDato etiqueta="Dirección">
                             <span className="font-mono text-[12px]">
                               {ipDe(plcInfoSel.endpoint)}
@@ -1148,6 +1382,21 @@ export function Configuracion() {
                               {plcInfoSel.sampling_interval_ms} ms
                             </span>
                           </FilaDato>
+                          {/* «Desconectado» a secas no dice nada. El último
+                              fallo del driver sí: "connection refused en el
+                              4840", "Object does not exist" en un DB
+                              optimizado... es lo que hay que leer para saber
+                              qué tocar en TIA. */}
+                          {!plcInfoSel.conectado && plcInfoSel.ultimo_error && (
+                            <div className="border-t border-slate-100 px-3 py-2.5 dark:border-navy-slate/60">
+                              <p className="mb-1 text-[10.5px] font-bold uppercase tracking-wider text-state-error">
+                                Último error
+                              </p>
+                              <p className="break-words text-[11.5px] leading-relaxed text-slate-600 dark:text-slate-300">
+                                {plcInfoSel.ultimo_error}
+                              </p>
+                            </div>
+                          )}
 
                           <div className="border-t border-slate-100 p-3 dark:border-navy-slate/60">
                             <button
@@ -1362,39 +1611,39 @@ export function Configuracion() {
               </h2>
 
               {/* Tabs de marca */}
-              <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-navy/60 p-1">
-                <button
-                  type="button"
-                  onClick={() => setVendor('siemens')}
-                  className={`rounded-lg py-2 text-sm font-medium transition ${
-                    !isRexroth
-                      ? 'bg-siemens text-white shadow shadow-siemens/30'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  Siemens
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setVendor('rexroth')}
-                  className={`rounded-lg py-2 text-sm font-medium transition ${
-                    isRexroth
-                      ? 'bg-siemens text-white shadow shadow-siemens/30'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  Rexroth
-                </button>
+              <div className="mb-5 grid grid-cols-3 gap-2 rounded-xl border border-white/10 bg-navy/60 p-1">
+                {(
+                  [
+                    ['siemens', t('login.vendorSiemens')],
+                    ['rexroth', t('login.vendorRexroth')],
+                    ['allenbradley', t('login.vendorAllenBradley')],
+                  ] as [PlcVendor, string][]
+                ).map(([v, etiqueta]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setVendor(v)}
+                    className={`rounded-lg py-2 text-sm font-medium transition ${
+                      vendor === v
+                        ? 'bg-siemens text-white shadow shadow-siemens/30'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {etiqueta}
+                  </button>
+                ))}
               </div>
 
               <p className="mb-4 text-[11px] text-slate-500">
                 {isRexroth
                   ? t('login.vendorRexrothHint')
-                  : t('login.vendorSiemensHint')}
+                  : isAllenBradley
+                    ? t('login.vendorAllenBradleyHint')
+                    : t('login.vendorSiemensHint')}
               </p>
 
               <div className="space-y-3">
-                {/* IP (con sufijo :4840 para Rexroth) */}
+                {/* IP (con sufijo :443 para Rexroth: HTTPS del Data Layer) */}
                 <div>
                   <span className="mb-1.5 block text-xs font-medium text-slate-400">
                     {t('login.ip')}
@@ -1406,16 +1655,289 @@ export function Configuracion() {
                       placeholder="192.168.0.1"
                       onChange={(e) => setNewIp(e.target.value)}
                       className={`flex-1 border border-white/10 bg-navy/60 py-2.5 px-3 text-sm text-white placeholder-slate-500 outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/30 ${
-                        isRexroth ? 'rounded-l-xl' : 'rounded-xl'
+                        isRexroth || isAllenBradley ? 'rounded-l-xl' : 'rounded-xl'
                       }`}
                     />
-                    {isRexroth && (
+                    {(isRexroth || isAllenBradley) && (
                       <span className="flex items-center rounded-r-xl border border-l-0 border-white/10 bg-navy/80 px-3 text-xs font-mono text-slate-500">
-                        :4840
+                        {isRexroth ? ':443' : ':44818'}
                       </span>
                     )}
                   </div>
                 </div>
+
+                {/* Siemens: identificar + transporte. Un S7-1200 sin OPC UA
+                    va por S7comm, y ahí los tags se escriben a mano. */}
+                {isSiemens && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={identificarSiemens}
+                      disabled={searching || newIp.trim() === ''}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-siemens/20 py-2.5 text-sm font-medium text-white transition hover:bg-siemens/30 disabled:opacity-40"
+                    >
+                      {searching ? (
+                        <>
+                          <motion.span
+                            className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white"
+                            animate={{ rotate: 360 }}
+                            transition={{ repeat: Infinity, duration: 0.7, ease: 'linear' }}
+                          />
+                          {t('login.identifying')}
+                        </>
+                      ) : (
+                        <>
+                          <SearchIcon className="h-4 w-4" />
+                          {t('login.identify')}
+                        </>
+                      )}
+                    </button>
+                    {modalHint && (
+                      <p className="text-[11px] leading-relaxed text-emerald-400/90">{modalHint}</p>
+                    )}
+
+                    <div>
+                      <span className="mb-1.5 block text-xs font-medium text-slate-400">
+                        {t('login.s7Transport')}
+                      </span>
+                      <div className="grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-navy/60 p-1">
+                        {(
+                          [
+                            ['opcua', t('login.s7Opcua')],
+                            ['s7comm', t('login.s7comm')],
+                          ] as ['opcua' | 's7comm', string][]
+                        ).map(([v, etiqueta]) => (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => setS7Transporte(v)}
+                            className={`rounded-lg py-2 text-sm font-medium transition ${
+                              s7Transporte === v
+                                ? 'bg-siemens text-white shadow shadow-siemens/30'
+                                : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            {etiqueta}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
+                        {s7Transporte === 's7comm'
+                          ? t('login.s7commHint')
+                          : t('login.s7OpcuaHint')}
+                      </p>
+                    </div>
+
+                    {s7Transporte === 's7comm' && (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          <ModalInput
+                            label={t('login.s7Rack')}
+                            value={s7Rack}
+                            onChange={(v) => setS7Rack(v.replace(/[^0-9]/g, ''))}
+                            placeholder="0"
+                          />
+                          <ModalInput
+                            label={t('login.s7Slot')}
+                            value={s7Slot}
+                            onChange={(v) => setS7Slot(v.replace(/[^0-9]/g, ''))}
+                            placeholder="1"
+                          />
+                        </div>
+                        {/* Variables: desde las fuentes de TIA. Nadie
+                            escribe offsets: los calcula el backend. */}
+                        <div>
+                          <div className="mb-1.5 flex items-center justify-between">
+                            <span className="text-xs font-medium text-slate-400">
+                              {t('login.s7Import')}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setS7Manual((v) => !v)}
+                              className="text-[11px] text-slate-500 underline-offset-2 hover:text-slate-300 hover:underline"
+                            >
+                              {s7Manual ? t('login.s7Import') : t('login.s7Manual')}
+                            </button>
+                          </div>
+
+                          {s7Manual ? (
+                            <>
+                              <textarea
+                                value={s7Tags}
+                                onChange={(e) => setS7Tags(e.target.value)}
+                                rows={6}
+                                spellCheck={false}
+                                placeholder={'temperatura;DB1;0;REAL\nmarcha;DB1;4.0;BOOL\ncontador;DB1;6;DINT\ntexto;DB1;10;STRING[20]'}
+                                className="w-full rounded-xl border border-white/10 bg-navy/60 py-2.5 px-3 font-mono text-[12px] leading-relaxed text-white placeholder-slate-600 outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/30"
+                              />
+                              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                                {t('login.s7TagsHint')}
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              {/* Camino principal: copiar del editor del DB y
+                                  pegar. Tres pasos, sin ficheros ni offsets. */}
+                              {s7Bloques.length === 0 && (
+                                <ol className="mb-2 space-y-1 rounded-xl border border-white/10 bg-navy/40 px-3 py-2.5 text-[11.5px] leading-relaxed text-slate-300">
+                                  <li className="font-semibold text-slate-200">{t('login.s7PasteTitle')}</li>
+                                  <li><span className="mr-1.5 font-mono text-siemens">1.</span>{t('login.s7PasteStep1')}</li>
+                                  <li><span className="mr-1.5 font-mono text-siemens">2.</span>{t('login.s7PasteStep2')}</li>
+                                  <li><span className="mr-1.5 font-mono text-siemens">3.</span>{t('login.s7PasteStep3')}</li>
+                                </ol>
+                              )}
+                              <textarea
+                                value={s7Pegado}
+                                onChange={(e) => setS7Pegado(e.target.value)}
+                                onPaste={(e) => {
+                                  // Al pegar se lee directamente: sin botón que buscar.
+                                  const txt = e.clipboardData.getData('text');
+                                  if (txt.trim()) {
+                                    e.preventDefault();
+                                    setS7Pegado(txt);
+                                    void importarFuentesTia(txt);
+                                  }
+                                }}
+                                rows={3}
+                                spellCheck={false}
+                                placeholder={t('login.s7PastePlaceholder')}
+                                className="w-full rounded-xl border border-white/10 bg-navy/60 py-2.5 px-3 font-mono text-[12px] leading-relaxed text-white placeholder-slate-600 outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/30"
+                              />
+                              {s7Pegado.trim() !== '' && !s7Importando && (
+                                <button
+                                  type="button"
+                                  onClick={() => void importarFuentesTia(s7Pegado)}
+                                  className="mt-1.5 w-full rounded-xl border border-white/10 bg-siemens/20 py-2 text-xs font-medium text-white transition hover:bg-siemens/30"
+                                >
+                                  {t('login.s7PasteRead')}
+                                </button>
+                              )}
+                              {s7Importando && (
+                                <p className="mt-1.5 flex items-center gap-2 text-[11px] text-slate-400">
+                                  <motion.span
+                                    className="h-3.5 w-3.5 rounded-full border-2 border-white/40 border-t-white"
+                                    animate={{ rotate: 360 }}
+                                    transition={{ repeat: Infinity, duration: 0.7, ease: 'linear' }}
+                                  />
+                                  {t('login.s7Importing')}
+                                </p>
+                              )}
+
+                              {/* Camino secundario: ficheros .db exportados. */}
+                              <input
+                                ref={s7FicherosRef}
+                                type="file"
+                                multiple
+                                accept=".db,.udt,.scl,.txt,.awl"
+                                className="hidden"
+                                onChange={(e) => e.target.files && void importarFuentesTia(e.target.files)}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => s7FicherosRef.current?.click()}
+                                onDragOver={(e) => { e.preventDefault(); setS7Arrastrando(true); }}
+                                onDragLeave={() => setS7Arrastrando(false)}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  setS7Arrastrando(false);
+                                  void importarFuentesTia(e.dataTransfer.files);
+                                }}
+                                disabled={s7Importando}
+                                className={`mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed px-3 py-2 text-center text-[11px] transition ${
+                                  s7Arrastrando
+                                    ? 'border-siemens bg-siemens/15 text-white'
+                                    : 'border-white/15 text-slate-500 hover:border-siemens/60 hover:text-slate-300'
+                                } disabled:opacity-50`}
+                              >
+                                <UploadIcon className="h-3.5 w-3.5" />
+                                {t('login.s7ImportDrop')}
+                              </button>
+                              <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
+                                {t('login.s7ImportHow')}
+                              </p>
+
+                              {s7Bloques.length > 0 && (
+                                <div className="mt-3 space-y-2">
+                                  {s7Bloques.map((b) => (
+                                    <BloqueTiaCard
+                                      key={b.nombre}
+                                      bloque={b}
+                                      t={t}
+                                      onDb={(db) =>
+                                        setS7Bloques((prev) =>
+                                          prev.map((x) => (x.nombre === b.nombre ? { ...x, db } : x)),
+                                        )
+                                      }
+                                      onToggle={(nombreTag, marcado) =>
+                                        setS7Bloques((prev) =>
+                                          prev.map((x) =>
+                                            x.nombre !== b.nombre
+                                              ? x
+                                              : {
+                                                  ...x,
+                                                  tags: x.tags.map((tg) =>
+                                                    nombreTag === '*' || tg.nombre === nombreTag
+                                                      ? { ...tg, marcado }
+                                                      : tg,
+                                                  ),
+                                                },
+                                          ),
+                                        )
+                                      }
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+
+                {/* Allen-Bradley: slot + identificar. Sin usuario ni contraseña:
+                    EtherNet/IP no autentica. */}
+                {isAllenBradley && (
+                  <>
+                    <div>
+                      <ModalInput
+                        label={t('login.slot')}
+                        value={slot}
+                        onChange={(v) => setSlot(v.replace(/[^0-9]/g, ''))}
+                        placeholder="0"
+                      />
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        {t('login.slotHint')}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={identificarAb}
+                      disabled={searching || newIp.trim() === ''}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-siemens/20 py-2.5 text-sm font-medium text-white transition hover:bg-siemens/30 disabled:opacity-40"
+                    >
+                      {searching ? (
+                        <>
+                          <motion.span
+                            className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white"
+                            animate={{ rotate: 360 }}
+                            transition={{ repeat: Infinity, duration: 0.7, ease: 'linear' }}
+                          />
+                          {t('login.identifying')}
+                        </>
+                      ) : (
+                        <>
+                          <SearchIcon className="h-4 w-4" />
+                          {t('login.identify')}
+                        </>
+                      )}
+                    </button>
+                    {modalHint && (
+                      <p className="text-[11px] text-emerald-400/90">{modalHint}</p>
+                    )}
+                  </>
+                )}
 
                 {/* Credenciales Rexroth */}
                 {isRexroth && (
@@ -1548,6 +2070,132 @@ export function Configuracion() {
 // =========================================================================
 // Componentes auxiliares del modal
 // =========================================================================
+// ─── Bloque importado de TIA (S7comm) ───────────────────────────
+interface TagTia {
+  nombre: string;
+  offset: number;
+  bit: number;
+  tipo: string;
+  longitud: number;
+  marcado: boolean;
+}
+
+interface BloqueTia {
+  nombre: string;
+  clase: string;
+  optimizado: boolean;
+  tamano: number;
+  db: number | null;
+  dbComo: string;
+  avisos: string[];
+  tags: TagTia[];
+}
+
+/**
+ * Un DB leído de las fuentes de TIA: su número (deducido, editable), sus
+ * variables con casilla y sus avisos. Un DB optimizado sale marcado en
+ * ámbar y no se agrega: S7comm no lo puede leer.
+ */
+function BloqueTiaCard({
+  bloque,
+  onDb,
+  onToggle,
+  t,
+}: {
+  bloque: BloqueTia;
+  onDb: (db: number | null) => void;
+  onToggle: (nombreTag: string, marcado: boolean) => void;
+  t: (k: string) => string;
+}) {
+  const marcados = bloque.tags.filter((x) => x.marcado).length;
+  const todos = marcados === bloque.tags.length;
+  const direccion = (x: TagTia) =>
+    x.tipo === 'BOOL' ? `${x.offset}.${x.bit}` : `${x.offset}`;
+  return (
+    <div
+      className={`rounded-xl border p-3 ${
+        bloque.optimizado
+          ? 'border-amber-500/40 bg-amber-500/5'
+          : 'border-white/10 bg-navy/40'
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] font-semibold text-white">
+          {bloque.nombre}
+        </span>
+        <span className="shrink-0 text-[10.5px] text-slate-500">
+          {bloque.tamano} B
+          {bloque.dbComo && !bloque.optimizado ? ` · DB por ${bloque.dbComo}` : ''}
+        </span>
+        <label className="flex shrink-0 items-center gap-1 text-[11px] text-slate-400">
+          {t('login.s7DbNumber')}
+          <input
+            type="text"
+            inputMode="numeric"
+            value={bloque.db ?? ''}
+            placeholder="?"
+            onChange={(e) => {
+              const v = e.target.value.replace(/[^0-9]/g, '');
+              onDb(v === '' ? null : Number(v));
+            }}
+            className={`w-14 rounded-lg border bg-navy/60 px-2 py-1 text-center font-mono text-[12px] text-white outline-none focus:border-siemens ${
+              bloque.db === null ? 'border-state-error/60' : 'border-white/10'
+            }`}
+          />
+        </label>
+      </div>
+
+      {bloque.avisos.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {bloque.avisos.map((a, i) => (
+            <p key={i} className="flex items-start gap-1.5 text-[11px] leading-relaxed text-amber-300/90">
+              <AlertTriangleIcon className="mt-0.5 h-3 w-3 shrink-0" />
+              <span>{a}</span>
+            </p>
+          ))}
+        </div>
+      )}
+
+      {!bloque.optimizado && bloque.tags.length > 0 && (
+        <>
+          <div className="mt-2 flex items-center justify-between text-[10.5px] text-slate-500">
+            <span>{marcados}/{bloque.tags.length}</span>
+            <button
+              type="button"
+              onClick={() => onToggle('*', !todos)}
+              className="hover:text-slate-300"
+            >
+              {todos ? 'Quitar todas' : 'Marcar todas'}
+            </button>
+          </div>
+          <div className="mp-scroll mp-scroll-dark mt-1 max-h-40 overflow-y-auto rounded-lg border border-white/5">
+            {bloque.tags.map((x) => (
+              <label
+                key={x.nombre}
+                className="flex cursor-pointer items-center gap-2 border-b border-white/5 px-2 py-1 text-[11.5px] last:border-b-0 hover:bg-white/5"
+              >
+                <input
+                  type="checkbox"
+                  checked={x.marcado}
+                  onChange={(e) => onToggle(x.nombre, e.target.checked)}
+                  className="h-3.5 w-3.5 accent-siemens"
+                />
+                <span className="min-w-0 flex-1 truncate font-mono text-slate-200">{x.nombre}</span>
+                <span className="shrink-0 font-mono text-[10.5px] text-slate-500">
+                  {x.tipo === 'STRING' ? `STRING[${x.longitud}]` : x.tipo}
+                </span>
+                <span className="w-12 shrink-0 text-right font-mono text-[10.5px] tabular-nums text-slate-500">
+                  {direccion(x)}
+                </span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function ModalInput({
   label,
   value,

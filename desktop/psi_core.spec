@@ -71,6 +71,13 @@ a = Analysis(
         "uvicorn.protocols.http.auto",
         "uvicorn.protocols.websockets.auto",
         "uvicorn.lifespan.on",
+        # Drivers que se importan DENTRO de una función (solo cuando hay un
+        # PLC de esa marca), así que el análisis estático no los ve.
+        "app.drivers.ethernetip_driver",
+        "app.drivers.ctrlx_datalayer_driver",
+        "pycomm3",
+        "app.drivers.s7comm_driver",
+        "snap7",
         # ---------------------------------------------------------------- #
         #  python-multipart: el que rompe el arranque entero si falta
         # ---------------------------------------------------------------- #

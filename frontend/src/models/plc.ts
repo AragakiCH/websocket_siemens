@@ -5,10 +5,19 @@ export type DataType = 'bool' | 'int' | 'double' | 'string';
 /**
  * Marca del PLC. Determina qué driver usa el backend:
  *  - 'siemens': S7-1500 por OPC UA anónimo, tags bajo DataBlocksGlobal.
- *  - 'rexroth': ctrlX CORE, requiere usuario/contraseña y elegir el programa
- *               dentro de Datalayer/plc/app/<app>/sym/<programa>.
+ *  - 'rexroth': ctrlX CORE por el Data Layer (HTTPS), requiere
+ *               usuario/contraseña y elegir el programa.
+ *  - 'allenbradley': Logix (ControlLogix/CompactLogix/Micro800) por
+ *               EtherNet/IP. Sin credenciales: solo IP y slot del procesador.
  */
-export type PlcVendor = 'siemens' | 'rexroth';
+export type PlcVendor = 'siemens' | 'rexroth' | 'allenbradley';
+
+/** Etiqueta legible de cada marca, para listas y cabeceras. */
+export const VENDOR_LABEL: Record<string, string> = {
+  siemens: 'Siemens S7',
+  rexroth: 'Bosch Rexroth ctrlX',
+  allenbradley: 'Allen-Bradley Logix',
+};
 
 /** Datos que la vista de Login envía al backend para dar de alta un PLC. */
 export interface PlcConnection {
@@ -20,13 +29,19 @@ export interface PlcConnection {
   password?: string;
   app?: string;
   programa?: string;
+  // Solo Allen-Bradley: slot del procesador en el chasis (0 en CompactLogix).
+  slot?: number;
 }
 
 export interface PlcVariable {
   id: string;
   name: string;
   type: DataType;
-  value: boolean | number | string;
+  /**
+   * Escalar en el caso normal. Un `Array[1..n] of X` del PLC llega como
+   * lista (con `type` = el del elemento) y un UDT decodificado como objeto.
+   */
+  value: boolean | number | string | unknown[] | Record<string, unknown>;
   unit?: string;
   selected: boolean;
 }

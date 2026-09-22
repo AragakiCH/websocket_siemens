@@ -80,6 +80,7 @@ class SubscriptionHandler:
         self._supervisor_task: Optional[asyncio.Task] = None
         # Estado de conexión legible para /health.
         self.estado_conexion: str = "desconectado"
+        self.ultimo_error: str = ""
 
         # Vigilancia de que la subscription ENTREGA. `time.monotonic()` del
         # último cambio que llegó por la subscription (no cuenta lo que
@@ -223,6 +224,11 @@ class SubscriptionHandler:
             "num_tags": len(self._tags),
             # Solo Rexroth: 'subscription' o 'polling' (el driver decide solo).
             "modo_lectura": getattr(self._driver, "modo_lectura", "subscription"),
+            # Modelo de la CPU, si el driver lo pudo leer ("CPU 1214C DC/DC/Rly",
+            # "1769-L33ER"). Es lo que evita llamar "S7-1500" a un 1200.
+            "modelo": getattr(self._driver, "modelo", "") or "",
+            # Último fallo de conexión, para que "Desconectado" diga POR QUÉ.
+            "ultimo_error": self.ultimo_error,
             # Intervalos configurados: cada cuánto se muestrea y se publica.
             "sampling_interval_ms": self._settings.sampling_interval_ms,
             "publishing_interval_ms": self._settings.publishing_interval_ms,
@@ -310,6 +316,7 @@ class SubscriptionHandler:
                 # Conexión OK: reiniciar el backoff y pasar a vigilancia.
                 delay = self._settings.reconnect_initial_delay
                 self.estado_conexion = "conectado"
+                self.ultimo_error = ""
                 self._log(logging.INFO, "PLC conectado y suscripciones activas.")
 
                 # Watchdog: comprobar periódicamente que la sesión sigue viva.
@@ -319,6 +326,7 @@ class SubscriptionHandler:
                 raise
             except Exception as exc:  # noqa: BLE001
                 self.estado_conexion = "reconectando"
+                self.ultimo_error = f"{type(exc).__name__}: {exc}"[:400]
                 self._log(logging.ERROR, "Fallo de conexión con el PLC: %s", exc)
 
             if not self._running:

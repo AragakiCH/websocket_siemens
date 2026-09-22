@@ -41,7 +41,8 @@ logger = logging.getLogger("plc_store")
 # recargar: un PLC que sobrevive a un reinicio es, por definición, uno que
 # alguien eligió conservar.
 CAMPOS = ("endpoint", "host", "port", "nombre", "vendor",
-          "usuario", "password", "app", "programa")
+          "usuario", "password", "app", "programa", "slot",
+          "rack", "transporte", "s7_tags")
 
 
 class PlcStore:
@@ -108,6 +109,10 @@ class PlcStore:
                     password=self.descifrar(d.get("password", "")),
                     app=d.get("app", ""),
                     programa=d.get("programa", ""),
+                    slot=int(d.get("slot") or 0),
+                    rack=int(d.get("rack") or 0),
+                    transporte=d.get("transporte", "") or "",
+                    s7_tags=d.get("s7_tags", "") or "",
                 ))
             except Exception as exc:  # noqa: BLE001
                 # Una entrada mala no invalida las demás.
