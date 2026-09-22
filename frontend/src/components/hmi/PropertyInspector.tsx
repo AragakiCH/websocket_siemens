@@ -1016,7 +1016,22 @@ export function PropertyInspector({
           widget={widget}
           config={widget.config ?? {}}
           paramsPantalla={paramsFaceplate}
-          setConfig={(config) => onChange({ config })} />
+          /* MEZCLA, no reemplaza.
+           *
+           * Reemplazaba, y eso obligaba a que cada panel esparciera la config
+           * ENTERA en cada cambio. Veinticuatro sitios lo hacen esparciendo su
+           * `cfg` —la config ya interpretada, con solo los campos que ese
+           * widget conoce—, así que cualquier campo COMPARTIDO desaparecía al
+           * tocar cualquier opción: escribir la unidad de un «Valor con
+           * Unidad» le borraba su modo de escritura. Pasó de verdad.
+           *
+           * Mezclando, un panel manda solo lo que cambia y lo demás se queda.
+           * Los veinticuatro siguen funcionando igual —esparcir de más sobre
+           * la misma config no cambia nada— y el que quiera borrar un campo lo
+           * manda como `undefined`, que es lo que ya hacía el desplegable de
+           * modo con el `modo` viejo. */
+          setConfig={(parche) =>
+          onChange({ config: { ...(widget.config ?? {}), ...parche } })} />
       </Section>
       }
 

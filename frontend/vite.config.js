@@ -41,6 +41,10 @@ export default defineConfig({
       // /categorias no sale de Vite: responde el index.html de la SPA y la
       // barra de widgets se queda con las cuatro de fábrica sin decir por qué.
       '/categorias': BACKEND,
+      // Los grupos de la barra de pestañas. Mismo motivo: sin esta línea
+      // el GET /grupos recibe el index.html de la SPA, el JSON.parse
+      // revienta y la barra se queda sin grupos sin decir por qué.
+      '/grupos': BACKEND,
       // Paleta y tipografías (el Gestor de Temas). SIN esta línea el GET
       // /temas no sale de Vite: el servidor de desarrollo responde el
       // index.html de la aplicación, así que el fetch recibe HTML donde

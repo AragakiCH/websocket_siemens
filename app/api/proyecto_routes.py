@@ -332,6 +332,14 @@ async def borrar_proyecto(
     except Exception:  # noqa: BLE001
         logger.warning('No se pudieron borrar las categorías de %s.', pid)
 
+    # Y sus grupos de pestañas, por el mismo motivo y con la misma red.
+    try:
+        grupos = getattr(request.app.state, 'grupos_store', None)
+        if grupos is not None:
+            grupos.olvidar_proyecto(pid)
+    except Exception:  # noqa: BLE001
+        logger.warning('No se pudieron borrar los grupos de %s.', pid)
+
     _auditar(request, "proyecto.borrado", sesion, pid,
              {"pantallas": borradas})
     await _difundir(request, "proyecto.removed", pid, usuario_de(sesion),
