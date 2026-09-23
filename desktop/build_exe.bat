@@ -41,6 +41,29 @@ if errorlevel 1 (
     echo.
 )
 
+REM  ── Drivers de PLC: aqui SI se aborta ─────────────────────────────────
+REM
+REM  pycomm3   Allen-Bradley por EtherNet/IP.
+REM  snap7     Siemens por S7comm (S7-1200 sin OPC UA, S7-300/400).
+REM
+REM  Un driver que se importa DENTRO de una funcion (solo cuando hay un PLC
+REM  de esa marca) esta en `hiddenimports` del .spec, pero eso solo sirve si
+REM  el paquete EXISTE en el venv que compila: PyInstaller no puede meter lo
+REM  que no encuentra. Si falta, deja una linea en
+REM  build\psi_core\warn-psi_core.txt ("missing module named pycomm3") y
+REM  genera el .exe igual. El resultado fue este: la ventana ofrece
+REM  Allen-Bradley, se pulsa Identificar y sale
+REM  "ModuleNotFoundError: No module named 'pycomm3'". Un .exe que anuncia
+REM  una marca y no puede hablar con ella no vale la pena generarlo.
+python -c "import importlib.util,sys; f=[m for m in ('pycomm3','snap7') if importlib.util.find_spec(m) is None]; sys.exit(0) if not f else (print('   *** FALTAN los drivers de PLC en este venv: '+', '.join(f)), sys.exit(1))"
+if errorlevel 1 (
+    echo    *** SE ABORTA: el .exe saldria sin poder conectar con esa marca de PLC.
+    echo    *** Instalalos en ESTE venv y vuelve a ejecutar:
+    echo    ***     pip install -r requirements-desktop.txt
+    echo.
+    goto :error
+)
+
 echo [2/5] Compilando el frontend React...
 REM  El 'set' de abajo NO puede ir dentro de un bloque entre parentesis:
 REM  cmd.exe expande %errorlevel% al PARSEAR el bloque entero, no al ejecutar

@@ -133,8 +133,34 @@ def _tipo_iec(tipo_logix: str) -> str:
 # ====================================================================== #
 # Exploración previa (sin driver): ¿responde? ¿qué es?
 # ====================================================================== #
+def _cargar_logix():
+    """
+    Importa `LogixDriver` de pycomm3 —solo cuando hay un PLC Allen-Bradley—
+    y, si el paquete no está, lo dice con nombre y apellidos.
+
+    El error crudo (`ModuleNotFoundError: No module named 'pycomm3'`) es lo
+    que se vio en la ventana de escritorio: el .exe se había generado desde
+    un venv sin pycomm3 instalado, y PyInstaller no puede empaquetar lo que
+    no encuentra (deja un aviso en build/psi_core/warn-psi_core.txt y sigue).
+    Con este mensaje quien lo lee sabe que NO es la red ni el PLC, sino la
+    instalación, y qué hacer.
+    """
+    try:
+        from pycomm3 import LogixDriver
+    except ImportError as exc:
+        raise RuntimeError(
+            "Esta instalación no incluye el cliente EtherNet/IP (paquete "
+            "'pycomm3'), así que no puede hablar con PLCs Allen-Bradley. "
+            "En desarrollo: pip install -r requirements.txt. En el .exe: "
+            "instalar pycomm3 en el venv con el que se compila "
+            "(pip install -r requirements-desktop.txt) y volver a generar "
+            "con desktop\\build_exe.bat."
+        ) from exc
+    return LogixDriver
+
+
 def _identificar_sync(host: str, slot: int, timeout: float) -> dict:
-    from pycomm3 import LogixDriver  # import local: solo con PLCs AB
+    LogixDriver = _cargar_logix()  # import local: solo con PLCs AB
     ruta = f"{host}/{slot}"
     plc = LogixDriver(ruta, init_tags=False, init_program_tags=False)
     plc.socket_timeout = timeout
@@ -161,9 +187,18 @@ async def identificar(host: str, slot: int = 0, timeout: float = 5.0) -> dict:
 
 
 async def probar(host: str, slot: int = 0, timeout: float = 5.0) -> Tuple[str, dict]:
-    """('OK' | 'DOWN', info). No hay AUTH_INVALID: CIP no autentica."""
+    """
+    ('OK' | 'DOWN' | 'SIN_DRIVER', info). No hay AUTH_INVALID: CIP no
+    autentica. `SIN_DRIVER` es "falta pycomm3 en esta instalación": no es un
+    problema de red y no hay IP ni slot que revisar, así que se distingue
+    para que la vista no mande a mirar el cable.
+    """
     try:
         return "OK", await identificar(host, slot, timeout)
+    except RuntimeError as exc:
+        if "pycomm3" in str(exc):
+            return "SIN_DRIVER", {"error": str(exc)}
+        return "DOWN", {"error": f"{type(exc).__name__}: {exc}"}
     except Exception as exc:  # noqa: BLE001
         return "DOWN", {"error": f"{type(exc).__name__}: {exc}"}
 
@@ -218,13 +253,7 @@ class EthernetIpDriver(PlcDriver):
     # Conexión
     # ================================================================== #
     async def connect(self) -> None:
-        try:
-            from pycomm3 import LogixDriver
-        except ImportError as exc:
-            raise RuntimeError(
-                "Falta el paquete 'pycomm3' (pip install pycomm3). Es el "
-                "cliente EtherNet/IP para PLCs Allen-Bradley."
-            ) from exc
+        LogixDriver = _cargar_logix()
 
         timeout = float(getattr(self._settings, "ab_connect_timeout", 5.0))
         ruta = self._ruta_cip()

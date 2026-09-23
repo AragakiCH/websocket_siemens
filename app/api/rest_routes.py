@@ -559,6 +559,11 @@ async def allenbradley_identificar(cuerpo: SondeoAllenBradley) -> dict:
     estado, info = await probar(
         host, cuerpo.slot,
         float(getattr(get_settings(), "ab_connect_timeout", 5.0)))
+    if estado == "SIN_DRIVER":
+        # Falta pycomm3 en ESTA instalación (típico: .exe generado desde un
+        # venv sin el paquete). Decir "revisa la IP" aquí mandaría a buscar
+        # el fallo donde no está.
+        raise HTTPException(500, info.get("error", "Falta el paquete pycomm3."))
     if estado != "OK":
         raise HTTPException(
             502,
