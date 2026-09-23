@@ -361,6 +361,23 @@ async def descargar_grabacion(request: Request, grabacion_id: str):
 # ====================================================================== #
 # Exportación desde la base de datos
 # ====================================================================== #
+def _texto_filtro(tags_filtrados: Optional[List[str]],
+                  tag: Optional[str]) -> str:
+    """
+    Cómo se cuenta en la hoja «Información» por qué variables se filtró.
+
+    Con muchas no se listan todas: la celda se volvería ilegible y el dato
+    que importa —cuántas y cuáles son las primeras— se pierde dentro. Las
+    columnas de la hoja «Datos» dicen el resto.
+    """
+    lista = list(tags_filtrados or ([tag] if tag else []))
+    if not lista:
+        return "Todos los del grupo"
+    if len(lista) <= 6:
+        return ", ".join(lista)
+    return f"{len(lista)} variables: " + ", ".join(lista[:6]) + ", …"
+
+
 @router.get(
     "/export/historico/excel",
     tags=TAG,
@@ -390,6 +407,21 @@ async def descargar_historico(
         description="Filtrar por un tag concreto, sin el prefijo del PLC. "
                     "Ej: `DB_snap7.temperatura`. Vacío = todos los del grupo.",
     ),
+    tags: Optional[List[str]] = Query(
+        default=None,
+        description="VARIOS tags, repitiendo el parámetro: "
+                    "`?tags=DB.temp&tags=DB.presion`. Sin el prefijo del PLC, "
+                    "igual que `tag`.\n\n"
+                    "Es lo que usa el botón de exportar del **widget de "
+                    "tendencia**, que necesita justo las series que dibuja: "
+                    "con `tag` solo cabía una, y sin filtro salían todos los "
+                    "del grupo — y un gráfico de tres líneas devolvía un Excel "
+                    "de veinte columnas.\n\n"
+                    "Se puede combinar con `tag`: se unen sin repetir. Tope de "
+                    "200; por encima se usan los primeros y se avisa en la "
+                    "hoja «Información».",
+        examples=[["DB_snap7.temperatura", "DB_snap7.presion"]],
+    ),
     desde: Optional[str] = Query(
         default=None,
         description="Fecha/hora inicial en ISO 8601. Ej: `2026-07-30T00:00:00`.",
@@ -402,7 +434,8 @@ async def descargar_historico(
     ),
 ):
     historizador = request.app.state.historizador
-    resultado = await historizador.leer(grupo_id, tag, desde, hasta, limite)
+    resultado = await historizador.leer(
+        grupo_id, tag, desde, hasta, limite, tags=tags)
 
     if not resultado.get("ok"):
         import json
@@ -423,12 +456,16 @@ async def descargar_historico(
             ("Origen", "Base de datos (historizador)"),
             ("Grupo", grupo_id),
             ("Tabla", resultado.get("tabla", "")),
-            ("Filtro de tag", tag or "Todos"),
+            # Los tags REALES que entraron en el WHERE, no lo que se pidió:
+            # si llegaron repetidos, vacíos o de más, aquí se ve lo que de
+            # verdad se consultó. Abrir un Excel y no saber qué variables
+            # trae —ni por qué falta una— es lo que esto evita.
+            ("Filtro de tag", _texto_filtro(resultado.get("tags_filtrados"), tag)),
             ("Desde", desde or "Sin límite"),
             ("Hasta", hasta or "Sin límite"),
             ("Registros leídos", resultado.get("num_filas", len(filas))),
             ("Recortado por el límite", "Sí" if resultado.get("truncado") else "No"),
-        ],
+        ] + ([("Aviso", resultado["aviso"])] if resultado.get("aviso") else []),
     )
     return _respuesta_excel(datos, nombre_archivo(f"historico_{grupo_id}"))
 

@@ -52,6 +52,7 @@ import {
   ChevronDownIcon,
 } from 'lucide-react';
 import { useAppStore } from '../../context/AppStore';
+import { useAutoScrollArrastre } from '../../hooks/useAutoScrollArrastre';
 import {
   crearPantalla,
   duplicarPantalla,
@@ -96,19 +97,6 @@ const TIPO_PANTALLA = 'psi-pantalla';
 /** Alto máximo del desplegable de un grupo. Por encima, scroll. */
 const ALTO_DESPLEGABLE = 'max-h-[280px]';
 
-/**
- * Franja de los bordes de la barra que, al arrastrar sobre ella, la desplaza.
- *
- * Existe porque el arrastre nativo del navegador NO desplaza contenedores por
- * su cuenta: sin esto, una pestaña del final de la barra no se puede llevar a
- * un grupo del principio — no hay forma de llegar, el ratón se sale por el
- * borde y el arrastre se cancela.
- */
-const BORDE_AUTOSCROLL = 84;
-
-/** Píxeles por fotograma pegado al borde. A 60 fps son ~1080 px/s. */
-const VELOCIDAD_AUTOSCROLL = 18;
-
 export function PantallasBar({ puedeEditar }: Props) {
   const {
     t,
@@ -132,10 +120,11 @@ export function PantallasBar({ puedeEditar }: Props) {
   const ficheroRef = useRef<HTMLInputElement>(null);
   const [renombrando, setRenombrando] = useState<string | null>(null);
   const [borrar, setBorrar] = useState<{ id: string; nombre: string } | null>(null);
-  const barraRef = useRef<HTMLDivElement>(null);
-  /** Píxeles por fotograma del auto-desplazamiento. 0 = parado. */
-  const velocidadRef = useRef(0);
-  const marcoRef = useRef<number | null>(null);
+  // Arrastrar una pestaña contra un borde desplaza la barra. La lógica vive
+  // en `hooks/useAutoScrollArrastre.ts`, compartida con el catálogo de
+  // widgets, que hace lo mismo en vertical.
+  const autoScroll = useAutoScrollArrastre<HTMLDivElement>('x');
+  const barraRef = autoScroll.ref;
 
   // `permisos === null` significa que el backend corre sin identidad
   // (`auth_requerida=false`): ahí todo el mundo puede todo, que es el
@@ -569,72 +558,6 @@ export function PantallasBar({ puedeEditar }: Props) {
     setMenuNueva(true);
   };
 
-  // ── Arrastrar hasta el otro extremo de la barra ────────────────
-  //
-  // El bucle vive en un `requestAnimationFrame` y no en el propio `dragover`:
-  // el navegador solo dispara `dragover` cuando el ratón SE MUEVE, así que
-  // dejar el puntero quieto contra el borde —que es justo lo que uno hace
-  // mientras espera a que llegue el grupo del principio— no desplazaría nada.
-
-  const detenerDesplazamiento = useCallback(() => {
-    velocidadRef.current = 0;
-    if (marcoRef.current !== null) {
-      cancelAnimationFrame(marcoRef.current);
-      marcoRef.current = null;
-    }
-  }, []);
-
-  const desplazar = useCallback(() => {
-    const barra = barraRef.current;
-    if (!barra || velocidadRef.current === 0) {
-      marcoRef.current = null;
-      return;
-    }
-    const antes = barra.scrollLeft;
-    barra.scrollLeft = antes + velocidadRef.current;
-    // Tope alcanzado: se para el bucle en vez de gastar un fotograma por
-    // frame contra una pared.
-    if (barra.scrollLeft === antes) {
-      marcoRef.current = null;
-      velocidadRef.current = 0;
-      return;
-    }
-    marcoRef.current = requestAnimationFrame(desplazar);
-  }, []);
-
-  /**
-   * Mira dónde está el puntero y decide si hay que desplazar.
-   *
-   * La velocidad sube con lo cerca que esté del borde: rozando la franja se
-   * mueve despacio (se puede soltar con precisión) y pegado al canto va
-   * rápido (se cruza la barra entera sin esperar).
-   */
-  const vigilarBordes = useCallback((e: React.DragEvent) => {
-    const barra = barraRef.current;
-    if (!barra) return;
-    const caja = barra.getBoundingClientRect();
-    const izquierda = e.clientX - caja.left;
-    const derecha = caja.right - e.clientX;
-
-    let v = 0;
-    if (izquierda < BORDE_AUTOSCROLL) {
-      v = -Math.ceil(((BORDE_AUTOSCROLL - izquierda) / BORDE_AUTOSCROLL) * VELOCIDAD_AUTOSCROLL);
-    } else if (derecha < BORDE_AUTOSCROLL) {
-      v = Math.ceil(((BORDE_AUTOSCROLL - derecha) / BORDE_AUTOSCROLL) * VELOCIDAD_AUTOSCROLL);
-    }
-
-    velocidadRef.current = v;
-    if (v !== 0 && marcoRef.current === null) {
-      marcoRef.current = requestAnimationFrame(desplazar);
-    } else if (v === 0) {
-      detenerDesplazamiento();
-    }
-  }, [desplazar, detenerDesplazamiento]);
-
-  // Si el componente se va con un arrastre a medias, el bucle se quedaría
-  // corriendo contra un nodo que ya no existe.
-  useEffect(() => detenerDesplazamiento, [detenerDesplazamiento]);
-
   /**
    * Vuelve a medir dónde cuelga el desplegable abierto.
    *
@@ -709,7 +632,7 @@ export function PantallasBar({ puedeEditar }: Props) {
         onDragEnd={() => {
           setArrastrando(null);
           setSobre(null);
-          detenerDesplazamiento();
+          autoScroll.detener();
         }}
         className={`group flex shrink-0 items-center rounded-lg border transition-colors ${
           enPanel ? 'w-full' : ''
@@ -831,12 +754,12 @@ export function PantallasBar({ puedeEditar }: Props) {
           onScroll={reanclar}
           // Arrastrar contra un borde desplaza la barra. Va en la TIRA y no en
           // cada zona: así funciona también sobre los huecos entre pestañas.
-          onDragOver={vigilarBordes}
+          onDragOver={autoScroll.vigilarBordes}
           onDragLeave={(e) => {
             if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-            detenerDesplazamiento();
+            autoScroll.detener();
           }}
-          onDrop={detenerDesplazamiento}
+          onDrop={autoScroll.detener}
         >
           {/* ── Fichas de grupo ──────────────────────────────
               Van SIEMPRE antes que las pantallas sueltas. Si cada ficha

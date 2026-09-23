@@ -14,7 +14,8 @@ import {
   ThemeMode,
   Language,
   PlcConnection,
-  PlcVendor } from
+  PlcVendor,
+  InfoPlc } from
 '../models/plc';
 import { HmiWidget, WidgetKind, BuiltInWidgetKind } from '../models/widget';
 import { RealPLCService as MockPLCService } from '../services/RealPLCService';
@@ -58,6 +59,15 @@ interface AppStore {
   disconnect: () => void;
   // variables
   variables: PlcVariable[];
+  /**
+   * Quién es cada PLC conectado, por `plc_id`: marca, nombre y estado.
+   *
+   * Llega en el snapshot del WebSocket, en el mismo mensaje que los valores.
+   * Lo usan las listas de variables para poder decir de qué autómata sale
+   * cada tag — el `plc_id` ya estaba dentro del id de la variable, pero la
+   * MARCA no estaba en ninguna parte del cliente.
+   */
+  plcs: Record<string, InfoPlc>;
   selectedVariables: PlcVariable[];
   toggleVariable: (id: string, selected: boolean) => void;
   // config
@@ -192,6 +202,12 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   // al login durante el instante en que `sesion` todavía es null.
   const [comprobandoSesion, setComprobandoSesion] = useState(true);
   const [presentes, setPresentes] = useState<{usuario: string;categoria: string;}[]>([]);
+  // Arranca con lo que el servicio ya tenga: este contexto puede montarse
+  // DESPUÉS de que el WebSocket haya recibido su primer snapshot (al navegar
+  // entre páginas), y entonces el evento ya pasó y no volvería a dispararse.
+  const [plcs, setPlcs] = useState<Record<string, InfoPlc>>(
+    () => MockPLCService.getPlcs()
+  );
   // El último proyecto y la última pantalla se recuerdan por navegador: al
   // recargar vuelves a donde estabas, no al principio. La pantalla se guarda
   // POR PROYECTO, porque si no, volver al proyecto A te dejaría en una
@@ -223,6 +239,18 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   useEffect(() => {
     MockPLCService.setRate(config.updateRate);
   }, [config.updateRate]);
+  // Quién es cada PLC. Lo emite `RealPLCService` al llegar cada snapshot y
+  // cuando un PLC cambia de estado o se quita.
+  useEffect(() => {
+    const alCambiar = (ev: Event) =>
+    setPlcs((ev as CustomEvent).detail ?? {});
+    window.addEventListener('hmi:plcs', alCambiar as EventListener);
+    // Por si el snapshot llegó entre el primer render y este efecto.
+    setPlcs(MockPLCService.getPlcs());
+    return () =>
+    window.removeEventListener('hmi:plcs', alCambiar as EventListener);
+  }, []);
+
   // Keep the OS color-scheme preference live so 'auto' reacts in real time.
   useEffect(() => {
     if (
@@ -673,6 +701,7 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     connect,
     disconnect,
     variables,
+    plcs,
     selectedVariables,
     toggleVariable,
     config,

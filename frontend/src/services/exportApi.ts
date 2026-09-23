@@ -15,9 +15,9 @@
 //   DELETE /export/grabaciones/{id}        -> borrar y liberar memoria
 //   GET    /export/grabaciones/{id}/excel  -> DESCARGAR el .xlsx
 //
-// Los dos que exportan desde la BASE DE DATOS (`/export/historico/excel` y
-// `/export/consultas/{id}/excel`) todavía no se llaman desde aquí: su parte
-// de la vista está montada pero sin conectar.
+// De los dos que exportan desde la BASE DE DATOS, `/export/historico/excel`
+// ya se usa en dos sitios —la pestaña «Exportar» y el botón del widget de
+// tendencia—; `/export/consultas/{id}/excel` sigue sin llamarse desde aquí.
 //
 // POR QUÉ NO REUTILIZA `components/flows/api.ts`
 // Ese `apiGet`/`apiPost` hace exactamente lo que hace falta para JSON, pero
@@ -269,6 +269,18 @@ export interface FiltroHistorico {
   grupoId: string;
   /** Tag SIN el prefijo del PLC. Vacío = todos los del grupo. */
   tag?: string;
+  /**
+   * VARIOS tags, sin el prefijo del PLC.
+   *
+   * Lo usa el botón de exportar del widget de tendencia, que necesita
+   * exactamente las series que dibuja. Con `tag` solo cabía una, y sin filtro
+   * salían todos los del grupo: un gráfico de tres líneas devolvía un Excel
+   * de veinte columnas, y la mitad hablaban de otra cosa.
+   *
+   * Se puede combinar con `tag` —el servidor los une sin repetir—, aunque en
+   * la práctica se manda uno u otro.
+   */
+  tags?: string[];
   /** ISO 8601. Vacío = sin límite por ese lado. */
   desde?: string;
   hasta?: string;
@@ -289,6 +301,15 @@ export interface FiltroHistorico {
 export function descargarExcelHistorico(f: FiltroHistorico): Promise<string> {
   const q = new URLSearchParams({ grupo_id: f.grupoId });
   if (f.tag?.trim()) q.set('tag', f.tag.trim());
+  // `append` y no `set`: FastAPI recibe una lista repitiendo el parámetro
+  // (`?tags=a&tags=b`), y `set` dejaría solo el último. Los vacíos se tiran
+  // aquí para no mandar `tags=` — el backend los descarta igual, pero una URL
+  // con parámetros vacíos es de las cosas que cuesta media hora entender
+  // cuando se mira el log.
+  for (const t of f.tags ?? []) {
+    const limpio = t?.trim();
+    if (limpio) q.append('tags', limpio);
+  }
   if (f.desde?.trim()) q.set('desde', f.desde.trim());
   if (f.hasta?.trim()) q.set('hasta', f.hasta.trim());
   if (f.limite && f.limite > 0) q.set('limite', String(f.limite));

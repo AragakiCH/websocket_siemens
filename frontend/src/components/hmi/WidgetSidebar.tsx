@@ -22,6 +22,7 @@
 // =========================================================================
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAutoScrollArrastre } from '../../hooks/useAutoScrollArrastre';
 import {
   UploadIcon,
   Trash2Icon,
@@ -110,6 +111,18 @@ export function WidgetSidebar() {
   // Qué secciones están plegadas, y cuál se está arrastrando para reordenar.
   const [plegadas, setPlegadas] = useState<Set<string>>(() => new Set());
   const arrastrando = useRef<string | null>(null);
+
+  // ── ARRASTRAR HASTA UNA CATEGORÍA QUE NO SE VE ──
+  //
+  // El catálogo es más alto que el panel: con las cuatro secciones abiertas,
+  // «Datos» queda fuera de pantalla. Y el arrastre nativo del navegador no
+  // desplaza nada por su cuenta, así que llevar un widget de abajo del todo a
+  // «Básicos» era imposible — al llegar al borde el ratón se salía y el
+  // arrastre se cancelaba.
+  //
+  // Es el MISMO hook que usa la barra de pestañas, en el otro eje. Ver
+  // `hooks/useAutoScrollArrastre.ts`.
+  const autoScroll = useAutoScrollArrastre<HTMLElement>('y');
   // Qué categoría se está renombrando, y con qué texto.
   const [editando, setEditando] = useState<string | null>(null);
   const [borrador, setBorrador] = useState('');
@@ -376,7 +389,20 @@ export function WidgetSidebar() {
     'w-full rounded-md border border-siemens/50 bg-white px-2 py-1 text-[11px] text-navy outline-none focus:ring-2 focus:ring-siemens/25 dark:border-siemens/40 dark:bg-navy dark:text-slate-100';
 
   return (
-    <aside className="mp-scroll mp-scroll-dark flex w-60 shrink-0 flex-col overflow-auto border-r border-slate-200 bg-white dark:border-navy-slate dark:bg-navy-soft">
+    <aside
+      ref={autoScroll.ref}
+      // Va en el `aside` y no en cada sección porque es ESTE el que tiene el
+      // scroll (`overflow-auto`). El manejador solo mide dónde está el
+      // puntero; quién acepta el drop lo siguen decidiendo las secciones.
+      //
+      // Sin `onDragLeave`/`onDrop` el bucle seguiría corriendo después de
+      // soltar: `dragover` deja de dispararse, pero el `requestAnimationFrame`
+      // no se entera solo.
+      onDragOver={autoScroll.vigilarBordes}
+      onDragLeave={autoScroll.detener}
+      onDrop={autoScroll.detener}
+      className="mp-scroll mp-scroll-dark flex w-60 shrink-0 flex-col overflow-auto border-r border-slate-200 bg-white dark:border-navy-slate dark:bg-navy-soft"
+    >
       <div className="border-b border-slate-100 px-4 py-3 dark:border-navy-slate">
         <div className="flex items-center justify-between">
           <div>
@@ -537,6 +563,11 @@ export function WidgetSidebar() {
                       onDragEnd={() => {
                         arrastrando.current = null;
                         setEncima(null);
+                        // `dragend` llega también cuando el arrastre se
+                        // CANCELA (Escape, o soltar fuera de la ventana), que
+                        // es justo cuando no hay ningún `drop` que pare el
+                        // bucle.
+                        autoScroll.detener();
                       }}
                       onClick={() => plegar(cat.id)}
                       title="Arrástrala para reordenar · púlsala para plegar"
@@ -602,6 +633,7 @@ export function WidgetSidebar() {
                             w.kind
                           );
                         }}
+                        onDragEnd={() => autoScroll.detener()}
                         whileHover={{ scale: 1.04 }}
                         whileTap={{ scale: 0.96 }}
                         className="group relative flex cursor-grab flex-col items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-center transition hover:border-siemens/40 hover:bg-siemens-50 active:cursor-grabbing dark:border-navy-slate dark:bg-navy dark:hover:border-siemens/50 dark:hover:bg-siemens/10"

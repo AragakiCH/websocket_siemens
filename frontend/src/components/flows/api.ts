@@ -365,6 +365,60 @@ export function detenerGrupo(grupoId: string): Promise<any> {
   return apiPost(`/historian/${encodeURIComponent(grupoId)}/stop`);
 }
 
+// ─── GET /health · quién es cada PLC ───────────────────────────
+//
+// POR QUÉ `/health` Y NO `/plcs`
+// `GET /plcs` suena a lo que hace falta y no lo es: devuelve una lista de
+// IDS pelados (`{"plcs": ["192.168.1.4", …]}`), sin marca ni nada más.
+// El que trae la ficha completa —y con ella el `vendor`— es `/health`, que
+// agrega el `health()` de cada handler.
+//
+// PARA QUÉ
+// `GET /tags` dice de qué `plc_id` es cada tag, pero no de qué MARCA. Y con
+// un Siemens y un ctrlX conectados a la vez, una cabecera que solo pone
+// `192.168.1.4` obliga a acordarse de memoria de cuál es cuál.
+
+/** Una ficha de PLC, tal como la devuelve `GET /health`. */
+export interface PlcRemoto {
+  /** El `plc_id`: la primera mitad de `"<plc>|<tag>"`. */
+  plc: string;
+  nombre: string;
+  /** 'siemens' | 'rexroth' | lo que traiga un driver nuevo. */
+  vendor: string;
+  endpoint: string;
+  conectado: boolean;
+  num_tags: number;
+}
+
+/**
+ * Los PLCs conectados, indexados por su id.
+ *
+ * Si falla se devuelve un mapa VACÍO en vez de propagar: esto solo sirve para
+ * enriquecer una cabecera, y que no se pueda leer la marca no puede impedir
+ * elegir los tags, que es a lo que se vino.
+ */
+export async function cargarPlcs(): Promise<Record<string, PlcRemoto>> {
+  try {
+    const d = await apiGet<{ plcs?: any[] }>('/health');
+    const salida: Record<string, PlcRemoto> = {};
+    for (const p of d?.plcs ?? []) {
+      const id = String(p?.plc ?? '');
+      if (!id) continue;
+      salida[id] = {
+        plc: id,
+        nombre: String(p?.nombre ?? ''),
+        vendor: String(p?.vendor ?? ''),
+        endpoint: String(p?.endpoint ?? ''),
+        conectado: !!p?.conectado,
+        num_tags: Number(p?.num_tags ?? 0),
+      };
+    }
+    return salida;
+  } catch {
+    return {};
+  }
+}
+
 // ─── GET /tags ─────────────────────────────────────────────────
 
 /** Una fila de `GET /tags`. */

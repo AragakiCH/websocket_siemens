@@ -18,7 +18,7 @@
 //  * La selección de variables (checkbox de Configuración) es 100% del
 //    frontend y se persiste en localStorage.
 // =========================================================================
-import { PlcVariable } from '../models/plc';
+import { InfoPlc, PlcVariable, PlcVendor } from '../models/plc';
 import { toPlcVariables } from './plcAdapter';
 import { getToken, tokenParaWs } from './authApi';
 
@@ -30,6 +30,16 @@ type Listener = (vars: PlcVariable[]) => void;
 class RealPLCServiceImpl {
   // Estado crudo recibido del backend: { "plc|tag": {plc, tag, value, type,...} }
   private tags: Record<string, any> = {};
+
+  // QUIÉN es cada PLC: marca, nombre, endpoint y estado.
+  //
+  // Viene en el MISMO snapshot que los tags, en `msg.plcs`, y hasta ahora se
+  // tiraba: la línea de abajo se quedaba solo con `msg.tags`. Por eso las
+  // listas de variables enseñaban `PLC_PRG.rVar1` sin decir de qué autómata
+  // salía, teniendo el dato a mano en cada mensaje.
+  //
+  // No cuesta una petición más ni un byte más de red: ya estaba llegando.
+  private plcs: Record<string, InfoPlc> = {};
   // Selección persistida por el usuario: id -> boolean
   private selection: Map<string, boolean> = this.loadSelection();
 
@@ -172,12 +182,20 @@ class RealPLCServiceImpl {
       if (msg.type === 'snapshot') {
         // Reemplaza todo el estado con lo del snapshot.
         this.tags = msg.tags ?? {};
+        this.fijarPlcs(msg.plcs);
         this.emitNow(); // refresco inmediato al conectar / al agregar PLC
       } else if (msg.type === 'plc_removed') {
         const id = msg.plc_removed;
         this.tags = Object.fromEntries(
           Object.entries(this.tags).filter(([, t]) => t.plc !== id)
         );
+        // Y su ficha: dejarla dejaría una marca colgando de un PLC que ya no
+        // existe, y las listas seguirían ofreciéndolo.
+        if (this.plcs[id]) {
+          const { [id]: _fuera, ...resto } = this.plcs;
+          this.plcs = resto;
+          this.avisarPlcs();
+        }
         this.emitNow();
       } else if (
         msg.type === 'project.updated' ||
@@ -197,7 +215,22 @@ class RealPLCServiceImpl {
         // segundo WebSocket solo para esto.
         window.dispatchEvent(new CustomEvent('hmi:ws', { detail: msg }));
       } else if (msg.type === 'status') {
-        // Estado de conexión de un PLC (no afecta a las variables). Se ignora.
+        // No afecta a las VARIABLES, pero sí a la ficha del PLC: es el aviso
+        // de que se cayó o volvió. Sin esto, la marca seguiría siendo
+        // correcta pero el «conectado» se quedaría clavado en lo que dijera
+        // el último snapshot, que puede ser de hace horas.
+        const ficha = this.plcs[msg.plc];
+        if (ficha && msg.status) {
+          this.plcs = {
+            ...this.plcs,
+            [msg.plc]: {
+              ...ficha,
+              estado: msg.status,
+              conectado: msg.status === 'conectado',
+            },
+          };
+          this.avisarPlcs();
+        }
       } else if (msg.tag) {
         // Cambio de valor de un tag en tiempo real.
         const clave = `${msg.plc}|${msg.tag}`;
@@ -214,6 +247,51 @@ class RealPLCServiceImpl {
     };
 
     ws.onerror = () => ws.close();
+  }
+
+  // ---- Quién es cada PLC ---------------------------------------------- //
+  //
+  // Se avisa por evento del navegador, igual que `hmi:conexion` y por el mismo
+  // motivo: quien lo necesita son componentes de módulos que no importan a
+  // este de vuelta, y un evento no crea esa dependencia.
+
+  /** Ficha de cada PLC conectado, indexada por `plc_id`. */
+  getPlcs(): Record<string, InfoPlc> {
+    return this.plcs;
+  }
+
+  /** La marca de un PLC, o cadena vacía si no se conoce todavía. */
+  vendorDe(plcId: string): string {
+    return this.plcs[plcId]?.vendor ?? '';
+  }
+
+  private fijarPlcs(crudo: any): void {
+    const nuevo: Record<string, InfoPlc> = {};
+    for (const [id, p] of Object.entries<any>(crudo ?? {})) {
+      nuevo[id] = {
+        id,
+        nombre: String(p?.nombre ?? ''),
+        // Se normaliza aquí y no en quien lo lee: un vendor que no
+        // reconozcamos NO se descarta —`etiquetaVendor` lo enseña tal cual—,
+        // porque ver «omron» es más útil que no ver nada el día que se añada
+        // un driver nuevo al backend y aún no esté en el tipo del frontend.
+        vendor: String(p?.vendor ?? '') as PlcVendor,
+        endpoint: String(p?.endpoint ?? ''),
+        estado: String(p?.estado ?? ''),
+        conectado: !!p?.conectado,
+        interno: !!p?.interno,
+      };
+    }
+    this.plcs = nuevo;
+    this.avisarPlcs();
+  }
+
+  private avisarPlcs(): void {
+    try {
+      window.dispatchEvent(new CustomEvent('hmi:plcs', { detail: this.plcs }));
+    } catch {
+      /* sin `window` (pruebas): el mapa ya está al día, que es lo que importa */
+    }
   }
 
   // ---- Throttle de re-render ------------------------------------------ //
