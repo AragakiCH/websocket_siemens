@@ -40,6 +40,7 @@ pueda ignorar su propio eco y no repintar de más.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -64,6 +65,8 @@ from app.api.intercambio import (
 from app.core.auth_manager import Sesion
 from app.db.project_store import ConflictoDeVersion, validar_id
 from app.db.proyecto_store import PROYECTO_POR_DEFECTO as PROYECTO_HMI_POR_DEFECTO
+
+logger = logging.getLogger("project_routes")
 
 router = APIRouter()
 
@@ -590,6 +593,18 @@ async def borrar_pantalla(
         raise HTTPException(400, str(exc))
     if not borrado:
         raise HTTPException(404, f"No existe la pantalla '{project_id}'.")
+
+    # La pantalla ya no está: se la saca también del grupo en el que
+    # estuviera. Sin esto, crear otra pantalla con el mismo id la metería
+    # sola en el grupo de la anterior — que parece magia negra cuando pasa.
+    # En un try aparte a propósito: la pantalla ya se borró, y fallar aquí no
+    # puede convertir un borrado hecho en un error para quien lo pidió.
+    try:
+        grupos = getattr(request.app.state, 'grupos_store', None)
+        if grupos is not None:
+            grupos.olvidar_pantalla(project_id)
+    except Exception:  # noqa: BLE001
+        logger.warning('No se pudo sacar %s de su grupo.', project_id)
 
     _auditar(request, "pantalla.borrada", sesion, project_id)
     await request.app.state.manager.broadcast({

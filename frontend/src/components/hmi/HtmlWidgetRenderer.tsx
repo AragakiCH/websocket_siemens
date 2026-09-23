@@ -39,6 +39,7 @@ import type { PlcVariable } from '../../models/plc';
 import type { ZipWidget } from '../../services/zipWidgetLoader';
 import { formatValue, valueFraction, isTruthy } from '../../utils/format';
 import { escribir, partirId } from '../../services/escrituraApi';
+import { permiteEscritura } from './acciones';
 
 interface Props {
   zipWidget: ZipWidget;
@@ -88,6 +89,15 @@ export function HtmlWidgetRenderer({
   zipWidget, widget, variable, enlaces, style, interactivo = false, onModal,
   onClic, clicable = false,
 }: Props) {
+  // Sólo lectura / Lectura y escritura. Es del widget, no de la acción; se
+  // edita en el panel de Acción y lo comparten todos (ver `acciones.ts`).
+  const escrituraOk = permiteEscritura(widget.config);
+  // La unidad que escribió quien monta la pantalla. El mismo campo que usa
+  // «Valor con Unidad»; aquí sólo se le pasa al widget, que decide si la pinta.
+  const unidad =
+    typeof (widget.config as any)?.unidad === 'string'
+      ? ((widget.config as any).unidad as string)
+      : '';
   const frac = valueFraction(variable);
   const on = isTruthy(variable);
   const label = variable ? formatValue(variable) : widget.text;
@@ -112,9 +122,9 @@ export function HtmlWidgetRenderer({
    * no hace falta—, y con `[]` se quedaría con los valores del primer
    * render. Esta referencia es la que lo mantiene al día.
    */
-  const vivo = useRef({ interactivo, variable, enlaces, widget, onClic });
+  const vivo = useRef({ interactivo, variable, enlaces, widget, onClic, escrituraOk });
   useEffect(() => {
-    vivo.current = { interactivo, variable, enlaces, widget, onClic };
+    vivo.current = { interactivo, variable, enlaces, widget, onClic, escrituraOk };
   });
 
   useEffect(() => {
@@ -137,6 +147,16 @@ export function HtmlWidgetRenderer({
       // orden a una máquina mientras se diseña la pantalla es lo contrario de
       // lo que espera cualquiera.
       if (!ctx.interactivo) return fin(false, 'En el Diseñador no se escribe.');
+
+      // Y el hermano del de arriba: si el widget está en sólo lectura, aquí
+      // se acaba. TIENE que estar en el anfitrión y no dentro del ZIP: allí
+      // sería decoración —el widget puede poner `readOnly` en su campo y
+      // llamar a `escribir()` igual, por descuido o por capricho—. El único
+      // sitio donde el modo se puede hacer cumplir es este, que es por donde
+      // pasan todas las escrituras de todos los ZIP.
+      if (!ctx.escrituraOk) {
+        return fin(false, 'Este widget está en sólo lectura.');
+      }
 
       // Qué tag: el de la variable con nombre que pida, o el principal. Se usa
       // la variable YA RESUELTA para que dentro de un faceplate escriba en el
@@ -344,6 +364,11 @@ window.WIDGET = {
   value: '', on: false, frac: 0, label: '', name: '',
   color: '#009999', bg: 'transparent', borderColor: '#94a3b8',
   fontSize: 14, bold: false, opacity: 1,
+  /* Sólo lectura hasta que el anfitrión diga lo contrario. Un widget que
+     arranca abierto y se cierra un instante después es peor que uno que
+     arranca cerrado: el operario ya pudo teclear. */
+  escritura: false,
+  unidad: '',
   vars: {}
 };
 </script>`;
@@ -526,6 +551,13 @@ ${userScript}
       // y parecería algo que el autor del ZIP puede usar.
       clicable: clicable && interactivo,
       widget: {
+        // DENTRO de `widget`, al revés que `clicable`. Ese se esconde porque
+        // es cosa del puntero y el autor del ZIP no pinta nada con él; éste
+        // es justo lo contrario: el widget TIENE que leerlo para saber si
+        // enseña su campo abierto o bloqueado. En el Diseñador va siempre
+        // false, como el propio cerrojo del anfitrión.
+        escritura: escrituraOk && interactivo,
+        unidad,
         // Las variables con nombre, ya masticadas igual que la principal: el
         // widget no tiene que saber formatear ni normalizar nada.
         vars: Object.fromEntries(
@@ -567,7 +599,7 @@ ${userScript}
   }, [enlaces, rawValue, on, frac, label, widget.name,
       style.color, style.background, style.borderColor,
       style.fontSize, style.bold, style.opacity,
-      clicable, interactivo]);
+      clicable, interactivo, escrituraOk, unidad]);
 
   return (
     <iframe

@@ -11,9 +11,10 @@ import { HmiWidget } from '../../models/widget';
 import {
   permitidosCacheados,
   EVENTO_PERMITIDOS,
+  partirId,
   unirId } from
 '../../services/escrituraApi';
-import { PlcVariable, DataType } from '../../models/plc';
+import { PlcVariable, DataType, etiquetaVendor } from '../../models/plc';
 import {
   leerEnlaces,
   conEnlace,
@@ -524,7 +525,7 @@ export function PropertyInspector({
   onStyleChange,
   onDelete
 }: Props) {
-  const { t, widgetLabel, pantallas, projectId } = useAppStore();
+  const { t, widgetLabel, pantallas, projectId, plcs } = useAppStore();
   const escribibles = useEscribibles();
 
   // Secciones que declara el Menú Lateral del lienzo. Llena el desplegable
@@ -642,11 +643,40 @@ export function PropertyInspector({
   const leeVariables = usaVariable(acepta);
   const { compatibles, otras } = repartirPorCompatibilidad(selectedVariables, acepta);
 
+  // ── DE QUÉ AUTÓMATA SALE CADA VARIABLE ──
+  //
+  // La lista enseñaba `PLC_PRG.rVar1 (double)` y nada más. Con un Siemens y
+  // un ctrlX conectados a la vez eso no basta: los dos tienen un `PLC_PRG`,
+  // los nombres se parecen, y enlazar el widget al autómata equivocado no da
+  // ningún error — da un valor que parece correcto y no lo es.
+  //
+  // El `plc_id` siempre estuvo ahí, dentro del propio id de la variable
+  // (`"192.168.1.4|PLC_PRG.rVar1"`); lo que faltaba era la MARCA, que ahora
+  // llega en el snapshot (ver `InfoPlc` en models/plc.ts).
+  const variosPlcs = Object.keys(plcs).length > 1;
+
+  /** ` · Rexroth`, o ` · 192.168.1.4 · Rexroth` si hay más de un PLC. */
+  const sufijoPlc = (variableId: string): string => {
+    const { plc_id } = partirId(variableId);
+    if (!plc_id) return '';
+    const info = plcs[plc_id];
+    // Las variables internas del HMI no son de ningún autómata, y decir su
+    // marca sería mentir. Se etiquetan por lo que son.
+    if (info?.interno) return '  ·  Interna';
+    const marca = etiquetaVendor(info?.vendor ?? '');
+    // Sin ficha todavía (el snapshot aún no llegó) se enseña al menos el
+    // `plc_id`: quedarse sin sufijo haría parpadear la lista al conectar.
+    if (!marca) return `  ·  ${plc_id}`;
+    return variosPlcs ? `  ·  ${plc_id}  ·  ${marca}` : `  ·  ${marca}`;
+  };
+
   // El lapicero marca «este tag se puede escribir». Va al final y no delante
   // para que los nombres sigan alineados y la lista se lea igual de rápido
   // cuando lo único que buscas es leer un valor.
   const opcion = (v: PlcVariable) => ({
-    label: `${v.name} (${v.type})${escribibles.has(v.id) ? '  \u270E' : ''}`,
+    label:
+      `${v.name} (${v.type})${sufijoPlc(v.id)}` +
+      `${escribibles.has(v.id) ? '  \u270E' : ''}`,
     value: v.id
   });
 
@@ -1016,7 +1046,22 @@ export function PropertyInspector({
           widget={widget}
           config={widget.config ?? {}}
           paramsPantalla={paramsFaceplate}
-          setConfig={(config) => onChange({ config })} />
+          /* MEZCLA, no reemplaza.
+           *
+           * Reemplazaba, y eso obligaba a que cada panel esparciera la config
+           * ENTERA en cada cambio. Veinticuatro sitios lo hacen esparciendo su
+           * `cfg` —la config ya interpretada, con solo los campos que ese
+           * widget conoce—, así que cualquier campo COMPARTIDO desaparecía al
+           * tocar cualquier opción: escribir la unidad de un «Valor con
+           * Unidad» le borraba su modo de escritura. Pasó de verdad.
+           *
+           * Mezclando, un panel manda solo lo que cambia y lo demás se queda.
+           * Los veinticuatro siguen funcionando igual —esparcir de más sobre
+           * la misma config no cambia nada— y el que quiera borrar un campo lo
+           * manda como `undefined`, que es lo que ya hacía el desplegable de
+           * modo con el `modo` viejo. */
+          setConfig={(parche) =>
+          onChange({ config: { ...(widget.config ?? {}), ...parche } })} />
       </Section>
       }
 

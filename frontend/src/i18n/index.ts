@@ -254,6 +254,36 @@ const es: Dict = {
   'screens.deleteConfirm': 'Eliminar',
   'screens.cancel': 'Cancelar',
 
+  // ── Grupos de pantallas (fichas de la barra de pestañas) ──
+  'groups.new': 'Nuevo grupo',
+  'groups.newHint': 'Crear un grupo para juntar varias pantallas',
+  'groups.defaultName': 'Grupo',
+  'groups.rename': 'Renombrar grupo',
+  'groups.renameHint': 'Doble clic para renombrar el grupo',
+  'groups.delete': 'Eliminar grupo',
+  'groups.cantDeleteFull':
+    'Saca primero las pantallas que tiene dentro. Borrar el grupo no borra ninguna pantalla.',
+  'groups.deleteTitle': 'Eliminar este grupo',
+  'groups.deleteBody1': 'Se va a eliminar el grupo ',
+  'groups.deleteBody2':
+    '. Está vacío, así que no se pierde ninguna pantalla: solo desaparece la ficha de la barra.',
+  'groups.empty': 'Este grupo está vacío. Arrastra pantallas aquí.',
+  'groups.dropHere': 'Soltar aquí',
+  'groups.dropOut': 'Soltar aquí para sacarla del grupo',
+  'groups.screensInside': 'pantallas dentro',
+  'groups.none': 'Sin grupo',
+  'groups.moveTo': 'Mover a',
+  'groups.takeOut': 'Sacar del grupo',
+  // ── Crear varias pantallas de una vez ──
+  'screens.newOne': 'Una pantalla',
+  'screens.newMany': 'Varias pantallas…',
+  'screens.howMany': '¿Cuántas?',
+  'screens.intoGroup': '¿Dónde?',
+  'screens.loose': 'Sueltas en la barra',
+  'screens.createMany': 'Crear',
+  'screens.maxAtOnce': 'Como mucho 20 de una vez.',
+  'screens.createdMany': 'pantallas creadas.',
+
   // Config
   'config.title': 'Configuración',
   'config.subtitle':
@@ -589,6 +619,36 @@ const en: Dict = {
   ' and all its widgets will be removed from the server. This cannot be undone.',
   'screens.deleteConfirm': 'Delete',
   'screens.cancel': 'Cancel',
+
+  // ── Screen groups (tabs bar chips) ──
+  'groups.new': 'New group',
+  'groups.newHint': 'Create a group to hold several screens',
+  'groups.defaultName': 'Group',
+  'groups.rename': 'Rename group',
+  'groups.renameHint': 'Double-click to rename the group',
+  'groups.delete': 'Delete group',
+  'groups.cantDeleteFull':
+    'Take the screens out first. Deleting the group deletes no screens.',
+  'groups.deleteTitle': 'Delete this group',
+  'groups.deleteBody1': 'The group ',
+  'groups.deleteBody2':
+    ' will be removed. It is empty, so no screen is lost: only the chip disappears from the bar.',
+  'groups.empty': 'This group is empty. Drag screens here.',
+  'groups.dropHere': 'Drop here',
+  'groups.dropOut': 'Drop here to take it out of the group',
+  'groups.screensInside': 'screens inside',
+  'groups.none': 'No group',
+  'groups.moveTo': 'Move to',
+  'groups.takeOut': 'Take out of the group',
+  // ── Create several screens at once ──
+  'screens.newOne': 'One screen',
+  'screens.newMany': 'Several screens…',
+  'screens.howMany': 'How many?',
+  'screens.intoGroup': 'Where?',
+  'screens.loose': 'Loose in the bar',
+  'screens.createMany': 'Create',
+  'screens.maxAtOnce': 'At most 20 at a time.',
+  'screens.createdMany': 'screens created.',
 
   'config.title': 'Settings',
   'config.subtitle':

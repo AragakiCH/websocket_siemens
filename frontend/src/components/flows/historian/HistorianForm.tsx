@@ -7,14 +7,17 @@ import {
   PencilIcon,
   ListChecksIcon,
 } from 'lucide-react';
-import { FlowNodeData } from '../types';
+import { FlowNodeData, TABLA_HISTORICO_POR_DEFECTO } from '../types';
 import {
   ConexionRemota,
+  PlcRemoto,
   TagRemoto,
   cargarConexiones,
+  cargarPlcs,
   cargarTags,
   claveTag,
 } from '../api';
+import { etiquetaVendor } from '../../../models/plc';
 
 interface Props {
   config: Record<string, any>;
@@ -124,11 +127,26 @@ export function HistorianForm({ config, connectionNodes, onChange }: Props) {
   const [filtro, setFiltro] = useState('');
   const [manual, setManual] = useState(false);
 
+  // Quién es cada PLC, para poder poner la MARCA en la cabecera de su grupo.
+  //
+  // `GET /tags` dice de qué `plc_id` es cada tag pero no de qué marca, así
+  // que la ficha se pide aparte. Va en la MISMA función que los tags —y con
+  // `Promise.all`— para que sea un solo viaje de ida y vuelta: pedirlas en
+  // serie dejaría la cabecera cambiando de texto un instante después de
+  // pintarse la lista, que se ve como un parpadeo sin motivo.
+  //
+  // Si `/health` falla, `cargarPlcs()` devuelve `{}` y las cabeceras quedan
+  // como estaban: con el id a secas. No poder leer la marca no puede impedir
+  // elegir los tags.
+  const [fichasPlc, setFichasPlc] = useState<Record<string, PlcRemoto>>({});
+
   const recargar = useCallback(async () => {
     setCargando(true);
     setErrorTags('');
     try {
-      setDisponibles(await cargarTags());
+      const [tags, fichas] = await Promise.all([cargarTags(), cargarPlcs()]);
+      setFichasPlc(fichas);
+      setDisponibles(tags);
     } catch (err: any) {
       setErrorTags(err?.message || 'No se pudieron cargar los tags.');
       setDisponibles([]);
@@ -431,6 +449,15 @@ export function HistorianForm({ config, connectionNodes, onChange }: Props) {
                         <div className="mb-1 flex items-center justify-between gap-2">
                           <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-400">
                             {plc}
+                            {/* La MARCA, si se conoce. En minúscula y con
+                                menos contraste que el id: lo que se busca al
+                                recorrer la lista es la IP, y la marca es el
+                                dato que confirma que es la que uno creía. */}
+                            {etiquetaVendor(fichasPlc[plc]?.vendor ?? '') && (
+                              <span className="ml-1.5 font-medium normal-case tracking-normal text-slate-500 dark:text-slate-500">
+                                · {etiquetaVendor(fichasPlc[plc].vendor)}
+                              </span>
+                            )}
                           </p>
                           <button
                             type="button"
@@ -520,11 +547,17 @@ export function HistorianForm({ config, connectionNodes, onChange }: Props) {
       )}
 
       {/* Tabla */}
+      {/* `?? ''` y no `|| TABLA_...`: con `||`, borrar la última letra deja
+          la cadena vacía —que es falsa— y el campo se rellenaba solo con el
+          nombre por defecto en la misma pulsación. Vaciarlo era imposible. El
+          valor por defecto se enseña como marcador y lo pone el POST al
+          guardar, que es donde de verdad hace falta. */}
       <Field label="Tabla destino">
         <input
           type="text"
-          value={config.tabla || 'historico_tags'}
+          value={config.tabla ?? ''}
           onChange={(e) => onChange({ tabla: e.target.value })}
+          placeholder={TABLA_HISTORICO_POR_DEFECTO}
           className="input-field"
         />
       </Field>

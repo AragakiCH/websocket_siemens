@@ -60,6 +60,8 @@ import {
   ZoomOutIcon,
   MaximizeIcon,
   Loader2Icon,
+  DownloadIcon,
+  SquareIcon,
 } from 'lucide-react';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
@@ -78,6 +80,7 @@ import {
   ventanaUtc,
 } from './historico';
 import { listarGrupos, type GrupoHistorico } from '../../../../services/historicoApi';
+import { useDescargaHistorico, useGrabacionTrend } from './grabacion';
 import { partirId } from '../../../../services/escrituraApi';
 import {
   ajustar,
@@ -144,6 +147,60 @@ export interface ConfigTrend {
   autoEscala: boolean;
   min: string;
   max: string;
+
+  // ── EXPORTAR A EXCEL ────────────────────────────────────────────
+  //
+  // POR QUÉ ES UN INTERRUPTOR POR WIDGET Y NO ALGO QUE SIEMPRE ESTÁ
+  // `/export/*` es, junto a `/ai/*`, uno de los dos routers del backend que
+  // NO comprueba rol ni sesión. Si el botón saliera en todos los Trends por
+  // defecto, cualquier pantalla de planta ya desplegada pasaría a ofrecerle
+  // la descarga de datos a quien tenga delante el panel, sin que nadie lo
+  // haya pedido — y por una actualización del programa, no por una decisión.
+  //
+  // Mismo criterio que `config.escritura` en `components/hmi/acciones.ts`:
+  // una pantalla guardada no puede cambiar de comportamiento sola.
+
+  /** Enseñar los botones de exportación en la Vista Previa. */
+  exportar: boolean;
+  /**
+   * Cada cuánto se toma una muestra de TODAS las series, en ms.
+   *
+   * NO es el refresco del gráfico: es el del fichero. El mínimo real son
+   * 100 ms, que es lo que publica el servidor OPC UA del S7-1500 — por
+   * debajo solo saldrían filas repetidas.
+   */
+  grabIntervaloMs: number;
+  /**
+   * Cuánto dura la grabación, en segundos. **0 = indefinida**, hasta que se
+   * pulse parar.
+   *
+   * El valor por defecto es 0 y no los 60 s del backend a propósito: aquí
+   * quien graba está delante de la pantalla mirando el proceso, y una
+   * grabación que se corta sola al minuto obliga a volver a empezar justo
+   * cuando pasa lo que se quería ver.
+   */
+  grabDuracionS: number;
+}
+
+// ── LÍMITES DE LA GRABACIÓN ──────────────────────────────────────
+//
+// Son una COPIA de los que valida el backend: `NuevaGrabacion` en
+// `app/api/export_routes.py` (ge/le de Pydantic) y las constantes de
+// `app/export/grabador.py`. Se duplican aquí a propósito, y la duplicación
+// tiene un motivo concreto: sin ellos, un intervalo de 50 ms se manda igual y
+// el servidor responde un 422 que el operario ve como «no se pudo grabar» sin
+// saber por qué. Con ellos, el Inspector no deja escribirlo.
+//
+// La barrera de verdad sigue siendo el servidor. Esto es cortesía.
+export const GRAB_INTERVALO_MIN_MS = 100;
+export const GRAB_INTERVALO_MAX_MS = 3_600_000;
+export const GRAB_DURACION_MAX_S = 86_400;
+
+/** Un número dentro de su rango, o el respaldo si no es un número válido. */
+function limitar(v: any, min: number, max: number, respaldo: number): number {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return respaldo;
+  return Math.min(max, Math.max(min, Math.round(n)));
 }
 
 export const CONFIG_TREND: ConfigTrend = {
@@ -162,6 +219,9 @@ export const CONFIG_TREND: ConfigTrend = {
   autoEscala: true,
   min: '',
   max: '',
+  exportar: false,
+  grabIntervaloMs: 1000,
+  grabDuracionS: 0,
 };
 
 /** Opciones del desplegable de retención, en segundos. */
@@ -173,6 +233,61 @@ export const RETENCIONES = [
   { v: 7200, t: '2 horas' },
   { v: 21600, t: '6 horas' },
 ];
+
+/**
+ * Intervalos de muestreo de la grabación.
+ *
+ * Arrancan en 100 ms porque es el mínimo que acepta el backend, y ese mínimo
+ * no es un capricho suyo: por debajo, el servidor OPC UA del S7-1500 no
+ * publica más rápido y el Excel solo tendría filas repetidas.
+ */
+export const INTERVALOS_GRAB = [
+  { v: 100, t: '100 ms · transitorios' },
+  { v: 250, t: '250 ms' },
+  { v: 500, t: '500 ms' },
+  { v: 1000, t: '1 segundo' },
+  { v: 2000, t: '2 segundos' },
+  { v: 5000, t: '5 segundos' },
+  { v: 10000, t: '10 segundos' },
+  { v: 30000, t: '30 segundos' },
+  { v: 60000, t: '1 minuto' },
+];
+
+/** Duraciones de la grabación. `0` = hasta que alguien la pare. */
+export const DURACIONES_GRAB = [
+  { v: 0, t: 'Hasta pararla a mano' },
+  { v: 30, t: '30 segundos' },
+  { v: 60, t: '1 minuto' },
+  { v: 300, t: '5 minutos' },
+  { v: 600, t: '10 minutos' },
+  { v: 1800, t: '30 minutos' },
+  { v: 3600, t: '1 hora' },
+  { v: 28800, t: '8 horas · un turno' },
+];
+
+/**
+ * Unidades del campo de duración personalizada.
+ *
+ * Existen porque «7200» no se lee y «2 h» sí. El valor guardado SIEMPRE son
+ * segundos —es lo que quiere el backend—; esto solo decide cómo se teclea.
+ */
+export const UNIDADES_DURACION = [
+  { v: 1, t: 'segundos' },
+  { v: 60, t: 'minutos' },
+  { v: 3600, t: 'horas' },
+] as const;
+
+/**
+ * En qué unidad conviene ENSEÑAR una duración dada en segundos.
+ *
+ * Se elige la mayor que dé un número redondo: 7200 se lee «2 horas», pero
+ * 7230 se lee «7230 segundos» y no «2,008 horas», que no lo entiende nadie.
+ */
+export function unidadDe(segundos: number): number {
+  if (segundos > 0 && segundos % 3600 === 0) return 3600;
+  if (segundos > 0 && segundos % 60 === 0) return 60;
+  return 1;
+}
 
 export const VENTANAS = [
   { v: 15, t: '15 segundos' },
@@ -220,6 +335,14 @@ export function leerConfigTrend(config: any): ConfigTrend {
     autoEscala: c.autoEscala !== false,
     min: typeof c.min === 'string' ? c.min : '',
     max: typeof c.max === 'string' ? c.max : '',
+    // Todo lo de exportar entra con valores por defecto, igual que en su día
+    // lo hizo el modo histórico: una pantalla guardada antes de que esto
+    // existiera abre con los botones apagados y se comporta como siempre.
+    // Cero migración.
+    exportar: c.exportar === true,
+    grabIntervaloMs: limitar(
+      c.grabIntervaloMs, GRAB_INTERVALO_MIN_MS, GRAB_INTERVALO_MAX_MS, 1000),
+    grabDuracionS: limitar(c.grabDuracionS, 0, GRAB_DURACION_MAX_S, 0),
   };
 }
 
@@ -313,6 +436,16 @@ export function prefijoComun(nombres: string[]): string {
 // posición horizontal del cursor. Sin ella no hay `cursor.left` ni
 // `cursor.idx`, o sea, no hay regla, no hay caja y no hay leyenda. Se deja el
 // seguimiento intacto y se esconde solo el div.
+/**
+ * El rojo de «grabando».
+ *
+ * Literal y no del tema a propósito: el punto rojo de grabar significa lo
+ * mismo en cualquier aparato del mundo, y que cambie de color con la paleta
+ * del proyecto solo conseguiría que dejara de reconocerse. Es el mismo
+ * `state.error` que ya define `tailwind.config.js`.
+ */
+const ROJO_GRABANDO = '#ef4444';
+
 const CLASE_TREND = 'psi-trend';
 
 let estilosPuestos = false;
@@ -705,6 +838,65 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     ventanaHist.hasta,
     cfg.limiteSerie
   );
+
+  // ── EXPORTAR A EXCEL ──────────────────────────────────────────
+  //
+  // Solo en la Vista Previa, solo en modo vivo y solo si quien diseñó la
+  // pantalla lo habilitó. Las tres condiciones van aquí y no dentro del hook
+  // para que en el Diseñador no se monte ni el temporizador de sondeo: un
+  // lienzo con seis Trends haría seis peticiones por segundo mientras alguien
+  // coloca widgets.
+  //
+  // En modo HISTÓRICO no aparece a propósito. Grabar captura lo que está
+  // pasando AHORA; si el gráfico enseña el martes pasado, el Excel traería
+  // otro tiempo distinto del que se ve, y nadie entendería el fichero. La
+  // descarga del histórico es otra cosa y va por su propio camino.
+  const puedeExportar = interactivo && !esHistorico && cfg.exportar;
+  const grab = useGrabacionTrend({
+    activo: puedeExportar,
+    widgetId: widget.id,
+    nombre: widget.name || widget.text || 'Tendencia',
+    tags: ids,
+    intervaloMs: cfg.grabIntervaloMs,
+    duracionS: cfg.grabDuracionS,
+  });
+
+  // ── DESCARGAR EL HISTÓRICO ────────────────────────────────────
+  //
+  // El otro lado de la misma moneda: en histórico no se graba, se pide lo que
+  // ya está en la base. Se le pasan LAS MISMAS fechas que el gráfico usó para
+  // traer sus puntos (`ventanaHist`, que sale de `resolverRango()` y ya viene
+  // en UTC), así que el Excel cubre exactamente el rango que se está viendo.
+  const puedeBajarHist = interactivo && esHistorico && cfg.exportar;
+  const descHist = useDescargaHistorico({
+    activo: puedeBajarHist,
+    grupoId: cfg.grupoId,
+    // El endpoint quiere el tag SIN el prefijo del PLC; `ids` los lleva en el
+    // formato de la vista (`"<plc>|<tag>"`). Se parte con `partirId`, que es
+    // la única función que sabe hacerlo en todo el proyecto.
+    tags: ids.map((id) => partirId(id).tag).filter(Boolean),
+    desde: ventanaHist.desde,
+    hasta: ventanaHist.hasta,
+    // El límite del endpoint es GLOBAL por consulta, no por tag (el mismo
+    // motivo por el que el gráfico pide una llamada por serie). Se multiplica
+    // por el número de series para que el Excel dé de sí lo mismo que la
+    // pantalla, sin pasar del techo que acepta el backend.
+    limite: Math.min(100_000, cfg.limiteSerie * Math.max(1, ids.length)),
+  });
+
+  // El mensaje de la grabación se enseña EN LA BARRA, en el hueco del rótulo
+  // de la vista, y NO como una capa sobre el gráfico —que es lo que hace el
+  // error del histórico—. La diferencia es deliberada: en vivo ese gráfico es
+  // el proceso, y taparlo entero para decir «no se pudo descargar el Excel»
+  // es justo lo que un HMI no puede hacer. Se usa el ámbar del tema, el mismo
+  // que ya usa este widget para avisar.
+  const mensajeGrab = grab.error || grab.aviso || descHist.error;
+
+  /** Quita el mensaje, venga del camino que venga. */
+  const limpiarMensaje = useCallback(() => {
+    grab.limpiarMensajes();
+    descHist.limpiarError();
+  }, [grab, descHist]);
 
   // ---- Muestreo en vivo. Alimenta el búfer y empuja los datos al canvas -- //
   //
@@ -1115,11 +1307,21 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
             whiteSpace: 'nowrap',
             fontSize: 10.5,
             fontVariantNumeric: 'tabular-nums',
-            color: señalando ? fuerte : tema.tintaSuave,
-            fontWeight: señalando ? 600 : 400,
+            color: mensajeGrab
+              ? tema.pausa
+              : señalando
+              ? fuerte
+              : tema.tintaSuave,
+            fontWeight: mensajeGrab || señalando ? 600 : 400,
+            cursor: mensajeGrab ? 'pointer' : 'default',
           }}
+          // El texto de la barra se recorta con puntos suspensivos, así que
+          // el mensaje entero va en el `title`. Y se quita al pulsarlo: un
+          // aviso que no se puede cerrar acaba siendo parte del decorado.
+          title={mensajeGrab || undefined}
+          onClick={mensajeGrab ? limpiarMensaje : undefined}
         >
-          {etiquetaVista}
+          {mensajeGrab || etiquetaVista}
         </span>
 
         {duracionVista && !señalando && (
@@ -1136,6 +1338,170 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
           >
             {duracionVista}
           </span>
+        )}
+
+        {/* ── DESCARGAR EL HISTÓRICO ──
+            En histórico no hay nada que grabar: los datos ya están en la
+            base. Un solo botón, sin ciclo. Ocupa el mismo sitio que el de
+            grabar porque los dos modos no conviven: o uno o el otro. */}
+        {puedeBajarHist && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              flexShrink: 0,
+              padding: 2,
+              borderRadius: 7,
+              border: `1px solid ${tema.borde}`,
+            }}
+          >
+            <BotonBarra
+              tema={tema}
+              titulo={
+                descHist.motivoBloqueo ||
+                `Descargar en Excel lo que se está viendo (${ids.length} ` +
+                  `variable(s), ${ventanaHist.desde.slice(0, 19).replace('T', ' ')}` +
+                  ` → ${ventanaHist.hasta.slice(0, 19).replace('T', ' ')} UTC)`
+              }
+              onClick={descHist.motivoBloqueo ? limpiarMensaje : descHist.descargar}
+            >
+              {descHist.bajando ? (
+                <Loader2Icon
+                  className="animate-spin"
+                  style={{ width: 12, height: 12 }}
+                />
+              ) : (
+                <DownloadIcon
+                  style={{
+                    width: 13,
+                    height: 13,
+                    // Apagado cuando falta el grupo o las series. No se
+                    // esconde: un botón que desaparece deja a quien lo busca
+                    // pensando que la función no existe, y el tooltip ya
+                    // explica qué falta.
+                    opacity: descHist.motivoBloqueo ? 0.4 : 1,
+                  }}
+                />
+              )}
+            </BotonBarra>
+          </div>
+        )}
+
+        {/* ── GRABAR A EXCEL ──
+            Un grupo aparte del de zoom, con su propio marco: no son gestos
+            sobre el gráfico, son una acción sobre los datos. Y a la izquierda
+            de los gestos porque se pulsa mucho menos.
+
+            Los cuatro estados del hook no caben en un botón que cambie de
+            icono: «grabando» necesita además el contador, y «lista» son dos
+            acciones (bajar y descartar). Por eso se pinta uno u otro. */}
+        {puedeExportar && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              flexShrink: 0,
+              padding: 2,
+              borderRadius: 7,
+              border: `1px solid ${tema.borde}`,
+            }}
+          >
+            {grab.fase === 'grabando' ? (
+              <>
+                <span
+                  title={`${grab.muestras} muestra(s) capturada(s)`}
+                  style={{
+                    padding: '0 5px',
+                    fontSize: 9.5,
+                    fontWeight: 700,
+                    fontVariantNumeric: 'tabular-nums',
+                    color: ROJO_GRABANDO,
+                    letterSpacing: '.04em',
+                  }}
+                >
+                  {/* El contador es lo único que dice que esto sigue vivo:
+                      una grabación indefinida no tiene barra de progreso
+                      contra la que medir. Si el número no sube, algo pasa. */}
+                  ● {grab.muestras}
+                </span>
+                <BotonBarra
+                  tema={tema}
+                  titulo="Parar la grabación y preparar el Excel"
+                  onClick={grab.parar}
+                >
+                  <SquareIcon style={{ width: 12, height: 12 }} />
+                </BotonBarra>
+              </>
+            ) : grab.fase === 'lista' ? (
+              <>
+                <BotonBarra
+                  tema={tema}
+                  titulo={
+                    grab.descargable
+                      ? `Descargar el Excel (${grab.muestras} fila(s))`
+                      : 'La grabación no capturó ninguna muestra'
+                  }
+                  onClick={grab.descargable ? grab.descargar : grab.descartar}
+                >
+                  <DownloadIcon
+                    style={{
+                      width: 13,
+                      height: 13,
+                      opacity: grab.descargable ? 1 : 0.4,
+                    }}
+                  />
+                </BotonBarra>
+                <BotonBarra
+                  tema={tema}
+                  titulo="Descartar esta grabación y liberar la memoria del servidor"
+                  onClick={grab.descartar}
+                >
+                  <Trash2Icon style={{ width: 12, height: 12 }} />
+                </BotonBarra>
+              </>
+            ) : grab.fase === 'inactiva' ? (
+              <BotonBarra
+                tema={tema}
+                titulo={`Grabar a Excel · cada ${fmtDuracion(
+                  cfg.grabIntervaloMs / 1000
+                )}, ${
+                  cfg.grabDuracionS
+                    ? `durante ${fmtDuracion(cfg.grabDuracionS)}`
+                    : 'hasta pararla'
+                }`}
+                onClick={grab.iniciar}
+              >
+                {/* Un punto rojo y no un icono: es el mando de grabar de
+                    cualquier aparato, y se reconoce sin leer el tooltip. */}
+                <span
+                  style={{
+                    width: 9,
+                    height: 9,
+                    borderRadius: 999,
+                    background: ROJO_GRABANDO,
+                    flexShrink: 0,
+                  }}
+                />
+              </BotonBarra>
+            ) : (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 24,
+                  height: 22,
+                  color: tema.tintaSuave,
+                }}
+              >
+                <Loader2Icon
+                  className="animate-spin"
+                  style={{ width: 12, height: 12 }}
+                />
+              </span>
+            )}
+          </div>
         )}
 
         <div
@@ -1712,6 +2078,21 @@ function InspectorTrend({ config, setConfig }: InspectorCtx) {
   const grupoElegido = grupos.find((g) => g.grupo_id === cfg.grupoId);
   const [abiertoVarias, setAbiertoVarias] = useState(false);
 
+  // ── DURACIÓN PERSONALIZADA ──
+  //
+  // El modo va en estado y no se deduce del valor, y la diferencia importa:
+  // deduciéndolo, elegir «Personalizada» con 60 s puestos volvería solo al
+  // desplegable —60 está en la lista— y el campo se cerraría en la cara de
+  // quien acaba de abrirlo. Arranca abierto si el valor guardado no es
+  // ninguno de los atajos, que es la única señal fiable al cargar.
+  const [duracionLibre, setDuracionLibre] = useState(
+    () => !DURACIONES_GRAB.some((d) => d.v === leerConfigTrend(config).grabDuracionS)
+  );
+  // La unidad es SOLO de presentación: lo que se guarda son segundos.
+  const [unidadDuracion, setUnidadDuracion] = useState(
+    () => unidadDe(leerConfigTrend(config).grabDuracionS)
+  );
+
   // Solo numéricas: una tendencia de un bool sería una escalera entre 0 y 1 y
   // de un texto no se puede dibujar nada.
   const numericas = selectedVariables.filter(
@@ -2265,6 +2646,148 @@ function InspectorTrend({ config, setConfig }: InspectorCtx) {
           </>
         )}
       </p>
+
+      {/* ══ EXPORTAR A EXCEL ══════════════════════════════════════
+          Va al final y detrás de un separador porque no configura el
+          GRÁFICO: configura qué puede hacer el operador con él. */}
+      <div className="border-t border-slate-200 pt-3 dark:border-navy-slate">
+        <label className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            Permitir exportar a Excel
+          </span>
+          <input
+            type="checkbox"
+            checked={cfg.exportar}
+            onChange={(e) => set({ exportar: e.target.checked })}
+            className="h-4 w-4 rounded border-slate-300 text-siemens focus:ring-2 focus:ring-siemens/40 dark:border-navy-slate dark:bg-navy"
+          />
+        </label>
+        <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
+          {esHistorico
+            ? 'Añade a la barra un botón que descarga en Excel exactamente estas series y este rango. Apagado por defecto: el endpoint de exportación no comprueba el rol del usuario, así que se habilita pantalla por pantalla.'
+            : 'Añade a la barra del gráfico los botones de grabar, parar y descargar. Apagado por defecto: el endpoint de exportación no comprueba el rol del usuario, así que se habilita pantalla por pantalla.'}
+        </span>
+      </div>
+
+      {/* Los ajustes de la grabación solo estorban si no se va a exportar, y
+          solo tienen sentido en vivo: en histórico no se graba nada. */}
+      {cfg.exportar && !esHistorico && (
+        <>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+              Muestra cada
+            </span>
+            <select
+              value={String(cfg.grabIntervaloMs)}
+              onChange={(e) => set({ grabIntervaloMs: Number(e.target.value) })}
+              className={INPUT}
+            >
+              {INTERVALOS_GRAB.map((o) => (
+                <option key={o.v} value={o.v}>
+                  {o.t}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
+              Cada cuánto se escribe una fila con TODAS las series a la vez. No
+              es el refresco del gráfico: es el detalle del fichero.
+            </span>
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+              Duración de la grabación
+            </span>
+            <select
+              value={duracionLibre ? 'otro' : String(cfg.grabDuracionS)}
+              onChange={(e) => {
+                if (e.target.value === 'otro') {
+                  // No se toca el valor: se abre el campo con lo que ya
+                  // había. Poner un número «de ejemplo» al abrir pisaría una
+                  // duración que alguien acababa de elegir a conciencia.
+                  setUnidadDuracion(unidadDe(cfg.grabDuracionS));
+                  setDuracionLibre(true);
+                  return;
+                }
+                setDuracionLibre(false);
+                set({ grabDuracionS: Number(e.target.value) });
+              }}
+              className={INPUT}
+            >
+              {DURACIONES_GRAB.map((o) => (
+                <option key={o.v} value={o.v}>
+                  {o.t}
+                </option>
+              ))}
+              <option value="otro">Personalizada…</option>
+            </select>
+
+            {duracionLibre && (
+              <div className="mt-1.5 grid grid-cols-[1fr_auto] gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  // El tope del campo va en la unidad que se esté usando, así
+                  // el navegador avisa antes de escribir «48» en horas.
+                  max={Math.floor(GRAB_DURACION_MAX_S / unidadDuracion)}
+                  step={1}
+                  value={
+                    cfg.grabDuracionS
+                      ? String(cfg.grabDuracionS / unidadDuracion)
+                      : ''
+                  }
+                  placeholder="0 = hasta pararla"
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    // Se acota contra el MISMO límite que valida el backend
+                    // (`duracion_s: ge=0, le=86400`). Sin esto, escribir 48
+                    // horas se manda igual y el servidor responde un 422 que
+                    // el operario lee como «no se pudo grabar».
+                    set({
+                      grabDuracionS: limitar(
+                        (Number.isFinite(n) ? n : 0) * unidadDuracion,
+                        0,
+                        GRAB_DURACION_MAX_S,
+                        0
+                      ),
+                    });
+                  }}
+                  className={INPUT}
+                />
+                <select
+                  value={String(unidadDuracion)}
+                  onChange={(e) => {
+                    // Cambiar de unidad NO cambia la duración: 120 segundos
+                    // siguen siendo 120 segundos aunque ahora se lean como
+                    // «2 minutos». Solo cambia cómo se escribe.
+                    setUnidadDuracion(Number(e.target.value));
+                  }}
+                  className={`${INPUT} w-auto`}
+                >
+                  {UNIDADES_DURACION.map((u) => (
+                    <option key={u.v} value={u.v}>
+                      {u.t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
+              {/* Cuántas filas van a salir, dicho ANTES de grabar. Es la
+                  cuenta que nadie hace de cabeza y la que explica por qué una
+                  grabación a 100 ms durante una hora es mala idea: el backend
+                  corta a las 200.000 muestras y la captura se queda coja sin
+                  avisar. */}
+              {cfg.grabDuracionS
+                ? `${fmtDuracion(cfg.grabDuracionS)} · saldrán unas ${Math.round(
+                    cfg.grabDuracionS / (cfg.grabIntervaloMs / 1000)
+                  ).toLocaleString('es-PE')} filas. El servidor corta a las 200.000.`
+                : 'Se graba hasta que alguien pulse parar. El servidor corta solo a las 200.000 filas.'}
+              {duracionLibre && ' Máximo 24 horas.'}
+            </span>
+          </label>
+        </>
+      )}
     </>
   );
 }

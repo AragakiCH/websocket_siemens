@@ -50,6 +50,16 @@ logger = logging.getLogger("historian")
 # a que el servicio se quede sin memoria y tumbe también la vista en vivo.
 MAX_BUFFER = 50_000
 
+# Tope de tags en el filtro de `leer()`.
+#
+# No es una preferencia: cada tag es un parámetro bindeado, y los motores
+# tienen un techo. SQL Server admite 2.100 parámetros por sentencia, y ahí
+# entran también las fechas; pasarse no da un error que mencione los tags,
+# da un fallo de driver que no orienta nada. Doscientas series en una sola
+# consulta ya son un gráfico que nadie puede leer, así que este tope corta
+# muy por debajo del problema — y cuando corta, se dice en la respuesta.
+MAX_TAGS_FILTRO = 200
+
 # Cada cuántos fallos IDÉNTICOS seguidos se vuelve a avisar.
 #
 # Un grupo que no puede escribir falla en cada ciclo, y a dos segundos por
@@ -530,6 +540,7 @@ class Historizador:
         desde: Optional[str] = None,
         hasta: Optional[str] = None,
         limite: int = 1000,
+        tags: Optional[List[str]] = None,
     ) -> dict:
         """
         Lee el histórico de un grupo sin tener que registrar una consulta.
@@ -537,6 +548,25 @@ class Historizador:
         Es un atajo para el widget de tendencia: como el esquema de la tabla lo
         controla el backend, se puede generar el SELECT de forma segura (los
         filtros van bindeados; el nombre de tabla se valida por lista blanca).
+
+        `tag` Y `tags` SON EL MISMO FILTRO CON DOS FORMAS
+        ------------------------------------------------
+        `tag` (uno) es el de siempre y no cambia. `tags` (varios) se añadió
+        para la exportación a Excel del widget de tendencia, que necesita
+        pedir EXACTAMENTE las series que dibuja.
+
+        Sin él solo había dos caminos, y ninguno servía: mandar un tag —y
+        exportar una línea de las cuatro que se ven— o no mandar ninguno —y
+        exportar los veinte del grupo, con la mitad de las columnas hablando
+        de otra cosa—.
+
+        `tags` va el ÚLTIMO en la firma a propósito: las dos llamadas que ya
+        existen pasan los cinco primeros POR POSICIÓN, así que colocarlo en
+        medio habría cambiado en silencio el significado de `limite`.
+
+        Si llegan los dos se unen, sin repetir y conservando el orden. Que
+        `tag` siga existiendo no es deuda: es el caso frecuente, y un `=` es
+        más barato que un `IN` de un solo elemento en cualquier motor.
         """
         grupo = self.grupos.get(grupo_id)
         if grupo is None:
@@ -549,9 +579,39 @@ class Historizador:
 
         condiciones = []
         parametros: Dict[str, Any] = {}
+
+        # Los dos filtros se unifican ANTES de tocar el SQL, para que de aquí
+        # abajo dé igual por cuál vinieron. Se tiran los vacíos —una serie a
+        # medio configurar en el widget llega como cadena vacía, y filtraría
+        # por '' en vez de por nada— y los repetidos.
+        pedidos: List[str] = [t for t in (tags or []) if t]
         if tag:
+            pedidos.append(tag)
+        vistos = set()
+        filtro: List[str] = []
+        for t in pedidos:
+            if t not in vistos:
+                vistos.add(t)
+                filtro.append(t)
+        recortado = len(filtro) > MAX_TAGS_FILTRO
+        filtro = filtro[:MAX_TAGS_FILTRO]
+
+        if len(filtro) == 1:
             condiciones.append("tag = :tag")
-            parametros["tag"] = tag
+            parametros["tag"] = filtro[0]
+        elif filtro:
+            # CADA VALOR VA BINDEADO, uno por marca. Lo único que se arma con
+            # texto son las marcas `:tag0, :tag1…`, que las genera este bucle
+            # y no vienen de fuera. Meter los nombres en el SQL —aunque «solo
+            # sean tags»— sería inyección directa: el widget los saca de la
+            # configuración de la pantalla, y esa se puede importar de un
+            # fichero que escribió cualquiera.
+            marcas = []
+            for i, t in enumerate(filtro):
+                clave = f"tag{i}"
+                marcas.append(f":{clave}")
+                parametros[clave] = t
+            condiciones.append(f"tag IN ({', '.join(marcas)})")
 
         # Los filtros de fecha se normalizan con la MISMA función que se usa al
         # escribir. Sin esto, en SQLite (donde `ts` es TEXT y la comparación es
@@ -621,6 +681,13 @@ class Historizador:
             return {"ok": False, "mensaje": f"Error leyendo el histórico: {exc}"}
 
         salida = {"ok": True, "grupo_id": grupo_id, "tabla": grupo.tabla}
+        # Por qué tags se filtró: lo pinta la hoja «Información» del Excel, y
+        # sirve para explicar un resultado corto sin abrir el log.
+        salida["tags_filtrados"] = list(filtro)
+        if recortado:
+            salida["aviso"] = (
+                f"Se pidieron más de {MAX_TAGS_FILTRO} variables; se usaron "
+                f"las {MAX_TAGS_FILTRO} primeras.")
         salida.update(resultado.to_dict())
         self._añadir_hora_local(salida)
         return salida

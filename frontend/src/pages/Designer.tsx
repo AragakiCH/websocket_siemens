@@ -295,7 +295,25 @@ export function Designer() {
   // cambios en vivo en modo lectura. Se pide al entrar y se suelta al salir.
   // Solo se toma en la pestaña del Diseñador: estar mirando Flujos o Alarmas
   // no debe bloquear el lienzo a los demás.
-  const lock = useLock(recursoDisenador(projectId), activeTab === 'designer');
+  //
+  // DESACTIVADO DE MOMENTO. El aviso «Solo lectura · Tomar control /
+  // Reintentar» salía en el menú de estado sin que nadie más estuviera en la
+  // pantalla, y con él el lienzo quedaba bloqueado. Hasta revisar por qué el
+  // backend no concede el lápiz en ese caso, el Diseñador trabaja como antes
+  // de la fase 4: siempre se puede editar (si el rol lo permite) y el bloque
+  // de estado no enseña nada del lápiz. El resto del mecanismo (`useLock`,
+  // rutas `/locks`, eventos `lock.changed`) sigue ahí; para volver a
+  // activarlo basta con poner esta constante en `true`.
+  const LOCK_ACTIVO = false;
+  const lockReal = useLock(recursoDisenador(projectId),
+                           LOCK_ACTIVO && activeTab === 'designer');
+  const lock = LOCK_ACTIVO ? lockReal : {
+    ...lockReal,
+    puedeEditar: true,
+    titular: null,
+    mensaje: '',
+    cargando: false,
+  };
 
   // Se puede editar si el rol lo permite Y se tiene el lápiz. Son dos cosas
   // distintas: el rol dice si PUEDES, el lápiz si te toca AHORA.
@@ -1727,7 +1745,7 @@ export function Designer() {
                     titulo={presentes.map((pp) => `${pp.usuario} (${pp.categoria})`).join('\n')} />
                   }
 
-                  {!lock.cargando && (lock.puedeEditar ?
+                  {LOCK_ACTIVO && !lock.cargando && (lock.puedeEditar ?
                   <FilaMenu
                     icono={<MousePointer2Icon className="h-3.5 w-3.5 text-state-ok" />}
                     texto="Editando"

@@ -9,7 +9,7 @@ import {
   CheckCircle2Icon,
   AlertCircleIcon,
 } from 'lucide-react';
-import { FlowNodeData } from './types';
+import { FlowNodeData, TABLA_HISTORICO_POR_DEFECTO } from './types';
 import { API_BASE, ERROR_SIN_BACKEND, extraerMensaje } from './api';
 import { ConnectionForm } from './bd/ConnectionForm';
 import { HistorianForm } from './historian/HistorianForm';
@@ -121,7 +121,7 @@ export function FlowConfigPanel({ node, nodes, onUpdateConfig, onUpdateStatus, o
             // selección del usuario se conserva en config por si vuelve a
             // cambiar de modo, pero no se envía.
             tags: h.modo_tags === 'seleccion' ? (h.tags || []) : [],
-            tabla: h.tabla || 'historico_tags',
+            tabla: (h.tabla || '').trim() || TABLA_HISTORICO_POR_DEFECTO,
             nombre: h.nombre || '',
             activo: h.activo ?? true,
             banda_muerta: h.banda_muerta ?? 0,

@@ -151,6 +151,42 @@ export const ACCION_VACIA: AccionWidget = {
   mensaje: '',
 };
 
+// =========================================================================
+// SÓLO LECTURA / LECTURA Y ESCRITURA
+//
+// Un interruptor por widget, no por tipo de widget. Vive en `config.escritura`
+// —al lado de la acción, no dentro— porque no es una acción: es en qué modo
+// está ese objeto. La acción es qué pasa al pulsarlo; esto es si el objeto
+// admite que le metan mano.
+//
+// POR QUÉ ESTÁ AQUÍ Y NO EN CADA WIDGET
+// Empezó siendo un campo privado de «Valor con Unidad» (`config.modo`). En
+// cuanto un segundo widget lo necesitó —un ZIP con su propio campo de
+// entrada— había dos opciones: copiar el campo, o compartirlo. Copiarlo son
+// dos verdades sobre lo mismo y una pregunta sin respuesta buena el día que
+// discrepen. Así que se comparte, y el panel de Acción —que lo tienen todos
+// los widgets— es donde se edita.
+//
+// POR DEFECTO, SÓLO LECTURA
+// Un diseño guardado antes de que esto existiera no puede volverse escribible
+// porque alguien actualizó el programa. Abrir mandos de planta sin que nadie
+// lo pida es exactamente lo que la lista blanca existe para impedir.
+// =========================================================================
+
+/**
+ * ¿Este widget admite que se escriba en su variable?
+ *
+ * `config.escritura` es el campo de hoy. `config.modo === 'escritura'` es el
+ * de «Valor con Unidad» de antes, y se sigue leyendo para que los diseños ya
+ * guardados con ese widget en modo entrada NO se queden mudos de golpe: el
+ * primer guardado con el Inspector abierto los pasa al campo nuevo.
+ */
+export function permiteEscritura(config: any): boolean {
+  const c = config ?? {};
+  if (typeof c.escritura === 'boolean') return c.escritura;
+  return c.modo === 'escritura';
+}
+
 export function leerAccion(config: any): AccionWidget {
   const a = config?.accion ?? {};
   const conocidas: TipoAccion[] = [

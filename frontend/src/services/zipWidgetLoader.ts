@@ -62,6 +62,7 @@ import { DataType } from '../models/plc';
 import { TIPOS_VALIDOS, esTipoValido } from '../utils/widgetBinding';
 import { RE_NOMBRE_ENLACE, type DeclaracionEnlace } from '../utils/enlaces';
 import { getToken } from './authApi';
+import { idCategoria } from './categoriasApi';
 
 // ---- Tipos públicos --------------------------------------------------- //
 
@@ -71,7 +72,16 @@ export interface ZipWidgetMeta {
   /** Nombre visible en el sidebar */
   label: string;
   /** Categoría del sidebar */
-  category: 'Básicos' | 'Indicadores' | 'Equipos' | 'Datos';
+  /**
+   * La categoría que DECLARA esta definición. Es el defecto, no la última
+   * palabra: encima va la asignación del proyecto, que es la que decide en
+   * qué sección se pinta (ver `categoriaEfectiva` en `services/categoriasApi`).
+   *
+   * Era una unión cerrada de cuatro valores. Se abrió a texto porque cada
+   * proyecto puede crear sus propias secciones, y un ZIP puede declarar una
+   * que aún no existe — antes eso hacía que el ZIP entero se rechazara.
+   */
+  category: string;
   /** Tamaño por defecto en píxeles */
   defaultWidth: number;
   defaultHeight: number;
@@ -116,7 +126,33 @@ export interface ZipWidget {
 
 // ---- Validación del widget.json --------------------------------------- //
 
-const VALID_CATEGORIES = ['Básicos', 'Indicadores', 'Equipos', 'Datos'];
+/**
+ * Tope del nombre de una categoría. El mismo que `MAX_NOMBRE` del servidor:
+ * más largo no cabe en la cabecera de la barra lateral.
+ */
+const MAX_CATEGORIA = 32;
+
+/**
+ * ¿Sirve este texto como categoría?
+ *
+ * Antes aquí había una LISTA BLANCA de cuatro nombres y el ZIP entero se
+ * rechazaba si declaraba cualquier otro — o sea que un widget con
+ * `"category": "Paneles"` ni siquiera llegaba a cargarse, aunque el proyecto
+ * ya tuviera esa sección. Ahora se valida la FORMA, no la pertenencia: la
+ * sección existirá, o se creará al subirlo (ver `WidgetSidebar.handleUpload`).
+ *
+ * Sigue haciendo falta que quede algo utilizable al normalizar: "---" o "!!!"
+ * dan un id vacío y ese widget no tendría dónde caer.
+ */
+function categoriaValida(x: unknown): x is string {
+  if (typeof x !== 'string') return false;
+  const limpio = x.trim();
+  return (
+    limpio.length > 0 &&
+    limpio.length <= MAX_CATEGORIA &&
+    idCategoria(limpio).length > 0
+  );
+}
 
 /**
  * Lee y valida `accepts`.
@@ -209,9 +245,11 @@ function validateMeta(raw: unknown): ZipWidgetMeta {
   if (typeof obj.label !== 'string' || !obj.label.trim()) {
     throw new Error('El .json del widget: falta "label" (string no vacío).');
   }
-  if (!VALID_CATEGORIES.includes(obj.category as string)) {
+  if (!categoriaValida(obj.category)) {
     throw new Error(
-      `El .json del widget: "category" debe ser uno de: ${VALID_CATEGORIES.join(', ')}.`
+      'El .json del widget: "category" tiene que ser un texto con al menos ' +
+      `una letra o un número, de ${MAX_CATEGORIA} caracteres como máximo. ` +
+      'Puede ser una sección que todavía no exista: se crea al subir el widget.'
     );
   }
   const dw = typeof obj.defaultWidth === 'number' ? obj.defaultWidth : 160;
@@ -220,7 +258,10 @@ function validateMeta(raw: unknown): ZipWidgetMeta {
   return {
     kind: obj.kind as string,
     label: obj.label as string,
-    category: obj.category as ZipWidgetMeta['category'],
+    // Se guarda el nombre TAL COMO lo escribió el autor, no su id: es lo que
+    // se enseña si hay que crear la sección, y «Paneles» se lee mejor que
+    // «paneles». La conversión a id la hace `categoriaEfectiva` al agrupar.
+    category: (obj.category as string).trim(),
     defaultWidth: Math.max(40, Math.min(800, dw)),
     defaultHeight: Math.max(40, Math.min(800, dh)),
     accepts: validarAccepts(obj.accepts),

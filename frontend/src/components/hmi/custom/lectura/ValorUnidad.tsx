@@ -43,6 +43,7 @@ import type { CustomWidgetDef, RenderCtx, InspectorCtx } from '../types';
 import type { PlcVariable } from '../../../../models/plc';
 import { useNavigate } from 'react-router-dom';
 import { estiloDeParte } from '../../partes';
+import { permiteEscritura } from '../../acciones';
 import {
   escribir,
   permitidosCacheados,
@@ -73,10 +74,15 @@ export function leerConfigValorUnidad(config: any): ConfigValorUnidad {
   const c = config ?? {};
   return {
     unidad: typeof c.unidad === 'string' ? c.unidad : '',
-    // Cualquier cosa que no sea exactamente 'escritura' es lectura. Un valor
-    // raro en un diseño importado deja el campo de sólo lectura, que es el
-    // lado seguro: lo contrario sería convertir un display en un mando.
-    modo: c.modo === 'escritura' ? 'escritura' : 'lectura',
+    // EL MODO YA NO ES DE ESTE WIDGET. Vive en `config.escritura`, compartido
+    // con todos los demás, y `permiteEscritura` es quien lo resuelve — ahí
+    // está también la lectura del `config.modo` de antes, para que un diseño
+    // guardado con este campo en modo entrada siga siéndolo.
+    //
+    // Se sigue exponiendo como `modo` para no tocar las veinte lecturas de
+    // este fichero: el nombre local es lo de menos, lo que importa es que hay
+    // UN solo sitio donde se decide.
+    modo: permiteEscritura(c) ? 'escritura' : 'lectura',
     confirmar: !!c.confirmar,
   };
 }
@@ -498,7 +504,16 @@ function InspectorValorUnidad({ widget, config, setConfig }: InspectorCtx) {
         </span>
         <select
           value={cfg.modo}
-          onChange={(e) => setConfig({ ...cfg, modo: e.target.value as ModoValor })}
+          onChange={(e) =>
+            // Se escribe el campo COMPARTIDO, y `modo` se borra: este
+            // desplegable y el del panel de Acción son dos mandos del mismo
+            // interruptor, no dos interruptores.
+            setConfig({
+              ...config,
+              escritura: e.target.value === 'escritura',
+              modo: undefined,
+            })
+          }
           className={`${CAMPO} cursor-pointer`}
         >
           <option value="lectura">Sólo lectura</option>
@@ -520,7 +535,11 @@ function InspectorValorUnidad({ widget, config, setConfig }: InspectorCtx) {
             <input
               type="checkbox"
               checked={cfg.confirmar}
-              onChange={(e) => setConfig({ ...cfg, confirmar: e.target.checked })}
+              // `...config` y NO `...cfg`: `cfg` es la config YA INTERPRETADA
+              // —sólo `unidad`, `modo` y `confirmar`—, así que esparcirla
+              // borraba todo lo demás que hubiera en la config, incluido el
+              // `escritura` compartido. `setConfig` reemplaza, no mezcla.
+              onChange={(e) => setConfig({ ...config, confirmar: e.target.checked })}
               className="h-4 w-4 rounded border-slate-300 text-siemens focus:ring-2 focus:ring-siemens/40 dark:border-navy-slate dark:bg-navy"
             />
           </label>
@@ -588,7 +607,9 @@ function InspectorValorUnidad({ widget, config, setConfig }: InspectorCtx) {
         </span>
         <input
           value={cfg.unidad}
-          onChange={(e) => setConfig({ ...cfg, unidad: e.target.value })}
+          // `...config`, por lo mismo que la casilla de arriba: escribir la
+          // unidad no puede llevarse por delante el modo del widget.
+          onChange={(e) => setConfig({ ...config, unidad: e.target.value })}
           placeholder="km/h, bar, °C, rpm…"
           className={CAMPO}
         />
