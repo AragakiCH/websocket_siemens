@@ -119,6 +119,95 @@ const SIN_CONFIRMACION: TipoAccion[] = [
   'cerrar-faceplate',
 ];
 
+/**
+ * El panel «Valor con Unidad» de los widgets IMPORTADOS.
+ *
+ * POR QUÉ ESTÁ AQUÍ Y NO EN EL WIDGET «Valor con Unidad»
+ * Son los mismos dos mandos, pero el widget de ese nombre es un TSX del
+ * registry con su propio inspector; esto es para los ZIP, que no tienen
+ * ninguno. Compartir el fichero es lo que hace que los dos escriban en el
+ * MISMO sitio —`config.escritura` y `config.unidad`— en vez de inventarse
+ * cada uno el suyo y discrepar el día que alguien cambie uno.
+ *
+ * POR QUÉ SE SEPARÓ DE «Acción»
+ * Nació dentro del panel de Acción por una limitación que ya no existe: el
+ * Inspector solo daba UN panel por widget, y «Acción» era el único que tenía
+ * un ZIP. Quedaba raro —el modo de un widget no es una acción— y era confuso:
+ * quien abría «Acción» buscando el botón se encontraba dos campos que no
+ * tenían que ver. Ahora que el Inspector admite varios paneles, cada cosa
+ * está donde se la busca.
+ *
+ * NO SE LE DA AL BOTÓN NI AL INTERRUPTOR, y eso es a propósito: `permiteEscritura()`
+ * solo lo consultan los ZIP y el «Valor con Unidad». En un botón el Modo no
+ * haría nada, y un mando que no hace nada es peor que no tenerlo.
+ */
+export function InspectorValorUnidad({ config, setConfig }: InspectorCtx) {
+  // El modo NO es una acción: es en qué estado está el widget. Ver
+  // `permiteEscritura` en `acciones.ts`.
+  const escritura = permiteEscritura(config);
+
+  return (
+    <>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+          Modo
+        </span>
+        <select
+          value={escritura ? 'escritura' : 'lectura'}
+          onChange={(e) =>
+            // Se escribe `escritura` y se BORRA el `modo` viejo de «Valor con
+            // Unidad»: dejarlo sería guardar dos veces lo mismo, y el día que
+            // alguien edite el JSON a mano tendría dos campos que se
+            // contradicen sin saber cuál manda.
+            setConfig({
+              ...config,
+              escritura: e.target.value === 'escritura',
+              modo: undefined,
+            })
+          }
+          className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+        >
+          <option value="lectura">Sólo lectura</option>
+          <option value="escritura">Lectura y escritura</option>
+        </select>
+        <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
+          {escritura
+            ? 'El widget puede mandar valores al PLC. El servidor sigue exigiendo que el tag esté en la lista blanca.'
+            : 'El widget sólo muestra. Si intenta escribir, se le rechaza aquí mismo, sin llegar al PLC.'}
+        </span>
+      </label>
+
+      {/* LA UNIDAD, COMPARTIDA.
+          Vive en `config.unidad`, que es el MISMO campo que «Valor con
+          Unidad» usa desde siempre: no se inventa uno nuevo, se comparte el
+          que ya había. Un widget importado la recibe en `WIDGET.unidad` y la
+          dibuja donde quiera; si no la usa, no pasa nada.
+
+          No se saca del PLC a propósito: el OPC UA no siempre la trae, y
+          cuando la trae viene como la escribió el programador («KMH»,
+          «Km/h», vacía). Escribiéndola aquí, la pantalla dice lo que tiene
+          que decir. */}
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+          Unidad
+        </span>
+        <input
+          value={typeof config?.unidad === 'string' ? config.unidad : ''}
+          onChange={(e) => setConfig({ ...config, unidad: e.target.value })}
+          placeholder="km/h, bar, °C, rpm…"
+          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+        />
+        <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
+          Se escribe tal cual, sin tocar el PLC. Déjala vacía y sólo se ve el
+          número. El widget decide si la dibuja.
+        </span>
+      </label>
+
+    </>
+  );
+}
+
+
 export function InspectorAccion({
   config,
   setConfig,
@@ -201,67 +290,8 @@ export function InspectorAccion({
   // el diseñador tiene que poder verlo aquí y no en planta.
   const huerfano = !!accion.tag && !elegido && !cargando;
 
-  // El modo va al lado de la acción pero NO dentro: no es una acción, es en
-  // qué estado está el widget. Ver `permiteEscritura` en `acciones.ts`.
-  const escritura = permiteEscritura(config);
-
   return (
     <>
-      <label className="block">
-        <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
-          Modo
-        </span>
-        <select
-          value={escritura ? 'escritura' : 'lectura'}
-          onChange={(e) =>
-            // Se escribe `escritura` y se BORRA el `modo` viejo de «Valor con
-            // Unidad»: dejarlo sería guardar dos veces lo mismo, y el día que
-            // alguien edite el JSON a mano tendría dos campos que se
-            // contradicen sin saber cuál manda.
-            setConfig({
-              ...config,
-              escritura: e.target.value === 'escritura',
-              modo: undefined,
-            })
-          }
-          className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
-        >
-          <option value="lectura">Sólo lectura</option>
-          <option value="escritura">Lectura y escritura</option>
-        </select>
-        <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
-          {escritura
-            ? 'El widget puede mandar valores al PLC. El servidor sigue exigiendo que el tag esté en la lista blanca.'
-            : 'El widget sólo muestra. Si intenta escribir, se le rechaza aquí mismo, sin llegar al PLC.'}
-        </span>
-      </label>
-
-      {/* LA UNIDAD, COMPARTIDA.
-          Vive en `config.unidad`, que es el MISMO campo que «Valor con
-          Unidad» usa desde siempre: no se inventa uno nuevo, se comparte el
-          que ya había. Un widget importado la recibe en `WIDGET.unidad` y la
-          dibuja donde quiera; si no la usa, no pasa nada.
-
-          No se saca del PLC a propósito: el OPC UA no siempre la trae, y
-          cuando la trae viene como la escribió el programador («KMH»,
-          «Km/h», vacía). Escribiéndola aquí, la pantalla dice lo que tiene
-          que decir. */}
-      <label className="block">
-        <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
-          Unidad
-        </span>
-        <input
-          value={typeof config?.unidad === 'string' ? config.unidad : ''}
-          onChange={(e) => setConfig({ ...config, unidad: e.target.value })}
-          placeholder="km/h, bar, °C, rpm…"
-          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
-        />
-        <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
-          Se escribe tal cual, sin tocar el PLC. Déjala vacía y sólo se ve el
-          número. El widget decide si la dibuja.
-        </span>
-      </label>
-
       <label className="block">
         <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
           Al pulsar

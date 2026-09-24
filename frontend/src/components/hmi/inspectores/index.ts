@@ -21,7 +21,7 @@
 import type { ReactNode } from 'react';
 import type { InspectorCtx } from '../custom/types';
 import { InspectorImagen } from './imagen';
-import { InspectorAccion } from './accion';
+import { InspectorAccion, InspectorValorUnidad } from './accion';
 
 /** Título de la sección + panel, por tipo de widget built-in. */
 interface PanelBuiltIn {
@@ -42,6 +42,23 @@ export function panelBuiltIn(kind: string): PanelBuiltIn | undefined {
   return PANELES[kind];
 }
 
+/**
+ * Los paneles de un widget IMPORTADO (ZIP).
+ *
+ * Son DOS, y en este orden: primero qué enseña el widget, después qué hace al
+ * pulsarlo. Es como se lee una ficha —qué es, y luego qué hace— y es también
+ * el orden del «Valor con Unidad» de fábrica, para que un ZIP no se configure
+ * al revés que el widget del que copia esos dos campos.
+ *
+ * Un ZIP no está en `PANELES`: ese mapa es para los built-in, que son ramas
+ * de un `switch` y no entradas de ningún registro. Por eso los importados van
+ * por su propia puerta.
+ */
+export const PANELES_ZIP: PanelBuiltIn[] = [
+  { titulo: 'Valor con Unidad', render: InspectorValorUnidad },
+  { titulo: 'Acción', render: InspectorAccion },
+];
+
 export { InspectorImagen, leerConfigImagen } from './imagen';
-export { InspectorAccion } from './accion';
+export { InspectorAccion, InspectorValorUnidad } from './accion';
 export type { ConfigImagen } from './imagen';

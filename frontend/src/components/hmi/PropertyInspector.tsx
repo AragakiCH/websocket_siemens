@@ -46,7 +46,7 @@ import {
 './partes';
 import type { ParteId } from '../../models/widget';
 import { customByKind, zipByKind } from './custom/registry';
-import { panelBuiltIn, InspectorAccion } from './inspectores';
+import { panelBuiltIn, PANELES_ZIP } from './inspectores';
 import {
   useSecciones,
   esWidgetDeNavegacion,
@@ -574,7 +574,7 @@ export function PropertyInspector({
   // que reporta el OPC UA y ante un nombre raro cae en 'string' por descarte.
   // Si eso escondiera la variable, el usuario se quedaría sin poder usar la
   // suya y sin saber por qué. Se separan, se avisa, y decide él.
-  // Panel propio del tipo de widget, si lo trae.
+  // Los paneles propios del tipo de widget, si trae alguno.
   //
   // Hay dos sitios donde puede estar declarado, y no por capricho: los
   // widgets custom lo traen en su propia definicion (`CustomWidgetDef`),
@@ -582,11 +582,21 @@ export function PropertyInspector({
   // un `switch`, asi que el suyo vive en un mapa aparte (inspectores/).
   // El primero que lo usa es la Imagen, que sin panel no tiene forma de
   // saber que imagen mostrar.
+  //
+  // ── PUEDEN SER VARIOS ──
+  //
+  // Durante mucho tiempo era UNO por widget, y de ahí salió un apaño feo: los
+  // mandos «Modo» y «Unidad» de los ZIP acabaron metidos dentro del panel de
+  // «Acción», que era el único que un importado tenía. Quedaba raro —el modo
+  // de un widget no es una acción— y despistaba a quien abría «Acción»
+  // buscando qué pasa al pulsar.
+  //
+  // Ahora es una lista. Los que traen un solo panel se comportan exactamente
+  // igual que antes; los ZIP reciben dos.
   const custom = customByKind(widget.kind);
-  const propio = custom?.inspector
-    ? { titulo: custom.label, render: custom.inspector }
-    : panelBuiltIn(widget.kind) ??
-      // ── LOS WIDGETS IMPORTADOS TAMBIÉN MANDAN ──
+  const paneles = custom?.inspector
+    ? [{ titulo: custom.label, render: custom.inspector }]
+    : // ── LOS WIDGETS IMPORTADOS TAMBIÉN MANDAN ──
       //
       // `panelBuiltIn` es un mapa de tres entradas fijas (imagen, botón,
       // interruptor). Un ZIP nunca está en él, así que su autor veía el
@@ -599,21 +609,12 @@ export function PropertyInspector({
       // Se da a TODOS los importados, no a una lista: un widget que se dibuja
       // en el lienzo y recibe clics puede mandar, y quién quiera usarlo lo
       // decide quien monta la pantalla dejando la acción en «Ninguna».
-      (zipByKind(widget.kind)
-        ? { titulo: 'Acción', render: InspectorAccion }
-        : undefined);
-
-  // Mayuscula a proposito: se renderiza como <PanelPropio />, NO se llama
-  // como propio.render(...).
-  //
-  // Parece lo mismo y no lo es. Llamarlo mete sus hooks DENTRO de este
-  // componente, asi que al seleccionar un widget con panel el Inspector
-  // pasaba de 5 hooks a 7 entre un render y el siguiente: «Rendered more
-  // hooks than during the previous render». Funciono mientras los paneles
-  // no usaban hooks; el de la Imagen usa useRef y useState y lo destapo.
-  //
-  // Como elemento, React le da su propia identidad y sus hooks son suyos.
-  const PanelPropio = propio?.render;
+      zipByKind(widget.kind)
+      ? PANELES_ZIP
+      : (() => {
+          const uno = panelBuiltIn(widget.kind);
+          return uno ? [uno] : [];
+        })();
 
   // El propio menú y el panel de sección no eligen sección: van fijos.
   const esNavegacion = esWidgetDeNavegacion(widget.kind);
@@ -1033,15 +1034,37 @@ export function PropertyInspector({
         </p>
       </Section>
 
-      {/* ── Panel propio del widget ──────────────────────────────
-          Solo aparece si su tipo trae uno. Es donde el Menú Lateral declara
-          sus secciones y donde la Imagen sube su archivo. */}
-      {propio && PanelPropio &&
-      <Section title={propio.titulo}>
+      {/* ── Paneles propios del widget ─────────────────────────────
+          Solo aparecen si su tipo trae alguno. Es donde el Menú Lateral
+          declara sus secciones, donde la Imagen sube su archivo y donde un
+          widget importado elige su modo y su acción. La lista suele tener un
+          elemento; los ZIP traen dos. */}
+      {paneles.map((panel) => {
+        // Mayuscula a proposito: se renderiza como <PanelPropio />, NO se
+        // llama como panel.render(...).
+        //
+        // Parece lo mismo y no lo es. Llamarlo mete sus hooks DENTRO de este
+        // componente, asi que al seleccionar un widget con panel el Inspector
+        // pasaba de 5 hooks a 7 entre un render y el siguiente: «Rendered
+        // more hooks than during the previous render». Funciono mientras los
+        // paneles no usaban hooks; el de la Imagen usa useRef y useState y lo
+        // destapo. Con DOS paneles el riesgo es el doble, así que esto no se
+        // toca.
+        //
+        // Como elemento, React le da su propia identidad y sus hooks son
+        // suyos.
+        const PanelPropio = panel.render;
+        return (
+        <Section key={panel.titulo} title={panel.titulo}>
         {/* `key` con el id: al saltar de un widget a otro del mismo tipo se
             monta un panel nuevo. Sin esto, el mensaje de error de una imagen
             que no cargo seguiria en pantalla al seleccionar la siguiente. */}
         <PanelPropio
+          /* El id del WIDGET y no el del panel: al saltar de un widget a
+             otro del mismo tipo hay que montar paneles nuevos, o el estado
+             del anterior (un mensaje de error, un desplegable abierto) se
+             quedaría en pantalla describiendo algo que ya no está
+             seleccionado. */
           key={widget.id}
           widget={widget}
           config={widget.config ?? {}}
@@ -1062,8 +1085,9 @@ export function PropertyInspector({
            * modo con el `modo` viejo. */
           setConfig={(parche) =>
           onChange({ config: { ...(widget.config ?? {}), ...parche } })} />
-      </Section>
-      }
+        </Section>
+        );
+      })}
 
       <Section title={t('insp.geometry')}>
         <div className="grid grid-cols-2 gap-2">
