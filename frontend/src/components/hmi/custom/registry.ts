@@ -10,6 +10,7 @@ import { contenedorGrupo } from './contenedor/Contenedor';
 import { valorUnidad } from './lectura/ValorUnidad';
 import { alarmasWidget } from './alarmas/Alarmas';
 import { simbolo } from './simbolos/Simbolo';
+import { recetasProceso } from './recetas/RecetasProceso';
 // El catálogo de ZIP pasó a resolverse por un índice (`zipWidgetPorKind`) en
 // vez de recorriendo la lista, y `catalogoListo` dice si ya llegó del
 // servidor — eso es lo que distingue «aún cargando» de «ese widget no está».
@@ -42,6 +43,10 @@ export const customWidgets: CustomWidgetDef[] = [
   alarmasWidget,
   // Biblioteca de símbolos de proceso: válvulas, y lo que se vaya añadiendo.
   simbolo,
+  // El editor de recetas dentro del lienzo. Comparte TODA la lógica con la
+  // pestaña «Recetas» del Diseñador (`hooks/useRecetasEditor`): son la misma
+  // pantalla con dos pieles, no dos copias.
+  recetasProceso,
   // semaforoIndustrial,   ← aquí agregas cada widget nuevo, punto
 ];
 
