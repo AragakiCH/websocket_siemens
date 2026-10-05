@@ -44,8 +44,29 @@ function alcanza(mio: string | undefined, minimo: Rol): boolean {
   return i >= 0 && i <= j;
 }
 
+/**
+ * ¿Esta persona, en esta pantalla, solo debe ver el runtime?
+ *
+ * Un VISOR (otro equipo de la red, lo decide el servidor por la IP) con una
+ * categoría por debajo de Administradores no tiene nada que hacer en el
+ * menú, la configuración o el Diseñador: su puesto es el HMI en marcha. Se
+ * le manda a `/preview` en vez de enseñarle un menú con cuatro tarjetas que
+ * en el mejor de los casos le devuelven un 403.
+ *
+ * Un Administrador o Supervisor que entra desde otro equipo SÍ puede seguir
+ * llegando a las pantallas de administración escribiendo la ruta: es lo que
+ * permite tomar el control o revisar la actividad desde un portátil sin ir
+ * al servidor. Al entrar, eso sí, también va al runtime (ver Login.tsx).
+ */
+export function soloRuntime(
+  esVisor: boolean | null,
+  categoria: string | undefined
+): boolean {
+  return esVisor === true && !alcanza(categoria, 'Administradores');
+}
+
 export function RutaProtegida({ children, rolMinimo }: Props) {
-  const { sesion, authRequerida, comprobandoSesion } = useAppStore();
+  const { sesion, authRequerida, comprobandoSesion, esVisor } = useAppStore();
   const donde = useLocation();
 
   // Mientras se pregunta al servidor quién soy, NO se decide nada. Sin este
@@ -77,6 +98,13 @@ export function RutaProtegida({ children, rolMinimo }: Props) {
     // `state.desde` permite volver a donde iba después de entrar, en vez de
     // dejarlo siempre en el menú.
     return <Navigate to="/" replace state={{ desde: donde.pathname }} />;
+  }
+
+  // Un visor de operación no ve nada más que el runtime. El permiso real lo
+  // aplica el backend igual; esto evita enseñar un menú al que no se puede
+  // entrar.
+  if (soloRuntime(esVisor, sesion.categoria)) {
+    return <Navigate to="/preview" replace />;
   }
 
   if (rolMinimo && !alcanza(sesion.categoria, rolMinimo)) {

@@ -108,3 +108,7 @@ tzdata==2025.2               # Windows no trae base de datos de zonas
                              # horarias: sin esto, ZoneInfo("America/Lima")
                              # falla y las marcas de tiempo locales del
                              # histórico se quedan en UTC.
+pycomm3>=1.2.14              # Allen-Bradley Logix por EtherNet/IP (CIP).
+                             # Pura Python: no necesita RSLinx ni DLLs.
+python-snap7>=3.0            # Siemens por S7comm (puerto 102): S7-1200 sin OPC UA, S7-300/400.
+                             # Desde 3.0 es Python puro: sin DLL de snap7 que instalar.

@@ -549,6 +549,18 @@ def abrir_ventana(puerto: int, url: str = "", titulo: str = "",
     # ventana, y cambiarla después no tiene efecto.
     webview.settings['ALLOW_DOWNLOADS'] = True
 
+    # ── Autorrelleno de Edge APAGADO ─────────────────────────────────────
+    #
+    # Con él activo, escribir el usuario en el login iba a saltos: el
+    # desplegable de sugerencias de Edge se comía letras y pintaba el campo
+    # de blanco. Detalle completo en desktop/autofill_webview.py. Se aplica
+    # antes de create_window porque envuelve el arranque del motor.
+    try:
+        from desktop.autofill_webview import desactivar_autofill_webview
+    except ImportError:
+        from autofill_webview import desactivar_autofill_webview  # empaquetado
+    desactivar_autofill_webview()
+
     try:
         destino = ({"html": html} if html
                    else {"url": url or f"http://127.0.0.1:{puerto}"})
@@ -582,6 +594,16 @@ def abrir_ventana(puerto: int, url: str = "", titulo: str = "",
             almacen = str(perfil)
         except Exception:  # noqa: BLE001
             almacen = None    # pywebview usará su ruta por defecto
+
+        # Caché HTTP fuera ANTES de abrir. Es lo que evita que, tras
+        # actualizar, la ventana pinte el index.html de la versión anterior
+        # con sus assets viejos (ver desktop/cache_webview.py). La sesión y
+        # el localStorage no se tocan.
+        try:
+            from desktop.cache_webview import limpiar_cache_webview
+        except ImportError:
+            from cache_webview import limpiar_cache_webview  # empaquetado
+        limpiar_cache_webview(almacen)
 
         # `gui=None` deja que pywebview elija el motor del sistema. En Windows
         # es WebView2 (Edge); si no estuviera, lanza y se cae al navegador.

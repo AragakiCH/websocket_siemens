@@ -49,6 +49,14 @@ class EndpointPlc:
     password: str = ""     # solo Rexroth
     app: str = ""          # solo Rexroth: Datalayer/plc/app/<app>
     programa: str = ""     # solo Rexroth: .../sym/<programa>
+    # 'allenbradley' -> EthernetIpDriver: slot del procesador en el chasis
+    # 'siemens' + transporte 's7comm' -> rack/slot de la CPU (0/1)
+    slot: int = 0
+    rack: int = 0
+    # Solo Siemens: 'opcua' (defecto) | 's7comm'
+    transporte: str = ""
+    # Solo S7comm: lista de tags "nombre;DB1;offset;TIPO", una por línea
+    s7_tags: str = ""
 
 
 def _host_puerto(endpoint: str) -> tuple[str, int]:

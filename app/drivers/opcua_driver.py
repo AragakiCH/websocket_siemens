@@ -33,6 +33,10 @@ from app.drivers.plc_driver import (
 
 logger = logging.getLogger("opcua_driver")
 
+# Nodos por petición `Read` en `read_tags`. Muy por debajo del límite
+# habitual del S7-1500 (MaxNodesPerRead ≈ 1000) para no rozarlo nunca.
+LOTE_LECTURA = 250
+
 # Nombres de nodos internos / metadata que NO son variables de datos reales.
 NODOS_IGNORADOS = {"Icon", "InputArguments", "OutputArguments"}
 
@@ -51,11 +55,44 @@ def _dt_iso(dt: Optional[datetime]) -> str:
 
 
 def _a_serializable(valor: object) -> object:
+    """
+    Convierte el valor a algo que `json.dumps` acepte.
+
+    Los ARRAYS del PLC (`Array[1..20] of Bool`) llegan como lista y se dejan
+    como lista: antes se pasaban por `str()` y el frontend recibía
+    "[True, False, ...]" como si fuera un texto. Un UDT ya decodificado por
+    asyncua (`load_data_type_definitions`) llega como objeto con atributos y
+    se convierte en dict. Un ExtensionObject SIN decodificar (los bytes del
+    struct, el `Body=b'\\x00...'` de la captura) no sirve para nada en un
+    widget: se devuelve None.
+    """
     if isinstance(valor, (bool, int, float, str)) or valor is None:
         return valor
     if isinstance(valor, datetime):
         return valor.isoformat()
+    if isinstance(valor, (bytes, bytearray)):
+        return None
+    if isinstance(valor, (list, tuple)):
+        return [_a_serializable(v) for v in valor]
+    if isinstance(valor, dict):
+        return {str(k): _a_serializable(v) for k, v in valor.items()}
+    if isinstance(valor, ua.ExtensionObject):
+        return None
+    # Struct decodificado por asyncua: un objeto plano con sus campos.
+    campos = getattr(valor, "__dict__", None)
+    if isinstance(campos, dict) and campos:
+        return {k: _a_serializable(v) for k, v in campos.items()
+                if not k.startswith("_")}
     return str(valor)
+
+
+def _es_struct_crudo(valor: object) -> bool:
+    """¿Es un UDT que no se ha podido decodificar (o una lista de ellos)?"""
+    if isinstance(valor, ua.ExtensionObject):
+        return True
+    if isinstance(valor, (list, tuple)) and valor:
+        return isinstance(valor[0], ua.ExtensionObject)
+    return False
 
 
 class _SubHandler:
@@ -117,17 +154,37 @@ class _SubHandler:
         except Exception as exc:  # noqa: BLE001
             logger.warning("Error procesando datachange: %s", exc)
 
+    def status_change_notification(self, status) -> None:
+        """
+        El servidor avisa de que la subscription cambió de estado. En la
+        práctica llega UNA vez, cuando la da por caducada (`BadTimeout`: el
+        cliente no envió Publish a tiempo, p. ej. tras una pausa del equipo)
+        o la cierra por su cuenta. La SESIÓN sigue viva, así que el watchdog
+        de sesión no ve nada raro; sin esto, el PLC quedaba "conectado" y sin
+        entregar un solo cambio hasta reiniciar el programa. Se marca aquí y
+        el SubscriptionHandler la recrea en su siguiente vuelta.
+        """
+        logger.warning("La subscription cambió de estado: %s. Se recreará.",
+                       status)
+        self._driver.subscription_caida = True
+
 
 class OpcUaDriver(PlcDriver):
     """Driver OPC UA basado en asyncua."""
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
+        # Modelo de la CPU leído del servidor, para la vista. "" si no se pudo.
+        self.modelo: str = ""
         self._client: Optional[Client] = None
         self._subscription = None
         self._handles: List[int] = []
         self._connected: bool = False
         self._ns_index: Optional[int] = None
+
+        # La subscription dejó de valer (StatusChangeNotification del
+        # servidor). La lee `subscription_viva()`; la limpia `subscribe()`.
+        self.subscription_caida: bool = False
 
         # Estado compartido con el handler.
         self.tag_por_nodeid: Dict[str, TagInfo] = {}
@@ -163,8 +220,32 @@ class OpcUaDriver(PlcDriver):
             if self._settings.opcua_password:
                 self._client.set_password(self._settings.opcua_password)
 
-        await self._client.connect()
+        try:
+            await self._client.connect()
+        except Exception as exc:  # noqa: BLE001
+            # Un S7-1200 sin servidor OPC UA (FW < 4.4, o sin activar) cae
+            # aquí con un "Connection refused" que no orienta a nadie. Se
+            # dice lo que casi siempre es.
+            raise ConnectionError(
+                f"No se pudo abrir sesión OPC UA en {self._settings.opcua_endpoint}: "
+                f"{exc}. Si es un S7-1200, su servidor OPC UA solo existe desde "
+                f"FW 4.4 y hay que activarlo (Propiedades → OPC UA → Servidor); "
+                f"si no, conecta por S7comm (puerto 102). Usa 'Identificar' para "
+                f"ver el modelo."
+            ) from exc
         self._connected = True
+        await self._leer_modelo()
+
+        # Definiciones de los UDT del PLC. Con esto, un `Array of
+        # "UDT_Analog_REAL"` llega decodificado (campo a campo) en vez de como
+        # un ExtensionObject opaco. El S7-1500 las publica desde FW 2.5; si
+        # no están, no pasa nada: los structs con miembros se expanden igual
+        # en el browse, y los que no se puedan decodificar se omiten.
+        try:
+            await self._client.load_data_type_definitions()
+            logger.info("Definiciones de tipos (UDT) cargadas del servidor.")
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Sin definiciones de UDT del servidor: %s", exc)
 
         try:
             self._ns_index = await self._client.get_namespace_index(
@@ -265,6 +346,36 @@ class OpcUaDriver(PlcDriver):
                     len(tags), len({t.db_name for t in tags}))
         return tags
 
+    async def _leer_modelo(self) -> None:
+        """
+        Modelo de la CPU ("CPU 1516-3 PN/DP") desde las propiedades DI del
+        nodo del PLC (`DeviceSet/PLC_x/Model` u `OrderNumber`). Solo para
+        enseñarlo: si no está, no pasa nada.
+        """
+        self.modelo = ""
+        try:
+            ds = await self._buscar_hijo_por_nombre(
+                self._client.nodes.objects, self._settings.browse_device_set)
+            if ds is None:
+                return
+            plc = await self._buscar_hijo_por_nombre(ds, self._settings.browse_plc_name)
+            if plc is None:
+                hijos = await ds.get_children()
+                plc = hijos[0] if hijos else None
+            if plc is None:
+                return
+            for prop in ("Model", "OrderNumber", "DeviceModel"):
+                n = await self._buscar_hijo_por_nombre(plc, prop)
+                if n is None:
+                    continue
+                v = await n.read_value()
+                v = getattr(v, "Text", v)
+                if v:
+                    self.modelo = str(v)
+                    return
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Sin modelo de CPU por OPC UA: %s", exc)
+
     async def _buscar_hijo_por_nombre(self, node: Node, nombre: str) -> Optional[Node]:
         try:
             for child in await node.get_children():
@@ -290,9 +401,35 @@ class OpcUaDriver(PlcDriver):
             except Exception:  # noqa: BLE001
                 continue
             if node_class == ua.NodeClass.Variable:
+                # Un STRUCT / UDT del DB es una Variable (su valor es el
+                # struct entero como ExtensionObject) que ADEMÁS tiene como
+                # hijos sus miembros, uno por campo marcado "accesible desde
+                # OPC UA". Antes se registraba solo el padre y el frontend
+                # enseñaba los bytes crudos del struct (`Body=b'\\x00...'`).
+                # Si tiene hijos, se entra: lo que se quiere son los campos.
+                hijos = await self._hijos_variables(child)
+                if hijos:
+                    await self._browse_recursivo(
+                        child, db_name, f"{prefijo}.{nombre}", acumulador)
+                    continue
                 await self._registrar_variable(child, db_name, prefijo, nombre, acumulador)
             elif node_class == ua.NodeClass.Object:
                 await self._browse_recursivo(child, db_name, f"{prefijo}.{nombre}", acumulador)
+
+    async def _hijos_variables(self, node: Node) -> List[Node]:
+        """Hijos de clase Variable de un nodo (los miembros de un struct)."""
+        try:
+            hijos = await node.get_children()
+        except Exception:  # noqa: BLE001
+            return []
+        salida: List[Node] = []
+        for h in hijos:
+            try:
+                if await h.read_node_class() == ua.NodeClass.Variable:
+                    salida.append(h)
+            except Exception:  # noqa: BLE001
+                continue
+        return salida
 
     async def _registrar_variable(self, child, db_name, prefijo, nombre, acumulador) -> None:
         try:
@@ -301,6 +438,39 @@ class OpcUaDriver(PlcDriver):
                 return
             node_id = child.nodeid.to_string()
             full_name = f"{prefijo}.{nombre}" if prefijo != nombre else nombre
+
+            # ¿Es un array? El ValueRank lo dice sin leer el valor. Se anota
+            # en el tipo ("Boolean[20]") para que la vista sepa que lo que
+            # llega es una lista y no lo pinte como un ON/OFF suelto.
+            try:
+                rank = await child.read_attribute(ua.AttributeIds.ValueRank)
+                rank = rank.Value.Value
+            except Exception:  # noqa: BLE001
+                rank = -1
+            if isinstance(rank, int) and rank >= 1:
+                try:
+                    dims = await child.read_attribute(ua.AttributeIds.ArrayDimensions)
+                    dims = list(dims.Value.Value or [])
+                except Exception:  # noqa: BLE001
+                    dims = []
+                data_type = f"{data_type}[{'x'.join(str(d) for d in dims) if dims else ''}]"
+
+            # Un struct SIN miembros expuestos (o un array de UDT que el
+            # servidor no sabe describir) es un ExtensionObject opaco: no
+            # hay forma de enlazarlo a un widget. Se omite y se dice por qué,
+            # que es mejor que enseñar sus bytes como si fueran un texto.
+            try:
+                valor = await child.read_value()
+            except Exception:  # noqa: BLE001
+                valor = None
+            if _es_struct_crudo(valor):
+                logger.warning(
+                    "Se omite '%s' (%s): es una estructura que el servidor no "
+                    "expone campo a campo. En TIA Portal, marca sus miembros "
+                    "como 'Accesible desde OPC UA' o publica las definiciones "
+                    "de tipo (FW >= 2.5).", full_name, data_type)
+                return
+
             acumulador.append(TagInfo(
                 name=nombre, full_name=full_name, node_id=node_id,
                 data_type=data_type, db_name=db_name,
@@ -335,6 +505,7 @@ class OpcUaDriver(PlcDriver):
             return
 
         await self._cerrar_subscription()
+        self.subscription_caida = False
 
         handler = _SubHandler(self, callback)
         # period = intervalo de publicación (cada cuánto el server envía lotes).
@@ -368,9 +539,46 @@ class OpcUaDriver(PlcDriver):
                 except Exception as e2:  # noqa: BLE001
                     logger.warning("No se pudo suscribir %s: %s", info.full_name, e2)
 
+    def subscription_viva(self) -> bool:
+        return not self.subscription_caida
+
     # ==================================================================== #
     # Lectura puntual
     # ==================================================================== #
+    async def read_tags(self, node_ids: List[str]) -> List[Optional[TagValue]]:
+        """
+        Lee varios tags con UNA petición `Read` por lote (el S7-1500 admite
+        cientos de nodos por petición; se trocea por si el programa es
+        grande). Si un lote entero falla, sus posiciones quedan en `None` y
+        se sigue con el siguiente: una lectura de contraste no puede tumbar
+        la conexión.
+        """
+        if self._client is None:
+            raise RuntimeError("read_tags llamado sin conexión activa.")
+        salida: List[Optional[TagValue]] = []
+        ahora = _ahora_iso()
+        for i in range(0, len(node_ids), LOTE_LECTURA):
+            lote = node_ids[i:i + LOTE_LECTURA]
+            try:
+                valores = await self._client.read_values(
+                    [self._client.get_node(n) for n in lote]
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Lectura en bloque fallida (%d nodos): %s",
+                             len(lote), exc)
+                salida.extend([None] * len(lote))
+                continue
+            for node_id, valor in zip(lote, valores):
+                info = self.tag_por_nodeid.get(node_id)
+                salida.append(TagValue(
+                    tag=info.full_name if info else node_id,
+                    value=_a_serializable(valor),
+                    data_type=info.data_type if info else type(valor).__name__,
+                    timestamp=ahora,
+                    node_id=node_id,
+                ))
+        return salida
+
     async def read_tag(self, node_id: str) -> TagValue:
         if self._client is None:
             raise RuntimeError("read_tag llamado sin conexión activa.")
@@ -435,7 +643,8 @@ class OpcUaDriver(PlcDriver):
             ) from exc
 
         logger.info("Escrito %s = %r en %s",
-                    info.full_name if info else node_id, valor_convertido, self.host)
+                    info.full_name if info else node_id, valor_convertido,
+                    self._settings.opcua_endpoint)
         return await self.read_tag(node_id)
 
     # ==================================================================== #

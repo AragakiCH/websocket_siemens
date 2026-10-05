@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
@@ -50,10 +51,16 @@ class SubscriptionHandler:
         endpoint: str = "",
         plc_nombre: str = "",
         vendor: str = "siemens",
+        snapshot_global=None,
     ) -> None:
         self._driver = driver
         self._manager = manager
         self._settings = settings
+        # Función que construye el snapshot de TODOS los PLCs (la de
+        # PlcManager). Se difunde al terminar de conectar; ver
+        # `_conectar_y_suscribir` para el porqué. Opcional para no romper a
+        # quien construya el handler a mano (pruebas).
+        self._snapshot_global = snapshot_global
 
         # Identidad del PLC (para etiquetar mensajes y agregación multi-PLC).
         self.plc_id = plc_id
@@ -73,6 +80,16 @@ class SubscriptionHandler:
         self._supervisor_task: Optional[asyncio.Task] = None
         # Estado de conexión legible para /health.
         self.estado_conexion: str = "desconectado"
+        self.ultimo_error: str = ""
+
+        # Vigilancia de que la subscription ENTREGA. `time.monotonic()` del
+        # último cambio que llegó por la subscription (no cuenta lo que
+        # descubre la reconciliación) y cuántos cambios ha encontrado la
+        # reconciliación en el PLC desde la última vez que la subscription
+        # entregó algo.
+        self._ultimo_dato_sub: float = 0.0
+        self._cambios_sin_sub: int = 0
+        self._ultima_vuelta: float = 0.0
 
     # Prefijo del logger para distinguir PLCs en los logs.
     def _log(self, nivel: int, msg: str, *args) -> None:
@@ -108,9 +125,15 @@ class SubscriptionHandler:
     # ------------------------------------------------------------------ #
     async def on_data_change(self, tag_value: TagValue) -> None:
         """
-        Recibe un cambio de valor desde el driver, actualiza el snapshot y hace
-        broadcast a los clientes WebSocket, etiquetando el PLC de origen.
+        Recibe un cambio de valor desde el driver (la subscription), actualiza
+        el snapshot y hace broadcast a los clientes WebSocket, etiquetando el
+        PLC de origen.
         """
+        self._ultimo_dato_sub = time.monotonic()
+        await self._difundir_valor(tag_value)
+
+    async def _difundir_valor(self, tag_value: TagValue) -> None:
+        """Snapshot + broadcast. Común a la subscription y a la reconciliación."""
         self._snapshot[tag_value.tag] = tag_value
         mensaje = {
             "timestamp": tag_value.timestamp,     # recepción en el backend
@@ -201,6 +224,11 @@ class SubscriptionHandler:
             "num_tags": len(self._tags),
             # Solo Rexroth: 'subscription' o 'polling' (el driver decide solo).
             "modo_lectura": getattr(self._driver, "modo_lectura", "subscription"),
+            # Modelo de la CPU, si el driver lo pudo leer ("CPU 1214C DC/DC/Rly",
+            # "1769-L33ER"). Es lo que evita llamar "S7-1500" a un 1200.
+            "modelo": getattr(self._driver, "modelo", "") or "",
+            # Último fallo de conexión, para que "Desconectado" diga POR QUÉ.
+            "ultimo_error": self.ultimo_error,
             # Intervalos configurados: cada cuánto se muestrea y se publica.
             "sampling_interval_ms": self._settings.sampling_interval_ms,
             "publishing_interval_ms": self._settings.publishing_interval_ms,
@@ -288,6 +316,7 @@ class SubscriptionHandler:
                 # Conexión OK: reiniciar el backoff y pasar a vigilancia.
                 delay = self._settings.reconnect_initial_delay
                 self.estado_conexion = "conectado"
+                self.ultimo_error = ""
                 self._log(logging.INFO, "PLC conectado y suscripciones activas.")
 
                 # Watchdog: comprobar periódicamente que la sesión sigue viva.
@@ -297,6 +326,7 @@ class SubscriptionHandler:
                 raise
             except Exception as exc:  # noqa: BLE001
                 self.estado_conexion = "reconectando"
+                self.ultimo_error = f"{type(exc).__name__}: {exc}"[:400]
                 self._log(logging.ERROR, "Fallo de conexión con el PLC: %s", exc)
 
             if not self._running:
@@ -329,9 +359,44 @@ class SubscriptionHandler:
 
         # Crear la subscription en tiempo real.
         await self._driver.subscribe(self._tags, self.on_data_change)
+        self._ultimo_dato_sub = time.monotonic()
+        self._ultima_vuelta = self._ultimo_dato_sub
+        self._cambios_sin_sub = 0
 
         # Cargar un snapshot inicial leyendo el valor actual de cada tag.
         await self._cargar_snapshot_inicial()
+
+        # ── DIFUNDIR LOS TAGS A LAS VISTAS QUE YA ESTÁN ABIERTAS ──────
+        #
+        # EL FALLO QUE HABÍA AQUÍ. El snapshot completo se difundía al DAR DE
+        # ALTA el PLC (`add_plc`), cuando todavía no se había conectado y no
+        # tenía ni un tag. Al terminar de conectar —aquí— solo se mandaba el
+        # `status: conectado`, que la vista ignora a propósito porque no
+        # trae variables. Así que las vistas abiertas solo se enteraban de un
+        # tag cuando ese tag CAMBIABA de valor (mensaje de data-change).
+        #
+        # Con un PLC virtual que mueve todos sus valores cada segundo no se
+        # notaba. Con un Siemens de verdad, donde la mayoría de tags son
+        # consignas y reservas que no cambian en toda la jornada, el síntoma
+        # era exacto: "aparece como conectado pero no salen los tags; al
+        # cerrar y abrir el programa, sí" — porque abrir el programa abre un
+        # WebSocket nuevo, y ESE sí recibe el snapshot con todo.
+        #
+        # Se difunde el snapshot GLOBAL y no solo el de este PLC porque la
+        # vista reemplaza su lista entera con `msg.tags` en cada snapshot:
+        # uno parcial borraría de pantalla los tags de los demás PLCs y las
+        # variables internas.
+        #
+        # Vale también para las RECONEXIONES: esta función corre otra vez
+        # cuando el watchdog detecta la caída, así que tras reiniciar el
+        # PLC los tags vuelven a las vistas sin tocar nada.
+        if self._snapshot_global is not None:
+            try:
+                await self._manager.broadcast(self._snapshot_global())
+            except Exception as exc:  # noqa: BLE001
+                self._log(logging.WARNING,
+                          "No se pudo difundir el snapshot al conectar: %s",
+                          exc)
 
         # Notificar a los clientes WS que este PLC está conectado.
         await self._manager.broadcast(
@@ -377,3 +442,91 @@ class SubscriptionHandler:
                      "plc": self.plc_id, "status": "reconectando"}
                 )
                 return  # sale del watchdog -> el supervisor reintentará
+
+            # La sesión vive. ¿Y la subscription? Ver `_reconciliar`.
+            await self._reconciliar()
+
+    async def _reconciliar(self) -> None:
+        """
+        Red de seguridad de la subscription: contrasta lo que hay en el PLC
+        con el último valor conocido y difunde lo que difiera.
+
+        POR QUÉ EXISTE. La subscription OPC UA es el camino normal y el
+        rápido, pero puede dejar de entregar sin que la SESIÓN se caiga: el
+        servidor la da por caducada tras una pausa del equipo (suspensión,
+        depurador, un GC largo), rechaza en silencio parte de los
+        MonitoredItems, o un firmware la deja muda tras recargar el programa.
+        El watchdog de sesión (`check_alive`) sigue diciendo "conectado", y
+        desde la pantalla el síntoma es exacto: "cambié la variable en el
+        Siemens y nunca llegó; al cerrar y abrir el programa, sí" —porque
+        abrir el programa crea una subscription nueva.
+
+        QUÉ HACE. En cada vuelta del watchdog (`healthcheck_interval`, 5 s)
+        lee TODOS los tags con una petición en bloque y difunde los que no
+        coincidan con el snapshot. Con la subscription sana no encuentra nada
+        (o encuentra el cambio de hace un instante, que llega dos veces: sin
+        consecuencias, el snapshot y las vistas son idempotentes). Con la
+        subscription muda, un cambio tarda como mucho 5 s en verse en vez de
+        no verse nunca. Y si acumula DOS cambios que solo vio la lectura
+        directa sin que la subscription haya entregado nada entre medias —o
+        el driver avisa de que el servidor la dio por muerta—, la recrea sin
+        tirar la conexión ni el snapshot. Un solo cambio no basta: puede ser
+        la carrera normal de un cambio hecho justo antes de leer, que la
+        subscription trae un instante después (y ese dato reinicia la cuenta).
+
+        COSTE. Una petición `Read` cada 5 s por PLC. Para 200 tags en un
+        S7-1500 son unos milisegundos; no compite con la subscription.
+        """
+        # Un driver mínimo (pruebas, un protocolo futuro) puede no tener
+        # lectura en bloque: entonces no hay contraste y se sigue como antes.
+        leer = getattr(self._driver, "read_tags", None)
+        if not self._tags or leer is None:
+            return
+
+        inicio = time.monotonic()
+        entrego_desde_la_ultima = self._ultimo_dato_sub >= self._ultima_vuelta
+        self._ultima_vuelta = inicio
+
+        try:
+            leidos = await leer([t.node_id for t in self._tags])
+        except Exception as exc:  # noqa: BLE001
+            # Sin lectura no hay contraste; el watchdog de sesión ya decidirá
+            # si la conexión está viva.
+            self._log(logging.DEBUG, "Reconciliación sin lectura: %s", exc)
+            return
+
+        diferencias = 0
+        for info, tv in zip(self._tags, leidos):
+            if tv is None:
+                continue
+            previo = self._snapshot.get(info.full_name)
+            if previo is not None and previo.value == tv.value:
+                continue
+            diferencias += 1
+            await self._difundir_valor(tv)
+
+        if diferencias:
+            self._log(logging.INFO,
+                      "Reconciliación: %d tag(s) habían cambiado sin pasar "
+                      "por la subscription.", diferencias)
+
+        # ¿Hay que recrear la subscription?
+        viva = getattr(self._driver, "subscription_viva", lambda: True)()
+        if entrego_desde_la_ultima:
+            self._cambios_sin_sub = 0
+        self._cambios_sin_sub += diferencias
+
+        if viva and self._cambios_sin_sub < 2:
+            return
+
+        self._log(logging.WARNING,
+                  "La subscription no entrega cambios (%s). Se recrea.",
+                  "el servidor la dio por caducada" if not viva
+                  else f"{self._cambios_sin_sub} cambios que solo vio la "
+                       f"lectura directa")
+        self._cambios_sin_sub = 0
+        # Si recrearla falla, la excepción sube al supervisor, que reconecta
+        # entero con backoff: es justo el caso en el que la sesión tampoco
+        # está bien.
+        await self._driver.subscribe(self._tags, self.on_data_change)
+        self._ultimo_dato_sub = time.monotonic()

@@ -9,6 +9,10 @@ central. No habla con los PLCs ni guarda nada: solo muestra la vista React y
 recibe los datos por WebSocket. Todo —pantallas, widgets, conexiones,
 usuarios, histórico— vive en el servidor.
 
+Al entrar, un visor va DIRECTO al runtime del proyecto que el supervisor tiene
+abierto en el servidor (no al menú), y lo sigue en vivo. Eso lo decide el
+servidor por la IP de origen, no este fichero: ver docs/VISOR_RUNTIME.md.
+
 Es deliberadamente un cliente FINO, y no importa nada de `app/`: así el .exe
 del visor pesa una fracción y actualizar la lógica del HMI no obliga a
 reinstalar en todos los puestos, solo en el servidor.
@@ -207,6 +211,18 @@ def main() -> None:
     # "exportar a Excel no hace nada" es el mismo fallo mudo aquí que allí.
     webview.settings['ALLOW_DOWNLOADS'] = True
 
+    # ── Autorrelleno de Edge APAGADO ─────────────────────────────────────
+    #
+    # Con él activo, escribir el usuario en el login iba a saltos: el
+    # desplegable de sugerencias de Edge se comía letras y pintaba el campo
+    # de blanco. Detalle completo en desktop/autofill_webview.py. Se aplica
+    # antes de create_window porque envuelve el arranque del motor.
+    try:
+        from desktop.autofill_webview import desactivar_autofill_webview
+    except ImportError:
+        from autofill_webview import desactivar_autofill_webview  # empaquetado
+    desactivar_autofill_webview()
+
     webview.create_window(titulo, width=ancho, height=alto, **destino)
 
     # ── private_mode=False: ESTO NO ES OPCIONAL ───────────────────────────
@@ -220,6 +236,15 @@ def main() -> None:
     # intermitente — que es mucho peor de diagnosticar que si fallara siempre.
     perfil = _carpeta_perfil()
     if perfil:
+        # Caché HTTP fuera antes de abrir: si no, tras actualizar el SERVIDOR
+        # este visor puede seguir pintando el index.html de la versión
+        # anterior con sus assets viejos (ver desktop/cache_webview.py). La
+        # sesión iniciada se conserva.
+        try:
+            from desktop.cache_webview import limpiar_cache_webview
+        except ImportError:
+            from cache_webview import limpiar_cache_webview  # empaquetado
+        limpiar_cache_webview(perfil)
         webview.start(private_mode=False, storage_path=perfil)
     else:
         webview.start(private_mode=False)

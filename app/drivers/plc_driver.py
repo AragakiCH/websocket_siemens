@@ -112,6 +112,41 @@ class PlcDriver(ABC):
         """Lee de forma puntual (one-shot) el valor actual de un tag."""
         raise NotImplementedError
 
+    async def read_tags(self, node_ids: List[str]) -> List[Optional[TagValue]]:
+        """
+        Lee de golpe el valor actual de varios tags.
+
+        Devuelve una lista ALINEADA con `node_ids`: en la posición de un tag
+        que no se pudo leer va `None`, nunca se acorta la lista ni se lanza
+        por un solo tag. Lo usa el SubscriptionHandler para CONTRASTAR, cada
+        pocos segundos, lo que dice la subscription con lo que hay de verdad
+        en el PLC (ver `SubscriptionHandler._reconciliar`).
+
+        Esta versión por defecto lee uno a uno con `read_tag`. Los drivers
+        OPC UA la sobreescriben con una sola petición `Read` en bloque, que
+        para cientos de tags es la diferencia entre un viaje y cientos.
+        """
+        salida: List[Optional[TagValue]] = []
+        for node_id in node_ids:
+            try:
+                salida.append(await self.read_tag(node_id))
+            except Exception:  # noqa: BLE001
+                salida.append(None)
+        return salida
+
+    def subscription_viva(self) -> bool:
+        """
+        ¿La subscription sigue entregando datos, hasta donde el driver sabe?
+
+        Un servidor OPC UA puede dar por caducada una subscription y dejar la
+        SESIÓN abierta: el watchdog de sesión no se entera, y desde fuera se
+        ve exactamente "conectado, pero no llega ningún cambio". El driver
+        que reciba ese aviso (StatusChangeNotification) devuelve False y el
+        handler recrea la subscription sin tirar la conexión. Un driver sin
+        ese detalle devuelve True y se apoya solo en la reconciliación.
+        """
+        return True
+
     async def write_tag(self, node_id: str, valor: object) -> TagValue:
         """
         Escribe un valor en un tag y DEVUELVE LO QUE QUEDÓ, releyéndolo.

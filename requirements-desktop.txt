@@ -64,3 +64,7 @@ tzdata==2025.2
 #  * ODBC Driver 18 for SQL Server — en la máquina que EJECUTA la aplicación,
 #    no en la que la empaqueta. La app lo detecta y lo explica en la pantalla
 #    de acceso si falta.
+pycomm3>=1.2.14              # Allen-Bradley Logix por EtherNet/IP (CIP).
+                             # Pura Python: no necesita RSLinx ni DLLs.
+python-snap7>=3.0            # Siemens por S7comm (puerto 102): S7-1200 sin OPC UA, S7-300/400.
+                             # Desde 3.0 es Python puro: sin DLL de snap7 que instalar.

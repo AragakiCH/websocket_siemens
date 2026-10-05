@@ -3,7 +3,8 @@
 // Cliente de los endpoints REST específicos de Bosch Rexroth ctrlX CORE.
 //
 // Se usan en la pantalla de Login, ANTES de dar de alta el PLC: el backend
-// abre una sesión OPC UA temporal con las credenciales que se escriben y
+// abre una sesión temporal con las credenciales que se escriben (por el
+// Data Layer REST del ctrlX, con JWT; sin certificado que aceptar) y
 // devuelve qué hay publicado en el controlador, para que el usuario elija.
 //
 //   POST /rexroth/apps     -> apps bajo Datalayer/plc/app
@@ -24,7 +25,9 @@ export interface RexrothCreds {
 function toBody(creds: RexrothCreds, extra: Record<string, unknown> = {}) {
   return JSON.stringify({
     host: creds.ip.trim(),
-    puerto: creds.puerto ?? 4840,
+    // 443 = HTTPS del Data Layer. El backend acepta también 4840 y lo
+    // sustituye por su puerto HTTPS configurado.
+    puerto: creds.puerto ?? 443,
     usuario: creds.usuario.trim(),
     password: creds.password,
     ...extra,

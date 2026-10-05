@@ -24,6 +24,14 @@ export default defineConfig({
       '/discover': BACKEND,
       // Exploración del ctrlX de Rexroth (apps y programas) desde el Login
       '/rexroth': BACKEND,
+      // Identificación previa al alta de Siemens (S7comm/OPC UA) y de
+      // Allen-Bradley (EtherNet/IP). Sin estas líneas Vite responde el
+      // index.html de la SPA y el botón «Identificar» ve un HTTP 404 que
+      // parece del backend.
+      '/siemens': BACKEND,
+      '/allenbradley': BACKEND,
+      // El proyecto publicado para los visores (GET/PUT /runtime).
+      '/runtime': BACKEND,
       // Multiusuario: identidad, diseño compartido, bloqueo de edición y
       // auditoría. OJO: si falta alguno de estos, Vite responde el index.html
       // de la SPA en vez de reenviar al backend, y la vista lo interpreta

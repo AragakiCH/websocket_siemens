@@ -11,12 +11,19 @@ enviar JSON. Un cliente lento o que se desconecta no debe afectar a los demás.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Callable, Dict, List, Optional, Set
 
 from fastapi import WebSocket
 
 logger = logging.getLogger("connection_manager")
+
+#: Segundos que se le dan a UN cliente para aceptar un mensaje. Un socket
+#: cuyo búfer TCP está lleno (portátil dormido, VPN caída sin FIN) no falla:
+#: se queda en `send` para siempre. Sin este límite, `gather` esperaría por
+#: él y el broadcast entero —los diez visores— se congelaría con él.
+TIMEOUT_ENVIO = 5.0
 
 
 class ConnectionManager:
@@ -205,8 +212,21 @@ class ConnectionManager:
         # (por VPN, o con la pestaña en segundo plano) retrasaba a todos los
         # que iban detrás en la lista. Con `gather` todos los envíos se lanzan
         # a la vez y el lento solo se retrasa a sí mismo.
+        #
+        # Se serializa UNA vez y se manda el texto: `send_json` hacía un
+        # `json.dumps` por cliente, y con diez visores y decenas de mensajes
+        # por segundo de tags eso era la mayor parte del trabajo del bucle.
+        try:
+            texto = json.dumps(message, ensure_ascii=False)
+        except (TypeError, ValueError) as exc:
+            logger.warning("Mensaje no serializable, no se difunde: %s", exc)
+            return
+
+        async def enviar(ws: WebSocket) -> None:
+            await asyncio.wait_for(ws.send_text(texto), timeout=TIMEOUT_ENVIO)
+
         resultados = await asyncio.gather(
-            *(ws.send_json(message) for ws in objetivo),
+            *(enviar(ws) for ws in objetivo),
             return_exceptions=True,
         )
 
@@ -222,3 +242,14 @@ class ConnectionManager:
                     self._usuarios.pop(ws, None)
             logger.info("Depurados %d clientes WS caídos. Total: %d",
                         len(caidos), len(self._active))
+            # Se cierra el socket de verdad, no solo se olvida. Si solo se
+            # quitara de la lista, un cliente que se quedó atascado y luego
+            # se recupera seguiría con la conexión abierta pero sin recibir
+            # nada más: una pantalla "En vivo" con datos congelados. Cerrado,
+            # su RealPLCService reconecta solo a los 3 s y vuelve a estar en
+            # la lista.
+            for ws in caidos:
+                try:
+                    await asyncio.wait_for(ws.close(code=1011), timeout=1.0)
+                except Exception:  # noqa: BLE001
+                    pass

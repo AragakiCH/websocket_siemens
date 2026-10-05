@@ -130,11 +130,49 @@ export function VariablesInternas() {
   // Los valores VIVOS. La misma lista que alimenta a los widgets: si otro
   // panel mueve la variable, esta tabla lo refleja sin preguntar nada.
   const { variables: tags } = useAppStore();
-  const vivos = useMemo(() => {
+  const vivosDelServidor = useMemo(() => {
     const m = new Map<string, unknown>();
     for (const t of tags) m.set(t.id, t.value);
     return m;
   }, [tags]);
+
+  // ── LO QUE ACABAS DE ESCRIBIR, MIENTRAS EL SERVIDOR LO CONFIRMA ───
+  //
+  // La columna «Valor ahora» enseña el valor VIVO (el que llega por el
+  // WebSocket), y eso es correcto: es lo que ven los demás paneles. Pero
+  // entre que pulsas el interruptor y el servidor devuelve el eco hay un
+  // viaje de ida y vuelta, y durante ese viaje el interruptor seguía
+  // enseñando el valor viejo. Un segundo clic en ese momento mandaba
+  // OTRA VEZ el contrario —o sea, lo deshacía—, y el control parecía roto.
+  //
+  // Aquí se guarda lo que se acaba de mandar y se enseña en su lugar hasta
+  // que el valor vivo lo alcanza (o hasta que el envío falla). Es lo que
+  // hace cualquier interruptor de una app decente: obedece al dedo y se
+  // corrige solo si el servidor dice otra cosa.
+  const [pendientes, setPendientes] = useState<Map<string, unknown>>(new Map());
+
+  useEffect(() => {
+    if (pendientes.size === 0) return;
+    let cambio = false;
+    const siguiente = new Map(pendientes);
+    for (const [nombre, valor] of pendientes) {
+      const vivo = vivosDelServidor.get(claveInterna(nombre));
+      // Se compara como texto: el servidor puede devolver 12 donde se mandó
+      // "12", y los dos son el mismo valor para quien mira la pantalla.
+      if (vivo !== undefined && String(vivo) === String(valor)) {
+        siguiente.delete(nombre);
+        cambio = true;
+      }
+    }
+    if (cambio) setPendientes(siguiente);
+  }, [vivosDelServidor, pendientes]);
+
+  const vivos = useMemo(() => {
+    if (pendientes.size === 0) return vivosDelServidor;
+    const m = new Map(vivosDelServidor);
+    for (const [nombre, valor] of pendientes) m.set(claveInterna(nombre), valor);
+    return m;
+  }, [vivosDelServidor, pendientes]);
 
   // ── Guardado diferido de la DEFINICION ────────────────────────
   const cola = useRef(new Map<string, Record<string, unknown>>());
@@ -238,8 +276,21 @@ export function VariablesInternas() {
       setVariables((prev) =>
         prev.map((x) => (x.nombre === v.nombre ? { ...x, valor } : x))
       );
+      // Se enseña ya, sin esperar al eco (ver `pendientes`).
+      setPendientes((prev) => new Map(prev).set(v.nombre, valor));
       void conServidor(async () => {
-        await fijarValorInterna(v.nombre, valor);
+        try {
+          await fijarValorInterna(v.nombre, valor);
+        } catch (e) {
+          // Si el servidor lo rechazó, el valor optimista era mentira: se
+          // quita y vuelve a verse el vivo, que es el que hay de verdad.
+          setPendientes((prev) => {
+            const m = new Map(prev);
+            m.delete(v.nombre);
+            return m;
+          });
+          throw e;
+        }
       });
     },
     [conServidor]

@@ -157,7 +157,10 @@ export function PlcConnect() {
       await connect({
         vendor,
         ip: ip.trim(),
-        puerto: 4840,
+        // Rexroth ya no va por OPC UA (4840): habla con el Data Layer por
+        // HTTPS. El backend sustituye igualmente un 4840 por el puerto HTTPS
+        // configurado, pero mejor no mandarlo.
+        puerto: isRexroth ? 443 : 4840,
         usuario: isRexroth ? user.trim() : '',
         password: isRexroth ? password : '',
         app: isRexroth ? app || 'Application' : '',

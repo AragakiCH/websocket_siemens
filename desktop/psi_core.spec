@@ -59,6 +59,11 @@ a = Analysis(
     ],
     hiddenimports=[
         "app.main",
+        # Limpieza de la caché de WebView2 al arrancar; se importa dentro de
+        # una función y con dos nombres posibles, así que se declara aquí.
+        "cache_webview",
+        # Apaga el autorrelleno de Edge en la ventana (mismo patrón de import).
+        "autofill_webview",
         # uvicorn resuelve estos por nombre en tiempo de ejecución, así que
         # PyInstaller no los ve al analizar los imports.
         "uvicorn.logging",
@@ -66,6 +71,13 @@ a = Analysis(
         "uvicorn.protocols.http.auto",
         "uvicorn.protocols.websockets.auto",
         "uvicorn.lifespan.on",
+        # Drivers que se importan DENTRO de una función (solo cuando hay un
+        # PLC de esa marca), así que el análisis estático no los ve.
+        "app.drivers.ethernetip_driver",
+        "app.drivers.ctrlx_datalayer_driver",
+        "pycomm3",
+        "app.drivers.s7comm_driver",
+        "snap7",
         # ---------------------------------------------------------------- #
         #  python-multipart: el que rompe el arranque entero si falta
         # ---------------------------------------------------------------- #

@@ -143,6 +143,7 @@ GO
 IF OBJECT_ID('plc_prg', 'U') IS NULL CREATE TABLE plc_prg (
     id BIGINT IDENTITY(1,1) PRIMARY KEY,
     ts DATETIME2 NOT NULL,
+    ts_local DATETIME2,
     plc_id VARCHAR(120) NOT NULL,
     programa VARCHAR(200),
     tag VARCHAR(400) NOT NULL,

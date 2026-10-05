@@ -254,14 +254,34 @@ def driver_odbc_por_defecto() -> str:
 # ====================================================================== #
 # Marcas de tiempo: todo se guarda en UTC, de forma determinista
 # ====================================================================== #
+def zona_almacen():
+    """
+    La zona en la que están escritas las marcas SIN zona de la base de datos.
+
+    Es UNA sola decisión para todo el sistema (`PLC_HISTORICO_HORA`): lo que
+    se escribe naive en `DATETIME`/`DATETIME2` se escribe en esta zona, y lo
+    que se lee naive se interpreta en esta misma zona. Si escritura y lectura
+    no usaran la misma, el Excel y la pantalla saldrían desplazados respecto
+    a lo que se ve en SSMS — que es justo lo que pasaba con UTC.
+    """
+    from app.config.settings import get_settings
+
+    st = get_settings()
+    modo = (getattr(st, "historico_hora", "local") or "local").strip().lower()
+    if modo == "utc":
+        return timezone.utc
+    return st.zona_horaria()
+
+
 def a_utc(valor: Any) -> Optional[datetime]:
     """
     Convierte cualquier marca de tiempo a un `datetime` **aware en UTC**.
 
     Acepta cadenas ISO 8601 (con o sin offset, con 'Z' o con '+00:00'),
-    `datetime` (aware o naive) y None. Una marca naive se asume UTC, que es lo
-    que emiten los dos drivers de PLC (`SourceTimestamp` de OPC UA es UTC por
-    especificación).
+    `datetime` (aware o naive) y None. Una marca NAIVE se interpreta en la
+    zona de almacén (`zona_almacen()`): es lo que hay en las columnas
+    `DATETIME` de la base. Los drivers de PLC emiten siempre marcas con zona
+    ('Z' o '+00:00'), así que a ellos esto no les afecta.
     """
     if valor is None:
         return None
@@ -279,7 +299,7 @@ def a_utc(valor: Any) -> Optional[datetime]:
         except ValueError:
             return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=zona_almacen()).astimezone(timezone.utc)
     return dt.astimezone(timezone.utc)
 
 
@@ -306,13 +326,18 @@ def ts_para_motor(valor: Any, motor: str) -> Any:
     dt = a_utc(valor)
     if dt is None:
         return None
+    # A la hora del ALMACÉN (la de la planta por defecto). Es la única
+    # conversión: el motor recibe un naive ya en esa hora y no toca nada.
+    dt = dt.astimezone(zona_almacen())
     if motor == "postgresql":
+        # TIMESTAMPTZ guarda el instante; se muestra en la zona de la sesión.
         return dt
     if motor == "sqlite":
-        # Formato fijo y ordenable. Se conserva el '+00:00' para que quede
-        # explícito en la tabla que el dato está en UTC.
+        # Formato fijo y ordenable, con el offset explícito ('-05:00') para
+        # que quede claro en la tabla en qué hora está.
         return dt.isoformat(sep=" ", timespec="milliseconds")
-    # MySQL y SQL Server: naive, con la hora UTC ya aplicada.
+    # MySQL y SQL Server: naive, en la hora del almacén. Lo que se ve en
+    # SSMS es lo que marca el reloj de la planta.
     return dt.replace(tzinfo=None)
 
 
@@ -323,14 +348,45 @@ def _serializable(valor: Any) -> Any:
     """
     Convierte tipos de BD a algo que `json.dumps` acepte.
 
-    Las fechas se emiten en ISO 8601 para que el frontend las parsee con
-    `new Date(...)` sin ambigüedad de formato.
+    Las fechas se emiten en ISO 8601 **con zona**, para que el frontend las
+    parsee con `new Date(...)` sin ambigüedad.
+
+    EL FALLO QUE HABÍA AQUÍ. Un `DATETIME2` de SQL Server (o `DATETIME` de
+    MySQL) vuelve de la base como datetime NAIVE: contiene la hora UTC —así se
+    escribió, ver `ts_para_motor`— pero no lo dice. `isoformat()` de eso da
+    `2026-09-17T15:29:10`, sin `Z` ni offset, y el estándar de JavaScript
+    dice que una fecha-hora SIN offset se interpreta como hora LOCAL del
+    navegador. En Perú son cinco horas de desplazamiento silencioso: una
+    alarma recién saltada salía como «hace 0 s» durante cinco horas, y la
+    fecha de creación de una receta, cinco horas tarde.
+
+    El historizador se había protegido por su cuenta (`_añadir_hora_local`
+    reescribe `ts` con `Z`), y el trend lleva un cinturón para lo mismo. Pero
+    todo lo que va por el CRUD genérico —alarmas, recetas, usuarios,
+    auditoría en tabla— pasaba por aquí sin protección. Arreglarlo en este
+    punto lo arregla para todos a la vez, hoy y para la tabla que se cree
+    mañana.
+
+    LA REGLA: un datetime sin zona que sale de la base ES UTC, porque así se
+    escribió (todas las escrituras pasan por `ts_para_motor` / `a_utc` o por
+    `_ahora`, que sella con `datetime.now(timezone.utc)`). Se le pone la zona
+    que le falta y se emite con `+00:00`. Un datetime que ya trae zona
+    (PostgreSQL, `TIMESTAMPTZ`) se emite tal cual. SQLite guarda texto con
+    `+00:00` y llega como `str`, así que ni pasa por aquí.
+
+    `date` y `time` sueltos no llevan zona por definición y se dejan como
+    están: una fecha de calendario no es un instante.
     """
     if valor is None or isinstance(valor, (str, int, float, bool)):
         return valor
     if isinstance(valor, Decimal):
         return float(valor)
-    if isinstance(valor, (datetime, date, dtime)):
+    if isinstance(valor, datetime):
+        if valor.tzinfo is None:
+            # Naive de la base: está en la hora del almacén, no en UTC.
+            valor = valor.replace(tzinfo=zona_almacen())
+        return valor.isoformat()
+    if isinstance(valor, (date, dtime)):
         return valor.isoformat()
     if isinstance(valor, UUID):
         return str(valor)
@@ -353,21 +409,44 @@ def tipos_motor(motor: str) -> Dict[str, str]:
     añadiera quedaría BIGINT en una base recién creada e INTEGER en una
     migrada, y la FK fallaría solo en la segunda.
     """
+    # `ts_local`: la misma marca en la hora de la planta (PLC_TIMEZONE), SIN
+    # zona: es lo que una persona espera ver al abrir la tabla en SSMS. En
+    # PostgreSQL es TIMESTAMP (sin tz) a propósito: un TIMESTAMPTZ con hora
+    # local la volvería a convertir.
     if motor == "postgresql":
         return {"pk": "BIGSERIAL PRIMARY KEY", "fk": "BIGINT",
-                "ts": "TIMESTAMPTZ", "texto": "TEXT",
+                "ts": "TIMESTAMPTZ", "ts_local": "TIMESTAMP", "texto": "TEXT",
                 "real": "DOUBLE PRECISION", "entero": "INTEGER"}
     if motor == "mysql":
         return {"pk": "BIGINT AUTO_INCREMENT PRIMARY KEY", "fk": "BIGINT",
-                "ts": "DATETIME(3)", "texto": "TEXT",
+                "ts": "DATETIME(3)", "ts_local": "DATETIME(3)", "texto": "TEXT",
                 "real": "DOUBLE PRECISION", "entero": "INT"}
     if motor == "mssql":
         return {"pk": "BIGINT IDENTITY(1,1) PRIMARY KEY", "fk": "BIGINT",
-                "ts": "DATETIME2", "texto": "NVARCHAR(MAX)",
+                "ts": "DATETIME2", "ts_local": "DATETIME2", "texto": "NVARCHAR(MAX)",
                 "real": "FLOAT", "entero": "INT"}
     return {"pk": "INTEGER PRIMARY KEY AUTOINCREMENT", "fk": "INTEGER",
-            "ts": "TEXT", "texto": "TEXT",
+            "ts": "TEXT", "ts_local": "TEXT", "texto": "TEXT",
             "real": "DOUBLE PRECISION", "entero": "INTEGER"}
+
+
+def ts_local_para_motor(valor: Any, motor: str, zona) -> Any:
+    """
+    La misma marca que `ts_para_motor`, pero en la hora de la planta y SIN
+    zona: lo que se ve en SSMS, en el Excel y en el reloj de la pared.
+
+    Existe porque `ts` en UTC es lo correcto para ordenar, comparar y no
+    depender del servidor —y a la vez es lo que nadie quiere leer. Las dos
+    columnas juntas quitan la discusión: `ts` para la máquina, `ts_local`
+    para la persona.
+    """
+    dt = a_utc(valor)
+    if dt is None:
+        return None
+    local = dt.astimezone(zona).replace(tzinfo=None)
+    if motor == "sqlite":
+        return local.isoformat(sep=" ", timespec="milliseconds")
+    return local
 
 
 
@@ -791,6 +870,7 @@ class SqlDriver(DbDriver):
     # "Invalid column name 'plc'" en cada volcado.
     ALIAS_HISTORICO = {
         "ts": ("ts",),
+        "ts_local": ("ts_local",),
         "plc": ("plc", "plc_id"),
         "tag": ("tag",),
         "valor_num": ("valor_num",),
@@ -933,6 +1013,7 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
             f"CREATE TABLE {t_plc} ("
             f"id {pk}, "
             f"ts {ts} NOT NULL, "
+            f"ts_local {t['ts_local']}, "
             f"plc_id VARCHAR(120) NOT NULL, "
             f"programa VARCHAR(200), "
             f"tag VARCHAR(400) NOT NULL, "

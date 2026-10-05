@@ -808,6 +808,38 @@ class RexrothDriver(PlcDriver):
     # ================================================================== #
     # Lectura puntual
     # ================================================================== #
+    async def read_tags(self, node_ids: List[str]) -> List[Optional[TagValue]]:
+        """
+        Lectura en bloque para la reconciliación del SubscriptionHandler.
+        Misma idea que en `opcua_driver.read_tags`: una petición por lote de
+        250 nodos, y `None` en el hueco de lo que no se pudo leer.
+        """
+        if self._client is None:
+            raise RuntimeError("read_tags llamado sin conexión activa.")
+        salida: List[Optional[TagValue]] = []
+        ahora = _ahora_iso()
+        for i in range(0, len(node_ids), 250):
+            lote = node_ids[i:i + 250]
+            try:
+                valores = await self._client.read_values(
+                    [self._client.get_node(n) for n in lote]
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Lectura en bloque fallida (%d nodos): %s",
+                             len(lote), exc)
+                salida.extend([None] * len(lote))
+                continue
+            for node_id, valor in zip(lote, valores):
+                info = self.tag_por_nodeid.get(node_id)
+                salida.append(TagValue(
+                    tag=info.full_name if info else node_id,
+                    value=_a_serializable(valor),
+                    data_type=info.data_type if info else type(valor).__name__,
+                    timestamp=ahora,
+                    node_id=node_id,
+                ))
+        return salida
+
     async def read_tag(self, node_id: str) -> TagValue:
         if self._client is None:
             raise RuntimeError("read_tag llamado sin conexión activa.")

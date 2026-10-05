@@ -34,10 +34,76 @@ from app.drivers.opcua_driver import OpcUaDriver
 from app.drivers.plc_driver import PlcDriver
 from app.drivers.rexroth_driver import RexrothDriver
 
+
+class _InternasComoPlc:
+    """
+    Las variables internas con la cara de un PLC, para `escribir_tags`.
+
+    POR QUÉ EXISTE. Un widget que escribe (Switch, Botón, «Sumar») manda
+    `{"plc_id": "interno", "tag": "modo", "valor": true}` por `/escritura`, y
+    `escribir_tags` buscaba el handler de `interno` en `_handlers`… donde no
+    hay ninguno: las internas viven en `InternasStore`, no en un handler. El
+    resultado era un error seco —«No hay ningún PLC con id 'interno'»— y una
+    variable interna que se podía LEER desde cualquier widget pero no ESCRIBIR
+    desde ninguno. El código de abajo ya esperaba un handler con `es_interno`
+    (ahí está el comentario de "la lista blanca no se aplica a las internas");
+    esto es la pieza que faltaba.
+
+    Implementa solo lo que `escribir_tags` toca: buscar el tag, leer el valor
+    previo (para poder deshacer), escribir, y decir que sí sabe escribir y que
+    sí está "conectado". No se registra en `_handlers` a propósito: allí
+    saldría también en `/plcs`, en el snapshot (duplicando las internas, que
+    ya se mezclan aparte) y en el descubrimiento.
+
+    Escribir difunde el cambio con el MISMO mensaje que usa la pantalla de
+    Variables (`como_mensaje`), así que el widget que lo pulsó y todos los
+    demás paneles lo ven moverse al instante.
+    """
+
+    es_interno = True
+
+    def __init__(self, store, manager: ConnectionManager) -> None:
+        self._store = store
+        self._manager = manager
+
+    # -- lo que consulta la fase de validación --------------------------
+    def soporta_escritura(self) -> bool:
+        return True
+
+    def is_plc_connected(self) -> bool:
+        return True
+
+    def buscar_tag(self, tag: str):
+        from types import SimpleNamespace
+        from app.core.internas_store import TIPOS, ErrorInterna
+        try:
+            v = self._store.obtener(tag)
+        except ErrorInterna:
+            return None
+        return SimpleNamespace(
+            full_name=v.nombre, node_id=v.nombre,
+            data_type=TIPOS[v.tipo]["opc"],
+        )
+
+    # -- lo que usan las fases de lectura y escritura --------------------
+    async def leer(self, node_id: str):
+        from types import SimpleNamespace
+        return SimpleNamespace(value=self._store.obtener(node_id).valor)
+
+    async def escribir(self, node_id: str, valor):
+        from types import SimpleNamespace
+        v = self._store.fijar_valor(node_id, valor)
+        try:
+            await self._manager.broadcast(v.como_mensaje())
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Interna '%s' escrita pero no difundida: %s",
+                           node_id, exc)
+        return SimpleNamespace(value=v.valor)
+
 logger = logging.getLogger("plc_manager")
 
 # Marcas soportadas.
-VENDORS = ("siemens", "rexroth")
+VENDORS = ("siemens", "rexroth", "allenbradley")
 
 
 def _ahora_iso() -> str:
@@ -193,13 +259,38 @@ class PlcManager:
                 "rexroth_app": ep.app or self._settings.rexroth_app,
                 "rexroth_program": ep.programa or self._settings.rexroth_program,
             })
+        elif ep.vendor == "allenbradley":
+            update["ab_slot"] = int(ep.slot or 0)
+        elif ep.vendor == "siemens":
+            transporte = (ep.transporte or self._settings.siemens_transporte
+                          or "opcua").strip().lower()
+            update["siemens_transporte"] = transporte
+            if transporte == "s7comm":
+                update.update({
+                    "s7_rack": int(ep.rack or 0),
+                    "s7_slot": int(ep.slot if ep.slot else self._settings.s7_slot),
+                    "s7_tags": ep.s7_tags or self._settings.s7_tags,
+                })
         return self._settings.model_copy(update=update)
 
     @staticmethod
     def _crear_driver(vendor: str, settings_plc: Settings) -> PlcDriver:
         """Instancia el driver que corresponde a la marca del PLC."""
+        if vendor == "allenbradley":
+            from app.drivers.ethernetip_driver import EthernetIpDriver
+            return EthernetIpDriver(settings_plc)
+        if vendor == "siemens" and (getattr(settings_plc, "siemens_transporte", "")
+                                    or "").strip().lower() == "s7comm":
+            from app.drivers.s7comm_driver import S7CommDriver
+            return S7CommDriver(settings_plc)
         if vendor == "rexroth":
-            return RexrothDriver(settings_plc)
+            # Data Layer REST (nuevo, por defecto) u OPC UA (el de antes).
+            transporte = (getattr(settings_plc, "rexroth_transporte", "datalayer")
+                          or "datalayer").strip().lower()
+            if transporte == "opcua":
+                return RexrothDriver(settings_plc)
+            from app.drivers.ctrlx_datalayer_driver import CtrlxDatalayerDriver
+            return CtrlxDatalayerDriver(settings_plc)
         return OpcUaDriver(settings_plc)
 
     async def _añadir_plc(self, ep: EndpointPlc) -> str:
@@ -219,6 +310,9 @@ class PlcManager:
             endpoint=ep.endpoint,
             plc_nombre=ep.nombre,
             vendor=ep.vendor,
+            # Para que, al terminar de conectar, difunda los tags a las
+            # vistas ya abiertas (ver SubscriptionHandler._conectar_y_suscribir).
+            snapshot_global=self.build_snapshot_message,
         )
         self._handlers[plc_id] = handler
         self._endpoints[plc_id] = ep
@@ -239,9 +333,16 @@ class PlcManager:
         password: str = "",
         app: str = "",
         programa: str = "",
+        slot: int = 0,
+        rack: int = 0,
+        transporte: str = "",
+        s7_tags: str = "",
     ) -> dict:
         """
         Añade un PLC escrito por el usuario (IP, host o endpoint completo).
+
+        Para `vendor='allenbradley'` basta la IP y el `slot` del procesador
+        (0 en CompactLogix): EtherNet/IP no tiene credenciales.
 
         Para `vendor='siemens'` basta la IP (conexión anónima, como siempre).
         Para `vendor='rexroth'` solo son obligatorios `usuario` y `password`:
@@ -270,10 +371,65 @@ class PlcManager:
             # `app` y `programa` son OPCIONALES: si no llegan, el driver los
             # descubre solo navegando plc/app/<app>/sym/<programa>.
 
-        if host.startswith("opc.tcp://"):
+        transporte_dl = (vendor == "rexroth" and
+                         (getattr(self._settings, "rexroth_transporte", "datalayer")
+                          or "datalayer").strip().lower() != "opcua")
+        transporte = (transporte or "").strip().lower()
+        if vendor == "siemens" and transporte == "s7comm":
+            # S7comm: s7://host:102/<rack>/<slot>. Sin OPC UA. La lista de
+            # tags es obligatoria porque S7comm no descubre nada.
+            from app.drivers.s7comm_driver import PUERTO_S7, parsear_tags
+            if host.startswith("s7://"):
+                resto = host[5:].split("/")
+                host_solo = resto[0].split(":")[0]
+                try:
+                    rack = int(resto[1]); slot = int(resto[2])
+                except (IndexError, ValueError):
+                    pass
+            else:
+                host_solo = host.split("://")[-1].split("/")[0].split(":")[0]
+            rack = int(rack or 0)
+            slot = int(slot) if slot else int(self._settings.s7_slot)
+            try:
+                lista = parsear_tags(s7_tags)
+            except ValueError as exc:
+                return {"ok": False, "mensaje": f"Lista de tags: {exc}"}
+            if not lista:
+                return {"ok": False,
+                        "mensaje": "S7comm necesita la lista de tags (nombre;DB1;"
+                                   "offset;TIPO, una por línea): no puede "
+                                   "descubrirlos solo como el OPC UA."}
+            puerto = PUERTO_S7
+            endpoint = f"s7://{host_solo}:{PUERTO_S7}/{rack}/{slot}"
+        elif vendor == "allenbradley":
+            # EtherNet/IP: enip://host:44818/<slot>. Un `enip://` completo
+            # trae el slot; una IP pelada usa el que llega aparte.
+            from app.drivers.ethernetip_driver import (
+                PUERTO_ENIP, endpoint_enip, host_de, slot_de,
+            )
+            host_solo = host_de(host)
+            if host.startswith("enip://"):
+                slot = slot_de(host, slot)
+            slot = int(slot or 0)
+            if not puerto or puerto in (4840, 443):
+                puerto = PUERTO_ENIP
+            endpoint = endpoint_enip(host_solo, slot, puerto)
+        elif host.startswith("opc.tcp://"):
             endpoint = host
             from app.core.plc_discovery import _host_puerto
             host_solo, puerto = _host_puerto(endpoint)
+        elif transporte_dl:
+            # Rexroth por Data Layer: el endpoint es HTTPS. La vista sigue
+            # mandando 4840 por costumbre del OPC UA; ese puerto no significa
+            # nada aquí, así que se sustituye por el HTTPS configurado.
+            from app.drivers.ctrlx_datalayer_driver import host_de, puerto_de
+            host_solo = host_de(host)
+            p_expl = puerto_de(host, 0)
+            if p_expl:
+                puerto = p_expl
+            elif not puerto or puerto == 4840:
+                puerto = int(getattr(self._settings, "rexroth_https_port", 443))
+            endpoint = f"https://{host_solo}:{puerto}"
         else:
             host_solo = host
             endpoint = f"opc.tcp://{host}:{puerto}"
@@ -287,7 +443,9 @@ class PlcManager:
         ep = EndpointPlc(endpoint=endpoint, host=host_solo, port=puerto,
                          nombre="", origen="manual", vendor=vendor,
                          usuario=usuario, password=password,
-                         app=app, programa=programa)
+                         app=app, programa=programa, slot=int(slot or 0),
+                         rack=int(rack or 0), transporte=transporte,
+                         s7_tags=s7_tags or "")
         plc_id = await self._añadir_plc(ep)
         self._persistir()
         # Refrescar a todos los clientes conectados con un snapshot nuevo.
@@ -540,6 +698,10 @@ class PlcManager:
                 raise ValueError(f"Entrada {i}: hacen falta 'plc_id' y 'tag'.")
 
             handler = self._handlers.get(plc_id)
+            # Las variables internas no tienen handler: se atienden con un
+            # adaptador sobre su almacén (ver `_InternasComoPlc`).
+            if handler is None and plc_id == "interno" and self._internas is not None:
+                handler = _InternasComoPlc(self._internas, self._manager)
             if handler is None:
                 raise KeyError(
                     f"No hay ningún PLC con id '{plc_id}'. Los conectados son: "
