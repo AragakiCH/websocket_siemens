@@ -58,10 +58,15 @@ export function inferUnit(name: string): string | undefined {
  * @param prevSel Set con los ids que el usuario tiene "seleccionados" (persistido).
  *                Un tag nuevo que NO esté en el set se marca como seleccionado
  *                por defecto (para que aparezca de una en el Designer).
+ * @param sinConexion Dice si un PLC está caído. Sus variables se conservan
+ *                (siguen listadas y enlazadas a sus widgets) pero SIN valor:
+ *                la vista pinta «—» en vez de un dato viejo que parezca
+ *                actual.
  */
 export function toPlcVariables(
   tags: Record<string, any>,
-  selection: Map<string, boolean>
+  selection: Map<string, boolean>,
+  sinConexion?: (plcId: string) => boolean
 ): PlcVariable[] {
   return Object.entries(tags).map(([key, t]) => {
     const name: string = t.tag ?? key;
@@ -72,7 +77,7 @@ export function toPlcVariables(
       id: key,
       name,
       type: mapOpcType(t.type),
-      value: t.value,
+      value: sinConexion && sinConexion(String(t.plc ?? '')) ? null : t.value,
       unit: inferUnit(name),
       selected,
     };

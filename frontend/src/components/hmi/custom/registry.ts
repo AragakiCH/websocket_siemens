@@ -11,6 +11,14 @@ import { valorUnidad } from './lectura/ValorUnidad';
 import { alarmasWidget } from './alarmas/Alarmas';
 import { simbolo } from './simbolos/Simbolo';
 import { recetasProceso } from './recetas/RecetasProceso';
+import {
+  recetaNueva,
+  recetaGuardar,
+  recetaCargar,
+  recetaEliminar,
+  recetaContador,
+} from './recetas/BotonesReceta';
+import { recetaCampo } from './recetas/CampoReceta';
 // El catálogo de ZIP pasó a resolverse por un índice (`zipWidgetPorKind`) en
 // vez de recorriendo la lista, y `catalogoListo` dice si ya llegó del
 // servidor — eso es lo que distingue «aún cargando» de «ese widget no está».
@@ -47,6 +55,13 @@ export const customWidgets: CustomWidgetDef[] = [
   // pestaña «Recetas» del Diseñador (`hooks/useRecetasEditor`): son la misma
   // pantalla con dos pieles, no dos copias.
   recetasProceso,
+  // Los botones de receta sueltos (sección «Recetas» de la paleta).
+  recetaNueva,
+  recetaGuardar,
+  recetaCargar,
+  recetaCampo,
+  recetaEliminar,
+  recetaContador,
   // semaforoIndustrial,   ← aquí agregas cada widget nuevo, punto
 ];
 

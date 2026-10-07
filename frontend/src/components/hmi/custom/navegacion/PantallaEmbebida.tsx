@@ -41,6 +41,7 @@
 // sus widgets de contenido. No le pongas su propio menú interno — no va a
 // funcionar, y ahora ya sabes por qué.
 // =========================================================================
+import { idRealDeEnlace, useRevisionEnlacesReceta } from '../../../../services/recetaEnlace';
 import {
   useCallback,
   useEffect,
@@ -369,6 +370,8 @@ export default function PantallaEmbebida({
   mapaTags,
 }: Props) {
   const { variables } = useAppStore();
+  // Vuelve a dibujar cuando se conoce el tag de un elemento de receta.
+  useRevisionEnlacesReceta();
   const { design, cargando, error } = usePantallaEmpotrada(projectId);
   const [ref, { ancho, alto }] = useTamano<HTMLDivElement>();
 
@@ -403,10 +406,13 @@ export default function PantallaEmbebida({
   const resolver = (variableId: string | null | undefined) => {
     if (!variableId) return undefined;
     if (variableId.startsWith('param:')) {
-      const tag = mapaTags?.[variableId.slice('param:'.length)];
+      // El parámetro puede apuntar a un elemento de receta: se traduce igual.
+      const tag = idRealDeEnlace(mapaTags?.[variableId.slice('param:'.length)]);
       return tag ? variables.find((v) => v.id === tag) : undefined;
     }
-    return variables.find((v) => v.id === variableId);
+    // `receta:…` -> el tag de ese elemento. Lo demás pasa tal cual.
+    const real = idRealDeEnlace(variableId);
+    return real ? variables.find((v) => v.id === real) : undefined;
   };
 
   const cw = design?.canvas?.width ?? 0;

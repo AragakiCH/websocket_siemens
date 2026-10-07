@@ -84,7 +84,16 @@ CATEGORIAS_BASE: List[dict] = [
     {"id": "indicadores", "nombre": "Indicadores", "fija": True},
     {"id": "equipos", "nombre": "Equipos", "fija": True},
     {"id": "datos", "nombre": "Datos", "fija": True},
+    # Los botones de receta (nueva / guardar / cargar). Llegó después que las
+    # cuatro de arriba: ver BASE_AL_FINAL.
+    {"id": "recetas", "nombre": "Recetas", "fija": True},
 ]
+
+#: Categorías de fábrica que, si faltan en un proyecto que YA tiene su orden
+#: guardado, se añaden AL FINAL y no delante. Son las que se incorporaron al
+#: programa después: un proyecto que alguien ordenó a su gusto no tiene por
+#: qué ver una sección nueva colarse en primera fila al actualizar.
+BASE_AL_FINAL = {"recetas"}
 
 #: Donde cae un widget cuya categoría no se reconoce. Nunca se pierde nada de
 #: vista: un widget que no aparece en la paleta es un widget que el usuario da
@@ -231,7 +240,12 @@ class CategoriasStore:
             if cid in vistos and cid not in orden:
                 orden.append(cid)
         faltan = [b["id"] for b in CATEGORIAS_BASE if b["id"] not in orden]
-        categorias = [vistos[i] for i in faltan + orden if i in vistos]
+        # Sin orden guardado todas van en el orden de fábrica. Con orden, las
+        # incorporadas después (BASE_AL_FINAL) van detrás de lo que ya había.
+        detras = [i for i in faltan if orden and i in BASE_AL_FINAL]
+        delante = [i for i in faltan if i not in detras]
+        categorias = [vistos[i] for i in delante + orden + detras
+                      if i in vistos]
 
         validos = {c["id"] for c in categorias}
         asignaciones: Dict[str, str] = {}

@@ -35,6 +35,7 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   RotateCcwIcon,
+  SearchIcon,
 } from 'lucide-react';
 import { getWidgetCatalog, CatalogItem } from './widgetCatalog';
 import { useAppStore } from '../../context/AppStore';
@@ -98,6 +99,14 @@ function guardarPlegadas(proyectoId: string, plegadas: Set<string>): void {
     /* que no se pueda recordar no puede impedir plegarla ahora */
   }
 }
+
+/** Minúsculas y sin tildes: «valvula» encuentra «Válvula». */
+const normalizar = (texto: string): string =>
+  (texto ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
 
 export function WidgetSidebar() {
   const { t, widgetLabel, proyectoId } = useAppStore();
@@ -194,6 +203,29 @@ export function WidgetSidebar() {
       return base && base.nombre === c.nombre ? t(`cat.${c.nombre}`) : c.nombre;
     },
     [t]
+  );
+
+  // ── BUSCADOR ──
+  //
+  // Con treinta y tantos widgets repartidos en secciones, y algunas plegadas,
+  // encontrar uno por su nombre era abrir secciones a ojo. Mientras hay texto:
+  //   * solo se ven los widgets que coinciden y las secciones que los tienen;
+  //   * las secciones plegadas se enseñan abiertas, sin tocar lo que estaba
+  //     plegado: al borrar el texto todo vuelve a como estaba.
+  // Busca en el nombre que se ve y en el de fábrica, por si están traducidos.
+  const [busca, setBusca] = useState('');
+  const palabras = useMemo(() => normalizar(busca).split(/\s+/).filter(Boolean), [busca]);
+  const buscando = palabras.length > 0;
+  const coincide = useCallback(
+    (w: CatalogItem) => {
+      const texto = normalizar(`${widgetLabel(w.kind)} ${w.label}`);
+      return palabras.every((p) => texto.includes(p));
+    },
+    [palabras, widgetLabel]
+  );
+  const sinResultados = useMemo(
+    () => buscando && !catalog.some(coincide),
+    [buscando, catalog, coincide]
   );
 
   const porCategoria = useMemo(() => {
@@ -438,6 +470,32 @@ export function WidgetSidebar() {
           />
         </div>
 
+        <div className="relative mt-2.5">
+          <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={busca}
+            spellCheck={false}
+            placeholder="Buscar widget…"
+            aria-label="Buscar widget"
+            onChange={(e) => setBusca(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setBusca('');
+            }}
+            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-7 text-xs text-navy outline-none transition placeholder:text-slate-400 focus:border-siemens focus:bg-white focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100 dark:focus:bg-navy"
+          />
+          {buscando && (
+            <button
+              type="button"
+              onClick={() => setBusca('')}
+              title="Limpiar la búsqueda"
+              className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-slate-400 transition hover:bg-slate-200 hover:text-navy dark:hover:bg-navy-slate dark:hover:text-slate-100"
+            >
+              <XIcon className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
         {creando && (
           <div className="mt-2 flex items-center gap-1">
             <input
@@ -467,7 +525,14 @@ export function WidgetSidebar() {
 
       <div className="p-3">
         {categorias.map((cat) => {
-          const items = porCategoria.get(cat.id) ?? [];
+          const todos = porCategoria.get(cat.id) ?? [];
+          const items = buscando ? todos.filter(coincide) : todos;
+          // Buscando, una sección sin coincidencias solo estorba.
+          if (buscando && items.length === 0) return null;
+          // Buscando se enseña abierta aunque esté plegada: el resultado
+          // tiene que verse. No se toca `plegadas`, así que al limpiar la
+          // búsqueda vuelve a estar como la dejó el usuario.
+          const plegada = plegadas.has(cat.id) && !buscando;
           const resaltada = encima === cat.id;
           return (
             <div
@@ -573,7 +638,7 @@ export function WidgetSidebar() {
                       title="Arrástrala para reordenar · púlsala para plegar"
                       className="flex flex-1 cursor-grab select-none items-center gap-1 truncate text-[11px] font-semibold uppercase tracking-wide text-slate-400 active:cursor-grabbing"
                     >
-                      {plegadas.has(cat.id) ? (
+                      {plegada ? (
                         <ChevronRightIcon className="h-3 w-3 shrink-0" />
                       ) : (
                         <ChevronDownIcon className="h-3 w-3 shrink-0" />
@@ -614,7 +679,7 @@ export function WidgetSidebar() {
                   siendo zona de soltar. Así se puede mandar un widget a una
                   sección plegada sin desplegarla, y el contador de la cabecera
                   confirma que llegó. */}
-              {plegadas.has(cat.id) ? null : items.length === 0 ? (
+              {plegada ? null : items.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-300 px-2 py-4 text-center text-[10px] leading-relaxed text-slate-400 dark:border-navy-slate">
                   Arrastra widgets aquí
                 </div>
@@ -679,6 +744,22 @@ export function WidgetSidebar() {
             </div>
           );
         })}
+
+        {sinResultados && (
+          <div className="px-2 py-8 text-center">
+            <SearchIcon className="mx-auto mb-2 h-6 w-6 text-slate-300 dark:text-slate-600" />
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-300">
+              Ningún widget coincide con «{busca.trim()}»
+            </p>
+            <button
+              type="button"
+              onClick={() => setBusca('')}
+              className="mt-2 text-[11px] font-medium text-siemens hover:underline"
+            >
+              Limpiar la búsqueda
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Toast de feedback */}

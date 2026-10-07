@@ -52,6 +52,7 @@ class SubscriptionHandler:
         plc_nombre: str = "",
         vendor: str = "siemens",
         snapshot_global=None,
+        tags_store=None,
     ) -> None:
         self._driver = driver
         self._manager = manager
@@ -72,8 +73,22 @@ class SubscriptionHandler:
 
         # Snapshot en memoria: full_name -> TagValue (último valor conocido).
         self._snapshot: Dict[str, TagValue] = {}
-        # Tags descubiertos en el último browse.
+        # Tags descubiertos en el último browse. Se arranca con el catálogo
+        # guardado en disco (ver tags_store.py): así, con el PLC apagado o
+        # tras reiniciar el servicio, sus variables siguen listadas y los
+        # widgets enseñan a qué están enlazados. Opcional para no romper a
+        # quien construya el handler a mano (pruebas).
+        self._tags_store = tags_store
         self._tags: List[TagInfo] = []
+        if tags_store is not None:
+            try:
+                self._tags = tags_store.cargar(plc_id)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("[%s] No se pudo cargar el catálogo de tags: "
+                               "%s", plc_id, exc)
+        # ¿Se avisó a las vistas de que este PLC está conectado? Sirve para
+        # avisar UNA vez de la caída, venga por donde venga.
+        self._avisado_conectado: bool = False
 
         # Estado del supervisor.
         self._running: bool = False
@@ -156,6 +171,29 @@ class SubscriptionHandler:
         '<plc_id>|<tag>' para evitar colisiones entre PLCs.
         """
         salida: Dict[str, dict] = {}
+        en_linea = self._en_linea()
+
+        # Primero el CATÁLOGO: todo tag conocido va en el snapshot, tenga o
+        # no valor. Sin conexión el valor es None (la vista pinta «—»): se
+        # conserva la variable y su enlace, no un dato viejo que parezca
+        # actual.
+        for info in self._tags:
+            fv = self._snapshot.get(info.full_name) if en_linea else None
+            if fv is not None:
+                continue  # con valor: lo pone el bucle de abajo
+            salida[f"{self.plc_id}|{info.full_name}"] = {
+                "plc": self.plc_id,
+                "tag": info.full_name,
+                "value": None,
+                "type": info.data_type,
+                "timestamp": None,
+                "source_ts": None,
+                "server_ts": None,
+                "delta_ms": None,
+            }
+        if not en_linea:
+            return salida
+
         for fv in self._snapshot.values():
             clave = f"{self.plc_id}|{fv.tag}"
             salida[clave] = {
@@ -173,8 +211,11 @@ class SubscriptionHandler:
     def get_tags_con_valor(self) -> List[dict]:
         """Lista de tags de este PLC con su último valor (para GET /tags)."""
         salida: List[dict] = []
+        en_linea = self._en_linea()
         for info in self._tags:
-            fv = self._snapshot.get(info.full_name)
+            # Sin conexión no se sirve el último valor conocido: ver
+            # `snapshot_entries`.
+            fv = self._snapshot.get(info.full_name) if en_linea else None
             salida.append(
                 {
                     "plc": self.plc_id,
@@ -295,6 +336,49 @@ class SubscriptionHandler:
     def num_tags(self) -> int:
         return len(self._tags)
 
+    def _en_linea(self) -> bool:
+        """
+        ¿Se puede confiar en los valores del snapshot?
+
+        No basta con `is_connected()`: cuando el watchdog detecta la caída,
+        el driver puede seguir diciendo "conectado" hasta el siguiente
+        intento de reconexión.
+        """
+        return (self._driver.is_connected()
+                and self.estado_conexion != "reconectando")
+
+    async def _avisar_caida(self) -> None:
+        """Avisa a las vistas, una sola vez, de que este PLC se cayó."""
+        if not self._avisado_conectado:
+            return
+        self._avisado_conectado = False
+        try:
+            await self._manager.broadcast(
+                {"timestamp": _ahora_iso(), "type": "status",
+                 "plc": self.plc_id, "status": "reconectando"}
+            )
+        except Exception as exc:  # noqa: BLE001
+            self._log(logging.DEBUG, "No se pudo avisar de la caída: %s", exc)
+
+    def _fijar_catalogo(self, tags: List[TagInfo]) -> None:
+        """
+        Adopta el resultado de un browse CORRECTO como catálogo del PLC.
+
+        Reemplaza, no mezcla: una variable borrada del programa deja de
+        aparecer. Por eso también se quita su último valor del snapshot; si
+        no, seguiría saliendo en las vistas como si existiera.
+        """
+        self._tags = tags
+        nombres = {t.full_name for t in tags}
+        for clave in [k for k in self._snapshot if k not in nombres]:
+            del self._snapshot[clave]
+        if self._tags_store is not None:
+            try:
+                self._tags_store.guardar(self.plc_id, tags)
+            except Exception as exc:  # noqa: BLE001
+                self._log(logging.WARNING,
+                          "No se pudo guardar el catálogo de tags: %s", exc)
+
     def is_plc_connected(self) -> bool:
         return self._driver.is_connected()
 
@@ -328,6 +412,10 @@ class SubscriptionHandler:
                 self.estado_conexion = "reconectando"
                 self.ultimo_error = f"{type(exc).__name__}: {exc}"[:400]
                 self._log(logging.ERROR, "Fallo de conexión con el PLC: %s", exc)
+                # Si la caída llegó por aquí (una excepción) y no por el
+                # watchdog, las vistas no se enteraban y seguían enseñando
+                # los últimos valores como si fueran actuales.
+                await self._avisar_caida()
 
             if not self._running:
                 break
@@ -354,7 +442,7 @@ class SubscriptionHandler:
         await self._driver.connect()
 
         # Auto-descubrimiento de tags.
-        self._tags = await self._driver.browse_tags()
+        self._fijar_catalogo(await self._driver.browse_tags())
         self._log(logging.INFO, "Browse completo: %d tags.", len(self._tags))
 
         # Crear la subscription en tiempo real.
@@ -403,6 +491,7 @@ class SubscriptionHandler:
             {"timestamp": _ahora_iso(), "type": "status",
              "plc": self.plc_id, "status": "conectado"}
         )
+        self._avisado_conectado = True
 
     async def _cargar_snapshot_inicial(self) -> None:
         """
@@ -437,10 +526,8 @@ class SubscriptionHandler:
                 self.estado_conexion = "reconectando"
                 self._log(logging.WARNING,
                           "Watchdog: conexión perdida, se forzará reconexión.")
-                await self._manager.broadcast(
-                    {"timestamp": _ahora_iso(), "type": "status",
-                     "plc": self.plc_id, "status": "reconectando"}
-                )
+                self._avisado_conectado = True  # el aviso sale siempre aquí
+                await self._avisar_caida()
                 return  # sale del watchdog -> el supervisor reintentará
 
             # La sesión vive. ¿Y la subscription? Ver `_reconciliar`.

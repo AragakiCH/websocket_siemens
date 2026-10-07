@@ -96,6 +96,111 @@ async def _difundir_valor(request: Request, variable) -> None:
         logger.warning("No se pudo difundir %s: %s", variable.nombre, exc)
 
 
+async def _reenlazar(request: Request, antes: str, ahora: str,
+                     usuario: str) -> Dict[str, Any]:
+    """
+    Tras renombrar una variable, lleva el nombre nuevo a todo lo que la usaba.
+
+    Sin esto, renombrar `repo1` a `repo` dejaba cada widget enlazado apuntando
+    a `interno|repo1`, que ya no existe: el widget se quedaba sin valor y en el
+    inspector aparecía sin variable asociada, sin ningún error que lo dijera.
+
+    Cubre las PANTALLAS (cualquier widget, del catálogo o subido en ZIP) y los
+    grupos del HISTORIZADOR. No cubre lo que vive en SQL (reglas de alarma,
+    elementos de receta): eso es otra base y otro cambio.
+
+    Nunca lanza. El renombrado ya está hecho cuando se llega aquí; si algo
+    falla, la respuesta lo cuenta en `errores` en vez de devolver un 500 que
+    haría creer que la variable no se renombró.
+    """
+    vieja, nueva = f"interno|{antes}", f"interno|{ahora}"
+    salida: Dict[str, Any] = {"widgets": 0, "pantallas": [],
+                              "historicos": [], "errores": []}
+
+    # --- Pantallas ---------------------------------------------------- #
+    proyectos = getattr(request.app.state, "project_store", None)
+    if proyectos is not None:
+        try:
+            tocadas = await proyectos.reemplazar_referencia(vieja, nueva, usuario)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("No se pudieron reenlazar las pantallas")
+            salida["errores"].append(f"pantallas: {exc}")
+            tocadas = []
+        # Import tardío: project_routes es un módulo grande y esto solo hace
+        # falta al renombrar; así no se acoplan los dos routers al arrancar.
+        from app.api.project_routes import _difundir, diff_de_widgets
+        for t in tocadas:
+            salida["widgets"] += t["widgets_tocados"]
+            salida["pantallas"].append(t["nombre"])
+            doc = t["doc"]
+            cambio: Dict[str, Any] = {
+                "accion": "proyecto_reemplazado",
+                "num_widgets": len(doc["widgets"]),
+                "motivo": "variable_renombrada",
+            }
+            diff = diff_de_widgets(t["widgets_antes"], doc["widgets"],
+                                   doc.get("canvas"), doc.get("canvas"))
+            if diff is not None:
+                cambio["diff"] = diff
+            try:
+                # `por` vacío A PROPÓSITO. El frontend ignora los avisos cuyo
+                # autor es él mismo («ya lo tengo pintado»), y aquí eso es
+                # falso: quien renombra desde la pestaña Variables tiene el
+                # Diseñador abierto con la clave VIEJA en memoria, y su
+                # siguiente autoguardado la volvería a escribir encima.
+                await _difundir(request, t["project_id"], doc, "", cambio)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("No se pudo avisar del reenlace de %s: %s",
+                               t["project_id"], exc)
+
+    # --- Historizador -------------------------------------------------- #
+    try:
+        historizador = getattr(request.app.state, "historizador", None)
+        # Los grupos en marcha: sin esto seguirían filtrando por la clave
+        # vieja hasta el siguiente reinicio y dejarían de guardar la variable.
+        for g in (getattr(historizador, "grupos", None) or {}).values():
+            if vieja in g.tags:
+                g.tags = [nueva if x == vieja else x for x in g.tags]
+        db = getattr(request.app.state, "db_manager", None)
+        almacen = getattr(db, "store", None)
+        if almacen is not None:
+            for gid, d in almacen.historicos.items():
+                tags = d.get("tags") or []
+                if vieja in tags:
+                    d["tags"] = [nueva if x == vieja else x for x in tags]
+                    salida["historicos"].append(gid)
+            if salida["historicos"]:
+                await almacen.guardar_async()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("No se pudo reenlazar el historizador")
+        salida["errores"].append(f"historizador: {exc}")
+
+    return salida
+
+
+def _mensaje_renombrado(ahora: str, enlaces: Dict[str, Any]) -> str:
+    """El texto del aviso: qué se actualizó, con números, no un «hecho»."""
+    partes = [f"Renombrada a '{ahora}'."]
+    n, pantallas = enlaces["widgets"], enlaces["pantallas"]
+    if n:
+        partes.append(
+            f"Se {'actualizó' if n == 1 else 'actualizaron'} {n} "
+            f"widget{'' if n == 1 else 's'} en {len(pantallas)} "
+            f"pantalla{'' if len(pantallas) == 1 else 's'}: "
+            f"{', '.join(pantallas)}.")
+    else:
+        partes.append("Ningún widget la tenía enlazada.")
+    if enlaces["historicos"]:
+        partes.append(
+            f"También en el historizador ({', '.join(enlaces['historicos'])}).")
+    if enlaces["errores"]:
+        partes.append(
+            "OJO: no se pudo actualizar todo ("
+            + "; ".join(enlaces["errores"])
+            + "). Revisa los widgets que la usaban.")
+    return " ".join(partes)
+
+
 def _auditar(request: Request, accion: str, sesion, detalle: dict) -> None:
     aud = getattr(request.app.state, "auditoria", None)
     if aud is not None:
@@ -230,9 +335,12 @@ async def crear(
     tags=TAG,
     summary="Cambiar la definición de una variable",
     description="Para mover el VALOR usa `PUT /internas/{nombre}/valor`.\n\n"
-                "**Renombrar rompe los enlaces existentes**: un widget "
-                "apuntando a `interno|viejo` se queda sin variable, porque la "
-                "clave es el nombre. La respuesta lo avisa cuando ocurre.\n\n"
+                "**Renombrar conserva los enlaces**: la clave es el nombre, "
+                "así que al cambiarlo el servidor actualiza `interno|viejo` "
+                "por `interno|nuevo` en todas las pantallas y en los grupos "
+                "del historizador. La respuesta dice cuántos widgets tocó "
+                "(`enlaces`). Las reglas de alarma y las recetas, que viven "
+                "en SQL, NO se actualizan.\n\n"
                 "**Cambiar el tipo reinterpreta el valor.** Si no se puede "
                 "(de Texto a Decimal con «hola» dentro), se cae al valor "
                 "vacío del tipo nuevo en vez de fallar.",
@@ -252,8 +360,22 @@ async def actualizar(
         raise _error(exc)
 
     await _difundir_valor(request, v)
+    # El snapshot ANTES que el reenlace: así, cuando a un panel le llega el
+    # widget con la clave nueva, la variable nueva ya está en su lista y no
+    # hay un instante en el que el widget apunte a algo que aún no conoce.
     await _difundir_snapshot(request)
-    _auditar(request, "editada", sesion, {"nombre": v.nombre})
+
+    enlaces: Optional[Dict[str, Any]] = None
+    if v.nombre != antes:
+        enlaces = await _reenlazar(request, antes, v.nombre,
+                                   usuario_de(sesion))
+
+    detalle: Dict[str, Any] = {"nombre": v.nombre}
+    if enlaces is not None:
+        detalle.update({"antes": antes,
+                        "widgets_reenlazados": enlaces["widgets"],
+                        "pantallas": enlaces["pantallas"]})
+    _auditar(request, "editada", sesion, detalle)
     try:
         await request.app.state.manager.difundir_config(
             "internas", usuario_de(sesion), "editada")
@@ -263,11 +385,10 @@ async def actualizar(
     salida = {"ok": True, "variable": v.como_fila(),
               "clave": f"interno|{v.nombre}",
               "mensaje": f"Variable '{v.nombre}' actualizada."}
-    if v.nombre != antes:
+    if enlaces is not None:
         salida["renombrada"] = {"antes": antes, "ahora": v.nombre}
-        salida["mensaje"] = (
-            f"Renombrada a '{v.nombre}'. Los widgets que apuntaban a "
-            f"`interno|{antes}` hay que volver a enlazarlos.")
+        salida["enlaces"] = enlaces
+        salida["mensaje"] = _mensaje_renombrado(v.nombre, enlaces)
     return salida
 
 

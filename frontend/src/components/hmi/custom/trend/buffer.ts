@@ -218,7 +218,9 @@ export function useBufferTrend(
     let alguno = false;
     for (const id of ids) {
       const v = variables.find((x) => x.id === id);
-      if (!v) {
+      // Sin valor (PLC sin conexión) cuenta como "no hay dato": Number(null)
+      // es 0 y dibujaría una caída a cero que nunca ocurrió.
+      if (!v || v.value === null || v.value === undefined) {
         valores.set(id, null);
         continue;
       }

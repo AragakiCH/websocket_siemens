@@ -450,3 +450,31 @@ export function setBaseRecetas(dbId: string): void {
     /* sin storage: se usará la del login en cada arranque */
   }
 }
+
+// ─── Nombres de elemento repetidos ───────────────────────────────
+
+/**
+ * Los ids de los elementos cuyo nombre se repite dentro de la receta.
+ *
+ * Salen TODOS los que comparten nombre, no solo el segundo: quien mira la
+ * tabla tiene que ver con cuál choca. Sin distinguir mayúsculas ni espacios
+ * alrededor — `Var_1` y `var_1 ` son el mismo nombre para cualquiera que lo
+ * lea en un desplegable. Un nombre vacío no cuenta: todavía no es un nombre.
+ */
+export function elementosRepetidos(
+  elementos: { id: number; name: string }[]
+): Set<number> {
+  const porNombre = new Map<string, number[]>();
+  for (const e of elementos) {
+    const n = e.name.trim().toLowerCase();
+    if (!n) continue;
+    const lista = porNombre.get(n);
+    if (lista) lista.push(e.id);
+    else porNombre.set(n, [e.id]);
+  }
+  const r = new Set<number>();
+  for (const ids of porNombre.values()) {
+    if (ids.length > 1) ids.forEach((id) => r.add(id));
+  }
+  return r;
+}

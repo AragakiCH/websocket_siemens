@@ -212,7 +212,10 @@ function Campo({
   deshabilitado,
   aviso,
   marcador,
+  error,
 }: {
+  /** Borde rojo y motivo al pasar el ratón: el valor no vale y no se guarda. */
+  error?: string;
   valor: string;
   onCambiar: (v: string) => void;
   mono?: boolean;
@@ -227,16 +230,18 @@ function Campo({
       value={valor}
       disabled={deshabilitado}
       placeholder={marcador}
+      title={error}
+      aria-invalid={!!error}
       onChange={(e) => onCambiar(e.target.value)}
       style={{
         width: '100%',
         minWidth: 0,
         height: 27,
         padding: '3px 7px',
-        border: `1px solid ${C.campoBorde}`,
+        border: `1px solid ${error ? C.rojo : C.campoBorde}`,
         borderRadius: 2,
-        background: deshabilitado ? '#eef2f5' : aviso ? C.rosa : C.blanco,
-        color: C.tinta,
+        background: deshabilitado ? '#eef2f5' : aviso || error ? C.rosa : C.blanco,
+        color: error ? C.rojo : C.tinta,
         fontFamily: mono ? MONO : 'inherit',
         fontSize: 12,
         fontVariantNumeric: 'tabular-nums',
@@ -969,7 +974,15 @@ function TablaElementos({ ed }: { ed: Editor }) {
           return (
             <tr key={e.id} style={{ borderBottom: `1px solid ${C.linea}` }}>
               <Td>
-                <Campo valor={e.name} onCambiar={(v) => ed.editarElemento(e.id, { name: v })} />
+                <Campo
+                  valor={e.name}
+                  onCambiar={(v) => ed.editarElemento(e.id, { name: v })}
+                  error={
+                    ed.repetidos.has(e.id)
+                      ? 'No se puede repetir el nombre: ya hay otro elemento que se llama así. No se guarda hasta que lo cambies.'
+                      : undefined
+                  }
+                />
               </Td>
               <Td>
                 <Campo

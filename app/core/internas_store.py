@@ -409,8 +409,9 @@ class InternasStore:
         v = self.obtener(nombre)
 
         # Renombrar es cambiar la CLAVE con la que la conocen los widgets.
-        # Se permite, pero se avisa en el resultado: el widget que apuntaba a
-        # `interno|viejo` se queda sin enlace, y eso tiene que verse.
+        # Aquí solo cambia la variable; llevar la clave nueva a las pantallas
+        # que la usaban es trabajo de la ruta (`_reenlazar`), que es quien
+        # tiene a mano el almacén de pantallas.
         nuevo = datos.get("nombre")
         renombrada = False
         if nuevo is not None:

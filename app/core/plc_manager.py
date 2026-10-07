@@ -165,6 +165,12 @@ class PlcManager:
         self._store = PlcStore()
         self._endpoints: Dict[str, EndpointPlc] = {}
 
+        # Catálogo de tags de cada PLC en disco: con el PLC apagado sus
+        # variables siguen listadas (ver tags_store.py).
+        from app.core.tags_store import TagsStore
+
+        self._tags_store = TagsStore()
+
     def _persistir(self) -> None:
         """Vuelca a disco los PLCs gestionados actualmente."""
         self._store.guardar(list(self._endpoints.values()))
@@ -313,6 +319,7 @@ class PlcManager:
             # Para que, al terminar de conectar, difunda los tags a las
             # vistas ya abiertas (ver SubscriptionHandler._conectar_y_suscribir).
             snapshot_global=self.build_snapshot_message,
+            tags_store=self._tags_store,
         )
         self._handlers[plc_id] = handler
         self._endpoints[plc_id] = ep
@@ -496,6 +503,11 @@ class PlcManager:
         self._ids_usados.discard(plc_id)
         self._endpoints.pop(plc_id, None)
         self._persistir()
+        # Eliminar el PLC es la forma de decir "ya no lo quiero": se olvida
+        # también su catálogo. Los widgets conservan su enlace (vive en el
+        # proyecto), así que si se vuelve a dar de alta con el mismo nombre
+        # vuelven a leer solos.
+        self._tags_store.borrar(plc_id)
         # Aviso a los clientes (sin clave 'plc' para que llegue a todos).
         await self._manager.broadcast(
             {"timestamp": _ahora_iso(), "type": "plc_removed",

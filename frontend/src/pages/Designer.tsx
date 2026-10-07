@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState, useRef } from 'react';
+import { idRealDeEnlace, useRevisionEnlacesReceta } from '../services/recetaEnlace';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeftIcon,
@@ -196,10 +197,17 @@ export function Designer() {
    * cambiaría de identidad en cada dibujo y haría rehacer la búsqueda de
    * todos los widgets aunque no hubiera llegado ninguna lectura nueva.
    */
+  // Un enlace a un ELEMENTO DE RECETA (`receta:…`) se cambia por el tag de
+  // ese elemento antes de buscar el valor. `revRecetas` sube cuando se
+  // entera de un tag nuevo, y es lo que hace repetir la búsqueda.
+  const revRecetas = useRevisionEnlacesReceta();
   const resolverVariable = useCallback(
-    (id: string | null | undefined) =>
-      id ? variables.find((v) => v.id === id) : undefined,
-    [variables]
+    (id: string | null | undefined) => {
+      const real = idRealDeEnlace(id);
+      return real ? variables.find((v) => v.id === real) : undefined;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [variables, revRecetas]
   );
   // ── SELECCIÓN MÚLTIPLE ────────────────────────────────────────
   //
@@ -1880,7 +1888,7 @@ export function Designer() {
               title={suya ? undefined : `Pertenece a la sección «${w.vista}»`}>
             <CanvasWidget
               widget={w}
-              variable={w.variableId ? variablePorId.get(w.variableId) : undefined}
+              variable={w.variableId ? variablePorId.get(idRealDeEnlace(w.variableId)) : undefined}
               // `resolver` viene de los faceplates: traduce los `param:` del
               // TIPO al tag real de cada instancia. Sin esto, un faceplate se
               // dibuja sin datos.

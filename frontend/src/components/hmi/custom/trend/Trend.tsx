@@ -1145,7 +1145,7 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
       return null;
     }
     const v = variables.find((x) => x.id === variableId);
-    if (!v) return null;
+    if (!v || v.value === null || v.value === undefined) return null;
     const n = typeof v.value === 'number' ? v.value : Number(v.value);
     return Number.isFinite(n) ? n : null;
   };

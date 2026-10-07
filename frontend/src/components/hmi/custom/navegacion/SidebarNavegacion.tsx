@@ -140,6 +140,33 @@ function Sidebar({ widget, style }: RenderCtx) {
   const filas = useMemo(() => arbolDe(secciones), [secciones]);
 
   /**
+   * Clic en el NOMBRE de una sección con hijos: además de navegar, la
+   * despliega. Antes solo desplegaba la flechita, y había que acertarle.
+   *
+   * Despliega UN nivel: se ven sus hijos directos, y los que a su vez
+   * tienen secciones dentro salen plegados; se abren al hacerles clic. Si no,
+   * abrir una rama grande soltaba el árbol entero de golpe.
+   *
+   * Solo ABRE. Plegar sigue siendo cosa de la flechita: si el clic también
+   * plegara, volver a una sección padre cerraría el menú cada vez.
+   */
+  const desplegarUnNivel = (id: string) =>
+  setCerradas((prev) => {
+    if (!prev.has(id)) return prev; // ya estaba abierta: no se toca nada
+    const pos = filas.findIndex((f) => f.seccion.id === id);
+    if (pos < 0) return prev;
+    const s = new Set(prev);
+    s.delete(id);
+    const base = filas[pos].profundidad;
+    for (let j = pos + 1; j < filas.length && filas[j].profundidad > base; j++) {
+      if (filas[j].profundidad === base + 1 && filas[j].tieneHijos) {
+        s.add(filas[j].seccion.id);
+      }
+    }
+    return s;
+  });
+
+  /**
    * Al CAMBIAR de sección se abre la rama que lleva hasta ella.
    *
    * Sin esto puedes navegar a un subproceso con su rama plegada: la pantalla
@@ -387,6 +414,7 @@ function Sidebar({ widget, style }: RenderCtx) {
               onClick={(e) => {
                 e.stopPropagation();
                 setVistaActiva(cfg.grupo, s.id);
+                if (tieneHijos) desplegarUnNivel(s.id);
               }}
               title={s.label}
               style={{

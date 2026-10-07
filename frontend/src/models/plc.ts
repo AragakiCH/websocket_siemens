@@ -92,7 +92,8 @@ export interface PlcVariable {
    * Escalar en el caso normal. Un `Array[1..n] of X` del PLC llega como
    * lista (con `type` = el del elemento) y un UDT decodificado como objeto.
    */
-  value: boolean | number | string | unknown[] | Record<string, unknown>;
+  /** `null`: la variable existe pero no hay valor (PLC sin conexión). */
+  value: boolean | number | string | unknown[] | Record<string, unknown> | null;
   unit?: string;
   selected: boolean;
 }

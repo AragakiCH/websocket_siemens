@@ -60,6 +60,8 @@ export const CATEGORIAS_BASE: Categoria[] = [
   { id: 'indicadores', nombre: 'Indicadores', fija: true },
   { id: 'equipos', nombre: 'Equipos', fija: true },
   { id: 'datos', nombre: 'Datos', fija: true },
+  // Los botones de receta. ESPEJO de CATEGORIAS_BASE en categorias_store.py.
+  { id: 'recetas', nombre: 'Recetas', fija: true },
 ];
 
 /** Sube cuando la paleta cambia. Lo escuchan la barra lateral y el catálogo. */

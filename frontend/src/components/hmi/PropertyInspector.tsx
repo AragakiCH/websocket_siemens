@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  esEnlaceReceta,
+  fichaDeEnlace,
+  idElementoReceta,
+  idRealDeEnlace,
+  leerCfgReceta,
+  useRecetasInspector,
+  useRevisionEnlacesReceta } from
+'../../services/recetaEnlace';
+import {
   MousePointerSquareDashedIcon,
   Link2Icon,
   AlertTriangleIcon,
@@ -65,7 +74,9 @@ import {
   ToggleField,
   SliderField,
   SelectField,
-  SelectGroupField } from
+  SelectGroupField,
+  BuscadorOpciones,
+  filtrarGrupos } from
 '../ui/Field';
 interface Props {
   widget: HmiWidget | null;
@@ -229,11 +240,15 @@ function FilaEnlace({
 }: {nombre: string;fijo: boolean;etiqueta: string;ayuda?: string;variableId: string;grupos: {label: string;options: {label: string;value: string;}[];}[];variable?: PlcVariable;onVariable: (v: string) => void;onRenombrar: (nuevo: string) => string;onQuitar: () => void;}) {
   const [borrador, setBorrador] = useState(nombre);
   const [error, setError] = useState('');
+  // El buscador de ESTA fila: filtra su desplegable de variables.
+  const [busca, setBusca] = useState('');
+  const filtro = filtrarGrupos(grupos, busca, variableId);
 
   // Al saltar de un widget a otro, la fila se reutiliza con otro nombre.
   useEffect(() => {
     setBorrador(nombre);
     setError('');
+    setBusca('');
   }, [nombre]);
 
   const cerrarNombre = () => {
@@ -284,12 +299,19 @@ function FilaEnlace({
         }
       </div>
 
+      <BuscadorOpciones
+        valor={busca}
+        onCambiar={setBusca}
+        coinciden={filtro.coinciden}
+        total={filtro.total}
+        compacto />
+
       <select
         value={variableId}
         onChange={(e) => onVariable(e.target.value)}
         className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100">
 
-        {grupos.map((g) =>
+        {filtro.grupos.map((g) =>
         g.options.length === 0 ?
         null :
         g.label ?
@@ -528,6 +550,13 @@ export function PropertyInspector({
   const { t, widgetLabel, pantallas, projectId, plcs } = useAppStore();
   const escribibles = useEscribibles();
 
+  // ── Receta ──
+  // Arriba del return temprano porque son hooks. Con «Habilitar receta»
+  // apagado no piden nada a la base.
+  const cfgReceta = leerCfgReceta(widget);
+  const recetasInsp = useRecetasInspector(cfgReceta.habilitada, cfgReceta.id);
+  useRevisionEnlacesReceta();
+
   // Secciones que declara el Menú Lateral del lienzo. Llena el desplegable
   // de "Vista".
   //
@@ -668,7 +697,49 @@ export function PropertyInspector({
     // Sin ficha todavía (el snapshot aún no llegó) se enseña al menos el
     // `plc_id`: quedarse sin sufijo haría parpadear la lista al conectar.
     if (!marca) return `  ·  ${plc_id}`;
-    return variosPlcs ? `  ·  ${plc_id}  ·  ${marca}` : `  ·  ${marca}`;
+    // Las variables de un PLC caído siguen en la lista (el servidor guarda
+    // su catálogo); se dice que no hay conexión para que el «—» no extrañe.
+    const caido = info && info.conectado === false ? '  ·  sin conexión' : '';
+    return (variosPlcs ? `  ·  ${plc_id}  ·  ${marca}` : `  ·  ${marca}`) + caido;
+  };
+
+  /**
+   * Añade a un desplegable la variable que YA está asignada, si no viene
+   * en la lista.
+   *
+   * Un `<select>` cuyo valor no coincide con ninguna opción enseña la
+   * primera —«Ninguna»— y parece que el widget perdió su enlace, cuando lo
+   * conserva (vive en el proyecto). Pasa si el PLC se eliminó, si la
+   * variable se borró del programa o si se desmarcó en Configuración.
+   */
+  const conAsignada = <G extends { label: string; options: { label: string; value: string }[] }>(
+    grupos: G[],
+    asignada: string | null | undefined
+  ) => {
+    const id = asignada ?? '';
+    if (!id || id.startsWith('param:')) return grupos;
+    if (grupos.some((g) => g.options.some((o) => o.value === id))) return grupos;
+    if (esEnlaceReceta(id)) {
+      // Elemento de una receta que ahora no se ofrece («Habilitar receta»
+      // apagado, otra receta elegida, o la base no responde). El enlace
+      // sigue puesto: se enseña con su nombre en vez de «Ninguna».
+      const nombre = fichaDeEnlace(id)?.nombre || 'elemento';
+      return [
+        ...grupos,
+        {
+          label: 'Asignada (receta)',
+          options: [{ label: `${nombre}  ·  receta`, value: id }]
+        }];
+
+    }
+    const { plc_id, tag } = partirId(id);
+    return [
+      ...grupos,
+      {
+        label: 'Asignada (no disponible ahora)',
+        options: [{ label: `${tag || id}  ·  ${plc_id || '?'}  ·  no disponible`, value: id }]
+      }];
+
   };
 
   // El lapicero marca «este tag se puede escribir». Va al final y no delante
@@ -680,6 +751,23 @@ export function PropertyInspector({
       `${escribibles.has(v.id) ? '  \u270E' : ''}`,
     value: v.id
   });
+
+  // ── LOS ELEMENTOS DE LA RECETA, COMO UN GRUPO MÁS DEL DESPLEGABLE ──
+  //
+  // Con «Habilitar receta» marcado y una receta elegida, sus elementos se
+  // ofrecen junto a las variables del PLC, en su propio grupo. Solo el
+  // nombre: de dónde lee cada uno (su tag) se decide en la vista de Recetas.
+  // Con el check apagado el grupo no existe; lo ya asignado se conserva.
+  const grupoReceta =
+  cfgReceta.habilitada && cfgReceta.id ?
+  [{
+    label: `Receta${cfgReceta.nombre ? `  ·  ${cfgReceta.nombre}` : ''}`,
+    options: recetasInsp.elementos.map((e) => ({
+      label: e.nombre || '(sin nombre)',
+      value: idElementoReceta(cfgReceta.id as number, e.id)
+    }))
+  }] :
+  [];
 
   /* Si esta pantalla es un TIPO de faceplate, sus parámetros se pueden
      enlazar como si fueran variables. Es lo que hace reutilizable al tipo:
@@ -700,7 +788,7 @@ export function PropertyInspector({
    * desplegable: la variable principal y cada variable con nombre, y cada una
    * admite tipos distintos.
    */
-  const gruposDe = (admite: DataType[] | undefined) => {
+  const gruposDe = (admite: DataType[] | undefined, asignada?: string) => {
     const reparto = repartirPorCompatibilidad(selectedVariables, admite);
     // Los parámetros del faceplate, filtrados por tipo cuando el enlace dice
     // cuál quiere: ofrecer un parámetro booleano para una velocidad es
@@ -708,8 +796,9 @@ export function PropertyInspector({
     const params = paramsFaceplate.filter(
       (p) => !admite || admite.length === 0 || admite.includes(p.tipo as DataType)
     );
-    return [
+    return conAsignada([
     { label: '', options: [{ label: t('insp.none'), value: '' }] },
+    ...grupoReceta,
     ...(params.length > 0 ?
     [{
       label: 'Parámetros del faceplate',
@@ -720,7 +809,8 @@ export function PropertyInspector({
     }] :
     []),
     { label: t('insp.varsCompatible'), options: reparto.compatibles.map(opcion) },
-    { label: t('insp.varsOther'), options: reparto.otras.map(opcion) }];
+    { label: t('insp.varsOther'), options: reparto.otras.map(opcion) }],
+    asignada);
 
   };
 
@@ -744,7 +834,8 @@ export function PropertyInspector({
   const nombresUsados = [...declaradas.map((d) => d.id), ...libres];
   const variablePorId = (id: string) =>
   id && !id.startsWith('param:') ?
-  selectedVariables.find((v) => v.id === id) :
+  // Un elemento de receta se busca por el tag que tiene puesto.
+  selectedVariables.find((v) => v.id === idRealDeEnlace(id)) :
   undefined;
 
   // ── Dinámicas ─────────────────────────────────────────────────
@@ -758,8 +849,9 @@ export function PropertyInspector({
     dinamicas: dinamicas.map((x) => x.id === id ? { ...x, ...parche } : x)
   });
 
-  const varGroups = [
+  const varGroups = conAsignada([
   { label: '', options: [{ label: t('insp.none'), value: '' }] },
+  ...grupoReceta,
   ...(paramsFaceplate.length > 0
     ? [{
         label: 'Parámetros del faceplate',
@@ -770,11 +862,14 @@ export function PropertyInspector({
       }]
     : []),
   { label: t('insp.varsCompatible'), options: compatibles.map(opcion) },
-  { label: t('insp.varsOther'), options: otras.map(opcion) }];
+  { label: t('insp.varsOther'), options: otras.map(opcion) }],
+  widget.variableId);
 
   // Variable enlazada ahora mismo, para avisar si no calza. Puede venir de un
   // diseño guardado antes de que existiera esta validación.
-  const variableActual = selectedVariables.find((v) => v.id === widget.variableId);
+  const variableActual = selectedVariables.find(
+    (v) => v.id === idRealDeEnlace(widget.variableId)
+  );
   // Un `param:` no es una variable: no hay tipo que comparar todavía —lo
   // pondrá cada instancia— así que avisar de incompatibilidad ahí sería
   // avisar de algo que aún no se ha decidido.
@@ -883,6 +978,61 @@ export function PropertyInspector({
         
       </Section>
 
+      {/* ── Receta ───────────────────────────────────────────────
+          En TODOS los widgets. Marcar el check y elegir una receta hace que
+          sus elementos aparezcan en los desplegables de variables de abajo
+          («Vínculo de datos» y «Variables con nombre»), en un grupo propio. */}
+      <Section title="Receta">
+        <ToggleField
+          label="Habilitar receta"
+          value={cfgReceta.habilitada}
+          onChange={(v) => onChange({ receta: { ...cfgReceta, habilitada: v } })} />
+
+        {cfgReceta.habilitada &&
+        <SelectField
+          label="Receta"
+          value={cfgReceta.id ? String(cfgReceta.id) : ''}
+          options={[
+          { label: '— Elige una receta —', value: '' },
+          ...recetasInsp.recetas.map((r) => ({ label: r.nombre, value: String(r.id) })),
+          // La que estaba elegida y ahora no viene en la lista (la base no
+          // responde, o se borró): se sigue viendo con el nombre guardado.
+          ...(cfgReceta.id && !recetasInsp.recetas.some((r) => r.id === cfgReceta.id) ?
+          [{
+            label: `${cfgReceta.nombre || `Receta ${cfgReceta.id}`}  ·  no disponible`,
+            value: String(cfgReceta.id)
+          }] :
+          [])]}
+          onChange={(v) => {
+            const elegida = recetasInsp.recetas.find((r) => String(r.id) === v);
+            onChange({
+              receta: {
+                habilitada: true,
+                id: elegida ? elegida.id : v ? cfgReceta.id : null,
+                nombre: elegida ? elegida.nombre : v ? cfgReceta.nombre : ''
+              }
+            });
+          }} />
+        }
+
+        {cfgReceta.habilitada && recetasInsp.error &&
+        <p className="text-[10px] leading-relaxed text-red-500">{recetasInsp.error}</p>
+        }
+        {cfgReceta.habilitada && !recetasInsp.error && !recetasInsp.cargando &&
+        recetasInsp.recetas.length === 0 &&
+        <p className="text-[10px] leading-relaxed text-slate-400">
+            No hay recetas todavía. Se crean en la vista de Recetas.
+          </p>
+        }
+        {cfgReceta.habilitada && cfgReceta.id &&
+        <p className="text-[10px] leading-relaxed text-slate-400">
+            {recetasInsp.elementos.length > 0 ?
+          `Sus ${recetasInsp.elementos.length} elementos salen en el grupo «Receta» de los desplegables de variables. Cada uno lee del tag que tenga puesto en la vista de Recetas.` :
+          'Esta receta no tiene elementos todavía.'}
+          </p>
+        }
+      </Section>
+
       {/* Solo si el widget lee variables. Los que declaran
           `accepts: []` (menú, panel de sección, formas decorativas) no
           usan ninguna, y ofrecerles el desplegable era ofrecer algo que
@@ -890,6 +1040,9 @@ export function PropertyInspector({
       {leeVariables &&
       <Section title={t('insp.binding')}>
         <SelectGroupField
+          // La `key` vacía el buscador al pasar a otro widget.
+          key={widget.id}
+          buscable
           label={t('insp.associatedVar')}
           value={widget.variableId ?? ''}
           groups={varGroups}
@@ -951,7 +1104,7 @@ export function PropertyInspector({
           etiqueta={d.label}
           ayuda={d.ayuda}
           variableId={enlaces[d.id] ?? ''}
-          grupos={gruposDe(d.accepts)}
+          grupos={gruposDe(d.accepts, enlaces[d.id])}
           variable={variablePorId(enlaces[d.id] ?? '')}
           onVariable={(v) =>
           onChange({
@@ -970,7 +1123,7 @@ export function PropertyInspector({
           fijo={false}
           etiqueta={k}
           variableId={enlaces[k] ?? ''}
-          grupos={gruposDe(undefined)}
+          grupos={gruposDe(undefined, enlaces[k])}
           variable={variablePorId(enlaces[k] ?? '')}
           onVariable={(v) => onChange({ enlaces: conEnlace(widget, k, v) })}
           onRenombrar={(nuevo) => {

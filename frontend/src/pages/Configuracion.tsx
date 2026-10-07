@@ -1213,7 +1213,10 @@ export function Configuracion() {
                         </h3>
                         <p className="truncate text-[11px] text-slate-400">
                           {plcInfoSel
-                            ? `${marcaDe(plcInfoSel.vendor)} · ${ipDe(plcInfoSel.endpoint)}`
+                            ? `${marcaDe(plcInfoSel.vendor)} · ${ipDe(plcInfoSel.endpoint)}` +
+                              (!plcInfoSel.conectado && (grupoSel?.vars.length ?? 0) > 0
+                                ? ' · sin conexión: últimas variables conocidas'
+                                : '')
                             : 'Elige un controlador de la lista'}
                         </p>
                       </div>

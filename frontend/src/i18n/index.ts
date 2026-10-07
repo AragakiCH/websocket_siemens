@@ -340,6 +340,7 @@ const es: Dict = {
   'cat.Indicadores': 'Indicadores',
   'cat.Equipos': 'Equipos',
   'cat.Datos': 'Datos',
+  'cat.Recetas': 'Recetas',
 
   // Inspector
   'insp.title': 'Propiedades',
@@ -701,6 +702,7 @@ const en: Dict = {
   'cat.Indicadores': 'Indicators',
   'cat.Equipos': 'Equipment',
   'cat.Datos': 'Data',
+  'cat.Recetas': 'Recipes',
 
   'insp.title': 'Properties',
   'insp.delete': 'Delete',

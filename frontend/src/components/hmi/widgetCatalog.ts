@@ -287,6 +287,16 @@ const ACCEPTS_TSX: Record<string, DataType[]> = {
   // Es un display de una magnitud: enteros y decimales. Un bool o un
   // string se pintarían igual, pero «ON km/h» no significa nada.
   'custom:valor-unidad': NUMERICOS,
+  // Los botones de receta no representan un valor: lo que usan son las
+  // variables CON NOMBRE (los elementos de la receta), no la principal.
+  'custom:receta-nueva': NINGUNO,
+  'custom:receta-guardar': NINGUNO,
+  'custom:receta-cargar': NINGUNO,
+  'custom:receta-eliminar': NINGUNO,
+  // El contador cuenta recetas guardadas, no lee ninguna variable.
+  'custom:receta-contador': NINGUNO,
+  // El campo de receta sí representa un valor: el de un elemento.
+  'custom:receta-campo': CUALQUIERA,
 };
 
 // Catálogo completo = built-in + custom TSX + custom ZIP (HTML).

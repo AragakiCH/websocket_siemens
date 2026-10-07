@@ -266,6 +266,46 @@ export function VariablesInternas() {
     [programar]
   );
 
+  // ── Renombrar: de una vez, no letra a letra ───────────────────
+  //
+  // El nombre NO pasa por `editar`. Es la clave de la fila y de los enlaces,
+  // y tratarlo como un campo cualquiera daba dos fallos a la vez: cada letra
+  // cambiaba la `key` de la fila —React la destruía y el cursor se perdía— y
+  // cada pausa de seis décimas mandaba un renombrado real, así que escribir
+  // «repo» renombraba la variable varias veces por el camino.
+  //
+  // Devuelve si de verdad se renombró, para que la celda sepa si quedarse
+  // con lo tecleado o volver al nombre que había.
+  const renombrar = useCallback(
+    async (antes: string, nuevo: string): Promise<boolean> => {
+      // Lo pendiente de esta fila está encolado con el nombre VIEJO: si se
+      // mandara después del renombrado, el servidor ya no la encontraría.
+      if (temporizador.current) {
+        window.clearTimeout(temporizador.current);
+        temporizador.current = null;
+      }
+      await vaciarCola();
+      setOcupado(true);
+      try {
+        const r = await actualizarInterna(antes, { nombre: nuevo });
+        setError('');
+        setGuardado('guardado');
+        // El servidor normaliza («Repo 1» -> «repo_1»): si tras normalizar
+        // queda el mismo nombre, no hubo renombrado y no hay nada que avisar.
+        if (r.renombrada) setAviso(r.mensaje);
+        recargarRef.current();
+        return !!r.renombrada;
+      } catch (e: any) {
+        setGuardado('error');
+        setError(e?.message ?? 'No se pudo renombrar la variable.');
+        return false;
+      } finally {
+        setOcupado(false);
+      }
+    },
+    [vaciarCola]
+  );
+
   // ── El VALOR: va al momento, no espera ────────────────────────
   //
   // Un interruptor que tarda seis decimas en obedecer se siente roto, y
@@ -491,6 +531,7 @@ export function VariablesInternas() {
                           vivo={vivos.get(claveInterna(v.nombre))}
                           confirmando={confirmar === v.nombre}
                           onEditar={editar}
+                          onRenombrar={renombrar}
                           onValor={ponerValor}
                           onPedirBorrar={() =>
                             setConfirmar(confirmar === v.nombre ? '' : v.nombre)
@@ -545,6 +586,67 @@ export function VariablesInternas() {
 // Piezas
 // ═════════════════════════════════════════════════════════════════
 
+/**
+ * El nombre de la variable, con borrador propio.
+ *
+ * Se escribe libre y solo se renombra al confirmar (Enter o salir del campo).
+ * Mientras tanto el nombre real no cambia, así que ni la fila se recrea ni
+ * el servidor recibe renombrados a medias. Escape deja el nombre que había.
+ */
+function CeldaNombre({
+  nombre,
+  onRenombrar,
+}: {
+  nombre: string;
+  onRenombrar: (antes: string, nuevo: string) => Promise<boolean>;
+}) {
+  const [borrador, setBorrador] = useState(nombre);
+  // Escape quita el foco, y quitar el foco confirma: sin esta marca, cancelar
+  // acabaría renombrando justo lo que se quería descartar.
+  const cancelado = useRef(false);
+
+  useEffect(() => {
+    setBorrador(nombre);
+  }, [nombre]);
+
+  const confirmar = async () => {
+    if (cancelado.current) {
+      cancelado.current = false;
+      setBorrador(nombre);
+      return;
+    }
+    const limpio = borrador.trim();
+    if (!limpio || limpio === nombre) {
+      setBorrador(nombre);
+      return;
+    }
+    const renombrada = await onRenombrar(nombre, limpio);
+    if (!renombrada) setBorrador(nombre);
+  };
+
+  return (
+    <input
+      type="text"
+      value={borrador}
+      spellCheck={false}
+      placeholder="nombre_variable"
+      aria-label={`Nombre de la variable ${nombre}`}
+      title="Escribe el nombre nuevo y pulsa Enter. Los widgets que la usan se actualizan solos. Escape cancela."
+      onChange={(e) => setBorrador(e.target.value)}
+      onBlur={() => void confirmar()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.currentTarget.blur();
+        } else if (e.key === 'Escape') {
+          cancelado.current = true;
+          e.currentTarget.blur();
+        }
+      }}
+      className="w-full rounded-md border border-transparent bg-transparent px-2.5 py-1.5 font-mono text-xs font-medium text-navy outline-none transition placeholder:text-slate-300 hover:border-slate-200 hover:bg-white focus:border-siemens focus:bg-white focus:ring-2 focus:ring-siemens/20 dark:text-slate-100 dark:placeholder:text-slate-600 dark:hover:border-navy-slate dark:hover:bg-navy dark:focus:bg-navy"
+    />
+  );
+}
+
 /** Una fila de la tabla. */
 function Fila({
   v,
@@ -553,6 +655,7 @@ function Fila({
   vivo,
   confirmando,
   onEditar,
+  onRenombrar,
   onValor,
   onPedirBorrar,
   onBorrar,
@@ -563,6 +666,7 @@ function Fila({
   vivo: unknown;
   confirmando: boolean;
   onEditar: (nombre: string, cambios: Partial<VariableInterna>) => void;
+  onRenombrar: (antes: string, nuevo: string) => Promise<boolean>;
   onValor: (v: VariableInterna, valor: unknown) => void;
   onPedirBorrar: () => void;
   onBorrar: () => void;
@@ -586,14 +690,7 @@ function Fila({
         <div className="flex items-start gap-1.5">
           <Icono className={`mt-2 h-3.5 w-3.5 shrink-0 ${colorDe(aspecto.insignia)}`} />
           <div className="min-w-0 flex-1">
-            <Celda
-              value={v.nombre}
-              onChange={(x) => onEditar(v.nombre, { nombre: x })}
-              placeholder="nombre_variable"
-              aria-label={`Nombre de la variable ${v.nombre}`}
-              title="Renombrarla cambia la clave: los widgets enlazados se quedan sin variable."
-              className="font-mono font-medium"
-            />
+            <CeldaNombre nombre={v.nombre} onRenombrar={onRenombrar} />
             <ClaveCopiable nombre={v.nombre} />
           </div>
         </div>

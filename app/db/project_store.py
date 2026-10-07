@@ -463,6 +463,72 @@ class ProjectStore:
             await self._escribir_async(pid)
             return doc
 
+    async def reemplazar_referencia(self, vieja: str, nueva: str,
+                                    usuario: str = "") -> List[dict]:
+        """
+        Cambia una clave de variable por otra en TODAS las pantallas.
+
+        Existe para el renombrado de variables internas. La clave de una
+        variable (`interno|<nombre>`) es lo que guardan los widgets, así que
+        renombrarla sin pasar por aquí deja cada widget apuntando a algo que
+        ya no existe: no da error, simplemente el widget se queda sin valor y
+        el inspector lo enseña como «sin variable».
+
+        Se busca en profundidad dentro de cada widget y NO en una lista de
+        campos conocidos (`variableId`, `enlaces`, `config.accion.tag`,
+        series del trend, parámetros de un faceplate...): cada widget nuevo
+        añade su propio sitio donde guardar una variable, y una lista escrita
+        a mano se quedaría atrás sin avisar. La comparación es por IGUALDAD
+        del texto completo, nunca por «contiene»: `interno|repo` no puede
+        tocar a `interno|repo_2`.
+
+        No comprueba versión ni lápiz a propósito. Quien tiene la pantalla
+        abierta no ha pedido este cambio, pero dejarle el enlace roto sería
+        peor; el aviso por WebSocket le actualiza lo que tiene en memoria.
+
+        Devuelve una entrada por pantalla tocada, con la lista de widgets de
+        ANTES (para poder difundir solo la diferencia) y cuántos cambiaron.
+        """
+        if not vieja or vieja == nueva:
+            return []
+
+        def cambiar(nodo: Any) -> Any:
+            # Devuelve el MISMO objeto si no hay nada que cambiar: así la
+            # lista de «antes» sigue siendo válida para calcular el diff.
+            if isinstance(nodo, str):
+                return nueva if nodo == vieja else nodo
+            if isinstance(nodo, list):
+                nuevos = [cambiar(x) for x in nodo]
+                if any(a is not b for a, b in zip(nodo, nuevos)):
+                    return nuevos
+                return nodo
+            if isinstance(nodo, dict):
+                nuevos_d = {k: cambiar(x) for k, x in nodo.items()}
+                if any(nuevos_d[k] is not nodo[k] for k in nodo):
+                    return nuevos_d
+                return nodo
+            return nodo
+
+        tocadas: List[dict] = []
+        async with self._lock_async:
+            for pid, doc in self._cache.items():
+                antes = list(doc.get("widgets") or [])
+                despues = [cambiar(w) for w in antes]
+                cuantos = sum(1 for a, b in zip(antes, despues) if a is not b)
+                if cuantos == 0:
+                    continue
+                doc["widgets"] = despues
+                self._sellar(doc, usuario)
+                await self._escribir_async(pid)
+                tocadas.append({
+                    "project_id": pid,
+                    "nombre": doc.get("nombre") or pid,
+                    "doc": doc,
+                    "widgets_antes": antes,
+                    "widgets_tocados": cuantos,
+                })
+        return tocadas
+
     async def guardar_widget(self, project_id: str, widget: dict,
                              version: Optional[int] = None,
                              usuario: str = "") -> dict:

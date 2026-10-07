@@ -104,7 +104,14 @@ class RealPLCServiceImpl {
 
   // ---- interfaz PÚBLICA (igual que MockPLCService) -------------------- //
   getVariables(): PlcVariable[] {
-    return toPlcVariables(this.tags, this.selection);
+    // Un PLC que el servidor reportó caído conserva sus variables, pero sin
+    // valor (ver `toPlcVariables`). Las internas no tienen conexión que
+    // perder.
+    return toPlcVariables(
+      this.tags,
+      this.selection,
+      (plc) => plc !== 'interno' && this.plcConectado.get(plc) === false
+    );
   }
 
   /** Compat con el mock; en modo real no se usa desde fuera. */
@@ -273,7 +280,12 @@ class RealPLCServiceImpl {
         // Estado de conexión de un PLC. No cambia ningún valor, pero sí si
         // se puede CONFIAR en los valores de ese PLC (ver `plcDisponible`).
         if (typeof msg.plc === 'string' && typeof msg.status === 'string') {
-          this.plcConectado.set(msg.plc, msg.status === 'conectado');
+          const antes = this.plcConectado.get(msg.plc);
+          const ahora = msg.status === 'conectado';
+          this.plcConectado.set(msg.plc, ahora);
+          // Al caerse, sus valores pasan a «—» YA: sin esto la pantalla
+          // seguía enseñando el último valor hasta el siguiente snapshot.
+          if (antes !== ahora) this.emitNow();
         }
         // Y la ficha del PLC: es el aviso de que se cayó o volvió. Sin esto,
         // el «conectado» de la ficha se quedaría clavado en lo que dijera el

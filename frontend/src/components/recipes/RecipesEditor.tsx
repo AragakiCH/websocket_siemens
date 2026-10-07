@@ -140,6 +140,7 @@ export function RecipesEditor() {
     duplicarReceta,
     agregarElemento,
     editarElemento,
+    repetidos,
     borrarElemento,
     agregarRegistro,
     editarRegistro,
@@ -527,8 +528,23 @@ export function RecipesEditor() {
                                 onChange={(v) => editarElemento(e.id, { name: v })}
                                 placeholder="limon"
                                 aria-label="Nombre del elemento"
-                                className="font-medium"
+                                aria-invalid={repetidos.has(e.id)}
+                                title={
+                                  repetidos.has(e.id)
+                                    ? 'Ya hay otro elemento con este nombre en la receta. No se guarda hasta que lo cambies.'
+                                    : undefined
+                                }
+                                className={
+                                  repetidos.has(e.id)
+                                    ? 'bg-red-50 font-medium text-red-600 ring-1 ring-inset ring-red-500 dark:bg-red-500/10 dark:text-red-400'
+                                    : 'font-medium'
+                                }
                               />
+                              {repetidos.has(e.id) && (
+                                <p className="px-2.5 pb-1 text-[10px] font-medium leading-tight text-red-500">
+                                  No se puede repetir el nombre
+                                </p>
+                              )}
                             </td>
                             <td className="px-1 py-1">
                               <Celda

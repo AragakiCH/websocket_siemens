@@ -265,12 +265,15 @@ export function valorAEscribir(
       // de planta esa diferencia importa.
       if (!actual) return null;
       const v = actual.value;
+      // Variable conocida pero sin valor (PLC sin conexión): tampoco hay
+      // lectura previa.
+      if (v === null || v === undefined) return null;
       if (typeof v === 'boolean') return !v;
       return Number(v) ? 0 : 1;
     }
 
     case 'incrementar': {
-      if (!actual) return null;
+      if (!actual || actual.value === null || actual.value === undefined) return null;
       const n = typeof actual.value === 'number' ? actual.value : Number(actual.value);
       if (!Number.isFinite(n)) return null;
       return n + (accion.paso ?? 1);

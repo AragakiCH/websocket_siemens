@@ -65,6 +65,13 @@ export interface HmiWidget {
   enlaces?: Record<string, string>;
 
   /**
+   * Receta habilitada para este widget (sección «Receta» del Inspector).
+   * Con ella, los elementos de esa receta se ofrecen en los desplegables de
+   * variables. Ver `services/recetaEnlace.ts`.
+   */
+  receta?: { habilitada: boolean; id: number | null; nombre: string };
+
+  /**
    * Reglas que cambian el ASPECTO del widget según lo que lee: se ve o no se
    * ve, de qué color, si parpadea.
    *

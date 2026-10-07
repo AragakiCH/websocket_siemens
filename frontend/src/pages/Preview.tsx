@@ -45,6 +45,7 @@
 //   * Los valores, de `useAppStore().variables`: al montar este contexto el
 //     RealPLCService abre su WebSocket y el snapshot llega solo.
 // =========================================================================
+import { idRealDeEnlace, useRevisionEnlacesReceta } from '../services/recetaEnlace';
 import {
   useCallback,
   useEffect,
@@ -348,10 +349,17 @@ export function Preview() {
    * de todos los widgets de la pantalla aunque no hubiera llegado ni una
    * lectura nueva.
    */
+  // Un enlace a un ELEMENTO DE RECETA (`receta:…`) se cambia por el tag de
+  // ese elemento antes de buscar el valor. `revRecetas` sube cuando se
+  // entera de un tag nuevo, y es lo que hace repetir la búsqueda.
+  const revRecetas = useRevisionEnlacesReceta();
   const resolverVariable = useCallback(
-    (id: string | null | undefined) =>
-      id ? variables.find((v) => v.id === id) : undefined,
-    [variables]
+    (id: string | null | undefined) => {
+      const real = idRealDeEnlace(id);
+      return real ? variables.find((v) => v.id === real) : undefined;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [variables, revRecetas]
   );
 
   // Vista abierta en la navegación. Al pulsar un botón del Menú Lateral
@@ -1041,7 +1049,7 @@ export function Preview() {
                   <WidgetRenderer
                     widget={w}
                     variable={
-                      w.variableId ? variablePorId.get(w.variableId) : undefined
+                      w.variableId ? variablePorId.get(idRealDeEnlace(w.variableId)) : undefined
                     }
                     // Aquí el widget se OPERA: el trend escucha el arrastre
                     // para moverse en el tiempo. En el Diseñador no, porque

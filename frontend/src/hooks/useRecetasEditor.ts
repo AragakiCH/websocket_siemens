@@ -24,6 +24,7 @@
 // mismos nombres. Esa fue la condición del refactor: el JSX no se tocó, así
 // que la pantalla de Recetas no puede haber cambiado de comportamiento.
 // =========================================================================
+import { EVENTO_RECETAS_EDITADAS } from '../services/recetaEnlace';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type EstadoGuardado } from '../components/ui/TableBits';
 import { apiGet, cargarTags, type TagRemoto } from '../components/flows/api';
@@ -52,6 +53,7 @@ import {
   nuevoElementoDb,
   nuevoRegistroDb,
   patchElementoADb,
+  elementosRepetidos,
   patchRecetaADb,
   patchRegistroADb,
   valorADb,
@@ -143,6 +145,9 @@ export function useRecetasEditor() {
       }
       setGuardado('guardado');
       setError('');
+      // Los widgets enlazados a un elemento de receta leen de su tag: se
+      // les avisa de que puede haber cambiado (ver recetaEnlace.ts).
+      window.dispatchEvent(new CustomEvent(EVENTO_RECETAS_EDITADAS));
     } catch (e: any) {
       setGuardado('error');
       setError(e?.message ?? 'No se pudo guardar el cambio.');
@@ -195,6 +200,9 @@ export function useRecetasEditor() {
       await fn();
       setError('');
       setGuardado('guardado');
+      // Los widgets enlazados a un elemento de receta leen de su tag: se
+      // les avisa de que puede haber cambiado (ver recetaEnlace.ts).
+      window.dispatchEvent(new CustomEvent(EVENTO_RECETAS_EDITADAS));
     } catch (e: any) {
       setError(e?.message ?? 'La operación falló.');
       setGuardado('error');
@@ -507,10 +515,35 @@ export function useRecetasEditor() {
     });
   }, [receta, conServidor]);
 
+  // ── Nombres repetidos ─────────────────────────────────────────
+  //
+  // Dos elementos de la misma receta no pueden llamarse igual: el nombre es
+  // lo que se ve al enlazarlos a un widget, y con dos `var_3` no hay forma
+  // de saber cuál es cuál. El campo se pinta en rojo y ESE nombre no se
+  // guarda. Lo tecleado se queda en pantalla para poder corregirlo; al
+  // recargar vuelve el último nombre válido.
+  //
+  // Aquí se apuntan los elementos con un nombre pendiente de guardar por
+  // repetido. Cuando deja de estarlo —porque se corrigió él, o porque se
+  // renombró o borró el otro— se guarda solo (ver el efecto de más abajo).
+  const nombresRetenidos = useRef(new Set<number>());
+
   const editarElemento = useCallback(
     (elemId: number, patch: Partial<RecipeElement>) => {
       if (!receta) return;
       const idReceta = receta.id;
+      const aDb = patchElementoADb(patch);
+      if (patch.name !== undefined) {
+        const comoQueda = receta.elements.map((e) =>
+          e.id === elemId ? { ...e, ...patch } : e
+        );
+        if (elementosRepetidos(comoQueda).has(elemId)) {
+          delete aDb.nombre;
+          nombresRetenidos.current.add(elemId);
+        } else {
+          nombresRetenidos.current.delete(elemId);
+        }
+      }
       setRecetas((prev) =>
         prev.map((r) =>
           r.id === idReceta
@@ -523,10 +556,30 @@ export function useRecetasEditor() {
             : r
         )
       );
-      programar('receta_elementos', elemId, patchElementoADb(patch));
+      programar('receta_elementos', elemId, aDb);
     },
     [receta, programar]
   );
+
+  /** Elementos de la receta abierta con el nombre repetido (para pintarlos). */
+  const repetidos = useMemo(
+    () => elementosRepetidos(receta?.elements ?? []),
+    [receta]
+  );
+
+  // Un nombre retenido que ya no choca con nadie se guarda ahora.
+  useEffect(() => {
+    if (!receta || nombresRetenidos.current.size === 0) return;
+    for (const id of [...nombresRetenidos.current]) {
+      const e = receta.elements.find((x) => x.id === id);
+      if (!e) {
+        nombresRetenidos.current.delete(id);
+      } else if (!repetidos.has(id)) {
+        nombresRetenidos.current.delete(id);
+        programar('receta_elementos', id, { nombre: e.name });
+      }
+    }
+  }, [receta, repetidos, programar]);
 
   /** Borra el elemento. El backend se lleva sus valores en los registros. */
   const borrarElemento = useCallback(
@@ -763,6 +816,7 @@ export function useRecetasEditor() {
     duplicarReceta,
     agregarElemento,
     editarElemento,
+    repetidos,
     borrarElemento,
     agregarRegistro,
     editarRegistro,
