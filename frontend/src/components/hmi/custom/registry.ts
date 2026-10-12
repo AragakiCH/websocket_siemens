@@ -18,6 +18,7 @@ import {
   recetaCargar,
   recetaEliminar,
   recetaContador,
+  recetaAplicar,
 } from './recetas/BotonesReceta';
 import { recetaCampo } from './recetas/CampoReceta';
 // El catálogo de ZIP pasó a resolverse por un índice (`zipWidgetPorKind`) en
@@ -64,6 +65,7 @@ export const customWidgets: CustomWidgetDef[] = [
   recetaGuardar,
   recetaCargar,
   recetaCampo,
+  recetaAplicar,
   recetaEliminar,
   recetaContador,
   // semaforoIndustrial,   ← aquí agregas cada widget nuevo, punto

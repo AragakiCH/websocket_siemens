@@ -293,6 +293,8 @@ const ACCEPTS_TSX: Record<string, DataType[]> = {
   'custom:receta-guardar': NINGUNO,
   'custom:receta-cargar': NINGUNO,
   'custom:receta-eliminar': NINGUNO,
+  // «Aplicar todos» envía lo de los campos; no lee ninguna variable.
+  'custom:receta-aplicar': NINGUNO,
   // El contador cuenta recetas guardadas, no lee ninguna variable.
   'custom:receta-contador': NINGUNO,
   // El campo de receta sí representa un valor: el de un elemento.

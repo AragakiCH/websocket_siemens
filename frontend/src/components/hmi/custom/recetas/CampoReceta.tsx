@@ -16,12 +16,14 @@
 //
 // ESCRIBIR NO ES ENVIAR
 //
-//   Lo que se escribe SE QUEDA en el campo aunque no se pulse Enter: es un
+//   Lo que se escribe SE QUEDA en el campo aunque no se pulse Enter (la marca
+//   ámbar sale desde la primera tecla distinta al PLC): es un
 //   cambio pendiente, y «Guardar receta» lo lleva al data record. El campo
 //   se marca con borde ámbar y una franja a la izquierda para que se vea que
 //   el PLC todavía no tiene ese valor.
 //
-//   SOLO ENTER lo envía al PLC, y al confirmarse se quita la marca. Escape
+//   Enter lo envía al PLC (o «Aplicar todos», que envía todos los ámbar de
+//   la receta), y al confirmarse se quita la marca. Escape
 //   deshace lo tecleado en esa edición. Guardar la receta no quita la marca:
 //   son dos cosas distintas, y el PLC sigue sin el valor.
 //
@@ -61,9 +63,11 @@ import {
   enviadoAlPlc,
   fijarBorrador,
   fueraDeLimite,
+  hayCambiosSinGuardar,
   llaveBorrador,
   metaDeReceta,
   quitarBorrador,
+  restaurarCambios,
   useBorrador,
 } from '../../../../services/recetaRuntime';
 import { notificar } from './avisos';
@@ -159,6 +163,12 @@ function CampoReceta({ widget, variable, interactivo, style }: RenderCtx) {
   // El `blur` que dispara el navegador al QUITAR el input no es el operario
   // saliendo del campo: no debe asentar nada.
   const ignorarBlur = useRef(false);
+  // Cómo estaba el campo al empezar a editarlo, para que Escape lo devuelva
+  // tal cual: lo tecleado ya se va asentando letra a letra.
+  const alAbrir = useRef<{ borrador: string | undefined; cambios: boolean }>({
+    borrador: undefined,
+    cambios: false,
+  });
 
   useEffect(() => {
     if (editando) entrada.current?.select();
@@ -190,6 +200,10 @@ function CampoReceta({ widget, variable, interactivo, style }: RenderCtx) {
   const abrir = () => {
     if (!editable || mandando || editando) return;
     ignorarBlur.current = false;
+    alAbrir.current = {
+      borrador: borradorDe(llave),
+      cambios: recetaId ? hayCambiosSinGuardar(recetaId) : false,
+    };
     setTexto(pendiente ?? textoVivo);
     setEditando(true);
   };
@@ -370,7 +384,13 @@ function CampoReceta({ widget, variable, interactivo, style }: RenderCtx) {
           ref={entrada}
           value={texto}
           inputMode="decimal"
-          onChange={(e) => setTexto(e.target.value)}
+          onChange={(e) => {
+            // Se asienta en cada tecla: la franja ámbar sale en cuanto el
+            // valor es distinto del PLC (y se va si se vuelve a dejar igual),
+            // sin tener que salir del campo. «Aplicar todos» lo ve al toque.
+            setTexto(e.target.value);
+            asentar(e.target.value.trim());
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
@@ -378,6 +398,10 @@ function CampoReceta({ widget, variable, interactivo, style }: RenderCtx) {
             } else if (e.key === 'Escape') {
               // Deshace lo tecleado en ESTA edición; lo que ya estaba
               // escrito de antes se queda como estaba.
+              const { borrador, cambios } = alAbrir.current;
+              if (borrador === undefined) quitarBorrador(llave);
+              else fijarBorrador(llave, borrador);
+              restaurarCambios(recetaId, cambios);
               cerrar();
             }
           }}

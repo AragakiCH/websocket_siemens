@@ -64,12 +64,14 @@ import {
   UploadIcon,
   XIcon,
   ListOrderedIcon,
+  SendIcon,
   type LucideIcon,
 } from 'lucide-react';
 import type { CustomWidgetDef, RenderCtx } from '../types';
 import { leerCfgReceta } from '../../../../services/recetaEnlace';
 import {
   cargarDataRecord,
+  enviarPendientes,
   eliminarDataRecord,
   guardarDataRecord,
   hayCambiosSinGuardar,
@@ -78,6 +80,7 @@ import {
   recetaActual,
   useConteoRecetas,
   useEstadoReceta,
+  usePendientesDeEnviar,
   valoresEnPantalla,
   type RegistroExistente,
   type ResultadoCargar,
@@ -113,6 +116,8 @@ function BotonReceta({
   peligro,
   onPulsar,
   refBoton,
+  apagado,
+  extra,
 }: {
   ctx: RenderCtx;
   texto: string;
@@ -123,9 +128,16 @@ function BotonReceta({
   /** Sin él, el botón todavía no tiene función. */
   onPulsar?: () => void;
   refBoton?: React.RefObject<HTMLButtonElement>;
+  /** Se ve, pero no hay nada que hacer ahora (gris y sin clic). */
+  apagado?: boolean;
+  /** Algo más tras el texto (p. ej. la cuenta de «Aplicar todos»). */
+  extra?: React.ReactNode;
 }) {
   const [encima, setEncima] = useState(false);
-  const fondo = primario
+  const activo = !!ctx.interactivo && !apagado;
+  const fondo = apagado
+    ? C.fondo
+    : primario
     ? encima ? C.verdeHover : C.verde
     : encima ? (peligro ? '#f6e4e5' : C.fondoHover) : C.fondo;
   return (
@@ -133,7 +145,8 @@ function BotonReceta({
       ref={refBoton}
       type="button"
       title={onPulsar ? texto : `${texto} (todavía sin función)`}
-      onClick={ctx.interactivo && onPulsar ? onPulsar : undefined}
+      onClick={activo && onPulsar ? onPulsar : undefined}
+      aria-disabled={apagado || undefined}
       onPointerEnter={() => setEncima(true)}
       onPointerLeave={() => setEncima(false)}
       style={{
@@ -154,14 +167,16 @@ function BotonReceta({
         fontSize: 13,
         fontWeight: peligro ? 700 : 600,
         fontFamily: FUENTE,
-        cursor: ctx.interactivo ? 'pointer' : 'default',
-        transition: 'background .12s',
+        cursor: !ctx.interactivo ? 'default' : apagado ? 'not-allowed' : 'pointer',
+        opacity: apagado ? 0.55 : 1,
+        transition: 'background .12s, opacity .12s',
         whiteSpace: 'nowrap',
         overflow: 'hidden',
       }}
     >
       <Icono style={{ width: 15, height: 15, flexShrink: 0 }} />
       {texto}
+      {extra}
     </button>
   );
 }
@@ -1467,6 +1482,93 @@ function EliminarReceta(ctx: RenderCtx) {
   );
 }
 
+// ─── «Aplicar todos» ─────────────────────────────────────────────
+
+/**
+ * Envía al PLC, uno por uno, todos los campos en ámbar de la receta que hay
+ * en esta pantalla. SOLO al PLC: no toca el data record. Para la receta
+ * siguen siendo cambios sin guardar («Guardar receta» es lo que guarda).
+ *
+ * Lleva la cuenta de pendientes y se apaga cuando no hay ninguno.
+ */
+function AplicarTodos(ctx: RenderCtx) {
+  const cfg = leerCfgReceta(ctx.widget);
+  const recetaId = cfg.habilitada ? cfg.id : null;
+  const pendientes = usePendientesDeEnviar(recetaId);
+  const [enviando, setEnviando] = useState(false);
+
+  const pulsar = async () => {
+    if (!recetaId) {
+      notificar(SIN_RECETA, 'aviso');
+      return;
+    }
+    if (enviando) return;
+    const total = pendientesDeEnviar(recetaId);
+    if (total === 0) {
+      notificar('No hay cambios por aplicar.', 'aviso');
+      return;
+    }
+    setEnviando(true);
+    try {
+      const r = await enviarPendientes(recetaId);
+      if (r.fallos.length === 0) {
+        notificar(
+          r.enviados === 1
+            ? 'Se envió 1 valor al PLC.'
+            : `Se enviaron ${r.enviados} valores al PLC.`,
+          'ok'
+        );
+        return;
+      }
+      const detalle = r.fallos.map((f) => `«${f.nombre}»: ${f.motivo}`).join(' · ');
+      notificar(
+        r.enviados > 0
+          ? `Se enviaron ${r.enviados} de ${r.enviados + r.fallos.length}. No se enviaron (siguen en ámbar): ${detalle}.`
+          : `No se envió ningún valor (siguen en ámbar): ${detalle}.`,
+        r.enviados > 0 ? 'aviso' : 'error',
+        9000
+      );
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  // En el Diseñador se ve normal, sin cuenta: ahí no se escribe nada.
+  const conCuenta = !!ctx.interactivo && pendientes > 0;
+  return (
+    <BotonReceta
+      ctx={ctx}
+      texto={enviando ? 'Enviando…' : 'Aplicar todos'}
+      Icono={SendIcon}
+      apagado={!!ctx.interactivo && (enviando || pendientes === 0)}
+      onPulsar={() => void pulsar()}
+      extra={
+        conCuenta && !enviando ? (
+          <span
+            title={`${pendientes} ${pendientes === 1 ? 'valor' : 'valores'} por enviar al PLC`}
+            style={{
+              minWidth: 20,
+              height: 20,
+              padding: '0 6px',
+              boxSizing: 'border-box',
+              borderRadius: 10,
+              background: C.ambar,
+              color: '#fff',
+              fontSize: 11.5,
+              fontWeight: 700,
+              lineHeight: '20px',
+              textAlign: 'center',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {pendientes}
+          </span>
+        ) : undefined
+      }
+    />
+  );
+}
+
 // ─── El contador ─────────────────────────────────────────────────
 
 /**
@@ -1567,6 +1669,15 @@ export const recetaEliminar: CustomWidgetDef = {
   icon: XIcon,
   defaultWidth: 152,
   render: (ctx) => <EliminarReceta {...ctx} />,
+};
+
+export const recetaAplicar: CustomWidgetDef = {
+  ...base,
+  kind: 'custom:receta-aplicar',
+  label: 'Aplicar todos',
+  icon: SendIcon,
+  defaultWidth: 170,
+  render: (ctx) => <AplicarTodos {...ctx} />,
 };
 
 export const recetaContador: CustomWidgetDef = {

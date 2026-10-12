@@ -84,13 +84,25 @@ interface CampoEnPantalla {
 }
 
 const campos = new Map<symbol, CampoEnPantalla>();
+/** Entró o salió un campo de la pantalla (lo escucha «Aplicar todos»). */
+const EVENTO_CAMPOS = 'hmi:receta-campos';
+
+function avisarCampos(): void {
+  try {
+    window.dispatchEvent(new CustomEvent(EVENTO_CAMPOS));
+  } catch {
+    /* sin `window` (pruebas) */
+  }
+}
 
 /** Apunta un campo. Devuelve cómo borrarlo (para el `useEffect`). */
 export function apuntarCampo(campo: CampoEnPantalla): () => void {
   const llave = Symbol('campo-receta');
   campos.set(llave, campo);
+  avisarCampos();
   return () => {
     campos.delete(llave);
+    avisarCampos();
   };
 }
 
@@ -238,6 +250,33 @@ export function quitarBorrador(llave: string): void {
 export function enviadoAlPlc(llave: string, recetaId = 0): void {
   if (recetaId) marcarCambios(recetaId, true);
   quitarBorrador(llave);
+}
+
+/**
+ * Deja la marca «cambios sin guardar» como estaba antes de una edición.
+ * La usa Escape en el campo: deshacer lo tecleado no es un cambio.
+ */
+export function restaurarCambios(recetaId: number, hay: boolean): void {
+  if (recetaId) marcarCambios(recetaId, hay);
+}
+
+/**
+ * Cuántos campos de la receta están en ámbar AHORA en la pantalla, vivo:
+ * se recalcula al escribir, al enviar y cuando entra o sale un campo.
+ */
+export function usePendientesDeEnviar(recetaId: number | null): number {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const contar = () => setN(recetaId ? pendientesDeEnviar(recetaId) : 0);
+    contar();
+    window.addEventListener(EVENTO_BORRADOR, contar);
+    window.addEventListener(EVENTO_CAMPOS, contar);
+    return () => {
+      window.removeEventListener(EVENTO_BORRADOR, contar);
+      window.removeEventListener(EVENTO_CAMPOS, contar);
+    };
+  }, [recetaId]);
+  return n;
 }
 
 /** ¿Se cambió algún campo de esa receta desde la última vez que se guardó? */
