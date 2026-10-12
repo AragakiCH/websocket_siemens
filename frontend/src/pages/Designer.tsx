@@ -79,9 +79,12 @@ import { ProyectoSelector } from '../components/hmi/ProyectoSelector';
 import { publicarRuntime } from '../services/runtimeApi';
 import {
   useVistaActiva,
+  usePanel,
+  sigueConPanelAbierto,
   useSecciones,
   setVistaActiva,
   setPantalla,
+  cerrarPaneles,
   publicarSecciones,
   publicarPantallas,
   arbolDe,
@@ -251,6 +254,11 @@ export function Designer() {
   // de pintar, así que ese estado intermedio no llega a verse.
   useLayoutEffect(() => {
     setPantalla(projectId);
+    // Lo que un operador dejó abierto dentro de un Panel de Sección en la
+    // Vista Previa no tiene que verse aquí: el historial vive en el módulo
+    // y sobrevive al cambio de ruta. En el lienzo, el panel enseña siempre
+    // su origen —la sección, o la pantalla que la sección tenga asignada—.
+    cerrarPaneles();
   }, [projectId]);
 
   // ── EL CATÁLOGO DE PANTALLAS, PARA EL INSPECTOR DEL MENÚ ──────
@@ -269,6 +277,13 @@ export function Designer() {
   }, [pantallas]);
 
   const vistaActiva = useVistaActiva(GRUPO_POR_DEFECTO);
+  // Lo que el Panel de Sección enseña POR ENCIMA de la sección (una pantalla
+  // abierta con uno de sus botones). Los botones del panel funcionan también
+  // en el lienzo, para poder probar la navegación sin salir al runtime; y
+  // mientras haya algo abierto, los widgets de la sección se tratan como si
+  // fueran de otra: atenuados, u ocultos con «Solo esta». Igual que hace la
+  // Vista Previa, que los esconde.
+  const panel = usePanel(GRUPO_POR_DEFECTO);
   const secciones = useSecciones(GRUPO_POR_DEFECTO);
 
   // Con esto en `true` el lienzo enseña SOLO la sección abierta, igual que la
@@ -1873,7 +1888,11 @@ export function Designer() {
             // seleccionar y arrastrar con normalidad.
             // "En todas" (vista vacía) se ve siempre; el resto solo si es
             // la sección abierta. Sin navegación montada, todo se ve.
-            const suya = !(w.vista ?? '').trim() || !vistaActiva || w.vista === vistaActiva;
+            const suya =
+              !(w.vista ?? '').trim() ||
+              !vistaActiva ||
+              (w.vista === vistaActiva &&
+                (!panel.abierta || sigueConPanelAbierto(w.kind)));
 
             // Con "Solo esta" se oculta de verdad, como en la Vista Previa:
             // es la única forma de ver una sección vacía y entender que la

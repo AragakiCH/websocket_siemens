@@ -126,6 +126,13 @@ export const PARTES_POR_KIND: Record<string, DefParte[]> = {
     BARRA,
   ],
   'custom:pantalla-screen': [CAJA, { ...TEXTO, label: 'Cabecera' }],
+  // El Navegador de Pantallas: la caja, el color de las flechas y el rótulo
+  // opcional con el nombre de lo que se está viendo.
+  'custom:navegador-panel': [
+    CAJA,
+    { ...ICONO, label: 'Flechas' },
+    { ...TEXTO, label: 'Nombre', props: ['color', 'fontSize', 'bold'] },
+  ],
 
   // El Contenedor es marco y título, nada más: lo de dentro son widgets
   // aparte y cada uno se estiliza solo.

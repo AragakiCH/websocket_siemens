@@ -4,6 +4,7 @@ import { motorHidraulico } from './motor/MotorTrifasico';
 import { sidebarNavegacion } from './navegacion/SidebarNavegacion';
 import { pantallaScreen } from './navegacion/PantallaScreen';
 import { accesoSeccion } from './navegacion/AccesoSeccion';
+import { navegadorPanel } from './navegacion/NavegadorPanel';
 import { faceplate } from './faceplate/Faceplate';
 import { trendWidget } from './trend/Trend';
 import { contenedorGrupo } from './contenedor/Contenedor';
@@ -37,6 +38,9 @@ export const customWidgets: CustomWidgetDef[] = [
   sidebarNavegacion,
   pantallaScreen,
   accesoSeccion,
+  // Las flechas que mandan sobre el Panel de Sección: recorren una lista
+  // de pantallas y vuelven al origen. Se colocan donde el diseño lo pida.
+  navegadorPanel,
   // Instancia de un tipo de faceplate: se define una vez, se coloca muchas.
   faceplate,
   // Tendencia en vivo: varias variables numéricas contra el tiempo.

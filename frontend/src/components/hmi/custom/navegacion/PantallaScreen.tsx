@@ -19,24 +19,52 @@
 // La asignación se hace en el Inspector del MENÚ LATERAL, en el desplegable
 // de cada sección — no aquí. Este widget solo obedece.
 //
+// Y UNA TERCERA, QUE MANDA EL OPERADOR: LO ABIERTO CON UN BOTÓN
+//
+//   3. Un «Navegador de Pantallas» (NavegadorPanel.tsx) —o cualquier widget
+//      con la acción «Mostrar pantalla en el Panel de Sección»— abre otra
+//      pantalla del proyecto AQUÍ DENTRO, por encima de lo que la sección
+//      enseñara por sí sola. Las dos cosas de arriba no cambian: siguen siendo lo que
+//      el panel muestra en su «origen».
+//
+//      Lo abierto se apila como en un navegador (ver `abrirEnPanel` en
+//      store.ts). El navegador —las flechas ◀ ▶ ⌂ con su lista de pantallas—
+//      es un widget suelto, puesto donde el diseño lo pida, incluso dentro
+//      de la pantalla que se empotra. Este panel no lleva mandos propios:
+//      solo enseña la ruta «Sección › Pantalla» en la cabecera. Cambiar de
+//      sección en el menú lo vacía todo.
+//
+//      Mientras el panel enseña una pantalla abierta así, la Vista Previa
+//      OCULTA los widgets de la sección actual (los que llevan su id en
+//      «Vista»): si no, quedarían dibujados encima de la pantalla empotrada.
+//      Se quedan los de «En todas» —el menú, un logo— y el Navegador de
+//      Pantallas, que es con lo que se vuelve. Esa regla vive en
+//      `Preview.tsx` y `Designer.tsx`, al lado del filtro por sección.
+//
+//      Esto fue primero una barra de botones fija de este mismo widget. Se
+//      sacó a un widget propio para poder arrastrarlo, estirarlo y
+//      estilizarlo como todo lo demás; el historial es el mismo.
+//
 // POR QUÉ NO ANIDA WIDGETS DENTRO
 // En este editor los widgets van posicionados en absoluto sobre un lienzo
 // plano, no unos dentro de otros. Meter widgets dentro de otro obligaría a
 // rehacer el arrastre, el redimensionado y el guardado. Para el caso 1 se
-// consigue lo mismo con las capas; para el caso 2, la pantalla empotrada
-// llega entera desde el servidor y se dibuja de una pieza.
+// consigue lo mismo con las capas; para el caso 2 y el 3, la pantalla
+// empotrada llega entera desde el servidor y se dibuja de una pieza.
 //
 // COLÓCALO DETRÁS
 // Es un fondo, así que va debajo del resto. Suéltalo primero y luego pon
 // encima los widgets de cada vista.
 // =========================================================================
 import { Suspense, lazy } from 'react';
-import { LayoutTemplateIcon, Loader2Icon } from 'lucide-react';
+import { LayoutTemplateIcon, Loader2Icon, ChevronRightIcon } from 'lucide-react';
 import type { CustomWidgetDef, RenderCtx, InspectorCtx } from '../types';
 import {
   GRUPO_POR_DEFECTO,
   useVistaActiva,
   useSecciones,
+  usePantallas,
+  usePanel,
   etiquetaDeVista,
   nombreDePantalla,
 } from './store';
@@ -81,6 +109,7 @@ export interface ConfigScreen {
    * problema de verdad.
    */
   ajuste: ModoAjuste;
+
 }
 
 export const CONFIG_SCREEN: ConfigScreen = {
@@ -107,6 +136,9 @@ export function leerConfigScreen(config: any): ConfigScreen {
     grupo: typeof c.grupo === 'string' && c.grupo.trim() ? c.grupo : GRUPO_POR_DEFECTO,
     mostrarCabecera: c.mostrarCabecera !== false,
     ajuste,
+    // Los campos `botones`, `posicionBotones`, `botonOrigen` y
+    // `mostrarNavegacion` de los mandos que hubo aquí se ignoran si aparecen
+    // en un diseño guardado: el mando es el Navegador de Pantallas.
   };
 }
 
@@ -120,13 +152,27 @@ function Screen({ widget, interactivo }: RenderCtx) {
   const pCab = estiloDeParte(widget, 'label');
   const activa = useVistaActiva(cfg.grupo);
   const secciones = useSecciones(cfg.grupo);
+  const panel = usePanel(cfg.grupo);
+  // Suscribe al catálogo: así el nombre de la pantalla abierta en la ruta
+  // cambia cuando se renombra, sin esperar a otro redibujado.
+  usePantallas();
 
   const nombre = etiquetaDeVista(cfg.grupo, activa);
 
   // A qué pantalla apunta la sección abierta. Sale de la lista que publica
   // el propio menú, así que no hace falta ningún canal nuevo: el objeto
   // `Seccion` ya viaja entero con su campo `pantalla` dentro.
-  const destino = (secciones.find((s) => s.id === activa)?.pantalla ?? '').trim();
+  const destinoSeccion = (secciones.find((s) => s.id === activa)?.pantalla ?? '').trim();
+
+  // Lo abierto por el operador manda sobre lo que diga la sección. Vacío =
+  // origen = lo de siempre.
+  const destino = panel.abierta || destinoSeccion;
+
+  // El panel está ocupado por una pantalla abierta desde el navegador. Es
+  // la única situación en la que se enseña la ruta «Sección › Pantalla».
+  const nombreAbierta = panel.abierta
+    ? nombreDePantalla(panel.abierta) || panel.abierta
+    : '';
 
   return (
     <div
@@ -156,6 +202,7 @@ function Screen({ widget, interactivo }: RenderCtx) {
             padding: '8px 12px',
             borderBottom: '1px solid rgba(148,163,184,0.25)',
             flexShrink: 0,
+            minWidth: 0,
           }}
         >
           <span
@@ -167,53 +214,87 @@ function Screen({ widget, interactivo }: RenderCtx) {
               flexShrink: 0,
             }}
           />
+          {/* La ruta: la sección, y si el panel enseña una pantalla abierta
+              desde un botón, «› Pantalla». La sección se atenúa entonces
+              para que se lea de un vistazo qué es lo que se está viendo. */}
           <span
             style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              minWidth: 0,
+              flex: 1,
               fontSize: pCab.fontSize,
               fontWeight: pCab.bold ? 700 : 600,
               color: pCab.color,
               textAlign: pCab.align,
               whiteSpace: 'nowrap',
               overflow: 'hidden',
-              textOverflow: 'ellipsis',
             }}
           >
-            {nombre || 'Sin sección activa'}
+            <span
+              style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                opacity: nombreAbierta ? 0.55 : 1,
+                fontWeight: nombreAbierta ? 500 : undefined,
+              }}
+            >
+              {nombre || 'Sin sección activa'}
+            </span>
+            {!!nombreAbierta && (
+              <>
+                <ChevronRightIcon
+                  style={{ width: 12, height: 12, flexShrink: 0, opacity: 0.55 }}
+                />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {nombreAbierta}
+                </span>
+              </>
+            )}
           </span>
         </div>
       )}
 
-      {/* El hueco. Vacío cuando la sección no apunta a ninguna pantalla —y a
-          propósito: ahí el contenido son los widgets de este mismo lienzo,
-          que se dibujan por encima del marco, no dentro de él. */}
-      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-        {!!destino && (
-          <Suspense
-            fallback={
-              <div className="flex h-full w-full items-center justify-center gap-2 text-xs text-slate-400">
-                <Loader2Icon className="h-4 w-4 animate-spin" />
-                Cargando…
-              </div>
-            }
-          >
-            {/* La `key` fuerza un montaje limpio al cambiar de pantalla. Sin
-                ella, React reutilizaría el componente y durante un instante
-                se verían los widgets de la pantalla anterior con las medidas
-                de la nueva. */}
-            <PantallaEmbebida
-              key={destino}
-              projectId={destino}
-              modo={cfg.ajuste}
-              interactivo={!!interactivo}
-            />
-          </Suspense>
-        )}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, minWidth: 0 }}>
+        {/* El hueco. Vacío cuando no hay nada que empotrar —y a propósito:
+            ahí el contenido son los widgets de este mismo lienzo, que se
+            dibujan por encima del marco, no dentro de él. */}
+        <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
+          {!!destino && (
+            <Suspense
+              fallback={
+                <div className="flex h-full w-full items-center justify-center gap-2 text-xs text-slate-400">
+                  <Loader2Icon className="h-4 w-4 animate-spin" />
+                  Cargando…
+                </div>
+              }
+            >
+              {/* La `key` fuerza un montaje limpio al cambiar de pantalla. Sin
+                  ella, React reutilizaría el componente y durante un instante
+                  se verían los widgets de la pantalla anterior con las medidas
+                  de la nueva. */}
+              <PantallaEmbebida
+                key={destino}
+                projectId={destino}
+                modo={cfg.ajuste}
+                interactivo={!!interactivo}
+              />
+            </Suspense>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 // ─── Panel del Inspector ─────────────────────────────────────────
+
+const INPUT =
+  'w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100';
+const SELECT = `${INPUT} cursor-pointer`;
+const CHECK =
+  'h-4 w-4 rounded border-slate-300 text-siemens focus:ring-2 focus:ring-siemens/40 dark:border-navy-slate dark:bg-navy';
 
 function InspectorScreen({ widget, config, setConfig }: InspectorCtx) {
   const cfg = leerConfigScreen(config);
@@ -242,7 +323,7 @@ function InspectorScreen({ widget, config, setConfig }: InspectorCtx) {
           type="checkbox"
           checked={cfg.mostrarCabecera}
           onChange={(e) => setConfig({ ...cfg, mostrarCabecera: e.target.checked })}
-          className="h-4 w-4 rounded border-slate-300 text-siemens focus:ring-2 focus:ring-siemens/40 dark:border-navy-slate dark:bg-navy"
+          className={CHECK}
         />
       </label>
 
@@ -255,7 +336,7 @@ function InspectorScreen({ widget, config, setConfig }: InspectorCtx) {
           onChange={(e) =>
             setConfig({ ...cfg, ajuste: e.target.value as ModoAjuste })
           }
-          className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+          className={SELECT}
         >
           {AJUSTES.map((a) => (
             <option key={a.valor} value={a.valor}>
@@ -267,6 +348,14 @@ function InspectorScreen({ widget, config, setConfig }: InspectorCtx) {
           {ayudaAjuste}
         </span>
       </label>
+
+      <div className="rounded-lg border border-slate-200 px-2.5 py-2 text-[11px] leading-relaxed text-slate-500 dark:border-navy-slate dark:text-slate-400">
+        Para abrir otras pantallas aquí dentro, arrastra un <b>Navegador de
+        Pantallas</b> desde la paleta y dale su lista de pantallas: sus
+        flechas las recorren y vuelven al origen. Se queda a la vista mientras
+        el panel enseña otra pantalla. Aquí en la cabecera solo se enseña la
+        ruta «Sección › Pantalla».
+      </div>
 
       <div className="rounded-lg bg-slate-100 px-2.5 py-2 text-[11px] leading-relaxed text-slate-500 dark:bg-navy-slate/40 dark:text-slate-400">
         {secciones.length === 0 ? (
@@ -281,10 +370,10 @@ function InspectorScreen({ widget, config, setConfig }: InspectorCtx) {
             <b>{secciones.map((s) => s.label || s.id).join(' · ')}</b>.
             <br />
             <br />
-            Ninguna apunta todavía a otra pantalla, así que este marco solo
-            hace de fondo. Para que una sección abra una pantalla completa
-            aquí dentro, elígela en el desplegable de esa sección, en las
-            propiedades del <b>Menú Lateral</b>.
+            Ninguna apunta todavía a otra pantalla, así que en su origen este
+            marco solo hace de fondo. Para que una sección abra una pantalla
+            completa aquí dentro, elígela en el desplegable de esa sección, en
+            las propiedades del <b>Menú Lateral</b>.
           </>
         ) : (
           <>
@@ -320,7 +409,8 @@ export const pantallaScreen: CustomWidgetDef = {
   //
   // Ahora sí hace algo que no se puede hacer de otra forma: es el hueco donde
   // se dibuja OTRA pantalla del proyecto cuando una sección la tiene
-  // asignada. Sin él, esa navegación no tiene dónde ocurrir.
+  // asignada, o cuando el operador la abre con el Navegador de Pantallas.
+  // Sin él, esa navegación no tiene dónde ocurrir.
   category: 'Básicos',
   icon: LayoutTemplateIcon,
   defaultWidth: 420,

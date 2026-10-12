@@ -27,7 +27,13 @@ import type { PlcVariable } from '../../models/plc';
 import { reconocerTodas } from '../../services/alarmasRuntimeApi';
 import { logout } from '../../services/authApi';
 import { leerTemas, guardarTemas } from '../../services/temaApi';
-import { setVistaActiva, GRUPO_POR_DEFECTO } from './custom/navegacion/store';
+import {
+  setVistaActiva,
+  abrirEnPanel,
+  volverPanel,
+  irAlOrigenPanel,
+  GRUPO_POR_DEFECTO,
+} from './custom/navegacion/store';
 import { abrirPopup, cerrarPopup, cerrarTodos } from './custom/faceplate/popups';
 import { PREFIJO_PARAM } from '../../utils/designStorage';
 
@@ -40,6 +46,9 @@ export type TipoAccion =
   // No escriben: mandan sobre la propia aplicación.
   | 'reconocer-alarmas'
   | 'ir-a-seccion'
+  // Lo que enseña el Panel de Sección, por encima de su sección.
+  | 'abrir-en-panel'
+  | 'volver-panel'
   | 'modo-color'
   | 'tema'
   | 'aviso'
@@ -109,7 +118,19 @@ export interface AccionWidget {
   mensaje?: string;
   /** Para `ir-a-seccion`. */
   seccion?: string;
+  /** Grupo de navegación: `ir-a-seccion`, `abrir-en-panel` y `volver-panel`. */
   grupo?: string;
+  /**
+   * Para `abrir-en-panel`: el `project_id` de la pantalla que el Panel de
+   * Sección de ese grupo pasa a enseñar. Se guarda el id y no el nombre, por
+   * lo mismo que en `Seccion.pantalla`: el nombre se puede cambiar, el id no.
+   */
+  pantalla?: string;
+  /**
+   * Para `volver-panel`: directo al origen (lo que la sección enseña por sí
+   * sola) en vez de un solo paso atrás.
+   */
+  alOrigen?: boolean;
   /** Para `modo-color`. */
   modo?: 'light' | 'dark' | 'auto';
   /** Para `tema`: el id del tema que pasa a estar activo. */
@@ -191,7 +212,8 @@ export function leerAccion(config: any): AccionWidget {
   const a = config?.accion ?? {};
   const conocidas: TipoAccion[] = [
     'escribir', 'alternar', 'incrementar',
-    'reconocer-alarmas', 'ir-a-seccion', 'modo-color', 'tema', 'aviso', 'salir',
+    'reconocer-alarmas', 'ir-a-seccion', 'abrir-en-panel', 'volver-panel',
+    'modo-color', 'tema', 'aviso', 'salir',
     'abrir-faceplate', 'cerrar-faceplate',
   ];
   const tipo: TipoAccion = conocidas.includes(a.tipo) ? a.tipo : 'ninguna';
@@ -204,6 +226,8 @@ export function leerAccion(config: any): AccionWidget {
     mensaje: typeof a.mensaje === 'string' ? a.mensaje : '',
     seccion: typeof a.seccion === 'string' ? a.seccion : '',
     grupo: typeof a.grupo === 'string' && a.grupo ? a.grupo : GRUPO_POR_DEFECTO,
+    pantalla: typeof a.pantalla === 'string' ? a.pantalla : '',
+    alOrigen: !!a.alOrigen,
     modo: ['light', 'dark', 'auto'].includes(a.modo) ? a.modo : 'auto',
     temaId: typeof a.temaId === 'string' ? a.temaId : '',
     faceplate: typeof a.faceplate === 'string' ? a.faceplate : '',
@@ -238,6 +262,8 @@ export const tieneAccion = (a: AccionWidget): boolean => {
   if (a.tipo === 'ninguna') return false;
   if (ACCIONES_DE_PLC.includes(a.tipo)) return !!a.tag;
   if (a.tipo === 'ir-a-seccion') return !!a.seccion;
+  // Abrir en el panel necesita saber qué; volver no, siempre es «lo de antes».
+  if (a.tipo === 'abrir-en-panel') return !!a.pantalla;
   // Cerrar no necesita decir cual: la de arriba. Abrir si necesita el tipo,
   // porque una ventana sin contenido no es nada.
   if (a.tipo === 'abrir-faceplate') return !!a.faceplate;
@@ -359,6 +385,21 @@ export async function ejecutarAccion(
         // Tarjeta de Acceso: cuatro mandos de una sola navegación, que se
         // sincronizan solos porque comparten estado.
         setVistaActiva(accion.grupo || GRUPO_POR_DEFECTO, accion.seccion || '');
+        return { ok: true };
+
+      case 'abrir-en-panel':
+        // El mismo historial que usan los botones del propio Panel de
+        // Sección y sus flechas: un botón suelto del lienzo y uno de la
+        // barra del panel abren por el mismo sitio y se deshacen igual.
+        abrirEnPanel(accion.grupo || GRUPO_POR_DEFECTO, accion.pantalla || '');
+        return { ok: true };
+
+      case 'volver-panel':
+        // Pensado para un botón «Volver» colocado DENTRO de la pantalla que el
+        // panel enseña: corre con la pantalla de fuera como actual, así que
+        // actúa sobre el panel que lo contiene sin saber nada de él.
+        if (accion.alOrigen) irAlOrigenPanel(accion.grupo || GRUPO_POR_DEFECTO);
+        else volverPanel(accion.grupo || GRUPO_POR_DEFECTO);
         return { ok: true };
 
       case 'modo-color':

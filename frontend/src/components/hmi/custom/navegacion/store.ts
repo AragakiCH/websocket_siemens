@@ -108,6 +108,30 @@ export function esWidgetDeNavegacion(kind: string): boolean {
   return KINDS_NAVEGACION.has(kind);
 }
 
+/**
+ * El Navegador de Pantallas: las flechas que mandan sobre lo que enseña el
+ * Panel de Sección.
+ *
+ * NO está en `KINDS_NAVEGACION` a propósito: ese conjunto significa «armazón,
+ * en todas las secciones», y el navegador es contenido de UNA sección como
+ * cualquier otro widget. Lo único especial que tiene es lo de abajo.
+ */
+export const KIND_NAVEGADOR_PANEL = 'custom:navegador-panel' as const;
+
+/**
+ * ¿Este widget se queda a la vista mientras el Panel de Sección enseña una
+ * pantalla abierta por encima de su sección?
+ *
+ * La regla general es que los widgets de la sección se esconden entonces
+ * (quedarían dibujados encima de la pantalla empotrada). El mando que sirve
+ * para volver es la excepción obvia: si desapareciera al pulsarlo, no habría
+ * forma de regresar. La aplican el filtro de la Vista Previa y el atenuado
+ * del Diseñador.
+ */
+export function sigueConPanelAbierto(kind: string): boolean {
+  return kind === KIND_NAVEGADOR_PANEL;
+}
+
 // Pantalla que se está mirando ahora mismo. La ponen el Diseñador y la
 // Vista Previa; los widgets no la conocen ni les hace falta.
 let pantallaActual = '';
@@ -160,6 +184,10 @@ export function setVistaActiva(grupo: string, vista: string): void {
   const k = llave(grupo);
   if (activas.get(k) === vista) return; // sin cambio, sin re-render
   activas.set(k, vista);
+  // Cambiar de sección es empezar de cero en el panel: lo que se tuviera
+  // abierto dentro era de la sección anterior. Sin esto, al entrar en
+  // «Detalles» te encontrarías la pantalla que dejaste abierta en «Inicio».
+  paneles.delete(k);
   avisar();
 }
 
@@ -179,14 +207,182 @@ export function iniciarVista(grupo: string, vista: string): void {
 
 /** Olvida la vista de un grupo de esta pantalla (o de TODAS las pantallas). */
 export function reiniciar(grupo?: string): void {
-  if (grupo === undefined) activas.clear();
-  else activas.delete(llave(grupo));
+  if (grupo === undefined) {
+    activas.clear();
+    paneles.clear();
+  } else {
+    activas.delete(llave(grupo));
+    paneles.delete(llave(grupo));
+  }
   avisar();
 }
 
 function suscribir(fn: () => void): () => void {
   oyentes.add(fn);
   return () => oyentes.delete(fn);
+}
+
+// ─── Lo que enseña el Panel de Sección POR ENCIMA de su sección ─────
+//
+// EL PROBLEMA QUE RESUELVE
+// La sección abierta decide qué enseña el panel: sus propios widgets, o la
+// pantalla que tenga asignada en el menú. Eso es una elección POR SECCIÓN y
+// la hace el diseñador. Lo que faltaba era que el OPERADOR, desde dentro de
+// una sección, pudiera abrir otra pantalla en el mismo hueco —con un botón
+// del propio panel o con cualquier botón del lienzo— y luego volver a lo que
+// había, y volver a ir, las veces que haga falta.
+//
+// ES UN HISTORIAL, COMO EL DE UN NAVEGADOR
+// Por cada `pantalla + grupo` se guarda una lista de lo abierto y un índice.
+// La posición 0 es SIEMPRE el origen (`''` = «lo que la sección enseña por sí
+// sola»), así que volver atrás desde la primera pantalla abierta deja el
+// panel exactamente como estaba antes de tocar nada. Avanzar recupera lo que
+// se dejó; abrir algo nuevo estando en medio tira lo que había por delante,
+// que es lo que hace cualquier navegador y lo que uno espera sin pensarlo.
+//
+// NO SE PERSISTE, por el mismo motivo que la vista activa: es estado de
+// operación, no de diseño. Y se vacía solo al cambiar de sección (ver
+// `setVistaActiva`): lo que se abrió dentro de «Inicio» no tiene nada que
+// hacer cuando se entra en «Detalles».
+//
+// LA LLAVE ES LA DE SIEMPRE, y eso importa dentro de una pantalla empotrada:
+// un botón «Volver» colocado DENTRO de la pantalla que el panel enseña corre
+// con `pantallaActual` = la pantalla de fuera (la que tiene el panel), así
+// que actúa sobre el panel correcto sin tener que saber nada de él.
+
+/** Dónde está el panel de un grupo: lo abierto y hacia dónde se puede ir. */
+export interface EstadoPanel {
+  /** `project_id` que el panel enseña encima de su sección. `''` = origen. */
+  abierta: string;
+  /** Hay algo detrás a lo que volver. */
+  puedeVolver: boolean;
+  /** Se volvió atrás y hay algo delante que recuperar. */
+  puedeAvanzar: boolean;
+  /** Todo el recorrido, del origen (`''`) en adelante. */
+  historial: readonly string[];
+  /** Posición actual dentro de `historial`. */
+  indice: number;
+}
+
+interface PilaPanel {
+  historial: string[];
+  indice: number;
+}
+
+/**
+ * Estado compartido para los paneles sin historial. Constante y congelada
+ * por lo mismo que `SIN_SECCIONES`: `useSyncExternalStore` compara con
+ * `Object.is`, y un objeto nuevo en cada lectura sería un bucle de render.
+ */
+const PANEL_EN_ORIGEN: EstadoPanel = Object.freeze({
+  abierta: '',
+  puedeVolver: false,
+  puedeAvanzar: false,
+  historial: Object.freeze(['']) as readonly string[],
+  indice: 0,
+}) as EstadoPanel;
+
+// pantalla+grupo -> pila. Solo tienen entrada los paneles donde se abrió algo.
+const paneles = new Map<string, PilaPanel>();
+// El snapshot que se entrega a React, por llave. Se recalcula solo cuando la
+// pila cambia; entre cambios se devuelve el MISMO objeto.
+const snapshotsPanel = new Map<string, EstadoPanel>();
+
+function snapshotDe(k: string): EstadoPanel {
+  const pila = paneles.get(k);
+  if (!pila) return PANEL_EN_ORIGEN;
+  let s = snapshotsPanel.get(k);
+  if (!s) {
+    s = Object.freeze({
+      abierta: pila.historial[pila.indice] ?? '',
+      puedeVolver: pila.indice > 0,
+      puedeAvanzar: pila.indice < pila.historial.length - 1,
+      historial: Object.freeze([...pila.historial]) as readonly string[],
+      indice: pila.indice,
+    }) as EstadoPanel;
+    snapshotsPanel.set(k, s);
+  }
+  return s;
+}
+
+/** Cualquier cambio en una pila invalida su snapshot y avisa. */
+function cambioPanel(k: string, pila: PilaPanel | null): void {
+  if (pila) paneles.set(k, pila);
+  else paneles.delete(k);
+  snapshotsPanel.delete(k);
+  avisar();
+}
+
+/** Lo que enseña el panel de ese grupo, en la pantalla actual. */
+export function getPanel(grupo: string): EstadoPanel {
+  return snapshotDe(llave(grupo));
+}
+
+export function usePanel(grupo: string): EstadoPanel {
+  return useSyncExternalStore(
+    suscribir,
+    () => getPanel(grupo),
+    () => getPanel(grupo)
+  );
+}
+
+/**
+ * Abre una pantalla dentro del panel. Es lo que hace un botón del panel y la
+ * acción «Mostrar pantalla en el Panel de Sección».
+ *
+ * Abrir la que ya está abierta no hace nada —ni apila repetidos ni redibuja—.
+ * Abrir estando a mitad del historial descarta lo que hubiera por delante.
+ */
+export function abrirEnPanel(grupo: string, projectId: string): void {
+  const id = (projectId ?? '').trim();
+  if (!id) return;
+  const k = llave(grupo);
+  const pila = paneles.get(k) ?? { historial: [''], indice: 0 };
+  if (pila.historial[pila.indice] === id) return;
+  const historial = [...pila.historial.slice(0, pila.indice + 1), id];
+  cambioPanel(k, { historial, indice: historial.length - 1 });
+}
+
+/** Un paso atrás. En el origen no hace nada. */
+export function volverPanel(grupo: string): void {
+  const k = llave(grupo);
+  const pila = paneles.get(k);
+  if (!pila || pila.indice === 0) return;
+  cambioPanel(k, { ...pila, indice: pila.indice - 1 });
+}
+
+/** Un paso adelante, si se había vuelto atrás. */
+export function avanzarPanel(grupo: string): void {
+  const k = llave(grupo);
+  const pila = paneles.get(k);
+  if (!pila || pila.indice >= pila.historial.length - 1) return;
+  cambioPanel(k, { ...pila, indice: pila.indice + 1 });
+}
+
+/**
+ * Directo al origen SIN tirar el historial: desde ahí «adelante» vuelve a
+ * recorrer lo que se abrió. Es la casita de la cabecera del panel.
+ */
+export function irAlOrigenPanel(grupo: string): void {
+  const k = llave(grupo);
+  const pila = paneles.get(k);
+  if (!pila || pila.indice === 0) return;
+  cambioPanel(k, { ...pila, indice: 0 });
+}
+
+/**
+ * Cierra lo abierto en TODOS los paneles de TODAS las pantallas.
+ *
+ * Lo llama el Diseñador al montarse. El historial vive en el módulo y la
+ * aplicación es una SPA: lo que un operador dejó abierto en la Vista Previa
+ * seguiría ahí al pasar al Diseñador, y el panel enseñaría otra pantalla sin
+ * que nadie hubiera pulsado nada en el lienzo.
+ */
+export function cerrarPaneles(): void {
+  if (paneles.size === 0) return;
+  paneles.clear();
+  snapshotsPanel.clear();
+  avisar();
 }
 
 /**

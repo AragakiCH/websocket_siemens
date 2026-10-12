@@ -26,7 +26,12 @@ import {
   type AccionWidget,
   type TipoAccion,
 } from '../acciones';
-import { useSecciones, GRUPO_POR_DEFECTO } from '../custom/navegacion/store';
+import {
+  useSecciones,
+  usePantallas,
+  usePantallaAbierta,
+  GRUPO_POR_DEFECTO,
+} from '../custom/navegacion/store';
 import { leerTemas } from '../../../services/temaApi';
 import type { Tema } from '../../../models/tema';
 import {
@@ -65,6 +70,21 @@ const TIPOS: { valor: TipoAccion; label: string; ayuda: string }[] = [
     ayuda:
       'Abre una sección del Menú Lateral. Usa el mismo mando que el menú y ' +
       'que las pestañas de la barra, así que los tres se sincronizan solos.',
+  },
+  {
+    valor: 'abrir-en-panel',
+    label: 'Mostrar pantalla en el Panel de Sección',
+    ayuda:
+      'El Panel de Sección de este grupo pasa a enseñar esa pantalla, sin ' +
+      'cambiar de sección ni mover el menú. Se apila como en un navegador: ' +
+      'las flechas del panel, o un botón «Volver», deshacen el paso.',
+  },
+  {
+    valor: 'volver-panel',
+    label: 'Volver en el Panel de Sección',
+    ayuda:
+      'Deshace lo último que se abrió en el panel. Sirve para poner un botón ' +
+      '«Volver» dentro de la pantalla que el panel está enseñando.',
   },
   {
     valor: 'reconocer-alarmas',
@@ -115,6 +135,8 @@ const TIPOS: { valor: TipoAccion; label: string; ayuda: string }[] = [
 const SIN_CONFIRMACION: TipoAccion[] = [
   'ninguna',
   'aviso',
+  'abrir-en-panel',
+  'volver-panel',
   'abrir-faceplate',
   'cerrar-faceplate',
 ];
@@ -218,6 +240,10 @@ export function InspectorAccion({
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const secciones = useSecciones(accion.grupo || GRUPO_POR_DEFECTO);
+  // Para «Mostrar pantalla en el Panel de Sección»: el mismo catálogo que
+  // usa el desplegable de cada sección del Menú Lateral.
+  const pantallas = usePantallas();
+  const pantallaAbierta = usePantallaAbierta();
   const [temas, setTemas] = useState<Tema[]>([]);
   const { variables } = useAppStore();
   // Los tipos de faceplate, sólo si la acción los necesita (ver `useTipos`).
@@ -339,6 +365,61 @@ export function InspectorAccion({
               las que ir.
             </span>
           )}
+        </label>
+      )}
+
+      {accion.tipo === 'abrir-en-panel' && (
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+            Pantalla
+          </span>
+          <select
+            value={accion.pantalla ?? ''}
+            onChange={(e) => set({ pantalla: e.target.value })}
+            className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+          >
+            <option value="">— Sin asignar —</option>
+            {pantallas.map((p) => (
+              <option key={p.project_id} value={p.project_id}>
+                {p.nombre}
+                {p.project_id === pantallaAbierta ? ' (actual)' : ''}
+              </option>
+            ))}
+            {/* Igual que en el menú: la borrada se sigue ofreciendo para que
+                el <select> no caiga a la primera opción y pierda la
+                asignación sólo con abrir el Inspector. */}
+            {!!accion.pantalla &&
+              pantallas.length > 0 &&
+              !pantallas.some((p) => p.project_id === accion.pantalla) && (
+                <option value={accion.pantalla}>
+                  {accion.pantalla} — ya no existe
+                </option>
+              )}
+          </select>
+          <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
+            {accion.pantalla && accion.pantalla === pantallaAbierta
+              ? 'Apunta a la pantalla en la que ya estás: el panel enseñaría ' +
+                'esta misma pantalla dentro de sí, sin su menú ni su panel.'
+              : 'Se enseña dentro del Panel de Sección que tenga el grupo «' +
+                (accion.grupo || GRUPO_POR_DEFECTO) +
+                '». Si este botón pertenece a una sección, ponle «En todas» ' +
+                'o métalo en la barra del propio panel: los widgets de la ' +
+                'sección se ocultan mientras el panel enseña otra pantalla.'}
+          </span>
+        </label>
+      )}
+
+      {accion.tipo === 'volver-panel' && (
+        <label className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            Directo al origen
+          </span>
+          <input
+            type="checkbox"
+            checked={!!accion.alOrigen}
+            onChange={(e) => set({ alOrigen: e.target.checked })}
+            className="h-4 w-4 rounded border-slate-300 text-siemens focus:ring-2 focus:ring-siemens/40 dark:border-navy-slate dark:bg-navy"
+          />
         </label>
       )}
 

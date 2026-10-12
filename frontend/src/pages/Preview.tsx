@@ -69,6 +69,8 @@ import { RealPLCService } from '../services/RealPLCService';
 import CapaPopups from '../components/hmi/custom/faceplate/CapaPopups';
 import {
   useVistaActiva,
+  usePanel,
+  sigueConPanelAbierto,
   useRutaDeVista,
   publicarPantallas,
   useEstructura,
@@ -366,6 +368,11 @@ export function Preview() {
   // cambia, y este componente se vuelve a dibujar mostrando solo los widgets
   // de esa sección.
   const vistaActiva = useVistaActiva(GRUPO_POR_DEFECTO);
+  // Qué enseña el Panel de Sección POR ENCIMA de la sección: una pantalla
+  // abierta con un botón del panel (o con la acción «Mostrar pantalla en el
+  // Panel de Sección»). Mientras haya una, los widgets de la sección se
+  // esconden; ver el filtro de abajo.
+  const panel = usePanel(GRUPO_POR_DEFECTO);
   const ruta = useRutaDeVista(GRUPO_POR_DEFECTO);
   const estructura = useEstructura(GRUPO_POR_DEFECTO);
   const enVivo = useEnVivo();
@@ -1033,7 +1040,16 @@ export function Preview() {
                 const v = (w.vista ?? '').trim();
                 if (!v) return true;          // "En todas"
                 if (!vistaActiva) return true; // aún sin navegación montada
-                return v === vistaActiva;
+                if (v !== vistaActiva) return false;
+                // Es de la sección abierta. Pero si el Panel de Sección está
+                // enseñando OTRA pantalla por encima —abierta con uno de sus
+                // botones—, los widgets de la sección se apartan: son
+                // vecinos del panel, no están dentro de él, y quedarían
+                // dibujados encima de la pantalla empotrada. Al volver al
+                // origen reaparecen tal cual. Los de «En todas» (el menú, un
+                // logo, el propio panel) ya salieron arriba y se quedan, y el
+                // Botón de Pantalla también: es con lo que se vuelve.
+                return !panel.abierta || sigueConPanelAbierto(w.kind);
               })
               .map((w) => (
                 <div
