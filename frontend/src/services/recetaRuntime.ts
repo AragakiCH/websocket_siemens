@@ -63,6 +63,38 @@ import {
 } from './recetasApi';
 import { baseDeRecetas, EVENTO_RECETAS_EDITADAS } from './recetaEnlace';
 
+// ─── Tipo de valor de un campo ───────────────────────────────────
+//
+// Cada «Campo de receta» dice en su Inspector qué acepta: número, texto o
+// ambos. Sin esto, «Guardar receta» guardaba cualquier cosa: un texto en un
+// campo de número llegaba al data record y luego no había forma de
+// enviarlo al PLC. Vive en el config del widget, no en SQL.
+
+export type TipoValor = 'numero' | 'texto' | 'ambos';
+
+/** El tipo del config. Lo que no se reconoce (o no está) es «número». */
+export function leerTipoValor(config: unknown): TipoValor {
+  const t = (config as { tipoValor?: unknown } | null | undefined)?.tipoValor;
+  return t === 'texto' || t === 'ambos' ? t : 'numero';
+}
+
+/** ¿Es un número? `5`, `-5.5` y `5,5` sí; vacío o `5a` no. Un bool cuenta. */
+export function esNumero(valor: unknown): boolean {
+  if (typeof valor === 'boolean') return true;
+  if (typeof valor === 'number') return Number.isFinite(valor);
+  const t = String(valor ?? '').trim().replace(',', '.');
+  return t !== '' && Number.isFinite(Number(t));
+}
+
+/**
+ * Por qué ese valor NO vale para ese tipo, o `''` si vale. Solo «número»
+ * rechaza algo: un texto puede ser cualquier cosa, también «5».
+ */
+export function motivoDeTipo(tipo: TipoValor, valor: unknown): string {
+  if (tipo === 'numero' && !esNumero(valor)) return 'solo acepta números';
+  return '';
+}
+
 // ─── Los campos que hay en pantalla ──────────────────────────────
 
 interface CampoEnPantalla {
@@ -70,6 +102,8 @@ interface CampoEnPantalla {
   elementoId: number;
   /** ¿Es un campo blanco (lectura y escritura)? Solo esos se guardan. */
   escritura: boolean;
+  /** Qué acepta (Inspector → «Tipo de valor»). */
+  tipo: () => TipoValor;
   /** El valor que muestra AHORA. `null`/`undefined` = sin valor («—»). */
   leer: () => unknown;
   /** Cómo se llama su elemento, para nombrarlo en los avisos. */
@@ -125,6 +159,24 @@ export function valoresEnPantalla(recetaId: number): Map<number, unknown> {
     const v = c.leer();
     if (v === null || v === undefined || v === '') continue;
     r.set(c.elementoId, v);
+  }
+  return r;
+}
+
+/**
+ * Los campos blancos de esa receta cuyo valor no es del tipo que aceptan
+ * («Temperatura»: solo acepta números). Vacío = todo en orden.
+ */
+export function valoresInvalidos(recetaId: number): string[] {
+  const r: string[] = [];
+  const vistos = new Set<number>();
+  for (const c of campos.values()) {
+    if (c.recetaId !== recetaId || !c.escritura || vistos.has(c.elementoId)) continue;
+    vistos.add(c.elementoId);
+    const v = c.leer();
+    if (v === null || v === undefined || v === '') continue; // vacío no se guarda
+    const motivo = motivoDeTipo(c.tipo(), v);
+    if (motivo) r.push(`«${c.nombre() || 'elemento'}» ${motivo} (tiene «${String(v)}»)`);
   }
   return r;
 }
@@ -539,7 +591,7 @@ const mismoNombre = (a: string, b: string) =>
 
 export interface ResultadoGuardar {
   ok: boolean;
-  /** Por qué no se guardó. Con `avisos`, es una lista de límites. */
+  /** Por qué no se guardó. Con `avisos`, la lista de límites o de tipos. */
   error?: string;
   avisos?: string[];
   registroId?: number;
@@ -579,6 +631,17 @@ export async function guardarDataRecord(
   }
   if (modo === 'crear' && !limpio) {
     return { ok: false, error: 'Ponle un nombre a la receta.' };
+  }
+
+  // Antes que nada: un valor que no es del tipo de su campo no se guarda, y
+  // con uno solo mal no se guarda NINGUNO (a medias sería peor).
+  const invalidos = valoresInvalidos(recetaId);
+  if (invalidos.length > 0) {
+    return {
+      ok: false,
+      error: 'No se guardó: hay valores que no son del tipo de su campo.',
+      avisos: invalidos,
+    };
   }
 
   const db = baseDeRecetas();

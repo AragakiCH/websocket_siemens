@@ -65,7 +65,10 @@ import {
   fueraDeLimite,
   hayCambiosSinGuardar,
   llaveBorrador,
+  leerTipoValor,
   metaDeReceta,
+  motivoDeTipo,
+  esNumero,
   quitarBorrador,
   restaurarCambios,
   useBorrador,
@@ -75,6 +78,8 @@ import { notificar } from './avisos';
 const MONO = "Consolas, 'Courier New', monospace";
 /** El color de «escrito y todavía no enviado al PLC». */
 const AMBAR = '#b7791f';
+/** El color de «lo escrito no es del tipo que acepta el campo». */
+const ROJO = '#c53030';
 
 /** ¿Son el mismo valor? `5`, `5.0` y `5,0` lo son. */
 function mismoValor(a: string, b: string): boolean {
@@ -100,6 +105,9 @@ function formatear(v: unknown, decimales: number): string {
 
 function CampoReceta({ widget, variable, interactivo, style }: RenderCtx) {
   const escritura = permiteEscritura(widget.config);
+  const tipoValor = leerTipoValor(widget.config);
+  const tipoRef = useRef(tipoValor);
+  tipoRef.current = tipoValor;
 
   // ── A qué elemento de qué receta apunta ──
   const enCrudo = String(widget.variableId ?? '');
@@ -137,6 +145,8 @@ function CampoReceta({ widget, variable, interactivo, style }: RenderCtx) {
       recetaId,
       elementoId,
       escritura,
+      // Por ref: cambiar el tipo en el Inspector no debe re-apuntar el campo.
+      tipo: () => tipoRef.current,
       leer: () => valorRef.current,
       nombre: () => nombreRef.current,
       // Directo del almacén, no del último dibujo: «Cargar» escribe el valor
@@ -247,8 +257,17 @@ function CampoReceta({ widget, variable, interactivo, style }: RenderCtx) {
       );
     }
 
-    const esTexto = variable?.type === 'string';
-    const num = Number(t.replace(',', '.'));
+    // Primero lo que dice el propio campo (Inspector → «Tipo de valor»).
+    const malTipo = motivoDeTipo(tipoValor, t);
+    if (malTipo) return retener(`este campo ${malTipo}`);
+
+    // Como texto: si el tag del PLC es texto, si el campo es de texto, o si
+    // es de «ambos» y lo escrito no es un número.
+    const esTexto =
+      variable?.type === 'string' ||
+      tipoValor === 'texto' ||
+      (tipoValor === 'ambos' && !esNumero(t));
+    const num = Number(t.trim().replace(',', '.'));
     if (!esTexto && !Number.isFinite(num)) return retener('el PLC espera un número');
 
     setMandando(true);
@@ -336,10 +355,14 @@ function CampoReceta({ widget, variable, interactivo, style }: RenderCtx) {
     color: tinta,
   };
   const marcado = pendiente !== undefined;
+  // Escrito y además del tipo equivocado: rojo en vez de ámbar, para que se
+  // vea ANTES de darle a «Guardar receta».
+  const malTipo = marcado ? motivoDeTipo(tipoValor, pendiente) : '';
+  const colorMarca = malTipo ? ROJO : AMBAR;
   // La marca ámbar manda sobre el borde de Apariencia: es información de
   // operación, no decoración.
   const borde = marcado
-    ? { border: `1px solid ${AMBAR}`, borderLeft: `5px solid ${AMBAR}` }
+    ? { border: `1px solid ${colorMarca}`, borderLeft: `5px solid ${colorMarca}` }
     : {
         border: style.borderWidth
           ? 'none'
@@ -353,7 +376,9 @@ function CampoReceta({ widget, variable, interactivo, style }: RenderCtx) {
       ref={caja}
       onClick={abrir}
       title={
-        marcado
+        malTipo
+          ? `Este campo ${malTipo}: no se puede guardar ni enviar al PLC.`
+          : marcado
           ? 'Valor escrito y todavía no enviado al PLC. Pulsa y confirma con Enter para enviarlo.'
           : editable
             ? 'Pulsa y escribe el valor. Enter lo envía al PLC.'
@@ -454,6 +479,26 @@ function InspectorCampoReceta({ config, setConfig }: InspectorCtx) {
           <option value="escritura">Lectura y escritura</option>
         </select>
       </label>
+      {escritura && (
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+            Tipo de valor
+          </span>
+          <select
+            value={leerTipoValor(config)}
+            onChange={(e) => setConfig({ ...config, tipoValor: e.target.value })}
+            className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy outline-none transition focus:border-siemens dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+          >
+            <option value="numero">Número</option>
+            <option value="texto">Texto</option>
+            <option value="ambos">Ambos (número o texto)</option>
+          </select>
+          <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
+            En «Número», si se escribe texto el campo se marca en rojo y
+            «Guardar receta» / «Nueva receta» no guardan, ni se envía al PLC.
+          </span>
+        </label>
+      )}
       <p className="text-[10px] leading-relaxed text-slate-400">
         {escritura
           ? 'Fondo blanco. En la Vista Previa se escribe el valor y se queda en el campo, marcado en ámbar. «Guardar receta» lo guarda; Enter lo envía al PLC (el tag tiene que estar habilitado en Configuración → Escritura).'
@@ -476,5 +521,5 @@ export const recetaCampo: CustomWidgetDef = {
   defaultHeight: 36,
   render: (ctx) => <CampoReceta {...ctx} />,
   inspector: (ctx) => <InspectorCampoReceta {...ctx} />,
-  defaultConfig: { escritura: false },
+  defaultConfig: { escritura: false, tipoValor: 'numero' },
 };
