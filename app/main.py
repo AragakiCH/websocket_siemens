@@ -30,9 +30,10 @@ from fastapi.staticfiles import StaticFiles
 from app.api import (ai_routes, alarm_routes, auth_routes, categoria_routes,
                      crud_routes, db_routes, escritura_routes, export_routes,
                      grupo_routes, historian_routes, internas_routes,
-                     lock_routes, project_routes, proyecto_routes, rest_routes,
-                     runtime_routes, sistema_routes, tema_routes,
-                     variables_routes, websocket_routes, widget_routes)
+                     lock_routes, migracion_routes, project_routes,
+                     proyecto_routes, rest_routes, runtime_routes,
+                     sistema_routes, tema_routes, variables_routes,
+                     websocket_routes, widget_routes)
 from app.config.settings import get_settings
 from app.core.alarm_engine import MotorAlarmas
 from app.core.connection_manager import ConnectionManager
@@ -549,6 +550,9 @@ app.include_router(lock_routes.router)
 app.include_router(rest_routes.router, tags=["REST"])
 app.include_router(websocket_routes.router, tags=["WebSocket"])
 app.include_router(db_routes.router)
+# Exportar / importar los DATOS del esquema del HMI entre bases (cuelga de
+# /db/{db_id}/datos/...; ver app/db/migracion_datos.py).
+app.include_router(migracion_routes.router)
 app.include_router(crud_routes.router)
 app.include_router(internas_routes.router)
 app.include_router(widget_routes.router)

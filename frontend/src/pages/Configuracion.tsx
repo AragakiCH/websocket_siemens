@@ -32,6 +32,7 @@ import { formatValue, formatValueFull } from '../utils/format';
 import { fetchRexrothPrograms } from '../services/rexrothApi';
 import { PanelBasesDatos } from '../components/bd/PanelBasesDatos';
 import { PanelCarpetaDatos } from '../components/sistema/PanelCarpetaDatos';
+import { PanelMigracionDatos } from '../components/sistema/PanelMigracionDatos';
 import { PanelEscritura, type EstadoEscritura } from '../components/escritura/PanelEscritura';
 import { listarPermitidos } from '../services/escrituraApi';
 
@@ -1574,6 +1575,15 @@ export function Configuracion() {
                     Carpeta de datos
                   </h3>
                   <PanelCarpetaDatos />
+
+                  {/* Hermano de la copia de seguridad, no de las conexiones:
+                      la carpeta se lleva la CONFIGURACIÓN y esto se lleva lo
+                      que vive dentro de la base (alarmas, recetas, histórico),
+                      sin cuentas. Ver PanelMigracionDatos. */}
+                  <h3 className="mb-2 mt-5 px-0.5 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                    Datos de la base
+                  </h3>
+                  <PanelMigracionDatos />
                 </div>
               </div>
             </>
