@@ -78,7 +78,7 @@ export function leerConfigSidebar(config: any): ConfigSidebar {
 
 // ─── Dibujo ──────────────────────────────────────────────────────
 
-function Sidebar({ widget, style }: RenderCtx) {
+function Sidebar({ widget, style, interactivo }: RenderCtx) {
   const cfg = leerConfigSidebar(widget.config);
 
   // Estilo por partes: la Caja, los Niveles y los botones de Sección se
@@ -130,7 +130,15 @@ function Sidebar({ widget, style }: RenderCtx) {
   //
   // No se guarda con el diseño a propósito: es estado de runtime, igual que
   // la vista activa. Al abrir la Vista Previa el menú empieza limpio.
-  const [cerradas, setCerradas] = useState<Set<string>>(new Set());
+  //
+  // EN LA VISTA PREVIA ARRANCA TODO PLEGADO: se ven los primeros niveles y
+  // cada rama se abre al pulsarla. En el Diseñador todo desplegado: ahí el
+  // menú es para ver y revisar la estructura, y plegado no se vería.
+  const [cerradas, setCerradas] = useState<Set<string>>(() =>
+  interactivo ?
+  new Set(arbolDe(secciones).filter((f) => f.tieneHijos).map((f) => f.seccion.id)) :
+  new Set()
+  );
 
   const alternar = (id: string) =>
   setCerradas((prev) => {
@@ -447,6 +455,13 @@ function Sidebar({ widget, style }: RenderCtx) {
                 e.stopPropagation();
                 if (s.sinPantalla) {
                   if (tieneHijos) alternarTodo(s.id);
+                  return;
+                }
+                // Ya estás en ella: el clic solo pliega / despliega lo de
+                // dentro, sin volver a navegar. Así el título hace lo mismo
+                // que el triángulo y no hay que acertarle.
+                if (s.id === activa) {
+                  if (tieneHijos) alternar(s.id);
                   return;
                 }
                 setVistaActiva(cfg.grupo, s.id);
