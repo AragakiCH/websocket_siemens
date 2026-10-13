@@ -346,13 +346,19 @@ function CampoId({
  * destino: `publicarSecciones()` ni siquiera los publica. Ofrecerle un
  * destino sería prometer algo que el menú no va a hacer.
  */
+/** El valor del <select> para «— no asignar pantalla —». Solo vive aquí. */
+const SIN_PANTALLA = '__sin_pantalla__';
+
 function SelectorPantalla({
   valor,
+  sinPantalla,
   onChange,
   etiquetaSeccion,
 }: {
   valor: string;
-  onChange: (projectId: string) => void;
+  /** «— no asignar pantalla —»: la sección no navega, solo despliega. */
+  sinPantalla: boolean;
+  onChange: (cambio: { pantalla?: string; sinPantalla?: boolean }) => void;
   etiquetaSeccion: string;
 }) {
   const pantallas = usePantallas();
@@ -369,13 +375,13 @@ function SelectorPantalla({
    * publicado todavía (primer render), TODO parecería borrado.
    */
   const huerfana =
-    !!valor && pantallas.length > 0 &&
+    !sinPantalla && !!valor && pantallas.length > 0 &&
     !pantallas.some((p) => p.project_id === valor);
 
   // Apuntarse a uno mismo. No se prohíbe —el Panel de Sección corta la
   // recursión por su lado— pero casi siempre es un descuido, así que se
   // avisa en vez de dejarlo pasar en silencio.
-  const esSiMisma = !!valor && valor === abierta;
+  const esSiMisma = !sinPantalla && !!valor && valor === abierta;
 
   return (
     <div className="mt-1 pl-[26px]">
@@ -388,19 +394,27 @@ function SelectorPantalla({
           } />
 
         <select
-          value={valor}
-          onChange={(e) => onChange(e.target.value)}
+          value={sinPantalla ? SIN_PANTALLA : valor}
+          onChange={(e) => {
+            const v = e.target.value;
+            // Las dos cosas a la vez: elegir una opción deshace la otra.
+            if (v === SIN_PANTALLA) onChange({ sinPantalla: true, pantalla: undefined });
+            else onChange({ sinPantalla: undefined, pantalla: v });
+          }}
           title={`Pantalla que se abre en el Panel de Sección al pulsar «${etiquetaSeccion}»`}
           aria-label={`Pantalla de destino de ${etiquetaSeccion}`}
           className={`min-w-0 flex-1 cursor-pointer rounded border bg-transparent px-1.5 py-0.5 text-[11px] outline-none transition focus:border-siemens focus:ring-1 focus:ring-siemens/30 dark:bg-navy ${
           huerfana ?
           'border-state-error/40 text-state-error' :
+          sinPantalla ?
+          'border-slate-300 text-slate-500 dark:border-navy-slate dark:text-slate-400' :
           valor ?
           'border-siemens/40 text-navy dark:text-slate-100' :
           'border-transparent text-slate-400 hover:border-slate-200 dark:hover:border-navy-slate'}`
           }>
 
           <option value="">— esta misma pantalla —</option>
+          <option value={SIN_PANTALLA}>— no asignar pantalla —</option>
           {pantallas.map((p) =>
           <option key={p.project_id} value={p.project_id}>
               {p.nombre}
@@ -421,6 +435,12 @@ function SelectorPantalla({
       <p className="mt-0.5 text-[10px] leading-snug text-state-error">
           Esa pantalla ya no está en el proyecto. Elige otra o vuelve a «esta
           misma pantalla».
+        </p>
+      }
+      {sinPantalla &&
+      <p className="mt-0.5 text-[10px] leading-snug text-slate-400">
+          No navega: al pulsarla se despliega todo lo que tiene dentro, y otro
+          clic lo pliega.
         </p>
       }
       {esSiMisma && !huerfana &&
@@ -729,8 +749,9 @@ export function EditorEstructura({
               {!nivel &&
               <SelectorPantalla
                 valor={s.pantalla ?? ''}
+                sinPantalla={!!s.sinPantalla}
                 etiquetaSeccion={s.label || s.id}
-                onChange={(pantalla) => editar(indice, { pantalla })} />
+                onChange={(cambio) => editar(indice, cambio)} />
               }
 
               {!nivel && abierto &&
@@ -773,7 +794,8 @@ export function EditorEstructura({
           <br />
           El desplegable de cada sección elige <b>a qué pantalla salta</b>. En
           «esta misma pantalla» se comporta como siempre: muestra los widgets
-          de este lienzo que la tengan asignada en «Vista».
+          de este lienzo que la tengan asignada en «Vista». En «no asignar
+          pantalla» no navega: solo despliega y pliega lo que tiene dentro.
         </p>
       }
     </div>);

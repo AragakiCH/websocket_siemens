@@ -56,7 +56,7 @@
 // LOS AVISOS de los tres salen abajo de la pantalla (ver `avisos.ts`), no
 // pegados al botón: ahí tapaban los campos.
 // =========================================================================
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   PlusIcon,
@@ -118,6 +118,7 @@ function BotonReceta({
   refBoton,
   apagado,
   extra,
+  escala = 1,
 }: {
   ctx: RenderCtx;
   texto: string;
@@ -132,6 +133,11 @@ function BotonReceta({
   apagado?: boolean;
   /** Algo más tras el texto (p. ej. la cuenta de «Aplicar todos»). */
   extra?: React.ReactNode;
+  /**
+   * Factor de tamaño del contenido (letra, icono, márgenes). 1 = el de
+   * siempre. Lo usa «Aplicar todos» para que todo quepa en su caja.
+   */
+  escala?: number;
 }) {
   const [encima, setEncima] = useState(false);
   const activo = !!ctx.interactivo && !apagado;
@@ -158,13 +164,13 @@ function BotonReceta({
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 7,
-        padding: '0 12px',
+        gap: 7 * escala,
+        padding: `0 ${12 * escala}px`,
         border: `1px solid ${primario ? C.verde : C.borde}`,
         borderRadius: 7,
         background: fondo,
         color: primario ? '#fff' : peligro ? C.rojo : C.tinta,
-        fontSize: 13,
+        fontSize: 13 * escala,
         fontWeight: peligro ? 700 : 600,
         fontFamily: FUENTE,
         cursor: !ctx.interactivo ? 'default' : apagado ? 'not-allowed' : 'pointer',
@@ -174,8 +180,10 @@ function BotonReceta({
         overflow: 'hidden',
       }}
     >
-      <Icono style={{ width: 15, height: 15, flexShrink: 0 }} />
-      {texto}
+      <Icono style={{ width: 15 * escala, height: 15 * escala, flexShrink: 0 }} />
+      {/* El texto es lo único que cede si el botón es estrecho: se corta
+          con «…». El icono y lo de `extra` (la cuenta) nunca se recortan. */}
+      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{texto}</span>
       {extra}
     </button>
   );
@@ -1484,6 +1492,46 @@ function EliminarReceta(ctx: RenderCtx) {
 
 // ─── «Aplicar todos» ─────────────────────────────────────────────
 
+const TEXTO_APLICAR = 'Aplicar todos';
+const ANCHO_BURBUJA = 28;
+const ALTO_BURBUJA = 20;
+
+/** Ancho de un texto en píxeles con esa fuente. Sin canvas: un aproximado. */
+function anchoDeTexto(texto: string, fuente: string): number {
+  try {
+    const c = document.createElement('canvas').getContext('2d');
+    if (c) {
+      c.font = fuente;
+      return c.measureText(texto).width;
+    }
+  } catch {
+    /* sin canvas */
+  }
+  return texto.length * 13 * 0.6;
+}
+
+/**
+ * Cuánto hay que achicar el contenido de «Aplicar todos» para que TODO
+ * —icono, texto y burbuja— quepa entero en la caja del widget.
+ *
+ * Se escala todo junto, no solo la letra: así el botón se ve igual de
+ * proporcionado en grande y en chico, y el texto no se corta con «…» por
+ * unos píxeles. Nunca agranda (máx. 1) y no baja de 9 px de letra: más
+ * chico ya no se lee, y ahí sí cede el texto con «…».
+ *
+ * Se mide siempre «Aplicar todos», también mientras dice «Enviando…»: si
+ * no, el botón cambiaría de tamaño al pulsarlo.
+ */
+function escalaAplicar(ancho: number, alto: number): number {
+  if (!ancho || !alto) return 1;
+  const texto = anchoDeTexto(TEXTO_APLICAR, `600 13px ${FUENTE}`) * 1.04; // margen por si Inter aún no cargó
+  // padding 12+12, borde 1+1, icono 15, dos huecos de 7, burbuja.
+  const necesita = 24 + 2 + 15 + 7 + texto + 7 + ANCHO_BURBUJA;
+  const porAncho = (ancho - 2) / necesita;
+  const porAlto = (alto - 6) / ALTO_BURBUJA;
+  return Math.max(9 / 13, Math.min(1, porAncho, porAlto));
+}
+
 /**
  * Envía al PLC, uno por uno, todos los campos en ámbar de la receta que hay
  * en esta pantalla. SOLO al PLC: no toca el data record. Para la receta
@@ -1496,6 +1544,9 @@ function AplicarTodos(ctx: RenderCtx) {
   const recetaId = cfg.habilitada ? cfg.id : null;
   const pendientes = usePendientesDeEnviar(recetaId);
   const [enviando, setEnviando] = useState(false);
+  const anchoW = ctx.widget.width;
+  const altoW = ctx.widget.height;
+  const escala = useMemo(() => escalaAplicar(anchoW, altoW), [anchoW, altoW]);
 
   const pulsar = async () => {
     if (!recetaId) {
@@ -1535,35 +1586,46 @@ function AplicarTodos(ctx: RenderCtx) {
 
   // En el Diseñador se ve normal, sin cuenta: ahí no se escribe nada.
   const conCuenta = !!ctx.interactivo && pendientes > 0;
+  // Más de dos cifras no caben en la burbuja: se resume.
+  const cuenta = pendientes > 99 ? '99+' : String(pendientes);
   return (
     <BotonReceta
       ctx={ctx}
-      texto={enviando ? 'Enviando…' : 'Aplicar todos'}
+      texto={enviando ? 'Enviando…' : TEXTO_APLICAR}
       Icono={SendIcon}
+      escala={escala}
       apagado={!!ctx.interactivo && (enviando || pendientes === 0)}
       onPulsar={() => void pulsar()}
       extra={
-        conCuenta && !enviando ? (
-          <span
-            title={`${pendientes} ${pendientes === 1 ? 'valor' : 'valores'} por enviar al PLC`}
-            style={{
-              minWidth: 20,
-              height: 20,
-              padding: '0 6px',
-              boxSizing: 'border-box',
-              borderRadius: 10,
-              background: C.ambar,
-              color: '#fff',
-              fontSize: 11.5,
-              fontWeight: 700,
-              lineHeight: '20px',
-              textAlign: 'center',
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {pendientes}
-          </span>
-        ) : undefined
+        // EL HUECO DE LA BURBUJA ESTÁ SIEMPRE, de ancho fijo, aunque no haya
+        // nada que contar (entonces es invisible). Así el texto no se mueve
+        // cuando aparece la cuenta, ni cuando pasa de 9 a 10: antes la
+        // burbuja crecía con el número y el botón la cortaba por la derecha.
+        <span
+          aria-hidden={!conCuenta || enviando || undefined}
+          title={
+            conCuenta
+              ? `${pendientes} ${pendientes === 1 ? 'valor' : 'valores'} por enviar al PLC`
+              : undefined
+          }
+          style={{
+            flexShrink: 0,
+            width: ANCHO_BURBUJA * escala,
+            height: ALTO_BURBUJA * escala,
+            borderRadius: (ALTO_BURBUJA * escala) / 2,
+            background: C.ambar,
+            color: '#fff',
+            fontSize: (cuenta.length > 2 ? 9.5 : 11.5) * escala,
+            fontWeight: 700,
+            lineHeight: `${ALTO_BURBUJA * escala}px`,
+            textAlign: 'center',
+            fontVariantNumeric: 'tabular-nums',
+            letterSpacing: cuenta.length > 2 ? -0.3 : 0,
+            visibility: conCuenta && !enviando ? 'visible' : 'hidden',
+          }}
+        >
+          {cuenta}
+        </span>
       }
     />
   );
@@ -1583,7 +1645,12 @@ function ContadorRecetas(ctx: RenderCtx) {
   const recetaId = cfg.habilitada ? cfg.id : null;
   const conteo = useConteoRecetas(recetaId);
   const alto = ctx.widget.height || 44;
-  const tamNumero = Math.max(18, Math.min(56, Math.round(alto * 0.72)));
+  const tamBase = Math.max(18, Math.min(56, Math.round(alto * 0.72)));
+  const texto = conteo === null ? '—' : String(conteo);
+  // La caja del número tiene SIEMPRE el ancho de tres cifras y el número va
+  // pegado a su derecha: al pasar de 9 a 10 el «1» nace a la izquierda y el
+  // rótulo no se mueve. Más de tres cifras: se achica la letra, no se empuja.
+  const tamNumero = texto.length > 3 ? Math.round((tamBase * 3) / texto.length) : tamBase;
 
   return (
     <div
@@ -1606,6 +1673,10 @@ function ContadorRecetas(ctx: RenderCtx) {
     >
       <strong
         style={{
+          flexShrink: 0,
+          // `ch` = ancho de un «0»; con cifras tabulares todas miden eso.
+          width: `${(3 * tamBase) / tamNumero}ch`,
+          textAlign: 'right',
           fontSize: tamNumero,
           fontWeight: 700,
           lineHeight: 1,
@@ -1613,11 +1684,12 @@ function ContadorRecetas(ctx: RenderCtx) {
           color: ctx.style.color || C.verde,
         }}
       >
-        {conteo === null ? '—' : conteo}
+        {texto}
       </strong>
       <span
         style={{
-          fontSize: Math.max(10.5, Math.min(14, tamNumero * 0.4)),
+          flexShrink: 0,
+          fontSize: Math.max(10.5, Math.min(14, tamBase * 0.4)),
           lineHeight: 1.3,
           color: '#8496a3',
         }}

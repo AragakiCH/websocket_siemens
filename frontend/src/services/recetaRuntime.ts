@@ -38,8 +38,13 @@
 //
 //   Un valor tecleado y todavía no enviado al PLC es un «borrador». Vive
 //   aquí y no en el campo para que sobreviva a cambiar de sección, y para
-//   que dos campos del mismo elemento enseñen lo mismo. Se pierde al
-//   recargar la página: lo que no se guardó, no está guardado.
+//   que dos campos del mismo elemento enseñen lo mismo.
+//
+//   Sobrevive a recargar o cerrar la Vista Previa (localStorage), igual que
+//   la marca «Sin guardar»: recargar no es guardar. Sin esto, tras recargar
+//   el bloque decía «Guardada» sin que nadie hubiera guardado nada, y lo
+//   escrito en ámbar desaparecía. Recargar NO envía nada al PLC ni toca el
+//   data record: solo vuelve a enseñar lo que había.
 //
 //   Va a las mismas tablas y por el mismo CRUD que la vista de Recetas
 //   (`receta_registros`, `receta_valores`), así que lo creado aquí se ve
@@ -189,16 +194,51 @@ export async function enviarPendientes(
 
 // ─── Lo escrito y no enviado (borradores) ────────────────────────
 
-const borradores = new Map<string, string>();
+const CLAVE_BORRADORES = 'hmi.recetas.borradores';
+const CLAVE_CAMBIOS = 'hmi.recetas.cambios';
+
+/** Lee un JSON de localStorage. Roto, ausente o sin acceso: `porDefecto`. */
+function leerGuardado<T>(clave: string, porDefecto: T): T {
+  try {
+    const t = localStorage.getItem(clave);
+    return t ? (JSON.parse(t) as T) : porDefecto;
+  } catch {
+    return porDefecto;
+  }
+}
+
+function guardarEnNavegador(clave: string, valor: unknown): void {
+  try {
+    localStorage.setItem(clave, JSON.stringify(valor));
+  } catch {
+    /* sin almacenamiento (pruebas, modo privado lleno): sigue en memoria */
+  }
+}
+
+const borradores = new Map<string, string>(
+  Object.entries(leerGuardado<Record<string, unknown>>(CLAVE_BORRADORES, {})).filter(
+    (par): par is [string, string] => typeof par[1] === 'string'
+  )
+);
 /** Recetas con algo escrito en sus campos que todavía no se ha guardado. */
-const conCambios = new Set<number>();
+const conCambios = new Set<number>(
+  (() => {
+    const l = leerGuardado<unknown>(CLAVE_CAMBIOS, []);
+    return Array.isArray(l) ? l.map(Number).filter((n) => Number.isInteger(n) && n > 0) : [];
+  })()
+);
 const EVENTO_CAMBIOS = 'hmi:receta-cambios';
+
+const persistirBorradores = () =>
+  guardarEnNavegador(CLAVE_BORRADORES, Object.fromEntries(borradores));
+const persistirCambios = () => guardarEnNavegador(CLAVE_CAMBIOS, [...conCambios]);
 
 /** Marca (o desmarca) una receta como «con cambios sin guardar», y avisa. */
 function marcarCambios(recetaId: number, hay: boolean): void {
   if (conCambios.has(recetaId) === hay) return;
   if (hay) conCambios.add(recetaId);
   else conCambios.delete(recetaId);
+  persistirCambios();
   try {
     window.dispatchEvent(new CustomEvent(EVENTO_CAMBIOS));
   } catch {
@@ -232,13 +272,17 @@ export function borradorDe(llave: string): string | undefined {
 export function fijarBorrador(llave: string, texto: string, recetaId = 0): void {
   if (borradores.get(llave) === texto) return;
   borradores.set(llave, texto);
+  persistirBorradores();
   if (recetaId) marcarCambios(recetaId, true);
   avisarBorrador();
 }
 
 /** El valor ya está en el PLC (o se descartó): el campo vuelve a lo vivo. */
 export function quitarBorrador(llave: string): void {
-  if (borradores.delete(llave)) avisarBorrador();
+  if (borradores.delete(llave)) {
+    persistirBorradores();
+    avisarBorrador();
+  }
 }
 
 /**

@@ -116,7 +116,10 @@ function Sidebar({ widget, style }: RenderCtx) {
     // pero son justo ellos los que dan la jerarquía que necesita la barra de
     // la Vista Previa para decir «GENERAL / Detalles». Ver `useRutaDeVista()`.
     publicarEstructura(cfg.grupo, secciones);
-    if (navegables.length > 0) iniciarVista(cfg.grupo, navegables[0].id);
+    // La vista inicial es la primera sección que SÍ navega: una «sin
+    // pantalla» es solo una carpeta y no tiene nada que enseñar.
+    const inicial = navegables.find((s) => !s.sinPantalla) ?? navegables[0];
+    if (inicial) iniciarVista(cfg.grupo, inicial.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg.grupo, cfg.secciones]);
 
@@ -192,6 +195,35 @@ function Sidebar({ widget, style }: RenderCtx) {
     // rama se volvería a abrir sola en cuanto se editara cualquier cosa.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activa]);
+
+  /**
+   * Clic en una sección «sin pantalla»: no navega, así que el clic es para
+   * plegar y desplegar. Cerrada (o a medias) -> se abre ENTERA, con todas
+   * sus subsecciones; abierta -> se pliega.
+   *
+   * Entera, y no un nivel como `desplegarUnNivel`: una sección sin pantalla
+   * es una carpeta, y lo que se quiere al pulsarla es ver lo que hay dentro.
+   */
+  const alternarTodo = (id: string) =>
+  setCerradas((prev) => {
+    const pos = filas.findIndex((f) => f.seccion.id === id);
+    if (pos < 0) return prev;
+    const base = filas[pos].profundidad;
+    const dentro: string[] = [];
+    for (let j = pos + 1; j < filas.length && filas[j].profundidad > base; j++) {
+      if (filas[j].tieneHijos) dentro.push(filas[j].seccion.id);
+    }
+    const s = new Set(prev);
+    // Abierta del todo: se pliega. Lo de dentro se deja como está; al volver
+    // a pulsarla se abre entera igual.
+    if (!prev.has(id) && !dentro.some((d) => prev.has(d))) {
+      s.add(id);
+      return s;
+    }
+    s.delete(id);
+    for (const d of dentro) s.delete(d);
+    return s;
+  });
 
   const estaCerrada = (id: string) => cerradas.has(id);
 
@@ -413,6 +445,10 @@ function Sidebar({ widget, style }: RenderCtx) {
               // para seleccionar y arrastrar; aquí solo llega en Vista Previa.
               onClick={(e) => {
                 e.stopPropagation();
+                if (s.sinPantalla) {
+                  if (tieneHijos) alternarTodo(s.id);
+                  return;
+                }
                 setVistaActiva(cfg.grupo, s.id);
                 if (tieneHijos) desplegarUnNivel(s.id);
               }}

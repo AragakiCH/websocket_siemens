@@ -481,6 +481,19 @@ export interface Seccion {
    */
   pantalla?: string;
 
+  /**
+   * «— no asignar pantalla —»: la sección NO navega. Pulsarla solo despliega
+   * todo lo que lleva dentro (y otro clic lo pliega). Sirve para secciones
+   * que son solo una carpeta del menú.
+   *
+   * Es un campo aparte y no un valor especial de `pantalla` a propósito:
+   * `pantalla` lo leen el Panel de Sección y la Tarjeta de Acceso como un
+   * `project_id`, y un valor inventado ahí lo tomarían por una pantalla
+   * borrada. Ausente = navega como siempre: los menús ya guardados no
+   * cambian.
+   */
+  sinPantalla?: boolean;
+
 }
 
 /** ¿Esta entrada es un encabezado de nivel y no una sección navegable? */
