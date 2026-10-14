@@ -1,0 +1,591 @@
+// =========================================================================
+// ModalFuncion.tsx
+// «Configurar modo función»: para la salida elegida (varPrincipal o una
+// variable con nombre), sus tags de entrada, sus variables internas y la
+// expresión que calculará su valor.
+//
+// TRABAJA SOBRE UNA COPIA
+//
+//   Se edita un borrador de TODAS las salidas a la vez: saltar de var1 a var2
+//   no pierde lo escrito en var1. Nada llega al widget hasta «Guardar
+//   función»; «Cancelar» (o Escape) lo tira entero.
+//
+// TODAVÍA NO CALCULA
+//
+//   La expresión se guarda tal cual. Evaluarla, validarla y los «Valores de
+//   prueba» son la siguiente fase. Ver `utils/funciones.ts`.
+// =========================================================================
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { PlusIcon, XIcon } from 'lucide-react';
+import type { PlcVariable } from '../../../models/plc';
+import { filtrarGrupos } from '../../ui/Field';
+import {
+  TIPOS_INTERNA,
+  errorDeFuncion,
+  funcionVacia,
+  type ConfigFunciones,
+  type FuncionSalida,
+  type TipoInterna,
+} from '../../../utils/funciones';
+
+type Grupos = { label: string; options: { label: string; value: string }[] }[];
+
+export interface SalidaFuncion {
+  clave: string;
+  /** Cómo se llama en la expresión: «varPrincipal», «var1»… */
+  nombre: string;
+}
+
+// TODOS LOS CUADROS MIDEN LO MISMO (h-10): el de búsqueda era más bajo y la
+// fila se veía descuadrada.
+const CAMPO =
+  'h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/25 dark:border-navy-slate dark:bg-navy dark:text-slate-100';
+const ROTULO =
+  'block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400';
+const BOTON_ANADIR =
+  'inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-siemens/50 bg-siemens/10 px-3 py-1.5 text-xs font-semibold text-siemens transition hover:bg-siemens/20 dark:text-siemens-200';
+const BOTON_QUITAR =
+  'inline-flex h-8 w-8 items-center justify-center rounded text-slate-400 transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10';
+
+// Columnas de cada lista. Los títulos van UNA vez arriba, con las mismas
+// columnas que las filas, y no repetidos en cada fila: así todo queda
+// alineado y caben más filas antes de que salga el scroll.
+const COLS_ENTRADA =
+  'grid grid-cols-[150px_minmax(0,2fr)_minmax(0,1fr)_150px_32px] items-center gap-3';
+const COLS_INTERNA = 'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_32px] items-center gap-3';
+
+/**
+ * Las filas de una lista, con SU PROPIO scroll a partir de unas cuatro
+ * filas: si no, con diez tags el modal crecía hasta salirse de la pantalla.
+ * Al añadir una fila baja solo hasta ella, para que se vea la nueva.
+ */
+function ListaConScroll({ filas, children }: { filas: number; children: React.ReactNode }) {
+  const caja = useRef<HTMLDivElement>(null);
+  const antes = useRef(filas);
+  useEffect(() => {
+    if (filas > antes.current && caja.current) caja.current.scrollTop = caja.current.scrollHeight;
+    antes.current = filas;
+  }, [filas]);
+  return (
+    <div ref={caja} className="mp-scroll max-h-[212px] space-y-2.5 overflow-y-auto pr-1">
+      {children}
+    </div>
+  );
+}
+
+/** Buscador del mismo alto que los demás cuadros. Filtra el «Tag asociado» de su fila. */
+function Buscador({
+  valor,
+  onCambiar,
+  coinciden,
+}: {
+  valor: string;
+  onCambiar: (v: string) => void;
+  coinciden: number;
+}) {
+  const buscando = valor.trim() !== '';
+  return (
+    <div className="relative">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+      >
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-3.5-3.5" />
+      </svg>
+      <input
+        value={valor}
+        onChange={(e) => onCambiar(e.target.value)}
+        placeholder="Buscar variable…"
+        spellCheck={false}
+        className={`${CAMPO} pl-9 ${buscando ? 'pr-14' : ''}`}
+      />
+      {buscando && (
+        <span className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
+          <span
+            className={`text-[10px] tabular-nums ${
+              coinciden === 0 ? 'text-state-error' : 'text-slate-400'
+            }`}
+          >
+            {coinciden}
+          </span>
+          <button
+            type="button"
+            onClick={() => onCambiar('')}
+            title="Limpiar búsqueda"
+            className="rounded p-0.5 text-slate-400 hover:text-navy dark:hover:text-slate-100"
+          >
+            <XIcon className="h-3.5 w-3.5" />
+          </button>
+        </span>
+      )}
+    </div>
+  );
+}
+
+function Bloque({
+  numero,
+  titulo,
+  descripcion,
+  accion,
+  children,
+}: {
+  numero: number;
+  titulo: string;
+  descripcion?: string;
+  accion?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-navy-slate dark:bg-navy-soft">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="flex items-center gap-2.5 text-[15px] font-bold text-navy dark:text-slate-100">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-siemens/15 text-xs font-bold text-siemens dark:text-siemens-200">
+              {numero}
+            </span>
+            {titulo}
+          </h3>
+          {descripcion && (
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{descripcion}</p>
+          )}
+        </div>
+        {accion}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** Una fila de «Tags de entrada». El buscador es suyo: filtra SU desplegable. */
+function FilaEntrada({
+  nombre,
+  variableId,
+  grupos,
+  variable,
+  onNombre,
+  onVariable,
+  onQuitar,
+}: {
+  nombre: string;
+  variableId: string;
+  grupos: Grupos;
+  variable?: PlcVariable;
+  onNombre: (v: string) => void;
+  onVariable: (v: string) => void;
+  onQuitar: () => void;
+}) {
+  const [busca, setBusca] = useState('');
+  const filtro = filtrarGrupos(grupos, busca, variableId);
+  const tipo = !variableId
+    ? '—'
+    : variableId.startsWith('param:')
+    ? 'Parámetro'
+    : variable?.type ?? 'Sin dato';
+  return (
+    <div className={COLS_ENTRADA}>
+      <input
+        value={nombre}
+        onChange={(e) => onNombre(e.target.value)}
+        spellCheck={false}
+        placeholder="p. ej. m31_en"
+        aria-label="Nombre en la función"
+        className={CAMPO}
+      />
+      <select
+        value={variableId}
+        onChange={(e) => onVariable(e.target.value)}
+        aria-label="Tag asociado"
+        className={`${CAMPO} cursor-pointer font-medium`}
+      >
+        {filtro.grupos.map((g, i) =>
+          g.options.length === 0 ? null : g.label ? (
+            <optgroup key={g.label + i} label={g.label}>
+              {g.options.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </optgroup>
+          ) : (
+            g.options.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))
+          )
+        )}
+      </select>
+      <Buscador valor={busca} onCambiar={setBusca} coinciden={filtro.coinciden} />
+      <div
+        className={`${CAMPO} flex items-center truncate text-slate-500 dark:text-slate-400`}
+        title={tipo}
+      >
+        <span className="truncate">{tipo}</span>
+      </div>
+      <button type="button" onClick={onQuitar} title="Quitar este tag" className={BOTON_QUITAR}>
+        <XIcon className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+/** El editor de la expresión: números de línea a la izquierda, como el diseño. */
+function EditorExpresion({ valor, onCambiar }: { valor: string; onCambiar: (v: string) => void }) {
+  const area = useRef<HTMLTextAreaElement>(null);
+  const margen = useRef<HTMLDivElement>(null);
+  const lineas = Math.max(4, valor.split('\n').length);
+  return (
+    <div className="flex overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-navy-slate dark:bg-[#0f1729]">
+      <div
+        ref={margen}
+        aria-hidden
+        className="select-none overflow-hidden border-r border-slate-200 bg-slate-50 px-3 py-3 text-right font-mono text-xs leading-[19px] text-slate-400 dark:border-navy-slate dark:bg-navy"
+      >
+        {Array.from({ length: lineas }, (_, i) => (
+          <div key={i}>{i + 1}</div>
+        ))}
+      </div>
+      <textarea
+        ref={area}
+        value={valor}
+        onChange={(e) => onCambiar(e.target.value)}
+        // Los números de línea acompañan al texto al desplazarse.
+        onScroll={(e) => {
+          if (margen.current) margen.current.scrollTop = e.currentTarget.scrollTop;
+        }}
+        onKeyDown={(e) => {
+          // Tab sangra (dos espacios) en vez de saltar al botón siguiente:
+          // en un editor de código es lo que se espera.
+          if (e.key !== 'Tab') return;
+          e.preventDefault();
+          const t = e.currentTarget;
+          const ini = t.selectionStart;
+          const fin = t.selectionEnd;
+          onCambiar(valor.slice(0, ini) + '  ' + valor.slice(fin));
+          requestAnimationFrame(() => {
+            if (area.current) area.current.selectionStart = area.current.selectionEnd = ini + 2;
+          });
+        }}
+        spellCheck={false}
+        rows={6}
+        placeholder={'if entrada = 0 then\n  salida = 3\nelse\n  salida = contador'}
+        className="min-h-[120px] flex-1 resize-y bg-transparent px-3 py-3 font-mono text-xs leading-[19px] text-navy outline-none placeholder:text-slate-400 dark:text-slate-100"
+      />
+    </div>
+  );
+}
+
+export function ModalFuncion({
+  salidas,
+  config,
+  gruposPara,
+  variablePorId,
+  onGuardar,
+  onCerrar,
+}: {
+  salidas: SalidaFuncion[];
+  config: ConfigFunciones;
+  /** Las opciones de «Tag asociado»: las mismas de «Variable asociada». */
+  gruposPara: (asignada: string) => Grupos;
+  variablePorId: (id: string) => PlcVariable | undefined;
+  onGuardar: (porSalida: Record<string, FuncionSalida>) => void;
+  onCerrar: () => void;
+}) {
+  const [borrador, setBorrador] = useState<Record<string, FuncionSalida>>(() => ({
+    ...config.porSalida,
+  }));
+  const [clave, setClave] = useState(salidas[0]?.clave ?? '');
+  const salida = salidas.find((s) => s.clave === clave) ?? salidas[0];
+  const f: FuncionSalida = (salida && borrador[salida.clave]) || funcionVacia();
+
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCerrar();
+    };
+    window.addEventListener('keydown', tecla);
+    return () => window.removeEventListener('keydown', tecla);
+  }, [onCerrar]);
+
+  const cambiar = (parche: Partial<FuncionSalida>) => {
+    if (!salida) return;
+    setBorrador((b) => ({ ...b, [salida.clave]: { ...f, ...parche } }));
+  };
+
+  // El primer problema de CUALQUIER salida: guardar guarda todas, así que
+  // una mal en var2 también bloquea aunque estés mirando var1.
+  const error = useMemo(() => {
+    for (const s of salidas) {
+      const fs = borrador[s.clave];
+      if (!fs) continue;
+      const e = errorDeFuncion(fs, s.nombre);
+      if (e) return s.clave === salida?.clave ? e : `${s.nombre}: ${e}`;
+    }
+    return '';
+  }, [borrador, salidas, salida]);
+
+  const guardar = () => {
+    if (error) return;
+    // Solo las salidas que siguen existiendo; las vacías no se guardan.
+    const limpio: Record<string, FuncionSalida> = {};
+    for (const s of salidas) {
+      const fs = borrador[s.clave];
+      if (!fs) continue;
+      if (fs.entradas.length === 0 && fs.internas.length === 0 && fs.expresion.trim() === '') continue;
+      limpio[s.clave] = {
+        entradas: fs.entradas.map((e) => ({ ...e, nombre: e.nombre.trim() })),
+        internas: fs.internas.map((i) => ({ ...i, nombre: i.nombre.trim() })),
+        expresion: fs.expresion,
+      };
+    }
+    onGuardar(limpio);
+  };
+
+  const nombreSalida = salida?.nombre ?? '—';
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/55 p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCerrar();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-label="Configurar modo función"
+        className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-navy-slate dark:bg-[#1c2737]"
+      >
+        {/* ── Cabecera ── */}
+        <header className="flex items-start gap-4 border-b border-slate-200 px-7 py-5 dark:border-navy-slate">
+          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-siemens/15 font-serif text-xl font-bold italic text-siemens dark:text-siemens-200">
+            ƒx
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-2xl font-bold text-navy dark:text-slate-100">Configurar modo función</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Define las entradas y la expresión que calculará el valor de esta variable.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCerrar}
+            title="Cerrar"
+            className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-100 dark:border-navy-slate dark:text-slate-300 dark:hover:bg-navy-slate/50"
+          >
+            <XIcon className="h-4 w-4" />
+          </button>
+        </header>
+
+        <div className="mp-scroll flex-1 space-y-4 overflow-auto px-7 py-5">
+          {/* ── Variable de salida ── */}
+          <div className="flex flex-wrap items-center gap-5 rounded-xl border border-siemens/40 border-l-4 border-l-siemens bg-siemens/5 px-6 py-3.5 dark:bg-siemens/10">
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-siemens dark:text-siemens-200">
+                Variable de salida
+              </div>
+              <div className="truncate text-lg font-bold text-navy dark:text-slate-100">{nombreSalida}</div>
+            </div>
+            <span className="rounded-full border border-siemens/60 bg-siemens/15 px-4 py-1.5 text-[11px] font-bold uppercase text-siemens dark:text-siemens-200">
+              Modo función
+            </span>
+            <label className="ml-auto flex items-center gap-2 text-sm text-slate-500 dark:text-slate-300">
+              Resultado →
+              <select
+                value={salida?.clave ?? ''}
+                onChange={(e) => setClave(e.target.value)}
+                disabled={salidas.length === 0}
+                title="Elige qué variable calcula esta función"
+                className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-navy outline-none focus:border-siemens dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+              >
+                {salidas.map((s) => (
+                  <option key={s.clave} value={s.clave}>
+                    {s.nombre}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {salidas.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-slate-300 px-5 py-6 text-center text-sm text-slate-500 dark:border-navy-slate dark:text-slate-400">
+              Este widget no tiene variables que calcular. Añade una en «Variables con nombre» del
+              Inspector y vuelve a abrir esta ventana.
+            </p>
+          ) : (
+            <>
+              {/* ── 1. Tags de entrada ── */}
+              <Bloque
+                numero={1}
+                titulo="Tags de entrada"
+                descripcion="Fuentes disponibles para consultar. Estos tags son de solo lectura dentro de la función."
+                accion={
+                  <button
+                    type="button"
+                    className={BOTON_ANADIR}
+                    onClick={() => cambiar({ entradas: [...f.entradas, { nombre: '', variableId: '' }] })}
+                  >
+                    <PlusIcon className="h-3.5 w-3.5" /> Añadir tag
+                  </button>
+                }
+              >
+                {f.entradas.length === 0 ? (
+                  <p className="text-xs text-slate-400">Sin tags de entrada todavía.</p>
+                ) : (
+                  <>
+                  <div className={`${COLS_ENTRADA} mb-1.5 pr-1`}>
+                    <span className={ROTULO}>Nombre en la función</span>
+                    <span className={ROTULO}>Tag asociado</span>
+                    <span className={ROTULO}>Buscar tag</span>
+                    <span className={ROTULO}>Tag seleccionado</span>
+                    <span />
+                  </div>
+                  <ListaConScroll filas={f.entradas.length}>
+                    {f.entradas.map((e, i) => (
+                      <FilaEntrada
+                        // Por posición: el nombre se edita y no sirve de llave.
+                        key={`${salida!.clave}-${i}`}
+                        nombre={e.nombre}
+                        variableId={e.variableId}
+                        grupos={gruposPara(e.variableId)}
+                        variable={variablePorId(e.variableId)}
+                        onNombre={(v) =>
+                          cambiar({ entradas: f.entradas.map((x, j) => (j === i ? { ...x, nombre: v } : x)) })
+                        }
+                        onVariable={(v) =>
+                          cambiar({ entradas: f.entradas.map((x, j) => (j === i ? { ...x, variableId: v } : x)) })
+                        }
+                        onQuitar={() => cambiar({ entradas: f.entradas.filter((_, j) => j !== i) })}
+                      />
+                    ))}
+                  </ListaConScroll>
+                  </>
+                )}
+              </Bloque>
+
+              {/* ── 2. Variables internas ── */}
+              <Bloque
+                numero={2}
+                titulo="Variables internas"
+                descripcion="Datos propios de la función disponibles para el cálculo."
+                accion={
+                  <button
+                    type="button"
+                    className={BOTON_ANADIR}
+                    onClick={() => cambiar({ internas: [...f.internas, { nombre: '', tipo: 'bool' }] })}
+                  >
+                    <PlusIcon className="h-3.5 w-3.5" /> Añadir variable
+                  </button>
+                }
+              >
+                {f.internas.length === 0 ? (
+                  <p className="text-xs text-slate-400">Sin variables internas todavía.</p>
+                ) : (
+                  <>
+                  <div className={`${COLS_INTERNA} mb-1.5 pr-1`}>
+                    <span className={ROTULO}>Nombre</span>
+                    <span className={ROTULO}>Tipo de dato</span>
+                    <span />
+                  </div>
+                  <ListaConScroll filas={f.internas.length}>
+                    {f.internas.map((v, i) => (
+                      <div key={`${salida!.clave}-${i}`} className={COLS_INTERNA}>
+                        <input
+                          value={v.nombre}
+                          onChange={(e) =>
+                            cambiar({
+                              internas: f.internas.map((x, j) => (j === i ? { ...x, nombre: e.target.value } : x)),
+                            })
+                          }
+                          spellCheck={false}
+                          placeholder="p. ej. contador"
+                          aria-label="Nombre"
+                          className={CAMPO}
+                        />
+                        <select
+                          value={v.tipo}
+                          onChange={(e) =>
+                            cambiar({
+                              internas: f.internas.map((x, j) =>
+                                j === i ? { ...x, tipo: e.target.value as TipoInterna } : x
+                              ),
+                            })
+                          }
+                          aria-label="Tipo de dato"
+                          className={`${CAMPO} cursor-pointer`}
+                        >
+                          {TIPOS_INTERNA.map((t) => (
+                            <option key={t.valor} value={t.valor}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          title="Quitar esta variable"
+                          onClick={() => cambiar({ internas: f.internas.filter((_, j) => j !== i) })}
+                          className={BOTON_QUITAR}
+                        >
+                          <XIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </ListaConScroll>
+                  </>
+                )}
+              </Bloque>
+
+              {/* ── 3. Expresión ── */}
+              <Bloque
+                numero={3}
+                titulo="Expresión"
+                accion={
+                  <span className="text-xs font-semibold text-siemens dark:text-siemens-200">
+                    Resultado → {nombreSalida}
+                  </span>
+                }
+              >
+                <EditorExpresion valor={f.expresion} onCambiar={(v) => cambiar({ expresion: v })} />
+                <details className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 dark:border-navy-slate dark:bg-navy-soft">
+                  <summary className="cursor-pointer text-xs font-semibold text-siemens dark:text-siemens-200">
+                    Valores de prueba y resultado
+                  </summary>
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    Próximamente: aquí se podrán poner valores a las entradas y ver qué devuelve la
+                    expresión antes de guardarla.
+                  </p>
+                </details>
+              </Bloque>
+            </>
+          )}
+        </div>
+
+        {/* ── Pie ── */}
+        <footer className="flex items-center gap-3 border-t border-slate-200 px-7 py-4 dark:border-navy-slate">
+          <p className="min-w-0 flex-1 text-xs text-state-error">{error}</p>
+          <button
+            type="button"
+            onClick={onCerrar}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-navy transition hover:bg-slate-100 dark:border-navy-slate dark:text-slate-100 dark:hover:bg-navy-slate/50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={guardar}
+            disabled={!!error || salidas.length === 0}
+            className="rounded-lg bg-siemens px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Guardar función
+          </button>
+        </footer>
+      </div>
+    </div>,
+    document.body
+  );
+}

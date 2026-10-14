@@ -72,6 +72,15 @@ export interface HmiWidget {
   receta?: { habilitada: boolean; id: number | null; nombre: string };
 
   /**
+   * «Modo función» (solo widgets ZIP): por cada salida —la principal o una
+   * variable con nombre— los tags de entrada, las variables internas y la
+   * expresión que calculará su valor. Por ahora solo se configura; no se
+   * evalúa. Opcional: sin él el widget es como siempre. Ver
+   * `utils/funciones.ts`.
+   */
+  funciones?: import('../utils/funciones').ConfigFunciones;
+
+  /**
    * Reglas que cambian el ASPECTO del widget según lo que lee: se ve o no se
    * ve, de qué color, si parpadea.
    *
