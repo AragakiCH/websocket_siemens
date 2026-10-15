@@ -35,6 +35,15 @@ import {
 '../../utils/enlaces';
 import { formatValue } from '../../utils/format';
 import {
+  leerFunciones,
+  renombrarSalida,
+  quitarSalida,
+  tieneContenido,
+  SALIDA_PRINCIPAL,
+  NOMBRE_PRINCIPAL } from
+'../../utils/funciones';
+import { ModalFuncion, type SalidaFuncion } from './funcion/ModalFuncion';
+import {
   leerDinamicas,
   dinamicaNueva,
   PIDE_VALOR,
@@ -568,6 +577,12 @@ export function PropertyInspector({
   // Parte cuyo estilo se está editando. Arriba del return temprano porque es
   // un hook: detrás de un return condicional React se perdería el orden.
   const [parteSel, setParteSel] = useState<ParteId>('box');
+  // La ventana «Configurar modo función». Se cierra al cambiar de widget:
+  // abierta, editaría el que ya no está seleccionado.
+  const [modalFuncion, setModalFuncion] = useState(false);
+  useEffect(() => {
+    setModalFuncion(false);
+  }, [widget?.id]);
 
   // Cada tipo de widget expone las suyas, así que al cambiar de widget la
   // parte elegida puede no existir en el nuevo. Sin esto, seleccionar un
@@ -838,6 +853,43 @@ export function PropertyInspector({
   selectedVariables.find((v) => v.id === idRealDeEnlace(id)) :
   undefined;
 
+  // ── Modo función ─────────────────────────────────────────────
+  //
+  // SOLO EN LOS WIDGETS ZIP. Las salidas que puede calcular: la principal
+  // (si el widget lee una) y cada variable con nombre, en el orden del
+  // Inspector. Cada una tiene su función propia.
+  const esZip = !!zipDef;
+  const funciones = leerFunciones(widget);
+  const salidasFuncion: SalidaFuncion[] = [
+  ...(leeVariables ? [{ clave: SALIDA_PRINCIPAL, nombre: NOMBRE_PRINCIPAL }] : []),
+  ...nombresUsados.map((k) => ({ clave: k, nombre: k }))];
+
+  const hayFuncion = salidasFuncion.some((s) => tieneContenido(funciones.porSalida[s.clave]));
+
+  const bloqueFuncion = esZip ?
+  <div className="flex items-center gap-2">
+      <div className="min-w-0 flex-1">
+        <ToggleField
+        label="Modo función"
+        value={funciones.activo}
+        onChange={(v) => onChange({ funciones: { ...funciones, activo: v } })} />
+      </div>
+      {funciones.activo &&
+    <button
+      type="button"
+      onClick={() => setModalFuncion(true)}
+      title={hayFuncion ? 'Editar la función' : 'Configurar la función'}
+      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border font-serif text-sm font-bold italic transition ${
+      hayFuncion ?
+      'border-siemens bg-siemens text-white hover:brightness-110' :
+      'border-slate-300 text-slate-500 hover:border-siemens hover:text-siemens dark:border-navy-slate dark:text-slate-300'}`
+      }>
+          ƒx
+        </button>
+    }
+    </div> :
+  null;
+
   // ── Dinámicas ─────────────────────────────────────────────────
   const dinamicas = leerDinamicas(widget);
   const fuentesDinamica = [
@@ -1039,6 +1091,7 @@ export function PropertyInspector({
           no hace nada. */}
       {leeVariables &&
       <Section title={t('insp.binding')}>
+        {bloqueFuncion}
         <SelectGroupField
           // La `key` vacía el buscador al pasar a otro widget.
           key={widget.id}
@@ -1096,6 +1149,21 @@ export function PropertyInspector({
           no lee ninguna variable para pintarse, pero es justo al que se le
           querrá poner una para que cambie de color. */}
       <Section title="Variables con nombre">
+        {/* Un ZIP que no lee variable principal no tiene «Vínculo de
+            datos»: el Modo función va aquí, junto a sus salidas. */}
+        {!leeVariables && bloqueFuncion}
+        {modalFuncion &&
+        <ModalFuncion
+          salidas={salidasFuncion}
+          config={funciones}
+          gruposPara={(asignada) => gruposDe(undefined, asignada)}
+          variablePorId={variablePorId}
+          onGuardar={(porSalida) => {
+            onChange({ funciones: { ...funciones, porSalida } });
+            setModalFuncion(false);
+          }}
+          onCerrar={() => setModalFuncion(false)} />
+        }
         {declaradas.map((d) =>
         <FilaEnlace
           key={d.id}
@@ -1131,10 +1199,21 @@ export function PropertyInspector({
               nuevo,
               nombresUsados.filter((x) => x !== k)
             );
-            if (!fallo) onChange({ enlaces: renombrarEnlace(widget, k, nuevo) });
+            // La función de esa salida se va con el nombre nuevo.
+            if (!fallo) {
+              onChange({
+                enlaces: renombrarEnlace(widget, k, nuevo),
+                ...(widget.funciones ? { funciones: renombrarSalida(funciones, k, nuevo.trim()) } : {})
+              });
+            }
             return fallo;
           }}
-          onQuitar={() => onChange({ enlaces: sinEnlace(widget, k) })} />
+          onQuitar={() =>
+          onChange({
+            enlaces: sinEnlace(widget, k),
+            ...(widget.funciones ? { funciones: quitarSalida(funciones, k) } : {})
+          })
+          } />
 
         )}
 
