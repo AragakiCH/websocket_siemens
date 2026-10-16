@@ -1,0 +1,97 @@
+{
+  "project_id": "proyecto_2_pantalla_3_2",
+  "nombre": "Pantalla 3",
+  "proyecto": "proyecto_2",
+  "version": 7,
+  "creado_en": "2026-10-12T16:24:06.122701Z",
+  "actualizado_en": "2026-10-12T16:24:21.529356Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1280,
+    "height": 760
+  },
+  "widgets": [
+    {
+      "id": "w_1791822252648_1",
+      "kind": "circle",
+      "name": "Círculo 1",
+      "x": 1115,
+      "y": 135,
+      "width": 100,
+      "height": 100,
+      "text": "Círculo",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "#cbd5e1",
+        "borderColor": "#94a3b8",
+        "borderWidth": 1,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791822255447_2",
+      "kind": "circle",
+      "name": "Círculo 2",
+      "x": 1106,
+      "y": 277,
+      "width": 100,
+      "height": 100,
+      "text": "Círculo",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "#cbd5e1",
+        "borderColor": "#94a3b8",
+        "borderWidth": 1,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791822258143_3",
+      "kind": "circle",
+      "name": "Círculo 3",
+      "x": 1103,
+      "y": 410,
+      "width": 100,
+      "height": 100,
+      "text": "Círculo",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "#cbd5e1",
+        "borderColor": "#94a3b8",
+        "borderWidth": 1,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

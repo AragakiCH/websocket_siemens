@@ -1,0 +1,21 @@
+{
+  "kind": "tanque-nivel",
+  "nombre": "Tanque de Nivel",
+  "html": "<!--\n  \"accepts\": [\"int\", \"double\"]  ->  cualquier magnitud numérica.\n\n  Del PLC al frontend los tipos se colapsan así:\n      REAL, LREAL          ->  \"double\"\n      INT, UINT, DINT...   ->  \"int\"\n      BOOL                 ->  \"bool\"\n      STRING               ->  \"string\"\n\n  Por eso se declara [\"int\",\"double\"] y no [\"real\"]: \"real\" no existe en el\n  frontend y el cargador rechazaría el ZIP.\n\n  ⚠️ OJO CON EL RANGO: --w-frac lo calcula el sistema con una heurística\n  (\"si el valor es <= 100, trátalo como porcentaje\"). Un sensor de 4-20 mA\n  llenaría el tanque solo hasta el 20 %. Todavía no se puede declarar el\n  rango real de la variable.\n-->\n<div class=\"tanque\">\n  <div class=\"cuerpo\">\n    <div class=\"liquido\"></div>\n    <div class=\"marcas\">\n      <span></span><span></span><span></span>\n    </div>\n  </div>\n  <span class=\"valor\">{{label}}</span>\n</div>\n",
+  "css": "/* ---------------------------------------------------------------\n   Nivel dibujado con --w-frac (0..1).\n\n   El truco es calc(): la altura del líquido es el porcentaje de llenado.\n\n       height: calc(var(--w-frac) * 100%);\n\n   Con --w-frac = 0.5 el tanque se llena a la mitad. Sin JavaScript.\n   --------------------------------------------------------------- */\n\n.tanque {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  gap: 6px;\n  width: 100%;\n  height: 100%;\n  padding: 6px;\n}\n\n.cuerpo {\n  position: relative;\n  flex: 1;\n  width: 100%;\n  overflow: hidden;\n\n  border: 3px solid var(--w-border-color);\n  border-radius: 10px 10px 16px 16px;\n  background: rgba(148, 163, 184, 0.12);\n}\n\n.liquido {\n  position: absolute;\n  left: 0;\n  right: 0;\n  bottom: 0;\n\n  height: calc(var(--w-frac) * 100%);\n  background: linear-gradient(180deg, var(--w-color), color-mix(in srgb, var(--w-color) 70%, black));\n  transition: height 0.3s ease;\n}\n\n/* Brillo en la superficie del líquido: lo que hace que parezca líquido y no\n   una barra de progreso girada. */\n.liquido::before {\n  content: '';\n  position: absolute;\n  top: 0;\n  left: 0;\n  right: 0;\n  height: 4px;\n  background: rgba(255, 255, 255, 0.45);\n}\n\n.marcas {\n  position: absolute;\n  inset: 0;\n  display: flex;\n  flex-direction: column;\n  justify-content: space-evenly;\n  pointer-events: none;\n}\n\n.marcas span {\n  height: 1px;\n  margin-left: 60%;\n  background: rgba(148, 163, 184, 0.5);\n}\n\n.valor {\n  font-size: var(--w-font-size);\n  font-weight: var(--w-bold);\n  color: var(--w-color);\n  white-space: nowrap;\n}\n\n/* Aviso de nivel alto: la clase la pone widget.js */\n.tanque.alto .valor { color: #ef4444; }\n",
+  "js": "// El CSS ya dibuja el nivel solo con --w-frac. El JavaScript se usa aquí\n// únicamente para lo que el CSS no puede hacer: decidir por umbral.\n//\n// Un widget puede perfectamente NO tener .js y reaccionar solo con las\n// variables CSS... salvo por el detalle del permiso de scripts. Ver el LEEME.\n\nwindow.onWidgetUpdate = function (w) {\n  var t = document.querySelector('.tanque');\n  if (!t) return;\n\n  // Por encima del 90 % el número se pone rojo.\n  t.classList.toggle('alto', w.frac > 0.9);\n};\n",
+  "meta": {
+    "kind": "tanque-nivel",
+    "label": "Tanque de Nivel",
+    "category": "Indicadores",
+    "defaultWidth": 130,
+    "defaultHeight": 190,
+    "accepts": [
+      "int",
+      "double"
+    ]
+  },
+  "creado_en": "2026-10-15T18:46:08.826678+00:00",
+  "actualizado_en": "2026-10-15T18:46:08.826678+00:00",
+  "creado_por": "operador01"
+}

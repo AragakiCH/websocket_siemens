@@ -61,6 +61,7 @@ import {
 } from '../../../../utils/aplicarCambio';
 import { WidgetRenderer } from '../../WidgetRenderer';
 import { ContextoEmbebido, esWidgetDeNavegacion } from './store';
+import { indiceDe } from '../../rendimiento';
 import { ContextoMapaTags } from '../faceplate/contexto';
 
 /** Cómo encaja el lienzo de la pantalla dentro del marco del panel. */
@@ -90,6 +91,54 @@ const enVuelo = new Map<string, Promise<SavedDesign | null>>();
 // un `project.updated` encima sin volver a pedir la pantalla: solo si el
 // evento es justo la versión siguiente. 0 o ausente = desconocida.
 const versiones = new Map<string, number>();
+
+/**
+ * Calienta la caché con esas pantallas, de una en una y sin estorbar.
+ *
+ * EL PROBLEMA QUE RESUELVE. La primera vez que se abre una sección, el
+ * panel tiene que PEDIR la pantalla al servidor, esperar, analizar el JSON y
+ * dibujarla de cero; una vista general con nueve Tarjetas de Acceso hace
+ * eso nueve veces a la vez nada más arrancar. Por eso el primer clic tarda
+ * y el segundo es instantáneo: la caché del módulo ya la tiene.
+ *
+ * Con esto la Vista Previa pide las pantallas del proyecto en segundo plano
+ * en cuanto pintó la suya —primero las que alguien referencia (menú,
+ * tarjetas, navegadores, faceplates), después el resto—, así que para
+ * cuando el operador pulsa, lo normal es que ya esté. Se piden en serie y
+ * en los ratos libres del navegador para no competir con el primer pintado.
+ *
+ * Las que ya están en caché no se vuelven a pedir: aquí no se revalida, eso
+ * lo hace cada panel al montarse (ver `usePantallaEmpotrada`).
+ */
+export function precargarPantallas(ids: string[]): void {
+  const pendientes = Array.from(new Set(ids.filter(Boolean))).filter(
+    (id) => !cache.has(id) && !enVuelo.has(id)
+  );
+  if (pendientes.length === 0) return;
+  const idle: (fn: () => void) => void =
+    typeof (window as any).requestIdleCallback === 'function'
+      ? (fn) => (window as any).requestIdleCallback(fn, { timeout: 1500 })
+      : (fn) => window.setTimeout(fn, 50);
+  const siguiente = () => {
+    const id = pendientes.shift();
+    if (!id) return;
+    if (cache.has(id)) {
+      siguiente();
+      return;
+    }
+    traer(id)
+      .catch(() => null)
+      .finally(() => idle(siguiente));
+  };
+  idle(siguiente);
+}
+
+/** Carga el código de este módulo y el de los símbolos antes de que hagan falta. */
+export function precargarModulos(): void {
+  // Las válvulas son un chunk aparte de ~450 KB: analizarlo por primera vez
+  // justo cuando se abre un sinóptico es medio segundo de pantalla en blanco.
+  void import('../simbolos/valvulas').catch(() => null);
+}
 
 async function traer(projectId: string): Promise<SavedDesign | null> {
   let pendiente = enVuelo.get(projectId);
@@ -403,17 +452,22 @@ export default function PantallaEmbebida({
    * panel de planta es peor que un hueco, porque nadie lo distingue de una
    * lectura real.
    */
-  const resolver = (variableId: string | null | undefined) => {
+  // `useCallback` y no una función nueva por render: `WidgetRenderer` cuelga
+  // de esta identidad sus `useMemo` (enlaces, dinámicas, funciones). Con una
+  // función nueva cada tick, cada widget de la pantalla empotrada rehacía
+  // todo eso en cada lectura del PLC aunque no le afectara.
+  const indice = useMemo(() => indiceDe(variables), [variables]);
+  const resolver = useCallback((variableId: string | null | undefined) => {
     if (!variableId) return undefined;
     if (variableId.startsWith('param:')) {
       // El parámetro puede apuntar a un elemento de receta: se traduce igual.
       const tag = idRealDeEnlace(mapaTags?.[variableId.slice('param:'.length)]);
-      return tag ? variables.find((v) => v.id === tag) : undefined;
+      return tag ? indice.get(tag) : undefined;
     }
     // `receta:…` -> el tag de ese elemento. Lo demás pasa tal cual.
     const real = idRealDeEnlace(variableId);
-    return real ? variables.find((v) => v.id === real) : undefined;
-  };
+    return real ? indice.get(real) : undefined;
+  }, [indice, mapaTags]);
 
   const cw = design?.canvas?.width ?? 0;
   const ch = design?.canvas?.height ?? 0;

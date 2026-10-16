@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "guardado_en": "2026-10-15T21:10:08.313678+00:00",
+  "variables": [
+    {
+      "nombre": "variable_01",
+      "tipo": "bool",
+      "descripcion": "prueba",
+      "unidad": "",
+      "minimo": null,
+      "maximo": null,
+      "valor": true,
+      "valor_inicial": false,
+      "retentiva": true,
+      "creado_en": "2026-10-15T18:47:18.530841+00:00",
+      "actualizado_en": "2026-10-15T18:47:19.751872+00:00"
+    },
+    {
+      "nombre": "bool1",
+      "tipo": "bool",
+      "descripcion": "",
+      "unidad": "",
+      "minimo": null,
+      "maximo": null,
+      "valor": false,
+      "valor_inicial": false,
+      "retentiva": true,
+      "creado_en": "2026-10-15T21:10:08.299607+00:00",
+      "actualizado_en": "2026-10-15T21:10:08.299607+00:00"
+    },
+    {
+      "nombre": "bool2",
+      "tipo": "bool",
+      "descripcion": "",
+      "unidad": "",
+      "minimo": null,
+      "maximo": null,
+      "valor": false,
+      "valor_inicial": false,
+      "retentiva": true,
+      "creado_en": "2026-10-15T21:10:08.303125+00:00",
+      "actualizado_en": "2026-10-15T21:10:08.303125+00:00"
+    },
+    {
+      "nombre": "bool3",
+      "tipo": "bool",
+      "descripcion": "",
+      "unidad": "",
+      "minimo": null,
+      "maximo": null,
+      "valor": false,
+      "valor_inicial": false,
+      "retentiva": true,
+      "creado_en": "2026-10-15T21:10:08.305124+00:00",
+      "actualizado_en": "2026-10-15T21:10:08.305124+00:00"
+    },
+    {
+      "nombre": "var1",
+      "tipo": "double",
+      "descripcion": "",
+      "unidad": "",
+      "minimo": null,
+      "maximo": null,
+      "valor": 0.0,
+      "valor_inicial": 0.0,
+      "retentiva": true,
+      "creado_en": "2026-10-15T21:10:08.310160+00:00",
+      "actualizado_en": "2026-10-15T21:10:08.310160+00:00"
+    },
+    {
+      "nombre": "var12",
+      "tipo": "double",
+      "descripcion": "",
+      "unidad": "",
+      "minimo": null,
+      "maximo": null,
+      "valor": 0.0,
+      "valor_inicial": 0.0,
+      "retentiva": true,
+      "creado_en": "2026-10-15T21:10:08.310160+00:00",
+      "actualizado_en": "2026-10-15T21:10:08.310160+00:00"
+    },
+    {
+      "nombre": "var17",
+      "tipo": "double",
+      "descripcion": "",
+      "unidad": "",
+      "minimo": null,
+      "maximo": null,
+      "valor": 0.0,
+      "valor_inicial": 0.0,
+      "retentiva": true,
+      "creado_en": "2026-10-15T21:10:08.312677+00:00",
+      "actualizado_en": "2026-10-15T21:10:08.312677+00:00"
+    },
+    {
+      "nombre": "var10",
+      "tipo": "double",
+      "descripcion": "",
+      "unidad": "",
+      "minimo": null,
+      "maximo": null,
+      "valor": 0.0,
+      "valor_inicial": 0.0,
+      "retentiva": true,
+      "creado_en": "2026-10-15T21:10:08.313678+00:00",
+      "actualizado_en": "2026-10-15T21:10:08.313678+00:00"
+    }
+  ]
+}

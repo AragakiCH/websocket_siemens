@@ -1,0 +1,18 @@
+{
+  "kind": "leyenda_lineas_colores",
+  "nombre": "LEYENDA LINEAS COLORES",
+  "html": "<div class=\"legend-widget\">\n  <svg\n    class=\"legend-svg\"\n    viewBox=\"0 0 960 104\"\n    preserveAspectRatio=\"xMidYMid meet\"\n    xmlns=\"http://www.w3.org/2000/svg\"\n    role=\"img\"\n    aria-label=\"Leyenda: Material/Fibra azul, Línea de vapor rojo y Condensado gris\"\n  >\n    <g class=\"legend-item\">\n      <line\n        class=\"legend-line legend-material\"\n        x1=\"28\"\n        y1=\"54\"\n        x2=\"84\"\n        y2=\"54\"\n      />\n      <text class=\"legend-text\" x=\"100\" y=\"54\">\n        Material/Fibra\n      </text>\n    </g>\n\n    <g class=\"legend-item\">\n      <line\n        class=\"legend-line legend-steam\"\n        x1=\"340\"\n        y1=\"54\"\n        x2=\"396\"\n        y2=\"54\"\n      />\n      <text class=\"legend-text\" x=\"412\" y=\"54\">\n        Línea de vapor\n      </text>\n    </g>\n\n    <g class=\"legend-item\">\n      <line\n        class=\"legend-line legend-condensate\"\n        x1=\"680\"\n        y1=\"54\"\n        x2=\"736\"\n        y2=\"54\"\n      />\n      <text class=\"legend-text\" x=\"752\" y=\"54\">\n        Condensado\n      </text>\n    </g>\n  </svg>\n</div>",
+  "css": ":root {\n  --legend-background: transparent;\n  --legend-text: #6C8193;\n\n  --legend-material: #0A638F;\n  --legend-steam: #930606;\n  --legend-condensate: #4E4E4E;\n}\n\nhtml,\nbody {\n  width: 100%;\n  height: 100%;\n  margin: 0;\n  padding: 0;\n  overflow: hidden;\n  background: transparent !important;\n}\n\n.legend-widget {\n  width: 100%;\n  height: 100%;\n  overflow: hidden;\n\n  background: var(--legend-background);\n  pointer-events: none;\n}\n\n.legend-svg {\n  display: block;\n  width: 100%;\n  height: 100%;\n\n  font-family: \"Segoe UI\", Arial, sans-serif;\n  shape-rendering: geometricPrecision;\n}\n\n.legend-line {\n  fill: none;\n  stroke-width: 7;\n  stroke-linecap: butt;\n}\n\n.legend-material {\n  stroke: var(--legend-material);\n}\n\n.legend-steam {\n  stroke: var(--legend-steam);\n}\n\n.legend-condensate {\n  stroke: var(--legend-condensate);\n}\n\n.legend-text {\n  fill: var(--legend-text);\n  font-size: 32px;\n  font-weight: 400;\n  dominant-baseline: middle;\n}",
+  "js": "\"use strict\";\n\n/*\n * Leyenda estática de las líneas de proceso.\n *\n * Material/Fibra: #0A638F\n * Línea de vapor: #930606\n * Condensado:     #4E4E4E\n *\n * No utiliza variables del PLC, animaciones\n * ni recursos externos.\n */",
+  "meta": {
+    "kind": "LEYENDA_LINEAS_COLORES",
+    "label": "LEYENDA LINEAS COLORES",
+    "category": "WIDGETS INDICADORES",
+    "defaultWidth": 800,
+    "defaultHeight": 87,
+    "accepts": []
+  },
+  "creado_en": "2026-10-15T21:10:08.169637+00:00",
+  "actualizado_en": "2026-10-15T21:10:08.169637+00:00",
+  "creado_por": ""
+}

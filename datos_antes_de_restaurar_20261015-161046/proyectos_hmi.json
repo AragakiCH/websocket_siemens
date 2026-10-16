@@ -1,0 +1,32 @@
+{
+  "proyectos": [
+    {
+      "proyecto_id": "principal",
+      "nombre": "Proyecto principal",
+      "creado_en": "",
+      "actualizado_en": "2026-09-10T17:13:57.470481Z",
+      "actualizado_por": ""
+    },
+    {
+      "proyecto_id": "proyecto_2",
+      "nombre": "Proyecto 2",
+      "creado_en": "2026-09-11T15:24:08.035939Z",
+      "actualizado_en": "2026-09-11T15:24:08.035939Z",
+      "actualizado_por": "operador01"
+    },
+    {
+      "proyecto_id": "proyecto_2_2",
+      "nombre": "Proyecto 2 (importado)",
+      "creado_en": "2026-09-11T16:34:27.840988Z",
+      "actualizado_en": "2026-09-11T16:34:27.840988Z",
+      "actualizado_por": "operador01"
+    },
+    {
+      "proyecto_id": "principal_2",
+      "nombre": "SDF",
+      "creado_en": "2026-10-15T21:10:07.787372Z",
+      "actualizado_en": "2026-10-15T21:10:07.787372Z",
+      "actualizado_por": ""
+    }
+  ]
+}

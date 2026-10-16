@@ -1,0 +1,45 @@
+{
+  "project_id": "principal_1_autefa_vista_general_01_copia",
+  "nombre": "2 Autefa Vista General 02",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-15T21:10:08.076992Z",
+  "actualizado_en": "2026-10-15T21:10:08.078992Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1791233597512_2",
+      "kind": "custom:2_autefa_vista_general_02",
+      "name": "AUTEFA / VISTA GENERAL 02 // Disposición del prensador, carro y levantador",
+      "x": 0,
+      "y": 0,
+      "width": 1610,
+      "height": 755,
+      "text": "2 Autefa Vista General 02",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

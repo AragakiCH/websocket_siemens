@@ -4,12 +4,14 @@
 // principal o una variable con nombre) se calculará con una expresión que
 // lee unos tags de entrada.
 //
-// QUÉ HAY Y QUÉ NO
+// QUÉ HAY
 //
-//   Por ahora solo se CONFIGURA y se guarda con el diseño: tags de entrada,
-//   variables internas y el texto de la expresión. Todavía no se evalúa: el
-//   widget sigue leyendo su variable de siempre. El cálculo en vivo es la
-//   siguiente fase, y por eso esto ya guarda todo lo que hará falta.
+//   Aquí, lo que se CONFIGURA y se guarda con el diseño: tags de entrada,
+//   variables internas y el código Python de la expresión. El cálculo en
+//   vivo lo hace `components/hmi/funcion/enVivo.ts` llamando al servidor
+//   (`POST /funciones/evaluar`, app/core/funciones_py.py), que es donde
+//   corre el Python y donde las internas conservan su valor entre
+//   evaluaciones.
 //
 // UNA FUNCIÓN POR SALIDA
 //

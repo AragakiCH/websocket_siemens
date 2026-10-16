@@ -1,0 +1,2434 @@
+{
+  "project_id": "principal_l3_receta_valv_arranque_1_copia_2",
+  "nombre": "L4 Receta Valv Arranque 1",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-15T21:10:08.132248Z",
+  "actualizado_en": "2026-10-15T21:10:08.133248Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1791413791822_10",
+      "kind": "custom:l4_receta_apertura_valvulas",
+      "name": "LÍNEA 4 / RECETA DE APERTURA DE VÁLVULAS//Configuración de la apertura por defecto de las válvulas durante el arranque",
+      "x": 0,
+      "y": 0,
+      "width": 1610,
+      "height": 755,
+      "text": "L4 Receta Válvula Arranque 1",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791933148231_236",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6",
+      "x": 332,
+      "y": 131,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:434",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933148231_237",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia",
+      "x": 599,
+      "y": 131,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:434",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933245858_238",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 2",
+      "x": 332,
+      "y": 162,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:435",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933245858_239",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 3",
+      "x": 599,
+      "y": 162,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:435",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933251481_240",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 4",
+      "x": 332,
+      "y": 193,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:436",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933251481_241",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 5",
+      "x": 599,
+      "y": 193,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:436",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933251481_242",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 6",
+      "x": 332,
+      "y": 224,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:437",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933251481_243",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 7",
+      "x": 599,
+      "y": 224,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:437",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933261599_244",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 8",
+      "x": 332,
+      "y": 254,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:438",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933261599_245",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 9",
+      "x": 599,
+      "y": 254,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:438",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933261599_246",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 10",
+      "x": 332,
+      "y": 285,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:439",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933261599_247",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 11",
+      "x": 599,
+      "y": 285,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:439",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933261599_248",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 12",
+      "x": 332,
+      "y": 316,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:440",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933261599_249",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 13",
+      "x": 599,
+      "y": 316,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:440",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933261599_250",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 14",
+      "x": 332,
+      "y": 347,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:441",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933261599_251",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 15",
+      "x": 599,
+      "y": 347,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:441",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_252",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 16",
+      "x": 332,
+      "y": 377,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:442",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_253",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 17",
+      "x": 599,
+      "y": 377,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:442",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_254",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 18",
+      "x": 332,
+      "y": 408,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:443",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_255",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 19",
+      "x": 599,
+      "y": 408,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:443",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_256",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 20",
+      "x": 332,
+      "y": 439,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:444",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_257",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 21",
+      "x": 599,
+      "y": 439,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:444",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_258",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 22",
+      "x": 332,
+      "y": 469,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:445",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_259",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 23",
+      "x": 599,
+      "y": 469,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:445",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_260",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 24",
+      "x": 332,
+      "y": 499,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:446",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_261",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 25",
+      "x": 599,
+      "y": 499,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:446",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_262",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 26",
+      "x": 332,
+      "y": 530,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:447",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_263",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 27",
+      "x": 599,
+      "y": 530,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:447",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_264",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 28",
+      "x": 332,
+      "y": 561,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:448",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_265",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 29",
+      "x": 599,
+      "y": 561,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:448",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_266",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 30",
+      "x": 332,
+      "y": 592,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:449",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933275910_267",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 31",
+      "x": 599,
+      "y": 592,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:449",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933312406_268",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 32",
+      "x": 332,
+      "y": 623,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:450",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933312406_269",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 33",
+      "x": 599,
+      "y": 623,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:450",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933312406_270",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 34",
+      "x": 332,
+      "y": 653,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:451",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933312406_271",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 35",
+      "x": 599,
+      "y": 653,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:451",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_272",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 36",
+      "x": 1112,
+      "y": 131,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:452",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_273",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 37",
+      "x": 1379,
+      "y": 131,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:452",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_274",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 38",
+      "x": 1112,
+      "y": 162,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:453",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_275",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 39",
+      "x": 1379,
+      "y": 162,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:453",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_276",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 40",
+      "x": 1112,
+      "y": 193,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:454",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_277",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 41",
+      "x": 1379,
+      "y": 193,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:454",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_278",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 42",
+      "x": 1112,
+      "y": 224,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:455",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_279",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 43",
+      "x": 1379,
+      "y": 224,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:455",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_280",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 44",
+      "x": 1112,
+      "y": 254,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:456",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_281",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 45",
+      "x": 1379,
+      "y": 254,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:456",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_282",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 46",
+      "x": 1112,
+      "y": 285,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:457",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_283",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 47",
+      "x": 1379,
+      "y": 285,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:457",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_284",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 48",
+      "x": 1112,
+      "y": 316,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:458",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_285",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 49",
+      "x": 1379,
+      "y": 316,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:458",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_286",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 50",
+      "x": 1112,
+      "y": 347,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:459",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_287",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 51",
+      "x": 1379,
+      "y": 347,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:459",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_288",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 52",
+      "x": 1112,
+      "y": 377,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:460",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_289",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 53",
+      "x": 1379,
+      "y": 377,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:460",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_290",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 54",
+      "x": 1112,
+      "y": 408,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:461",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_291",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 55",
+      "x": 1379,
+      "y": 408,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:461",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_292",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 56",
+      "x": 1112,
+      "y": 439,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:462",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_293",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 57",
+      "x": 1379,
+      "y": 439,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:462",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_294",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 58",
+      "x": 1112,
+      "y": 469,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:463",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_295",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 59",
+      "x": 1379,
+      "y": 469,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:463",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_296",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 60",
+      "x": 1112,
+      "y": 499,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:464",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_297",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 61",
+      "x": 1379,
+      "y": 499,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:464",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_298",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 62",
+      "x": 1112,
+      "y": 530,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:465",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791933349853_299",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 63",
+      "x": 1379,
+      "y": 530,
+      "width": 189,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:22:465",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791934942904_300",
+      "kind": "custom:receta-contador",
+      "name": "Contador de recetas 245",
+      "x": 1404,
+      "y": 12,
+      "width": 203,
+      "height": 64,
+      "text": "Contador de recetas",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791934942904_301",
+      "kind": "custom:receta-guardar",
+      "name": "Guardar receta 230",
+      "x": 180,
+      "y": 78,
+      "width": 155,
+      "height": 37,
+      "text": "Guardar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "enlaces": {},
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791934942904_302",
+      "kind": "custom:receta-nueva",
+      "name": "Nueva receta 227",
+      "x": 28,
+      "y": 78,
+      "width": 145,
+      "height": 37,
+      "text": "Nueva receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791934942904_303",
+      "kind": "custom:receta-cargar",
+      "name": "Cargar receta 232",
+      "x": 341,
+      "y": 78,
+      "width": 148,
+      "height": 37,
+      "text": "Cargar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791934942904_304",
+      "kind": "custom:receta-eliminar",
+      "name": "Eliminar receta 235",
+      "x": 1423,
+      "y": 78,
+      "width": 158,
+      "height": 37,
+      "text": "Eliminar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    },
+    {
+      "id": "w_1791935304278_323",
+      "kind": "rectangle",
+      "name": "Rectángulo 236",
+      "x": 15,
+      "y": 706,
+      "width": 145,
+      "height": 36,
+      "text": "Rectángulo",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "#cbd5e1",
+        "borderColor": "#94a3b8",
+        "borderWidth": 1,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791935311025_324",
+      "kind": "custom:receta-aplicar",
+      "name": "Aplicar todos 233",
+      "x": 15,
+      "y": 706,
+      "width": 145,
+      "height": 36,
+      "text": "Aplicar todos",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 22,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS"
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

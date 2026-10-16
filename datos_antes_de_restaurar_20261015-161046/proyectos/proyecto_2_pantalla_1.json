@@ -1,0 +1,210 @@
+{
+  "project_id": "proyecto_2_pantalla_1",
+  "nombre": "Pantalla 1",
+  "proyecto": "proyecto_2",
+  "version": 65,
+  "creado_en": "2026-09-11T15:24:08.037870Z",
+  "actualizado_en": "2026-10-12T19:41:12.702563Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 1280,
+    "height": 760
+  },
+  "widgets": [
+    {
+      "id": "w_1789139163464_2",
+      "kind": "custom:sidebar-navegacion",
+      "name": "Menú Lateral 2",
+      "x": 1,
+      "y": 0,
+      "width": 258,
+      "height": 760,
+      "text": "Menú Lateral",
+      "style": {
+        "color": "#009999",
+        "background": "transparent",
+        "borderColor": "#94a3b8",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "grupo": "principal",
+        "secciones": [
+          {
+            "id": "general",
+            "label": "General",
+            "tipo": "nivel",
+            "padre": ""
+          },
+          {
+            "id": "inicio",
+            "label": "Inicio",
+            "tipo": "seccion",
+            "padre": "general"
+          },
+          {
+            "id": "detalles",
+            "label": "Detalles",
+            "tipo": "seccion",
+            "pantalla": "proyecto_2_pantalla_2",
+            "padre": "general"
+          },
+          {
+            "id": "seccion-4",
+            "label": "Sección 4",
+            "tipo": "seccion",
+            "padre": "general",
+            "pantalla": "proyecto_2_pantalla_3_2"
+          }
+        ]
+      }
+    },
+    {
+      "id": "w_1789139167255_3",
+      "kind": "custom:pantalla-screen",
+      "name": "Panel de Sección 3",
+      "x": 261,
+      "y": 0,
+      "width": 1019,
+      "height": 760,
+      "text": "Panel de Sección",
+      "style": {
+        "color": "#009999",
+        "background": "transparent",
+        "borderColor": "#94a3b8",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "grupo": "principal",
+        "mostrarCabecera": true,
+        "ajuste": "ajustar",
+        "botones": [
+          {
+            "id": "bmv5idu1lrkjl",
+            "label": "",
+            "pantalla": "proyecto_2_pantalla_4"
+          }
+        ],
+        "posicionBotones": "cabecera",
+        "botonOrigen": true,
+        "mostrarNavegacion": true
+      },
+      "dinamicas": []
+    },
+    {
+      "id": "w_1789140169064_5",
+      "kind": "gaugeLinear",
+      "name": "Medidor Lineal 5",
+      "x": 288,
+      "y": 95,
+      "width": 200,
+      "height": 64,
+      "text": "Medidor Lineal",
+      "style": {
+        "color": "#009999",
+        "background": "transparent",
+        "borderColor": "#94a3b8",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "detalles"
+    },
+    {
+      "id": "w_1791829181429_1",
+      "kind": "custom:boton-panel",
+      "name": "Botón de Pantalla 1",
+      "x": 710,
+      "y": 89,
+      "width": 150,
+      "height": 40,
+      "text": "Botón de Pantalla",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "seccion-4",
+      "config": {
+        "grupo": "principal",
+        "modo": "abrir",
+        "pantalla": "proyecto_2_pantalla_4",
+        "icono": true
+      }
+    },
+    {
+      "id": "w_1791830541983_1",
+      "kind": "custom:navegador-panel",
+      "name": "navegador",
+      "x": 1165,
+      "y": 2,
+      "width": 110,
+      "height": 36,
+      "text": "Navegador de Pantallas",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "inicio",
+      "config": {
+        "grupo": "principal",
+        "pantallas": [
+          "proyecto_2_pantalla_4"
+        ],
+        "mostrarInicio": true,
+        "mostrarNombre": false
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

@@ -5,7 +5,12 @@ import { HmiWidget } from "../../models/widget";
 import { PlcVariable } from "../../models/plc";
 import { formatValue, valueFraction, isTruthy } from "../../utils/format";
 import { leerAccion, tieneAccion, ejecutarAccion } from "./acciones";
-import { resolverEnlaces } from "../../utils/enlaces";
+import { resolverEnlaces, leerEnlaces } from "../../utils/enlaces";
+import { leerFunciones } from "../../utils/funciones";
+import {
+  useEsMiniatura,
+  KINDS_CAROS_EN_MINIATURA,
+} from "./rendimiento";
 import { evaluarDinamicas, aplicarDinamicas } from "../../utils/dinamicas";
 import { ContextoMapaTags } from "./custom/faceplate/contexto";
 import { useAppStore } from "../../context/AppStore";
@@ -13,6 +18,7 @@ import { customByKind, zipByKind, zipCatalogoListo } from "./custom/registry";
 import { estiloDeParte } from "./partes";
 import { HtmlWidgetRenderer } from "./HtmlWidgetRenderer";
 import { leerConfigImagen } from "./inspectores";
+import { useFuncionesEnVivo } from "./funcion/enVivo";
 
 interface Props {
   widget: HmiWidget;
@@ -37,25 +43,37 @@ interface Props {
 }
 
 // Pure visual renderer for a single HMI widget. Reused by canvas + preview.
-export function WidgetRenderer({
+//
+// Va envuelto en `React.memo` con un comparador propio (al final del
+// fichero): con cientos de widgets, redibujarlos todos en cada lectura del
+// PLC era el grueso del trabajo de cada tick. Ahora uno se redibuja solo si
+// cambió su diseño o alguna de LAS variables que usa.
+function WidgetRendererBase({
   widget,
-  variable,
+  variable: variableLeida,
   interactivo = false,
   resolver,
 }: Props) {
+  // Dentro de una Tarjeta de Acceso: los widgets caros (tendencia, alarmas,
+  // recetas) se cambian por un marcador. Ver `rendimiento.ts`.
+  const miniatura = useEsMiniatura();
   // Las variables con nombre. `useMemo` porque esto corre en cada tick de
-
   // valores y por cada widget de la pantalla; sin él se reharía la búsqueda
-
   // entera aunque no hubiera cambiado ni el widget ni las lecturas.
-
-  const enlacesResueltos = React.useMemo(
-
+  const enlacesLeidos = React.useMemo(
     () => (resolver ? resolverEnlaces(widget, resolver) : undefined),
-
     [widget, resolver]
-
   );
+
+  // «MODO FUNCIÓN». Si el widget calcula alguna salida con código Python,
+  // aquí se cambia lo leído por lo calculado: la principal y/o las variables
+  // con nombre. Todo lo de abajo —dinámicas, acciones, el dibujo— ve la
+  // `PlcVariable` calculada y no se entera de que la escribió Python. Sin
+  // función configurada devuelve exactamente lo que entró (mismos objetos),
+  // así que el camino de un widget normal no cambia. Ver funcion/enVivo.ts.
+  const calculado = useFuncionesEnVivo(widget, variableLeida, enlacesLeidos, resolver);
+  const variable = calculado.variable;
+  const enlacesResueltos = calculado.enlaces;
 
   /**
    * El aspecto que mandan las dinámicas, y el widget ya repintado con él.
@@ -170,6 +188,27 @@ export function WidgetRenderer({
   };
 
   const content = () => {
+    // En miniatura, lo caro se dibuja como una caja con su nombre. Una
+    // tendencia pediría su histórico y una lista de alarmas consultaría al
+    // servidor — nueve tarjetas con eso dentro es lo que congelaba la vista
+    // general al abrirla. (Los ZIP hacen lo propio en HtmlWidgetRenderer.)
+    if (miniatura && KINDS_CAROS_EN_MINIATURA.has(widget.kind)) {
+      return (
+        <div
+          title={widget.name}
+          style={{
+            width: "100%", height: "100%", boxSizing: "border-box",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            borderRadius: 8, border: "1px dashed rgba(148,163,184,0.45)",
+            background: "rgba(148,163,184,0.08)", color: "rgba(100,116,139,0.8)",
+            fontSize: 11, overflow: "hidden", textAlign: "center", padding: 4,
+          }}
+        >
+          {widget.name || customByKind(widget.kind)?.label || widget.kind}
+        </div>
+      );
+    }
+
     // 👇 primero checa si es custom TSX, si sí lo delega al registry
     const custom = customByKind(widget.kind);
     if (custom) {
@@ -841,3 +880,51 @@ function MiniChart({ color, frac }: { color: string; frac: number }) {
     </div>
   );
 }
+
+// ─── Memo ────────────────────────────────────────────────────────
+
+/**
+ * Qué ids de variable usa un widget, además de la principal (que llega ya
+ * resuelta en `variable`): sus variables con nombre, el tag de su acción
+ * (que «alternar» lee antes de escribir) y las entradas de sus funciones.
+ */
+function idsQueUsa(widget: HmiWidget): string[] {
+  const ids: string[] = Object.values(leerEnlaces(widget));
+  const accion = leerAccion(widget.config);
+  if (accion.tag) ids.push(accion.tag);
+  const f = leerFunciones(widget);
+  if (f.activo) {
+    for (const salida of Object.values(f.porSalida)) {
+      for (const e of salida.entradas) if (e.variableId) ids.push(e.variableId);
+    }
+  }
+  return ids;
+}
+
+/**
+ * ¿Se puede saltar el redibujado?
+ *
+ * Mismo diseño (el objeto `widget` cambia cuando el Diseñador lo toca),
+ * misma variable principal (los objetos son estables mientras el valor no
+ * cambie: ver `toPlcVariables`), mismo modo, y cada variable que el widget
+ * usa resuelve al MISMO objeto con el resolutor nuevo que con el viejo.
+ *
+ * El resolutor cambia de identidad en cada lectura; por eso no se compara
+ * él sino lo que devuelve para lo que este widget necesita. Y como se
+ * compara TODO lo que el widget lee —incluido el tag de la acción—, cuando
+ * se salta el redibujado el `pulsar()` que quedó en el cierre anterior ve
+ * exactamente los mismos valores que vería uno nuevo.
+ */
+function iguales(a: Props, b: Props): boolean {
+  if (a.widget !== b.widget) return false;
+  if (a.variable !== b.variable) return false;
+  if (a.interactivo !== b.interactivo || a.live !== b.live) return false;
+  if (a.resolver === b.resolver) return true;
+  if (!a.resolver || !b.resolver) return false;
+  for (const id of idsQueUsa(b.widget)) {
+    if (a.resolver(id) !== b.resolver(id)) return false;
+  }
+  return true;
+}
+
+export const WidgetRenderer = React.memo(WidgetRendererBase, iguales);

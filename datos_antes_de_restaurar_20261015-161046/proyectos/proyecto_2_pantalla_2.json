@@ -1,0 +1,41 @@
+{
+  "project_id": "proyecto_2_pantalla_2",
+  "nombre": "Pantalla 2",
+  "proyecto": "proyecto_2",
+  "version": 2,
+  "creado_en": "2026-09-11T15:24:08.050436Z",
+  "actualizado_en": "2026-09-11T15:24:08.053450Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 1280,
+    "height": 760
+  },
+  "widgets": [
+    {
+      "id": "w_1789139296996_4",
+      "kind": "custom:transportador-rodillos",
+      "name": "Transportador de Rodillos 4",
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 760,
+      "text": "Transportador de Rodillos",
+      "style": {
+        "color": "#009999",
+        "background": "transparent",
+        "borderColor": "#94a3b8",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    }
+  ]
+}

@@ -29,8 +29,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import (ai_routes, alarm_routes, auth_routes, categoria_routes,
                      crud_routes, db_routes, escritura_routes, export_routes,
-                     grupo_routes, historian_routes, internas_routes,
-                     lock_routes, migracion_routes, project_routes,
+                     funciones_routes, grupo_routes, historian_routes,
+                     internas_routes, lock_routes, migracion_routes, project_routes,
                      proyecto_routes, rest_routes, runtime_routes,
                      sistema_routes, tema_routes, variables_routes,
                      websocket_routes, widget_routes)
@@ -562,6 +562,9 @@ app.include_router(categoria_routes.router)
 app.include_router(grupo_routes.router)
 app.include_router(escritura_routes.router)
 app.include_router(variables_routes.router)
+# «Modo función» de los widgets: código Python evaluado en el servidor
+# (ver app/core/funciones_py.py).
+app.include_router(funciones_routes.router)
 app.include_router(historian_routes.router)
 app.include_router(alarm_routes.router)
 app.include_router(export_routes.router)

@@ -1,0 +1,99 @@
+{
+  "project_id": "principal",
+  "nombre": "HMI Principal",
+  "version": 29,
+  "actualizado_en": "2026-09-11T15:05:41.701724Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 1280,
+    "height": 760
+  },
+  "widgets": [
+    {
+      "id": "w_1788979369004_1",
+      "kind": "custom:sidebar-navegacion",
+      "name": "Menú Lateral 1",
+      "x": 1,
+      "y": 0,
+      "width": 260,
+      "height": 760,
+      "text": "Menú Lateral",
+      "style": {
+        "color": "#009999",
+        "background": "transparent",
+        "borderColor": "#94a3b8",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "grupo": "principal",
+        "secciones": [
+          {
+            "id": "general",
+            "label": "General",
+            "tipo": "nivel"
+          },
+          {
+            "id": "inicio",
+            "label": "Inicio",
+            "tipo": "seccion"
+          },
+          {
+            "id": "detalles",
+            "label": "Detalles",
+            "tipo": "seccion",
+            "pantalla": "pantalla_2"
+          },
+          {
+            "id": "graficos",
+            "label": "Gráficos",
+            "tipo": "seccion",
+            "pantalla": "pantalla_3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "w_1788979376695_2",
+      "kind": "custom:pantalla-screen",
+      "name": "Panel de Sección 2",
+      "x": 264,
+      "y": 1.99993896484375,
+      "width": 1016,
+      "height": 758.0000610351562,
+      "text": "Panel de Sección",
+      "style": {
+        "color": "#009999",
+        "background": "transparent",
+        "borderColor": "#94a3b8",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "grupo": "principal",
+        "mostrarCabecera": true,
+        "ajuste": "ajustar"
+      }
+    }
+  ],
+  "creado_en": "",
+  "proyecto": "principal"
+}

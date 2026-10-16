@@ -1,0 +1,16 @@
+[
+  {
+    "query_id": "por_maquina",
+    "db_id": "prod",
+    "nombre": "Piezas por máquina",
+    "sql": "SELECT maquina, SUM(piezas) AS total FROM produccion WHERE fecha >= :desde GROUP BY maquina ORDER BY total DESC",
+    "parametros": {
+      "desde": {
+        "tipo": "string",
+        "defecto": "2026-01-01"
+      }
+    },
+    "limite": 500,
+    "descripcion": ""
+  }
+]

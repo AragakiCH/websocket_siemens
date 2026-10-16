@@ -1,0 +1,48 @@
+{
+  "project_id": "principal_6_autefa_transportador_copia",
+  "nombre": "7 Autefa Carro Transportador",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-15T21:10:08.088585Z",
+  "actualizado_en": "2026-10-15T21:10:08.089697Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 920,
+    "height": 642
+  },
+  "widgets": [
+    {
+      "id": "w_1791397349638_1",
+      "kind": "custom:7_autefa_carro_transportador",
+      "name": "AUTEFA / CARRO TRANSPORTADOR // Vistas frontal y superior",
+      "x": 0,
+      "y": 0,
+      "width": 920,
+      "height": 642,
+      "text": "7 Autefa Carro Transportador",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "interno|var_5",
+      "vista": "",
+      "enlaces": {
+        "var1": "interno|var_3"
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

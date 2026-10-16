@@ -1,0 +1,21 @@
+{
+  "kind": "lectura_status_linea",
+  "nombre": "LECTURA STATUS LINEA",
+  "html": "<div class=\"status-widget\">\n  <div class=\"status-frame\">\n    <span class=\"status-label\">Estado de línea</span>\n\n    <span\n      class=\"status-value\"\n      role=\"status\"\n      aria-label=\"Estado de línea: Sin señal\"\n    >Sin señal</span>\n  </div>\n</div>",
+  "css": ":root {\n  --status-background: #F7F9FB;\n  --status-border: #CBD5E1;\n  --status-text-color: #527DA5;\n}\n\nhtml,\nbody {\n  width: 100%;\n  height: 100%;\n  margin: 0;\n  padding: 0;\n  overflow: hidden;\n  background: transparent !important;\n}\n\n.status-widget,\n.status-widget * {\n  box-sizing: border-box;\n}\n\n.status-widget {\n  width: 100%;\n  height: 100%;\n  padding: 3px 5px;\n  overflow: hidden;\n\n  font-family: \"Segoe UI\", Arial, sans-serif;\n  background: transparent;\n  pointer-events: none;\n  opacity: var(--w-opacity, 1);\n}\n\n.status-frame {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n\n  width: 100%;\n  height: 100%;\n  padding: 0 15px;\n  overflow: hidden;\n\n  border: 1px solid var(--status-border);\n  border-radius: 6px;\n  background: var(--status-background);\n}\n\n.status-label {\n  flex: 0 1 auto;\n  min-width: 0;\n  max-width: 55%;\n\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n\n  color: var(--status-text-color);\n  font-size: 14px;\n  font-weight: 400;\n  line-height: 1.2;\n}\n\n.status-value {\n  display: block;\n  flex: 0 1 auto;\n  min-width: 0;\n\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  text-align: right;\n\n  color: var(--status-text-color);\n  font-size: 18px;\n  font-weight: 400;\n  line-height: 1.2;\n}",
+  "js": "\"use strict\";\n\n(function () {\n  /*\n   * Edita estos textos para cambiar los estados.\n   */\n  const STATES = new Map([\n    [0, \"Sin señal\"],\n    [1, \"Detenida\"],\n    [2, \"En marcha\"],\n    [3, \"Alarma\"]\n  ]);\n\n  let valueElement = null;\n  let lastUpdate = null;\n\n  function render(w) {\n    if (!valueElement) return;\n\n    const raw = w ? w.value : null;\n    let numericValue = NaN;\n\n    if (typeof raw === \"number\") {\n      numericValue = raw;\n    } else if (\n      typeof raw === \"string\" &&\n      raw.trim() !== \"\"\n    ) {\n      numericValue = Number(raw);\n    }\n\n    let text = \"Sin señal\";\n\n    if (Number.isFinite(numericValue)) {\n      /*\n       * Solo se aceptan coincidencias exactas:\n       * un valor como 2.5 no se convierte en 2.\n       */\n      text = STATES.has(numericValue)\n        ? STATES.get(numericValue)\n        : \"Desconocido\";\n    }\n\n    valueElement.textContent = text;\n\n    valueElement.setAttribute(\n      \"aria-label\",\n      \"Estado de línea: \" + text\n    );\n  }\n\n  /* Recibe las actualizaciones de la variable del PLC */\n  window.onWidgetUpdate = function (w) {\n    lastUpdate = w;\n    render(w);\n  };\n\n  function initialize() {\n    valueElement = document.querySelector(\".status-value\");\n\n    if (!valueElement) return;\n\n    render(lastUpdate || window.WIDGET || null);\n  }\n\n  if (document.readyState === \"loading\") {\n    document.addEventListener(\n      \"DOMContentLoaded\",\n      initialize,\n      { once: true }\n    );\n  } else {\n    initialize();\n  }\n})();",
+  "meta": {
+    "kind": "LECTURA_STATUS_LINEA",
+    "label": "LECTURA STATUS LINEA",
+    "category": "WIDGETS INDICADORES",
+    "defaultWidth": 410,
+    "defaultHeight": 65,
+    "accepts": [
+      "int",
+      "double"
+    ]
+  },
+  "creado_en": "2026-10-15T21:10:08.168595+00:00",
+  "actualizado_en": "2026-10-15T21:10:08.168595+00:00",
+  "creado_por": ""
+}

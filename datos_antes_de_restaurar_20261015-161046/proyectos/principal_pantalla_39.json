@@ -1,0 +1,45 @@
+{
+  "project_id": "principal_pantalla_39",
+  "nombre": "5.7",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-15T21:10:07.987110Z",
+  "actualizado_en": "2026-10-15T21:10:07.987110Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1280,
+    "height": 760
+  },
+  "widgets": [
+    {
+      "id": "w_1789486788090_10",
+      "kind": "custom:l5_7_seca_secc_3",
+      "name": "L5_7_SECA_SECC_3 10",
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 760,
+      "text": "L5_7_SECA_SECC_3",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

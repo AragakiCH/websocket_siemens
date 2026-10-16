@@ -1,0 +1,5 @@
+Los datos de PsiCore se movieron a:
+/sessions/awesome-magical-bell/tmp/tmpcvk0ge5m
+
+Fecha: 2026-09-10T15:37:45.914095+00:00
+Esta carpeta ya NO la usa la aplicación. Se conserva como respaldo; puedes borrarla cuando compruebes que todo va bien.

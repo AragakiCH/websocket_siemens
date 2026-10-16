@@ -1,0 +1,46 @@
+{
+  "project_id": "principal_l3_arranque_motores_copia",
+  "nombre": "L3 Reporte",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-15T21:10:08.071991Z",
+  "actualizado_en": "2026-10-15T21:10:08.073991Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1790810971539_2",
+      "kind": "custom:l3_control_calidad_cinta_continua",
+      "name": "LÍNEA 3 / CONTROL DE CALIDAD CINTA CONTINUA//Cinta continua, parámetros de proceso y resultados de los ensayos",
+      "x": 0,
+      "y": 0,
+      "width": 1610,
+      "height": 755,
+      "text": "L3 Reporte",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "enlaces": {}
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

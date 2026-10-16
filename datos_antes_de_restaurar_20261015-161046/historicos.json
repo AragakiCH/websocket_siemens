@@ -1,0 +1,22 @@
+[
+  {
+    "grupo_id": "proceso",
+    "db_id": "local",
+    "tags": [],
+    "tabla": "plc_prg",
+    "nombre": "proceso",
+    "activo": true,
+    "banda_muerta": 0.01,
+    "intervalo_min_ms": 0
+  },
+  {
+    "grupo_id": "g1",
+    "db_id": "e2e",
+    "tags": [],
+    "tabla": "historico_tags",
+    "nombre": "g1",
+    "activo": true,
+    "banda_muerta": 0.0,
+    "intervalo_min_ms": 0
+  }
+]

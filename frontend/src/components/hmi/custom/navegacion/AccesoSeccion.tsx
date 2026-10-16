@@ -64,6 +64,7 @@ import {
 } from './store';
 import { CampoGrupo, AvisoVistaPropia } from './inspector';
 import { estiloDeParte } from '../../partes';
+import { ContextoMiniatura, usarTurno } from '../../rendimiento';
 
 /** Ver la nota del mismo `lazy()` en PantallaScreen: rompe un ciclo de imports. */
 const PantallaEmbebida = lazy(() => import('./PantallaEmbebida'));
@@ -118,6 +119,12 @@ function Acceso({ widget, interactivo }: RenderCtx) {
   const soloVista = asignada ? undefined : cfg.seccion || undefined;
 
   const titulo = destino?.label || destino?.id || 'Sin destino';
+
+  // La miniatura se monta cuando la cola le da turno, no todas a la vez:
+  // una vista general con nueve tarjetas montaba nueve pantallas de golpe
+  // y la vista entera se quedaba en blanco hasta que acababan. Por turnos,
+  // la pantalla principal pinta primero y las tarjetas van llegando.
+  const turno = usarTurno();
 
   const ir = () => {
     // En el Diseñador NO navega: ahí el clic sirve para seleccionar la
@@ -233,7 +240,7 @@ function Acceso({ widget, interactivo }: RenderCtx) {
           pointerEvents: 'none',
         }}
       >
-        {pantalla && !embebido ? (
+        {pantalla && !embebido && turno ? (
           <Suspense
             fallback={
               <div
@@ -252,14 +259,22 @@ function Acceso({ widget, interactivo }: RenderCtx) {
               </div>
             }
           >
-            <PantallaEmbebida
-              key={`${pantalla}|${soloVista ?? ''}`}
-              projectId={pantalla}
-              modo="ajustar"
-              interactivo={false}
-              soloVista={soloVista}
-            />
+            {/* Dentro de una miniatura los widgets caros se dibujan como
+                marcador (ZIP, tendencias, alarmas, recetas): esto es para
+                reconocer la pantalla, no para operarla. Ver rendimiento.ts. */}
+            <ContextoMiniatura.Provider value>
+              <PantallaEmbebida
+                key={`${pantalla}|${soloVista ?? ''}`}
+                projectId={pantalla}
+                modo="ajustar"
+                interactivo={false}
+                soloVista={soloVista}
+              />
+            </ContextoMiniatura.Provider>
           </Suspense>
+        ) : pantalla && !embebido && !turno ? (
+          // Esperando turno: la caja vacía, sin mensaje. Dura milisegundos.
+          <div style={{ height: '100%' }} />
         ) : (
           <div
             style={{

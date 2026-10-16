@@ -1,0 +1,45 @@
+{
+  "project_id": "principal_4_10_copia",
+  "nombre": "5.1",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-15T21:10:07.976082Z",
+  "actualizado_en": "2026-10-15T21:10:07.977083Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1280,
+    "height": 760
+  },
+  "widgets": [
+    {
+      "id": "w_1789483489396_1",
+      "kind": "custom:l5_1_lava_secc_1",
+      "name": "L5_1_LAVA_SECC_1 1",
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 760,
+      "text": "L5_1_LAVA_SECC_1",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

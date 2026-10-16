@@ -34,6 +34,7 @@
 // colocarlo.
 // =========================================================================
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { usarTurno } from './rendimiento';
 import type { HmiWidget, WidgetStyle } from '../../models/widget';
 import type { PlcVariable } from '../../models/plc';
 import type { ZipWidget } from '../../services/zipWidgetLoader';
@@ -104,6 +105,25 @@ export function HtmlWidgetRenderer({
   const rawValue = variable?.value ?? '';
   const hasJs = zipWidget.js.length > 0;
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // ── CUÁNDO SE CONSTRUYE EL IFRAME ──────────────────────────────
+  //
+  // No al montar el componente, sino cuando la cola de `rendimiento.ts` le
+  // da turno. Un iframe es un documento entero (HTML + CSS + JS del ZIP +
+  // nuestro puente) que el navegador construye en el hilo principal; una
+  // pantalla con treinta de estos, montados de golpe, se queda en blanco
+  // un buen rato y no atiende clics. Por turnos, lo ligero de la pantalla
+  // aparece ya y los iframes van llegando de dos en dos sin bloquear.
+  //
+  // En una MINIATURA (Tarjeta de Acceso) también se construye —el dibujo
+  // del ZIP ES la miniatura cuando una pantalla entera es un ZIP, y sin él
+  // la tarjeta salía como una caja gris—, pero igual que aquí: por turnos.
+  // Lo que congelaba la vista general no era que las tarjetas tuvieran ZIP,
+  // sino que los nueve se montaran en el mismo instante. (El contexto de
+  // miniatura lo usan tendencias, alarmas y recetas, que sí consultan al
+  // servidor; ver WidgetRenderer.)
+  const turno = usarTurno();
+  const montarIframe = turno;
 
   /**
    * El widget tiene una capa a pantalla completa abierta (un modal).
@@ -599,7 +619,15 @@ ${userScript}
   }, [enlaces, rawValue, on, frac, label, widget.name,
       style.color, style.background, style.borderColor,
       style.fontSize, style.bold, style.opacity,
-      clicable, interactivo, escrituraOk, unidad]);
+      clicable, interactivo, escrituraOk, unidad,
+      // El iframe puede no existir todavía cuando corre la primera vez (ver
+      // `montarIframe`): al aparecer hay que volver a mandarle los datos.
+      montarIframe]);
+
+  if (!montarIframe) {
+    // Esperando turno: la caja vacía. Dura unas decenas de milisegundos.
+    return <div title={zipWidget.meta.label} style={{ width: '100%', height: '100%' }} />;
+  }
 
   return (
     <iframe

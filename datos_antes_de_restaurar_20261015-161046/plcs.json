@@ -1,0 +1,24 @@
+[
+  {
+    "endpoint": "opc.tcp://192.168.100.31:4840",
+    "host": "192.168.100.31",
+    "port": 4840,
+    "nombre": "",
+    "vendor": "rexroth",
+    "usuario": "boschrexroth",
+    "password": "enc:gAAAAABqkSdnD2LiXQH8NdyuBqjiixT9j2yD6p_QAiJYDPHU8MzVVai78UoVpc5Iz1fWmIzcDyfY-zwSRlPzFRYrWnvX1a1_NA==",
+    "app": "Application",
+    "programa": "DB"
+  },
+  {
+    "endpoint": "opc.tcp://192.168.0.1:4840",
+    "host": "192.168.0.1",
+    "port": 4840,
+    "nombre": "",
+    "vendor": "siemens",
+    "usuario": "",
+    "password": "",
+    "app": "",
+    "programa": ""
+  }
+]

@@ -1,0 +1,93 @@
+{
+  "project_id": "pantalla_3",
+  "nombre": "Pantalla 3",
+  "version": 5,
+  "creado_en": "2026-09-09T16:50:35.567318Z",
+  "actualizado_en": "2026-09-09T16:52:03.237141Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 1280,
+    "height": 760
+  },
+  "widgets": [
+    {
+      "id": "w_1788972719235_2",
+      "kind": "led",
+      "name": "Indicador LED 2",
+      "x": 391,
+      "y": 364,
+      "width": 90,
+      "height": 90,
+      "text": "Indicador LED",
+      "style": {
+        "color": "#009999",
+        "background": "transparent",
+        "borderColor": "#94a3b8",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1788972721012_3",
+      "kind": "tank",
+      "name": "Tanque 3",
+      "x": 231,
+      "y": 330,
+      "width": 110,
+      "height": 160,
+      "text": "Tanque",
+      "style": {
+        "color": "#009999",
+        "background": "transparent",
+        "borderColor": "#94a3b8",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1788972722047_4",
+      "kind": "switch",
+      "name": "Switch 4",
+      "x": 478,
+      "y": 193,
+      "width": 90,
+      "height": 48,
+      "text": "Switch",
+      "style": {
+        "color": "#009999",
+        "background": "transparent",
+        "borderColor": "#94a3b8",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    }
+  ],
+  "proyecto": "principal"
+}

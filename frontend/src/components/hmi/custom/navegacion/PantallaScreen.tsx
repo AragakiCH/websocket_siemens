@@ -56,7 +56,7 @@
 // Es un fondo, así que va debajo del resto. Suéltalo primero y luego pon
 // encima los widgets de cada vista.
 // =========================================================================
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useMemo, useRef } from 'react';
 import { LayoutTemplateIcon, Loader2Icon, ChevronRightIcon } from 'lucide-react';
 import type { CustomWidgetDef, RenderCtx, InspectorCtx } from '../types';
 import {
@@ -168,6 +168,27 @@ function Screen({ widget, interactivo }: RenderCtx) {
   // origen = lo de siempre.
   const destino = panel.abierta || destinoSeccion;
 
+  // ── LAS PANTALLAS VISITADAS SE QUEDAN MONTADAS ──────────────────
+  //
+  // Antes, cambiar de sección DESMONTABA la pantalla empotrada y montaba la
+  // nueva (la `key`). Volver a la anterior era volver a construirla entera:
+  // con widgets ZIP, treinta iframes otra vez. Ahora las últimas visitadas
+  // siguen montadas, ocultas con `display: none`; volver es instantáneo y
+  // los iframes conservan su estado. Se guardan unas pocas (las más
+  // recientes) para no acumular memoria sin tope.
+  //
+  // Es estado de montaje, no de navegación: vive en un `ref` y no en el
+  // store, y se pierde al desmontar el panel, que es lo que toca.
+  const MAX_VIVAS = 4;
+  const vivas = useRef<string[]>([]);
+  const montadas = useMemo(() => {
+    const lista = vivas.current.filter((id) => id !== destino);
+    if (destino) lista.push(destino);
+    while (lista.length > MAX_VIVAS) lista.shift();
+    vivas.current = lista;
+    return lista;
+  }, [destino]);
+
   // El panel está ocupado por una pantalla abierta desde el navegador. Es
   // la única situación en la que se enseña la ruta «Sección › Pantalla».
   const nombreAbierta = panel.abierta
@@ -261,27 +282,34 @@ function Screen({ widget, interactivo }: RenderCtx) {
             ahí el contenido son los widgets de este mismo lienzo, que se
             dibujan por encima del marco, no dentro de él. */}
         <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
-          {!!destino && (
-            <Suspense
-              fallback={
-                <div className="flex h-full w-full items-center justify-center gap-2 text-xs text-slate-400">
-                  <Loader2Icon className="h-4 w-4 animate-spin" />
-                  Cargando…
-                </div>
-              }
+          {montadas.map((id) => (
+            // Una capa por pantalla viva; solo la de `destino` se ve. La
+            // `key` es la pantalla: React conserva cada capa entre cambios
+            // en vez de reutilizar una para otra pantalla.
+            <div
+              key={id}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: id === destino ? 'block' : 'none',
+              }}
             >
-              {/* La `key` fuerza un montaje limpio al cambiar de pantalla. Sin
-                  ella, React reutilizaría el componente y durante un instante
-                  se verían los widgets de la pantalla anterior con las medidas
-                  de la nueva. */}
-              <PantallaEmbebida
-                key={destino}
-                projectId={destino}
-                modo={cfg.ajuste}
-                interactivo={!!interactivo}
-              />
-            </Suspense>
-          )}
+              <Suspense
+                fallback={
+                  <div className="flex h-full w-full items-center justify-center gap-2 text-xs text-slate-400">
+                    <Loader2Icon className="h-4 w-4 animate-spin" />
+                    Cargando…
+                  </div>
+                }
+              >
+                <PantallaEmbebida
+                  projectId={id}
+                  modo={cfg.ajuste}
+                  interactivo={!!interactivo && id === destino}
+                />
+              </Suspense>
+            </div>
+          ))}
         </div>
       </div>
     </div>

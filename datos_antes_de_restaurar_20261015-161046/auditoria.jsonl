@@ -1,0 +1,635 @@
+{"ts": "2026-08-26T15:36:35.763613Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-26T15:36:52.192515Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-26T15:37:36.813011Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-26T17:41:19.395403Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-26T17:41:19.606291Z", "usuario": "anónimo", "accion": "bd.conexiones.alta", "recurso": "conexiones", "resultado": "ok"}
+{"ts": "2026-08-26T17:41:19.764212Z", "usuario": "anónimo", "accion": "servicio.parada", "recurso": "", "resultado": "ok"}
+{"ts": "2026-08-26T17:41:58.910489Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-26T17:41:59.097898Z", "usuario": "anónimo", "accion": "bd.conexiones.alta", "recurso": "conexiones", "resultado": "ok"}
+{"ts": "2026-08-26T17:41:59.159538Z", "usuario": "anónimo", "accion": "servicio.parada", "recurso": "", "resultado": "ok"}
+{"ts": "2026-08-26T17:44:46.716359Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-26T17:44:46.893558Z", "usuario": "anónimo", "accion": "bd.conexiones.alta", "recurso": "conexiones", "resultado": "ok"}
+{"ts": "2026-08-26T17:44:46.972825Z", "usuario": "anónimo", "accion": "servicio.parada", "recurso": "", "resultado": "ok"}
+{"ts": "2026-08-26T17:45:19.146421Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-26T17:45:19.312581Z", "usuario": "anónimo", "accion": "bd.conexiones.alta", "recurso": "conexiones", "resultado": "ok"}
+{"ts": "2026-08-26T17:45:19.380438Z", "usuario": "anónimo", "accion": "servicio.parada", "recurso": "", "resultado": "ok"}
+{"ts": "2026-08-26T17:45:38.056031Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-26T18:03:43.702168Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-26T18:03:43.814798Z", "usuario": "anónimo", "accion": "bd.conexiones.alta", "recurso": "conexiones", "resultado": "ok"}
+{"ts": "2026-08-26T18:03:43.892530Z", "usuario": "anónimo", "accion": "bd.conexiones.alta", "recurso": "conexiones", "resultado": "ok"}
+{"ts": "2026-08-26T18:03:43.906330Z", "usuario": "anónimo", "accion": "servicio.parada", "recurso": "", "resultado": "ok"}
+{"ts": "2026-08-26T18:04:01.613035Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-26T20:29:27.009007Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-26T20:29:49.573230Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-26T20:42:39.339848Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-26T21:15:42.961594Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T03:25:00.583229Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T03:25:38.172370Z", "usuario": "anónimo", "accion": "bd.conexiones.alta", "recurso": "conexiones", "resultado": "ok"}
+{"ts": "2026-08-27T03:33:36.285188Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T03:36:58.890927Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T03:37:29.607572Z", "usuario": "anónimo", "accion": "usuario.creado", "recurso": "operador01", "resultado": "ok", "detalle": {"categoria": "Supervisor", "db_id": "local"}}
+{"ts": "2026-08-27T03:37:42.511836Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T03:37:44.187621Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T03:37:45.222487Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T03:37:45.900763Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T03:39:47.448401Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T03:39:49.360802Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T04:26:19.003565Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T04:55:40.834964Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T05:00:00.684890Z", "usuario": "anónimo", "accion": "bd.provisionada", "recurso": "HMI_PRUEBAS", "resultado": "ok", "detalle": {"motor": "mssql", "host": "localhost", "esquema": true, "usuario_creado": "host_hmi"}}
+{"ts": "2026-08-27T05:00:02.028588Z", "usuario": "anónimo", "accion": "bd.conexiones.alta", "recurso": "conexiones", "resultado": "ok"}
+{"ts": "2026-08-27T05:00:29.300230Z", "usuario": "anónimo", "accion": "usuario.creado", "recurso": "operador01", "resultado": "ok", "detalle": {"categoria": "Supervisor", "db_id": "local"}}
+{"ts": "2026-08-27T05:11:33.046522Z", "usuario": "operador01", "accion": "bd.provisionada", "recurso": "HMI_PRUEBA2", "resultado": "ok", "detalle": {"motor": "mssql", "host": "localhost", "esquema": true, "usuario_creado": "operador02"}}
+{"ts": "2026-08-27T05:11:34.302670Z", "usuario": "operador01", "accion": "bd.conexiones.alta", "recurso": "conexiones", "resultado": "ok"}
+{"ts": "2026-08-27T05:11:58.662283Z", "usuario": "operador01", "accion": "usuario.creado", "recurso": "operador02", "resultado": "ok", "detalle": {"categoria": "Supervisor", "db_id": "local"}}
+{"ts": "2026-08-27T05:12:20.101743Z", "usuario": "operador02", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T05:12:20.820342Z", "usuario": "operador02", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T05:27:20.940190Z", "usuario": "operador02", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T05:27:22.211442Z", "usuario": "operador02", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T05:44:36.932212Z", "usuario": "operador02", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T05:44:38.251680Z", "usuario": "operador02", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T17:28:20.713503Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T17:50:44.942969Z", "usuario": "anónimo", "accion": "plc.alta", "recurso": "192.168.100.31", "resultado": "ok", "detalle": {"vendor": "rexroth"}}
+{"ts": "2026-08-27T17:54:59.314128Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T17:55:01.854303Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T17:58:58.119520Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T17:58:58.974875Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T18:07:17.128089Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T18:07:17.927305Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T18:07:41.290901Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T18:07:42.171412Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T18:11:38.164074Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T18:16:06.347625Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T18:17:08.906048Z", "usuario": "anónimo", "accion": "bd.provisionada", "recurso": "HMI_PRUEBAS", "resultado": "ok", "detalle": {"motor": "mssql", "host": "localhost", "esquema": true, "usuario_creado": "hmi_host"}}
+{"ts": "2026-08-27T18:17:10.158212Z", "usuario": "anónimo", "accion": "bd.conexiones.alta", "recurso": "conexiones", "resultado": "ok"}
+{"ts": "2026-08-27T18:17:39.566598Z", "usuario": "anónimo", "accion": "usuario.creado", "recurso": "operador01", "resultado": "ok", "detalle": {"categoria": "Supervisor", "db_id": "local"}}
+{"ts": "2026-08-27T18:18:58.572922Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T18:18:59.414767Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T18:19:30.202127Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T18:19:30.663249Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T18:26:54.920460Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T18:26:55.415428Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T18:27:03.355328Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T18:27:53.312057Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T19:56:59.417500Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T19:57:11.018446Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T19:57:13.253840Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T20:16:59.042232Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T21:41:09.578243Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T21:41:36.165485Z", "usuario": "anónimo", "accion": "bd.provisionada", "recurso": "HMI_PRUEBA", "resultado": "ok", "detalle": {"motor": "mssql", "host": "localhost", "esquema": true, "usuario_creado": "hmi_low"}}
+{"ts": "2026-08-27T21:41:37.405975Z", "usuario": "anónimo", "accion": "bd.conexiones.alta", "recurso": "conexiones", "resultado": "ok"}
+{"ts": "2026-08-27T21:42:02.007032Z", "usuario": "anónimo", "accion": "usuario.creado", "recurso": "operador01", "resultado": "ok", "detalle": {"categoria": "Supervisor", "db_id": "local"}}
+{"ts": "2026-08-27T21:42:05.490086Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T21:42:06.644314Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:04:21.984058Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T22:04:22.973268Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:04:29.123325Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:04:29.377954Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:04:30.352860Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:04:37.178407Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:04:38.996002Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:05:33.826837Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:05:34.587812Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:08:39.921567Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:08:45.721776Z", "usuario": "operador01", "accion": "proyecto.creado", "recurso": "pantalla_2", "resultado": "ok"}
+{"ts": "2026-08-27T22:08:45.762230Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:08:45.765263Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-08-27T22:08:46.893547Z", "usuario": "operador01", "accion": "proyecto.creado", "recurso": "pantalla_2_copia", "resultado": "ok"}
+{"ts": "2026-08-27T22:08:46.947755Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-08-27T22:08:46.947755Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:pantalla_2_copia", "resultado": "ok"}
+{"ts": "2026-08-27T22:08:47.589180Z", "usuario": "operador01", "accion": "proyecto.creado", "recurso": "pantalla_2_copia_copia", "resultado": "ok"}
+{"ts": "2026-08-27T22:08:47.627830Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:pantalla_2_copia", "resultado": "ok"}
+{"ts": "2026-08-27T22:08:47.628840Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:pantalla_2_copia_copia", "resultado": "ok"}
+{"ts": "2026-08-27T22:08:49.459070Z", "usuario": "operador01", "accion": "proyecto.borrado", "recurso": "pantalla_2_copia_copia", "resultado": "ok"}
+{"ts": "2026-08-27T22:08:49.484974Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:pantalla_2_copia_copia", "resultado": "ok"}
+{"ts": "2026-08-27T22:08:49.487334Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:08:51.022873Z", "usuario": "operador01", "accion": "proyecto.borrado", "recurso": "pantalla_2_copia", "resultado": "ok"}
+{"ts": "2026-08-27T22:08:58.229198Z", "usuario": "operador01", "accion": "proyecto.borrado", "recurso": "pantalla_2", "resultado": "ok"}
+{"ts": "2026-08-27T22:11:31.099132Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T22:11:49.020722Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:11:50.392519Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:19:22.234682Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T22:19:43.161256Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:19:43.969256Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:30:46.116194Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T22:31:01.031665Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:31:01.741820Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:31:08.413590Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:31:09.644628Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:32:02.780092Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:32:03.448285Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:37:50.303426Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-27T22:37:51.452362Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:37:53.169105Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:37:57.167399Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:37:58.166339Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:43:45.658208Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:43:46.626594Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-27T22:43:52.946848Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-28T06:14:47.640988Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-28T06:15:03.527655Z", "usuario": "anónimo", "accion": "plc.alta", "recurso": "192.168.0.1", "resultado": "ok", "detalle": {"vendor": "siemens"}}
+{"ts": "2026-08-28T06:15:38.379115Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-28T06:15:58.388325Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-28T06:20:07.000388Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-28T06:20:29.295022Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-28T06:20:30.231112Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-28T06:20:32.375386Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-28T06:20:32.901851Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-28T06:20:36.713052Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-28T06:20:37.354469Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-01T23:35:41.484779Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-01T23:39:53.569864Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-01T23:52:23.518750Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-01T23:52:23.748062Z", "usuario": "anónimo", "accion": "servicio.parada", "recurso": "", "resultado": "ok"}
+{"ts": "2026-09-02T00:08:03.993996Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-02T00:08:04.162762Z", "usuario": "anónimo", "accion": "servicio.parada", "recurso": "", "resultado": "ok"}
+{"ts": "2026-09-02T00:08:04.187302Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-02T00:08:04.206150Z", "usuario": "anónimo", "accion": "servicio.parada", "recurso": "", "resultado": "ok"}
+{"ts": "2026-09-02T00:08:14.744584Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-02T00:25:08.169122Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-02T00:25:08.309150Z", "usuario": "anónimo", "accion": "servicio.parada", "recurso": "", "resultado": "ok"}
+{"ts": "2026-09-02T00:25:08.369091Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-02T00:25:08.389177Z", "usuario": "anónimo", "accion": "servicio.parada", "recurso": "", "resultado": "ok"}
+{"ts": "2026-09-02T00:25:08.697480Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-02T00:25:08.742924Z", "usuario": "anónimo", "accion": "servicio.parada", "recurso": "", "resultado": "ok"}
+{"ts": "2026-09-09T16:49:47.931673Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-09T16:50:12.585921Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:34.724631Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.creado", "recurso": "pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:34.765841Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:34.765841Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:35.568313Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.creado", "recurso": "pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:35.596910Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:35.602019Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:36.296680Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:36.296680Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:36.907950Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:36.908951Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:37.286953Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:37.287955Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:37.696332Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:37.698330Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:38.135018Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:38.135018Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:38.418173Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-09T16:50:38.418173Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T16:51:56.639651Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T16:51:56.640653Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-09T16:51:58.110583Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-09T16:51:58.110583Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-09T18:38:31.453900Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-09T18:38:37.222828Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-09T18:38:38.787027Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-09T18:38:38.787027Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T18:38:39.759473Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T18:38:40.045259Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T18:38:43.408776Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T18:38:43.676220Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T18:38:45.054664Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T18:38:45.068085Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-09T18:38:45.541449Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-09T18:38:45.541449Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-09T18:38:46.119661Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-09T18:38:46.119661Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-09T18:38:46.425449Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-09T18:38:46.425449Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T18:39:22.021251Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T18:39:31.995553Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T18:42:45.533418Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.widget_borrado", "recurso": "principal", "resultado": "ok", "detalle": {"widget": "w_1788979129560_1"}}
+{"ts": "2026-09-09T18:42:46.893392Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.widget_borrado", "recurso": "principal", "resultado": "ok", "detalle": {"widget": "w_1788306025106_1"}}
+{"ts": "2026-09-09T18:44:10.246581Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-09T18:44:21.537358Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T18:44:23.016917Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-09T20:43:31.154721Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-10T15:06:04.729179Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-10T16:20:37.493357Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-10T16:20:49.218590Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T16:41:13.410166Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T16:42:23.395033Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T16:42:23.402546Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T16:43:05.393668Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T16:43:05.403775Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T16:43:34.377274Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T16:43:34.477274Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T16:43:55.392126Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T16:43:55.416404Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T16:45:31.691171Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T16:45:40.753921Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T16:46:01.665010Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T16:59:25.612831Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T17:13:57.474006Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-10T17:13:59.966042Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T17:14:01.048084Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T17:14:07.396195Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T17:14:29.682005Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.creado", "recurso": "proyecto_2", "resultado": "ok", "detalle": {"pantalla": "proyecto_2_pantalla_1"}}
+{"ts": "2026-09-10T17:15:07.814482Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T17:15:08.164632Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T17:16:29.429988Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T17:16:30.134351Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T17:16:37.224105Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T17:16:37.534182Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:", "resultado": "ok"}
+{"ts": "2026-09-10T17:16:41.223018Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:", "resultado": "ok"}
+{"ts": "2026-09-10T17:16:41.426965Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T17:16:43.521804Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T17:16:43.725427Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:", "resultado": "ok"}
+{"ts": "2026-09-10T17:16:46.102076Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:", "resultado": "ok"}
+{"ts": "2026-09-10T17:16:46.303061Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T19:47:15.914539Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-10T19:48:21.447848Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T19:48:29.222512Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T19:48:29.488175Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T19:49:35.841303Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T19:49:36.018759Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:", "resultado": "ok"}
+{"ts": "2026-09-10T19:51:05.506337Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:", "resultado": "ok"}
+{"ts": "2026-09-10T19:51:07.220196Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T19:51:14.282597Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:00.203210Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-10T19:56:12.790348Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:14.992260Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:14.993260Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:16.781792Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:16.784794Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:17.290094Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:17.292091Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:17.840074Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:17.841076Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:18.354715Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:18.354715Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:19.533449Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:19.533449Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:20.988609Z", "usuario": "operador01", "usuario_id": 1, "accion": "pantalla.creada", "recurso": "proyecto_2_pantalla_2", "resultado": "ok", "detalle": {"proyecto": "proyecto_2"}}
+{"ts": "2026-09-10T19:56:21.018883Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:21.021893Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:21.541635Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:21.542637Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:24.289642Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:24.289642Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:26.282233Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:26.283232Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:27.347849Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T19:56:27.347849Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T19:57:17.355069Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T19:57:17.356072Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T19:57:17.728531Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T19:57:17.728531Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-10T19:57:18.209780Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-10T19:57:18.209780Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T19:57:19.067046Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T19:57:19.069054Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T19:57:20.106081Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T19:57:20.106081Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T19:57:20.454814Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T19:57:20.456322Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T19:57:21.324430Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T19:57:21.324430Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:12:16.544712Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-10T20:12:27.177965Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:12:32.137107Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:12:32.479731Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:12:45.071005Z", "usuario": "anónimo", "accion": "proyecto.exportado", "recurso": "principal", "resultado": "ok", "detalle": {"pantallas": 3, "widgets_personalizados": 0}}
+{"ts": "2026-09-10T20:14:43.314153Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:14:43.316670Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T20:14:45.766924Z", "usuario": "anónimo", "accion": "proyecto.exportado", "recurso": "proyecto_2", "resultado": "ok", "detalle": {"pantallas": 2, "widgets_personalizados": 0}}
+{"ts": "2026-09-10T20:14:57.669383Z", "usuario": "anónimo", "accion": "proyecto.borrado", "recurso": "proyecto_2", "resultado": "ok", "detalle": {"pantallas": ["proyecto_2_pantalla_1", "proyecto_2_pantalla_2"]}}
+{"ts": "2026-09-10T20:14:57.713327Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T20:14:57.714327Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:02.853114Z", "usuario": "anónimo", "accion": "proyecto.importado", "recurso": "proyecto_2", "resultado": "ok", "detalle": {"pantallas": 2, "widgets_nuevos": [], "widgets_ya_existentes": []}}
+{"ts": "2026-09-10T20:15:02.903563Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:02.903563Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:10.212281Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:10.504139Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:12.184989Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:12.188000Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:13.282427Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:13.282427Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:15.268618Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:15.269616Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:15.988927Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:16.793466Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:17.676824Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:17.677831Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:19.051122Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:19.051122Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:20.020031Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:15:22.170259Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:00.204238Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-10T20:46:01.720717Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:04.394330Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:04.681734Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:25.922206Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:25.923210Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:32.532434Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:32.533941Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:36.904960Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:36.904960Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:37.276844Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:37.277853Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:38.074007Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:38.074514Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:38.559775Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:38.559775Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:39.658123Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:39.659123Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:40.585663Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:40.585663Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:41.150254Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:41.151764Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:56.209496Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-10T20:46:56.211494Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:47:01.514809Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-10T20:47:01.515810Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T20:47:01.811875Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-10T20:47:01.813874Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-10T20:47:02.173197Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-10T20:47:07.744193Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-10T21:02:06.625613Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-10T21:02:43.097839Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-10T21:02:46.060462Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-10T21:05:29.911306Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-10T21:08:03.312400Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-10T21:08:04.341165Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:02:47.752497Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-11T15:05:29.389474Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:30.892378Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:30.892378Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:32.088184Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:32.088184Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:34.090187Z", "usuario": "operador01", "usuario_id": 1, "accion": "pantalla.widget_borrado", "recurso": "pantalla_2", "resultado": "ok", "detalle": {"widget": "w_1788972717436_1"}}
+{"ts": "2026-09-11T15:05:39.845206Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:39.846206Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:43.354618Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:43.355618Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:43.821893Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:43.821893Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:44.167446Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:44.168447Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:44.470558Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:44.471558Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:54.073525Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:54.073525Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:58.506169Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:05:58.507170Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:06:00.954035Z", "usuario": "operador01", "usuario_id": 1, "accion": "pantalla.widget_borrado", "recurso": "proyecto_2_pantalla_1", "resultado": "ok", "detalle": {"widget": "w_1789070182391_1"}}
+{"ts": "2026-09-11T15:08:13.416678Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:08:13.417677Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:08:14.100585Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:08:14.100585Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:08:14.396171Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:08:14.397179Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:08:20.640577Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:08:20.641575Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:08:45.716866Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:08:45.716866Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:08:46.881069Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:08:46.881069Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:08:59.243322Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.exportado", "recurso": "proyecto_2", "resultado": "ok", "detalle": {"pantallas": 2, "widgets_personalizados": 1}}
+{"ts": "2026-09-11T15:09:21.301260Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.borrado", "recurso": "proyecto_2", "resultado": "ok", "detalle": {"pantallas": ["proyecto_2_pantalla_1", "proyecto_2_pantalla_2"]}}
+{"ts": "2026-09-11T15:09:21.356854Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:09:21.358855Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:09:25.665415Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.importado", "recurso": "proyecto_2", "resultado": "ok", "detalle": {"pantallas": 2, "widgets_nuevos": [], "widgets_ya_existentes": ["transportador-rodillos"]}}
+{"ts": "2026-09-11T15:09:25.702022Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:09:25.705532Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:10:19.385419Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:07.740137Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:18.072097Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:18.073671Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:19.005836Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:19.005836Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:20.011956Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:20.013959Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:20.338617Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:20.339620Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:20.783969Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:20.786129Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:21.050098Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:21.050098Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:21.408952Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:21.408952Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:21.719609Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:21.719609Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:21.979277Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:21.979277Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:22.251444Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:22.253441Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:24.964262Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:24.965263Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:25.724528Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:25.725526Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:26.024178Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:26.025178Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:26.323654Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:26.323654Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:26.606473Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:26.606473Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:26.924431Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:26.924431Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:27.310893Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:27.310893Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:28.132581Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:28.135579Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:43.419272Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:22:43.421278Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:23:15.759906Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.exportado", "recurso": "proyecto_2", "resultado": "ok", "detalle": {"pantallas": 2, "widgets_personalizados": 1}}
+{"ts": "2026-09-11T15:23:50.539656Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.exportado", "recurso": "proyecto_2", "resultado": "ok", "detalle": {"pantallas": 2, "widgets_personalizados": 1}}
+{"ts": "2026-09-11T15:24:04.664428Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.borrado", "recurso": "proyecto_2", "resultado": "ok", "detalle": {"pantallas": ["proyecto_2_pantalla_1", "proyecto_2_pantalla_2"]}}
+{"ts": "2026-09-11T15:24:04.701220Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:24:04.704221Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:24:08.055978Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.importado", "recurso": "proyecto_2", "resultado": "ok", "detalle": {"pantallas": 2, "widgets_nuevos": [], "widgets_ya_existentes": ["transportador-rodillos"]}}
+{"ts": "2026-09-11T15:24:08.107754Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:24:08.107754Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:24:25.012631Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:24:25.013638Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:24:25.537644Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:24:25.537644Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:24:30.697183Z", "usuario": "operador01", "usuario_id": 1, "accion": "pantalla.widget_borrado", "recurso": "proyecto_2_pantalla_1", "resultado": "ok", "detalle": {"widget": "w_1789140269133_6"}}
+{"ts": "2026-09-11T15:24:32.124381Z", "usuario": "operador01", "usuario_id": 1, "accion": "pantalla.creada", "recurso": "proyecto_2_pantalla_3", "resultado": "ok", "detalle": {"proyecto": "proyecto_2"}}
+{"ts": "2026-09-11T15:24:32.160766Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:24:32.166975Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:24:36.752972Z", "usuario": "operador01", "usuario_id": 1, "accion": "pantalla.widget_borrado", "recurso": "proyecto_2_pantalla_3", "resultado": "ok", "detalle": {"widget": "w_1789140274998_7"}}
+{"ts": "2026-09-11T15:24:43.713198Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:24:43.714199Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:24:50.477019Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:24:50.479022Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:25:58.507111Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:25:58.509111Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:25:59.072096Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:25:59.072096Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:26:06.156460Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.exportado", "recurso": "proyecto_2", "resultado": "ok", "detalle": {"pantallas": 3, "widgets_personalizados": 2}}
+{"ts": "2026-09-11T15:26:29.015288Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:26:29.016289Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:26:31.257986Z", "usuario": "operador01", "usuario_id": 1, "accion": "pantalla.borrada", "recurso": "proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:26:31.282575Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:26:31.284082Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:26:43.127502Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.importado", "recurso": "proyecto_2_2", "resultado": "ok", "detalle": {"pantallas": 3, "widgets_nuevos": ["cuba-pre-estiramiento"], "widgets_ya_existentes": ["transportador-rodillos"]}}
+{"ts": "2026-09-11T15:26:43.197925Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:26:43.197925Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:26:46.363598Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:26:46.363598Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:27:26.098549Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:27:26.098549Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:27:27.461763Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:27:27.461763Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:27:30.235833Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:27:30.235833Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:27:31.183805Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:27:31.183805Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:27:32.394917Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:27:32.396428Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:27:32.713899Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:27:32.713899Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:36:31.699117Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.borrado", "recurso": "proyecto_2_2", "resultado": "ok", "detalle": {"pantallas": ["proyecto_2_pantalla_1_2", "proyecto_2_pantalla_2_2", "proyecto_2_pantalla_3"]}}
+{"ts": "2026-09-11T15:36:31.731226Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:36:33.081622Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:36:33.081622Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:36:33.855293Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:36:33.856290Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:36:34.343726Z", "usuario": "operador01", "usuario_id": 1, "accion": "pantalla.creada", "recurso": "proyecto_2_pantalla_3", "resultado": "ok", "detalle": {"proyecto": "proyecto_2"}}
+{"ts": "2026-09-11T15:36:34.379217Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:36:34.384743Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:46:31.725623Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.exportado", "recurso": "proyecto_2", "resultado": "ok", "detalle": {"pantallas": 3, "widgets_personalizados": 2}}
+{"ts": "2026-09-11T15:49:22.334629Z", "usuario": "operador01", "usuario_id": 1, "accion": "pantalla.borrada", "recurso": "proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:49:22.362053Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:49:43.629932Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.importado", "recurso": "proyecto_2_2", "resultado": "ok", "detalle": {"pantallas": 3, "widgets_nuevos": ["cuba-pre-estiramiento"], "widgets_ya_existentes": ["transportador-rodillos"]}}
+{"ts": "2026-09-11T15:49:43.668402Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:49:43.670913Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:49:45.578680Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:49:45.580683Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:52:48.397154Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:54:13.430066Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:56:51.199601Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:56:51.721249Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:56:51.723764Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:56:53.279998Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:56:53.280996Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:56:53.539829Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:56:53.539829Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:56:58.904621Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:56:59.243064Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:18.100181Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.borrado", "recurso": "proyecto_2_2", "resultado": "ok", "detalle": {"pantallas": ["proyecto_2_pantalla_1_2", "proyecto_2_pantalla_2_2", "proyecto_2_pantalla_3"]}}
+{"ts": "2026-09-11T15:58:18.143650Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:18.145158Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:23.268140Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.importado", "recurso": "proyecto_2_2", "resultado": "ok", "detalle": {"pantallas": 3, "widgets_nuevos": [], "widgets_ya_existentes": ["transportador-rodillos", "cuba-pre-estiramiento"]}}
+{"ts": "2026-09-11T15:58:23.332510Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:23.337030Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:24.640606Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:24.641608Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:26.455528Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:26.456539Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:37.615964Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:37.615964Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:38.085634Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:38.086981Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:38.794159Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:38.794159Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:39.163994Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:39.164993Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:39.391977Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:39.392977Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:42.487843Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:42.490844Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:43.391127Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:43.391127Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:43.930648Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:43.930648Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:44.736131Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-11T15:58:44.736131Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:59:44.613181Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.borrado", "recurso": "proyecto_2_2", "resultado": "ok", "detalle": {"pantallas": ["proyecto_2_pantalla_1_2", "proyecto_2_pantalla_2_2", "proyecto_2_pantalla_3"]}}
+{"ts": "2026-09-11T15:59:44.647454Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T15:59:44.647454Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:19.257160Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:20.783218Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:22.100440Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:27.868574Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.importado", "recurso": "proyecto_2_2", "resultado": "ok", "detalle": {"pantallas": 3, "widgets_nuevos": [], "widgets_ya_existentes": ["transportador-rodillos", "cuba-pre-estiramiento"]}}
+{"ts": "2026-09-11T16:34:28.235114Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:28.238631Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:34.318521Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:34.318521Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:35.393043Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:35.394054Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:35.841523Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:35.841523Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:36.290469Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:36.296471Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:36.672689Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:36.681240Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:37.266019Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:37.268017Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:38.887706Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:38.893233Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:39.194743Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:39.209795Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:39.564471Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:34:39.573005Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:40:25.480381Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:40:25.720488Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:40:52.690204Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:42:40.625980Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:44:11.411974Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T16:44:11.419508Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T17:22:51.260797Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T19:11:13.719653Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-11T20:22:41.432441Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-11T20:22:54.494790Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T20:22:56.026435Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-11T20:22:56.026435Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T20:22:56.388534Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-11T20:22:56.388534Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-11T20:22:57.301914Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-17T15:21:45.497774Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-17T15:22:21.441554Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-17T15:22:35.127218Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1_2", "resultado": "ok"}
+{"ts": "2026-09-17T15:22:35.129222Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-17T15:22:35.626591Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2_2", "resultado": "ok"}
+{"ts": "2026-09-17T15:22:35.627592Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-17T15:22:36.998546Z", "usuario": "operador01", "usuario_id": 1, "accion": "pantalla.creada", "recurso": "proyecto_2_2_pantalla_4", "resultado": "ok", "detalle": {"proyecto": "proyecto_2_2"}}
+{"ts": "2026-09-17T15:22:37.043046Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-17T15:22:37.046567Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T15:22:49.367870Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T15:27:28.738922Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T15:27:29.350135Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T15:28:49.679260Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T15:28:50.604735Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T15:47:19.705504Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-17T15:47:31.607016Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T15:47:33.262463Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T15:47:36.025750Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T15:47:36.505534Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T15:47:50.810323Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T15:47:51.762741Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T16:03:02.348316Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-17T16:03:06.464675Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T16:05:04.961125Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T16:05:07.350259Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T16:05:16.807242Z", "usuario": "anónimo", "accion": "pantalla.widget_borrado", "recurso": "proyecto_2_2_pantalla_4", "resultado": "ok", "detalle": {"widget": "w_1789661115234_4"}}
+{"ts": "2026-09-17T16:05:18.327920Z", "usuario": "anónimo", "accion": "pantalla.widget_borrado", "recurso": "proyecto_2_2_pantalla_4", "resultado": "ok", "detalle": {"widget": "w_1789661114201_3"}}
+{"ts": "2026-09-17T16:05:18.734450Z", "usuario": "anónimo", "accion": "pantalla.widget_borrado", "recurso": "proyecto_2_2_pantalla_4", "resultado": "ok", "detalle": {"widget": "w_1789661113066_2"}}
+{"ts": "2026-09-17T16:05:20.201270Z", "usuario": "anónimo", "accion": "pantalla.widget_borrado", "recurso": "proyecto_2_2_pantalla_4", "resultado": "ok", "detalle": {"widget": "w_1789661111968_1"}}
+{"ts": "2026-09-17T16:05:21.085695Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:proyecto_2_2_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-17T16:05:23.867636Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-17T16:05:24.517090Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-23T20:19:24.484612Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-23T20:19:48.323237Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-23T20:19:48.325238Z", "usuario": "operador01", "usuario_id": 1, "accion": "runtime.publicado", "recurso": "proyecto_2", "resultado": "ok", "detalle": {"anterior": "principal"}}
+{"ts": "2026-09-23T20:19:54.338430Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-23T20:19:54.338430Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-23T20:19:55.036764Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:proyecto_2_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-23T20:19:55.037776Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:proyecto_2_pantalla_1", "resultado": "ok"}
+{"ts": "2026-09-23T20:30:31.406223Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-10-12T16:05:05.990870Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-10-12T16:23:35.675980Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-10-12T16:24:06.123707Z", "usuario": "anónimo", "accion": "pantalla.creada", "recurso": "proyecto_2_pantalla_3_2", "resultado": "ok", "detalle": {"proyecto": "proyecto_2"}}
+{"ts": "2026-10-12T16:30:18.653435Z", "usuario": "anónimo", "accion": "pantalla.creada", "recurso": "proyecto_2_pantalla_4", "resultado": "ok", "detalle": {"proyecto": "proyecto_2"}}
+{"ts": "2026-10-12T17:09:17.522336Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-10-12T17:47:56.817551Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-10-12T18:16:26.070028Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-10-12T18:42:08.286284Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-10-12T18:55:23.261460Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-10-12T19:40:17.999102Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-10-13T21:07:11.171611Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-10-13T21:08:12.128282Z", "usuario": "operador01", "usuario_id": 1, "accion": "bd.datos.exportados", "recurso": "local", "resultado": "ok", "detalle": {"incluir_historico": true, "filas": {"plc_prg": 62475, "alarmas_def": 0, "recetas": 1, "receta_elementos": 1, "receta_registros": 1, "alarmas": 0, "receta_valores": 1}, "bytes": 1072605}}
+{"ts": "2026-10-15T18:43:26.177823Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-10-15T18:44:39.320179Z", "usuario": "operador01", "usuario_id": 1, "accion": "pantalla.widget_borrado", "recurso": "proyecto_2_pantalla_4", "resultado": "ok", "detalle": {"widget": "w_1792089836435_1"}}
+{"ts": "2026-10-15T18:47:18.532841Z", "usuario": "operador01", "usuario_id": 1, "accion": "internas.creada", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "variable_01", "tipo": "bool"}}
+{"ts": "2026-10-15T18:47:19.752870Z", "usuario": "operador01", "usuario_id": 1, "accion": "internas.valor", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "variable_01", "valor": true}}
+{"ts": "2026-10-15T21:09:15.926186Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-10-15T21:10:08.314676Z", "usuario": "anónimo", "accion": "proyecto.importado", "recurso": "principal_2", "resultado": "ok", "detalle": {"pantallas": 92, "widgets_nuevos": ["logo_sdf", "navegacion_planta", "lectura_temperatura_linea", "lectura_presion_vapor_linea", "lectura_status_linea", "leyenda_lineas_colores", "usuario_inicio", "lectura_arranques_linea_3", "lectura_arranques_linea_2", "lectura_arranques_linea_4", "tirc_id", "lectura_arranques_linea_5", "boton_ver_detalle", "texto_detalle", "lectura_velocidad_linea", "l2_1_lava_secc_1", "l2_2_lava_secc_2", "l2_3_lava_secc_3", "l2_4_lava_secc_4", "l2_5_seca_secc_1", "l2_6_seca_secc_2", "l2_7_seca_secc_3", "l2_8_rizado", "l2_9_zona_tanques", "linea_vertical", "l3_1_lava_secc_1", "lectura_dato_temperatura", "lectura_dato_porcentaje", "lectura_titulo_unidad", "lectura_titulo_doble_unidad", "boton_motor_peque", "texto_ajustable", "l3_2_lava_secc_2", "l3_3_lava_secc_3", "firc_pirc_id", "linea_horizontal", "l3_4_lava_secc_4", "lectura_multiple", "boton_motor_grande", "l3_5_seca_secc_1", "lectura_dato_corriente", "boton_helice", "estado_puerta", "l3_6_seca_secc_2", "l3_7_seca_secc_3", "l3_8_rizado", "lectura_dato_presion", "l3_9_zona_tanques", "estado_motor_peque", "estado_eje_aspas", "l4_1_lava_secc_1", "l4_2_lava_secc_2", "l4_3_lava_secc_3", "l4_4_lava_secc_4", "l4_5_seca_secc_1", "l4_6_seca_secc_2", "l4_7_seca_secc_3", "l4_8_rizado", "l4_9_vaporizador", "lectura_dato_kg", "lectura_dato_rpm", "estado_desmenuzador", "boton_banda_transp", "boton_circulo", "l4_10_zona_tanques", "l5_1_lava_secc_1", "l5_2_lava_secc_2", "l5_3_lava_secc_3", "l5_4_lava_secc_4", "l5_5_seca_secc_1", "l5_6_seca_secc_2", "l5_7_seca_secc_3", "l5_8_rizado_1", "l5_9_rizado_2", "l5_10_rizado_3", "l5_11_rizado_4", "l5_12_zona_tanques", "linea_vertical_punteada", "cabecera_subprocesos_secador", "cabecera_subprocesos_lavadora", "cabecera_subprocesos_lavadora_5", "cabecera_subprocesos_rizado", "lxpid1", "lxmotorjsgn", "lxmotor", "lxmp", "panel_tendencias", "tabla_barras_cubas_8_11", "receta_lazos_criticos_l3", "receta_lazos_criticos_l3_estiro", "receta_valores_nominales_l3", "receta_tolerancias_l3", "receta_tolerancia_final_l3", "l3_receta_apertura_valvulas", "receta_posicion_valvula_final_l3", "l3_habilitacion_alarmas", "boton_activa_inactiva", "l3_habilitacion_alarmas_proceso", "l3_tablero_arranque_motores", "boton_tablero_motores", "l3_control_calidad_cinta_continua", "1_autefa_vista_general_01", "2_autefa_vista_general_02", "3_autefa_plegador_frontal_01", "4_autefa_plegador_superior_01", "5_autefa_prensa", "6_autefa_transportador", "7_autefa_carro_transportador", "l4_panel_tendencias", "l4_error_lazos_1", "l4_error_lazos_2", "receta_lazos_criticos_l4", "receta_lazos_criticos_l4_estiro", "receta_valores_nominales_l4", "receta_tolerancias_l4", "receta_tolerancia_final_l4", "l4_receta_apertura_valvulas", "receta_posicion_valvula_final_l4", "l4_habilitacion_alarmas", "l4_habilitacion_alarmas_proceso", "l4_tablero_arranque_motores", "l4_control_calidad_cinta_continua", "tabla_barras_27", "columna_de_tags_tabla_error"], "widgets_ya_existentes": ["logo_sdf"], "variables_nuevas": ["bool1", "bool2", "bool3", "var1", "var12", "var17", "var10"]}}
+{"ts": "2026-10-15T21:10:08.558910Z", "usuario": "anónimo", "accion": "runtime.publicado", "recurso": "principal_2", "resultado": "ok", "detalle": {"anterior": "proyecto_2"}}

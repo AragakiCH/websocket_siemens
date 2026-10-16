@@ -1,0 +1,5012 @@
+{
+  "project_id": "principal_l3_receta_lazos_criticos_1_copia_2",
+  "nombre": "L4 receta lazos criticos 1",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-15T21:10:08.103636Z",
+  "actualizado_en": "2026-10-15T21:10:08.106148Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1791411871325_5",
+      "kind": "custom:receta_lazos_criticos_l4",
+      "name": "LÍNEA 4 / RECETA DE LAZOS CRÍTICOS//Configuración de parámetros de los lazos críticos del proceso",
+      "x": 0,
+      "y": 0,
+      "width": 1610,
+      "height": 755,
+      "text": "L4 Receta  lazos críticos 1",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791922945530_26",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161",
+      "x": 30,
+      "y": 124,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791922945530_27",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6",
+      "x": 115,
+      "y": 159,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:274",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_28",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia",
+      "x": 115,
+      "y": 188,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:275",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_29",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 2",
+      "x": 115,
+      "y": 217,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:276",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_30",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 3",
+      "x": 115,
+      "y": 246,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:277",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_31",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 4",
+      "x": 115,
+      "y": 275,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:278",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_32",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 5",
+      "x": 115,
+      "y": 304,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:279",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_33",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 6",
+      "x": 115,
+      "y": 333,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:280",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_34",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 7",
+      "x": 115,
+      "y": 362,
+      "width": 118,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:281",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_35",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 8",
+      "x": 276,
+      "y": 159,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:274",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_36",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 9",
+      "x": 276,
+      "y": 188,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:275",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_37",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 10",
+      "x": 276,
+      "y": 217,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:276",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_38",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 11",
+      "x": 276,
+      "y": 246,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:277",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_39",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 12",
+      "x": 276,
+      "y": 275,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:278",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_40",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 13",
+      "x": 276,
+      "y": 304,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:279",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_41",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 14",
+      "x": 276,
+      "y": 333,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:280",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_42",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 15",
+      "x": 276,
+      "y": 362,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:281",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_26",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_43",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia",
+      "x": 420,
+      "y": 124,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791922945530_44",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 16",
+      "x": 506,
+      "y": 159,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:290",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_45",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 17",
+      "x": 506,
+      "y": 188,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:291",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_46",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 18",
+      "x": 506,
+      "y": 217,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:292",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_47",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 19",
+      "x": 506,
+      "y": 246,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:293",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_48",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 20",
+      "x": 506,
+      "y": 275,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:294",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_49",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 21",
+      "x": 506,
+      "y": 304,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:295",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_50",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 22",
+      "x": 506,
+      "y": 333,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:296",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_51",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 23",
+      "x": 506,
+      "y": 362,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:297",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_52",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 24",
+      "x": 666,
+      "y": 159,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:290",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_53",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 25",
+      "x": 666,
+      "y": 188,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:291",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_54",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 26",
+      "x": 666,
+      "y": 217,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:292",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_55",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 27",
+      "x": 666,
+      "y": 246,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:293",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_56",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 28",
+      "x": 666,
+      "y": 275,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:294",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_57",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 29",
+      "x": 666,
+      "y": 304,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:295",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_58",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 30",
+      "x": 666,
+      "y": 333,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:296",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_59",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 31",
+      "x": 666,
+      "y": 362,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:297",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_43",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_60",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia 2",
+      "x": 811,
+      "y": 124,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791922945530_61",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 32",
+      "x": 896,
+      "y": 159,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:306",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_62",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 33",
+      "x": 896,
+      "y": 188,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:307",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_63",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 34",
+      "x": 896,
+      "y": 217,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:308",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_64",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 35",
+      "x": 896,
+      "y": 246,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:309",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_65",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 36",
+      "x": 896,
+      "y": 275,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:310",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_66",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 37",
+      "x": 896,
+      "y": 304,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:311",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_67",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 38",
+      "x": 896,
+      "y": 333,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:312",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_68",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 39",
+      "x": 896,
+      "y": 362,
+      "width": 118,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:313",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_69",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 40",
+      "x": 1057,
+      "y": 159,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:306",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_70",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 41",
+      "x": 1057,
+      "y": 188,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:307",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_71",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 42",
+      "x": 1057,
+      "y": 217,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:308",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_72",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 43",
+      "x": 1057,
+      "y": 246,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:309",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_73",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 44",
+      "x": 1057,
+      "y": 275,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:310",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_74",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 45",
+      "x": 1057,
+      "y": 304,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:311",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_75",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 46",
+      "x": 1057,
+      "y": 333,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:312",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_76",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 47",
+      "x": 1057,
+      "y": 362,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:313",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_60",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_77",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia 3",
+      "x": 1201,
+      "y": 124,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791922945530_78",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 48",
+      "x": 1287,
+      "y": 159,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:322",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_79",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 49",
+      "x": 1287,
+      "y": 188,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:323",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_80",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 50",
+      "x": 1287,
+      "y": 217,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:324",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_81",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 51",
+      "x": 1287,
+      "y": 246,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:325",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_82",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 52",
+      "x": 1287,
+      "y": 275,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:326",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_83",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 53",
+      "x": 1287,
+      "y": 304,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:327",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_84",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 54",
+      "x": 1287,
+      "y": 333,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:328",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_85",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 55",
+      "x": 1287,
+      "y": 362,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:329",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_86",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 56",
+      "x": 1447,
+      "y": 159,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:322",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_87",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 57",
+      "x": 1447,
+      "y": 188,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:323",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_88",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 58",
+      "x": 1447,
+      "y": 217,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:324",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_89",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 59",
+      "x": 1447,
+      "y": 246,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:325",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_90",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 60",
+      "x": 1447,
+      "y": 275,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:326",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_91",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 61",
+      "x": 1447,
+      "y": 304,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:327",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_92",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 62",
+      "x": 1447,
+      "y": 333,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:328",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_93",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 63",
+      "x": 1447,
+      "y": 362,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:329",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_77",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_94",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia 4",
+      "x": 30,
+      "y": 412,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791922945530_95",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 64",
+      "x": 115,
+      "y": 447,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:282",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_96",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 65",
+      "x": 115,
+      "y": 476,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:283",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_97",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 66",
+      "x": 115,
+      "y": 505,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:284",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_98",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 67",
+      "x": 115,
+      "y": 534,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:285",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_99",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 68",
+      "x": 115,
+      "y": 563,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:286",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_100",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 69",
+      "x": 115,
+      "y": 592,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:287",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_101",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 70",
+      "x": 115,
+      "y": 621,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:288",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_102",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 71",
+      "x": 115,
+      "y": 650,
+      "width": 118,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:289",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_103",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 72",
+      "x": 276,
+      "y": 447,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:282",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_104",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 73",
+      "x": 276,
+      "y": 476,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:283",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_105",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 74",
+      "x": 276,
+      "y": 505,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:284",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_106",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 75",
+      "x": 276,
+      "y": 534,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:285",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_107",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 76",
+      "x": 276,
+      "y": 563,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:286",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_108",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 77",
+      "x": 276,
+      "y": 592,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:287",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_109",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 78",
+      "x": 276,
+      "y": 621,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:288",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_110",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 79",
+      "x": 276,
+      "y": 650,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:289",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_94",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_111",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia 5",
+      "x": 420,
+      "y": 412,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791922945530_112",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 80",
+      "x": 506,
+      "y": 447,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:298",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_113",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 81",
+      "x": 506,
+      "y": 476,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:299",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_114",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 82",
+      "x": 506,
+      "y": 505,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:300",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_115",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 83",
+      "x": 506,
+      "y": 534,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:301",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_116",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 84",
+      "x": 506,
+      "y": 563,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:302",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_117",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 85",
+      "x": 506,
+      "y": 592,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:303",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_118",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 86",
+      "x": 506,
+      "y": 621,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:304",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_119",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 87",
+      "x": 506,
+      "y": 650,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:305",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_120",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 88",
+      "x": 666,
+      "y": 447,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:298",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_121",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 89",
+      "x": 666,
+      "y": 476,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:299",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_122",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 90",
+      "x": 666,
+      "y": 505,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:300",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_123",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 91",
+      "x": 666,
+      "y": 534,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:301",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_124",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 92",
+      "x": 666,
+      "y": 563,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:302",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_125",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 93",
+      "x": 665,
+      "y": 592,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:303",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_126",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 94",
+      "x": 666,
+      "y": 621,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:304",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_127",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 95",
+      "x": 666,
+      "y": 650,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:305",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_111",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_128",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia 6",
+      "x": 811,
+      "y": 412,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791922945530_129",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 96",
+      "x": 896,
+      "y": 447,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:314",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_130",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 97",
+      "x": 896,
+      "y": 476,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:315",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_131",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 98",
+      "x": 896,
+      "y": 505,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:316",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_132",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 99",
+      "x": 896,
+      "y": 534,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:317",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_133",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 100",
+      "x": 896,
+      "y": 563,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:318",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_134",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 101",
+      "x": 896,
+      "y": 592,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:319",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_135",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 102",
+      "x": 896,
+      "y": 621,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:320",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_136",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 103",
+      "x": 896,
+      "y": 650,
+      "width": 118,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:321",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_137",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 104",
+      "x": 1057,
+      "y": 447,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:314",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_138",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 105",
+      "x": 1057,
+      "y": 476,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:315",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_139",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 106",
+      "x": 1057,
+      "y": 505,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:316",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_140",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 107",
+      "x": 1057,
+      "y": 534,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:317",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_141",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 108",
+      "x": 1057,
+      "y": 563,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:318",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_142",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 109",
+      "x": 1057,
+      "y": 592,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:319",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_143",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 110",
+      "x": 1057,
+      "y": 621,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:320",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_144",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 111",
+      "x": 1057,
+      "y": 650,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:321",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_128",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_145",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia 7",
+      "x": 1201,
+      "y": 412,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791922945530_146",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 112",
+      "x": 1287,
+      "y": 447,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:330",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_147",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 113",
+      "x": 1287,
+      "y": 476,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:331",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_148",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 114",
+      "x": 1287,
+      "y": 505,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:332",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_149",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 115",
+      "x": 1287,
+      "y": 534,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:333",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_150",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 116",
+      "x": 1287,
+      "y": 563,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:334",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_151",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 117",
+      "x": 1287,
+      "y": 592,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:335",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_152",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 118",
+      "x": 1287,
+      "y": 621,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:336",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_153",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 119",
+      "x": 1287,
+      "y": 650,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:337",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_154",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 120",
+      "x": 1447,
+      "y": 447,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:330",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_155",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 121",
+      "x": 1447,
+      "y": 476,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:331",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_156",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 122",
+      "x": 1447,
+      "y": 505,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:332",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_157",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 123",
+      "x": 1447,
+      "y": 534,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:333",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_158",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 124",
+      "x": 1447,
+      "y": 563,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:334",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_159",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 125",
+      "x": 1447,
+      "y": 592,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:335",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_160",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 126",
+      "x": 1447,
+      "y": 621,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:336",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922945530_161",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 127",
+      "x": 1447,
+      "y": 650,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:17:337",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791922945530_145",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922978439_162",
+      "kind": "custom:receta-contador",
+      "name": "Contador de recetas 245",
+      "x": 1404,
+      "y": 12,
+      "width": 203,
+      "height": 64,
+      "text": "Contador de recetas",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922978439_163",
+      "kind": "custom:receta-guardar",
+      "name": "Guardar receta 230",
+      "x": 180,
+      "y": 78,
+      "width": 155,
+      "height": 37,
+      "text": "Guardar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "enlaces": {},
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922978439_164",
+      "kind": "custom:receta-nueva",
+      "name": "Nueva receta 227",
+      "x": 28,
+      "y": 78,
+      "width": 145,
+      "height": 37,
+      "text": "Nueva receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922978439_165",
+      "kind": "custom:receta-cargar",
+      "name": "Cargar receta 232",
+      "x": 341,
+      "y": 78,
+      "width": 148,
+      "height": 37,
+      "text": "Cargar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922978439_166",
+      "kind": "custom:receta-eliminar",
+      "name": "Eliminar receta 235",
+      "x": 1423,
+      "y": 78,
+      "width": 158,
+      "height": 37,
+      "text": "Eliminar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791922990650_167",
+      "kind": "rectangle",
+      "name": "Rectángulo 236",
+      "x": 15,
+      "y": 706,
+      "width": 145,
+      "height": 36,
+      "text": "Rectángulo",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "#cbd5e1",
+        "borderColor": "#94a3b8",
+        "borderWidth": 1,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791923012449_168",
+      "kind": "custom:receta-aplicar",
+      "name": "Aplicar todos 233",
+      "x": 15,
+      "y": 706,
+      "width": 145,
+      "height": 36,
+      "text": "Aplicar todos",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 17,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791923025663_169",
+      "kind": "custom:navegador-panel",
+      "name": "Navegador de Pantallas 237",
+      "x": 745,
+      "y": 699,
+      "width": 123,
+      "height": 56,
+      "text": "Navegador de Pantallas",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "grupo": "principal",
+        "pantallas": [
+          "principal_l3_receta_lazos_criticos_2_copia_2"
+        ],
+        "mostrarInicio": true,
+        "mostrarNombre": false
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "project_id": "principal_l3_reporte_copia_2",
+  "nombre": "L4 Reporte",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-15T21:10:08.152528Z",
+  "actualizado_en": "2026-10-15T21:10:08.153539Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1791415579953_16",
+      "kind": "custom:l4_control_calidad_cinta_continua",
+      "name": "LÍNEA 4 / CONTROL DE CALIDAD CINTA CONTINUA//Cinta continua, parámetros de proceso y resultados de los ensayos",
+      "x": 0,
+      "y": 0,
+      "width": 1610,
+      "height": 755,
+      "text": "L4 Reporte",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

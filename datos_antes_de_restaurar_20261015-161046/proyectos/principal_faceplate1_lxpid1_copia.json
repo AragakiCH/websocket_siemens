@@ -1,0 +1,19 @@
+{
+  "project_id": "principal_faceplate1_lxpid1_copia",
+  "nombre": "faceplate6_LxPidop",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-15T21:10:08.158551Z",
+  "actualizado_en": "2026-10-15T21:10:08.160067Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 370,
+    "height": 611,
+    "fondo": "#edf0f5"
+  },
+  "widgets": [],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

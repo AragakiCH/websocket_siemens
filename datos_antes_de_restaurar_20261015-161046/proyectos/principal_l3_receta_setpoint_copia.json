@@ -1,0 +1,1890 @@
+{
+  "project_id": "principal_l3_receta_setpoint_copia",
+  "nombre": "L3 Receta Rangos 1",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-15T21:10:08.045235Z",
+  "actualizado_en": "2026-10-15T21:10:08.046236Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1790804032408_11",
+      "kind": "custom:receta_tolerancias_l3",
+      "name": "LÍNEA 3 / RECETA DE TOLERANCIAS//Configuración de las tolerancias de los valores nominales del proceso",
+      "x": 0,
+      "y": 0,
+      "width": 1610,
+      "height": 755,
+      "text": "L3 Receta Rangos 1",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791913748222_85",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6",
+      "x": 335,
+      "y": 131,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:212",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_86",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia",
+      "x": 603,
+      "y": 131,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:212",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_87",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 2",
+      "x": 335,
+      "y": 171,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:213",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_88",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 3",
+      "x": 603,
+      "y": 171,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:213",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_89",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 4",
+      "x": 335,
+      "y": 210,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:214",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_90",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 5",
+      "x": 603,
+      "y": 210,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:214",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_91",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 6",
+      "x": 335,
+      "y": 249,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:215",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_92",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 7",
+      "x": 603,
+      "y": 249,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:215",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_93",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 8",
+      "x": 335,
+      "y": 289,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:216",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_94",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 9",
+      "x": 603,
+      "y": 289,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:216",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_95",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 10",
+      "x": 335,
+      "y": 328,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:217",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_96",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 11",
+      "x": 603,
+      "y": 328,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:217",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_97",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 12",
+      "x": 335,
+      "y": 367,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:218",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_98",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 13",
+      "x": 603,
+      "y": 367,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:218",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_99",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 14",
+      "x": 335,
+      "y": 407,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:219",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_100",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 15",
+      "x": 603,
+      "y": 407,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:219",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_101",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 16",
+      "x": 335,
+      "y": 446,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:220",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_102",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 17",
+      "x": 603,
+      "y": 446,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:220",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748222_103",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 18",
+      "x": 335,
+      "y": 485,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:221",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748223_104",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 19",
+      "x": 603,
+      "y": 485,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:221",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748223_105",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 20",
+      "x": 335,
+      "y": 525,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:222",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748223_106",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 21",
+      "x": 603,
+      "y": 525,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:222",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748223_107",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 22",
+      "x": 335,
+      "y": 564,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:223",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748223_108",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 23",
+      "x": 603,
+      "y": 564,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:223",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748223_109",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 24",
+      "x": 335,
+      "y": 604,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:224",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748223_110",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 25",
+      "x": 603,
+      "y": 604,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:224",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748223_111",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 26",
+      "x": 335,
+      "y": 644,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:225",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913748223_112",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 27",
+      "x": 603,
+      "y": 644,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:225",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814627_113",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 28",
+      "x": 1114,
+      "y": 131,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:226",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814627_114",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 29",
+      "x": 1382,
+      "y": 131,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:226",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_115",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 30",
+      "x": 1114,
+      "y": 171,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:227",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_116",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 31",
+      "x": 1382,
+      "y": 171,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:227",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_117",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 32",
+      "x": 1114,
+      "y": 210,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:228",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_118",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 33",
+      "x": 1382,
+      "y": 210,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:228",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_119",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 34",
+      "x": 1114,
+      "y": 249,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:229",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_120",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 35",
+      "x": 1382,
+      "y": 249,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:229",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_121",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 36",
+      "x": 1114,
+      "y": 289,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:230",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_122",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 37",
+      "x": 1382,
+      "y": 289,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:230",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_123",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 38",
+      "x": 1114,
+      "y": 328,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:231",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_124",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 39",
+      "x": 1382,
+      "y": 328,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:231",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_125",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 40",
+      "x": 1114,
+      "y": 367,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:232",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_126",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 41",
+      "x": 1382,
+      "y": 367,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:232",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_127",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 42",
+      "x": 1114,
+      "y": 407,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:233",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_128",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 43",
+      "x": 1382,
+      "y": 407,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:233",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_129",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 44",
+      "x": 1114,
+      "y": 446,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:234",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_130",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 45",
+      "x": 1382,
+      "y": 446,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:234",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_131",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 46",
+      "x": 1114,
+      "y": 485,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:235",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913814628_132",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 47",
+      "x": 1382,
+      "y": 485,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:13:235",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913933121_134",
+      "kind": "custom:receta-guardar",
+      "name": "Guardar receta 230",
+      "x": 180,
+      "y": 78,
+      "width": 155,
+      "height": 37,
+      "text": "Guardar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "enlaces": {},
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913933121_135",
+      "kind": "custom:receta-nueva",
+      "name": "Nueva receta 227",
+      "x": 28,
+      "y": 78,
+      "width": 145,
+      "height": 37,
+      "text": "Nueva receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913933121_136",
+      "kind": "custom:receta-cargar",
+      "name": "Cargar receta 232",
+      "x": 341,
+      "y": 78,
+      "width": 148,
+      "height": 37,
+      "text": "Cargar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791913933121_137",
+      "kind": "custom:receta-eliminar",
+      "name": "Eliminar receta 235",
+      "x": 1423,
+      "y": 78,
+      "width": 158,
+      "height": 37,
+      "text": "Eliminar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791914586871_138",
+      "kind": "rectangle",
+      "name": "Rectángulo 236",
+      "x": 15,
+      "y": 706,
+      "width": 145,
+      "height": 36,
+      "text": "Rectángulo",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "#cbd5e1",
+        "borderColor": "#94a3b8",
+        "borderWidth": 1,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791914595907_139",
+      "kind": "custom:receta-aplicar",
+      "name": "Aplicar todos 233",
+      "x": 15,
+      "y": 706,
+      "width": 145,
+      "height": 36,
+      "text": "Aplicar todos",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    },
+    {
+      "id": "w_1791921470633_5",
+      "kind": "custom:receta-contador",
+      "name": "Contador de recetas 245",
+      "x": 1404,
+      "y": 12,
+      "width": 203,
+      "height": 64,
+      "text": "Contador de recetas",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 13,
+        "nombre": "L3 RECETA DE TOLERANCIAS"
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

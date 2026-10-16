@@ -1,0 +1,53 @@
+[
+  {
+    "db_id": "prod",
+    "motor": "sqlite",
+    "nombre": "Producción",
+    "host": "",
+    "puerto": null,
+    "base_datos": "/tmp/prueba.db",
+    "usuario": "",
+    "password": "",
+    "opciones": {},
+    "autoconectar": true
+  },
+  {
+    "db_id": "hist",
+    "motor": "sqlite",
+    "nombre": "Historico",
+    "host": "",
+    "puerto": null,
+    "base_datos": "/tmp/api_hist.db",
+    "usuario": "",
+    "password": "",
+    "opciones": {},
+    "autoconectar": true
+  },
+  {
+    "db_id": "e2e",
+    "motor": "sqlite",
+    "nombre": "e2e",
+    "host": "",
+    "puerto": null,
+    "base_datos": "/tmp/e2e.db",
+    "usuario": "",
+    "password": "",
+    "opciones": {},
+    "autoconectar": true
+  },
+  {
+    "db_id": "local",
+    "motor": "mssql",
+    "nombre": "HMI_SQL",
+    "host": "localhost",
+    "puerto": 1433,
+    "base_datos": "HMI_PRUEBA",
+    "usuario": "hmi_low",
+    "password": "enc:gAAAAABqkK8R0UTgqVu88tDXE3SJw_8bfusfLPoShI4XijyFzUDLUU11oQqEIrCN4KdFAYtuFI9_WUjEiAYaqDxv_cTmYIMprA==",
+    "opciones": {
+      "driver": "ODBC Driver 17 for SQL Server",
+      "TrustServerCertificate": "yes"
+    },
+    "autoconectar": true
+  }
+]

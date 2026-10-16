@@ -1,0 +1,41 @@
+{
+  "project_id": "proyecto_2_pantalla_3",
+  "nombre": "Pantalla 3",
+  "proyecto": "proyecto_2_2",
+  "version": 3,
+  "creado_en": "2026-09-11T16:34:27.858032Z",
+  "actualizado_en": "2026-09-11T16:34:34.959354Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 1280,
+    "height": 760
+  },
+  "widgets": [
+    {
+      "id": "w_1789141000921_9",
+      "kind": "custom:cuba-pre-estiramiento",
+      "name": "Cuba Pre-Estiramiento 9",
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 760,
+      "text": "Cuba Pre-Estiramiento",
+      "style": {
+        "color": "#009999",
+        "background": "transparent",
+        "borderColor": "#94a3b8",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    }
+  ]
+}

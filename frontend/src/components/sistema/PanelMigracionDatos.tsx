@@ -171,6 +171,12 @@ export function PanelMigracionDatos() {
     }
   };
 
+  // OJO: no se bloquea nada por `conectado`. Ese campo es el estado del POOL
+  // —abierto o no en este momento—, y el servidor lo reabre solo con la
+  // primera petición (`DbManager._driver_de`). Bloquear aquí dejaba los
+  // botones grises con una base perfectamente alcanzable que simplemente
+  // no se había usado desde el arranque. Si de verdad no se llega, el
+  // servidor lo dice con su diagnóstico y se enseña abajo.
   const base = bases.find((b) => b.db_id === dbId);
   const ocupado = !!trabajando;
 
@@ -206,11 +212,18 @@ export function PanelMigracionDatos() {
             <option key={b.db_id} value={b.db_id}>
               {b.nombre || b.db_id} · {b.etiqueta_motor || b.motor}
               {b.base_datos ? ` · ${b.base_datos}` : ''}
-              {b.conectado ? '' : ' (sin conexión)'}
+              {b.conectado ? '' : ' (no abierta todavía)'}
             </option>
           ))}
         </select>
       </label>
+
+      {base && !base.conectado && (
+        <p className="mt-1 text-[10.5px] leading-relaxed text-slate-400">
+          Esta conexión no está abierta ahora mismo; se abrirá al exportar o
+          importar. {base.ultimo_error ? `Último error: ${base.ultimo_error}` : ''}
+        </p>
+      )}
 
       <label className="mt-2.5 flex items-center gap-2 text-[11.5px] text-slate-600 dark:text-slate-300">
         <input
@@ -227,7 +240,7 @@ export function PanelMigracionDatos() {
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button
           onClick={() => void exportar()}
-          disabled={ocupado || !dbId || !base?.conectado}
+          disabled={ocupado || !dbId}
           className="flex items-center gap-1.5 rounded-lg bg-siemens px-3 py-2 text-xs font-semibold text-white transition hover:bg-siemens-600 disabled:opacity-50"
         >
           {trabajando === 'exportar' ? (
@@ -313,7 +326,7 @@ export function PanelMigracionDatos() {
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             onClick={() => void importar(true)}
-            disabled={ocupado || !archivo || !dbId || !base?.conectado}
+            disabled={ocupado || !archivo || !dbId}
             className={BTN_SEC}
             title="Hace todo el recorrido sin guardar nada y enseña qué pasaría."
           >
@@ -326,7 +339,7 @@ export function PanelMigracionDatos() {
           </button>
           <button
             onClick={() => void importar(false)}
-            disabled={ocupado || !archivo || !dbId || !base?.conectado}
+            disabled={ocupado || !archivo || !dbId}
             className="flex items-center gap-1.5 rounded-lg border border-amber-400/60 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
           >
             {trabajando === 'importar' ? (

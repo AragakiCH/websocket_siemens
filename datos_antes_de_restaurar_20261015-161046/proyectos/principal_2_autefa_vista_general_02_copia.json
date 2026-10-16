@@ -1,0 +1,46 @@
+{
+  "project_id": "principal_2_autefa_vista_general_02_copia",
+  "nombre": "3 Autefa Plegador Frontal 01",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-15T21:10:08.079498Z",
+  "actualizado_en": "2026-10-15T21:10:08.080505Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1791238853834_8",
+      "kind": "custom:3_autefa_plegador_frontal_01",
+      "name": "AUTEFA / PLEGADOR 01 / VISTA FRONTAL // Vista frontal de las depositadoras 1A y 1B // Depositadora 1A // Depositadora 1B // 041-xxx",
+      "x": 0,
+      "y": 0,
+      "width": 1610,
+      "height": 755,
+      "text": "3 Autefa Plegador Frontal 01",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "interno|bool_3",
+      "vista": "",
+      "enlaces": {}
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

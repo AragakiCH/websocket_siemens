@@ -1,0 +1,1482 @@
+{
+  "project_id": "principal_l3_receta_lazos_criticos_2_copia",
+  "nombre": "L3 receta setpoint",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-15T21:10:08.041235Z",
+  "actualizado_en": "2026-10-15T21:10:08.042237Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1790802950112_9",
+      "kind": "custom:receta_valores_nominales_l3",
+      "name": "LÍNEA 3 / RECETA DE VALORES NOMINALES//Configuración de los valores de consigna del proceso",
+      "x": 0,
+      "y": 0,
+      "width": 1610,
+      "height": 755,
+      "text": "L3 Receta Setpoint",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791909395107_13",
+      "kind": "custom:receta-guardar",
+      "name": "Guardar receta 230",
+      "x": 180,
+      "y": 78,
+      "width": 155,
+      "height": 37,
+      "text": "Guardar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "enlaces": {},
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791909395107_14",
+      "kind": "custom:receta-nueva",
+      "name": "Nueva receta 227",
+      "x": 28,
+      "y": 78,
+      "width": 145,
+      "height": 37,
+      "text": "Nueva receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791909395107_15",
+      "kind": "custom:receta-cargar",
+      "name": "Cargar receta 232",
+      "x": 341,
+      "y": 78,
+      "width": 148,
+      "height": 37,
+      "text": "Cargar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791909395107_16",
+      "kind": "custom:receta-eliminar",
+      "name": "Eliminar receta 235",
+      "x": 1423,
+      "y": 78,
+      "width": 158,
+      "height": 37,
+      "text": "Eliminar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791909406290_17",
+      "kind": "rectangle",
+      "name": "Rectángulo 236",
+      "x": 15,
+      "y": 706,
+      "width": 145,
+      "height": 36,
+      "text": "Rectángulo",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "#cbd5e1",
+        "borderColor": "#94a3b8",
+        "borderWidth": 1,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791909412198_18",
+      "kind": "custom:receta-aplicar",
+      "name": "Aplicar todos 233",
+      "x": 15,
+      "y": 706,
+      "width": 145,
+      "height": 36,
+      "text": "Aplicar todos",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791909488163_19",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6",
+      "x": 335,
+      "y": 131,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:194",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791910934154_20",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia",
+      "x": 603,
+      "y": 131,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:194",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911055353_22",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 2",
+      "x": 335,
+      "y": 171,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:195",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911055353_23",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 3",
+      "x": 603,
+      "y": 171,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:195",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911135579_28",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 4",
+      "x": 335,
+      "y": 210,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:196",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911135579_29",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 5",
+      "x": 603,
+      "y": 210,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:196",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911245409_30",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 6",
+      "x": 335,
+      "y": 249,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:197",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911245409_31",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 7",
+      "x": 603,
+      "y": 249,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:197",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911245409_32",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 8",
+      "x": 335,
+      "y": 289,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:198",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911245409_33",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 9",
+      "x": 603,
+      "y": 289,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:198",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911245409_34",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 10",
+      "x": 335,
+      "y": 328,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:199",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911245409_35",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 11",
+      "x": 603,
+      "y": 328,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:199",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911268787_36",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 12",
+      "x": 335,
+      "y": 367,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:200",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911268787_37",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 13",
+      "x": 603,
+      "y": 367,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:200",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911268787_38",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 14",
+      "x": 335,
+      "y": 407,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:201",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911268787_39",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 15",
+      "x": 603,
+      "y": 407,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:201",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911268787_40",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 16",
+      "x": 335,
+      "y": 446,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:202",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911268787_41",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 17",
+      "x": 603,
+      "y": 446,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:202",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911268787_42",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 18",
+      "x": 335,
+      "y": 485,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:203",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911268787_43",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 19",
+      "x": 603,
+      "y": 485,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:203",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911268787_44",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 20",
+      "x": 335,
+      "y": 525,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:204",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911268787_45",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 21",
+      "x": 603,
+      "y": 525,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:204",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911268787_46",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 22",
+      "x": 335,
+      "y": 564,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:205",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911268787_47",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 23",
+      "x": 603,
+      "y": 564,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:205",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911286287_48",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 24",
+      "x": 335,
+      "y": 604,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:206",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911286287_49",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 25",
+      "x": 603,
+      "y": 604,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:206",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911286287_50",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 26",
+      "x": 335,
+      "y": 644,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:207",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911286287_51",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 27",
+      "x": 603,
+      "y": 644,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:207",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911340611_52",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 28",
+      "x": 1113,
+      "y": 131,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:208",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911340611_53",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 29",
+      "x": 1381,
+      "y": 131,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:208",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911340611_54",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 30",
+      "x": 1113,
+      "y": 171,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:209",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911340611_55",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 31",
+      "x": 1381,
+      "y": 171,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:209",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911340611_56",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 32",
+      "x": 1113,
+      "y": 210,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:210",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911340611_57",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 33",
+      "x": 1381,
+      "y": 210,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:210",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911340611_58",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 34",
+      "x": 1113,
+      "y": 249,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:211",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791911340611_59",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 35",
+      "x": 1380,
+      "y": 249,
+      "width": 182,
+      "height": 36,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:12:211",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    },
+    {
+      "id": "w_1791921446225_4",
+      "kind": "custom:receta-contador",
+      "name": "Contador de recetas 245",
+      "x": 1404,
+      "y": 12,
+      "width": 203,
+      "height": 64,
+      "text": "Contador de recetas",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 12,
+        "nombre": "L3 RECETA DE VALORES NOMINALES"
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

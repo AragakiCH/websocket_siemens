@@ -1,0 +1,3242 @@
+{
+  "project_id": "principal_l3_receta_lazos_criticos_2_copia_2",
+  "nombre": "L4 receta lazos criticos 2",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-15T21:10:08.112183Z",
+  "actualizado_en": "2026-10-15T21:10:08.115183Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1791412196363_6",
+      "kind": "custom:receta_lazos_criticos_l4_estiro",
+      "name": "LÍNEA 4 / RECETA DE LAZOS CRÍTICOS DE PRE-ESTIRO Y ESTIRO//Configuración de parámetros de los lazos críticos del proceso",
+      "x": 1,
+      "y": 0,
+      "width": 1609,
+      "height": 755,
+      "text": "L4 Receta lazos críticos 2",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791924947749_171",
+      "kind": "custom:navegador-panel",
+      "name": "Navegador de Pantallas 237",
+      "x": 745,
+      "y": 699,
+      "width": 123,
+      "height": 56,
+      "text": "Navegador de Pantallas",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "grupo": "principal",
+        "pantallas": [
+          "principal_l3_receta_lazos_criticos_1_copia_2"
+        ],
+        "mostrarInicio": true,
+        "mostrarNombre": false
+      }
+    },
+    {
+      "id": "w_1791926348829_172",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161",
+      "x": 194,
+      "y": 124,
+      "width": 400,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791926348829_173",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6",
+      "x": 280,
+      "y": 159,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:338",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_174",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia",
+      "x": 280,
+      "y": 188,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:339",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_175",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 2",
+      "x": 280,
+      "y": 217,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:340",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_176",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 3",
+      "x": 280,
+      "y": 246,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:341",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_177",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 4",
+      "x": 280,
+      "y": 275,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:342",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_178",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 5",
+      "x": 280,
+      "y": 304,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:343",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_179",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 6",
+      "x": 280,
+      "y": 333,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:344",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_180",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 7",
+      "x": 280,
+      "y": 362,
+      "width": 128,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:345",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_181",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 8",
+      "x": 451,
+      "y": 159,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:338",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_182",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 9",
+      "x": 451,
+      "y": 188,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:339",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_183",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 10",
+      "x": 451,
+      "y": 217,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:340",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_184",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 11",
+      "x": 451,
+      "y": 246,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:341",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_185",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 12",
+      "x": 451,
+      "y": 275,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:342",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_186",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 13",
+      "x": 451,
+      "y": 304,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:343",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_187",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 14",
+      "x": 451,
+      "y": 333,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:344",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_188",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 15",
+      "x": 451,
+      "y": 362,
+      "width": 128,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:345",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_172",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_189",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia",
+      "x": 606,
+      "y": 124,
+      "width": 398,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791926348829_190",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 16",
+      "x": 691,
+      "y": 159,
+      "width": 130,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:354",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_191",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 17",
+      "x": 691,
+      "y": 188,
+      "width": 130,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:355",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_192",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 18",
+      "x": 691,
+      "y": 217,
+      "width": 130,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:356",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_193",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 19",
+      "x": 691,
+      "y": 246,
+      "width": 130,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:357",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_194",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 20",
+      "x": 691,
+      "y": 275,
+      "width": 130,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:358",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_195",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 21",
+      "x": 691,
+      "y": 304,
+      "width": 130,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:359",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_196",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 22",
+      "x": 691,
+      "y": 333,
+      "width": 130,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:360",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_197",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 23",
+      "x": 691,
+      "y": 362,
+      "width": 130,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:361",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_198",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 24",
+      "x": 861,
+      "y": 159,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:354",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_199",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 25",
+      "x": 861,
+      "y": 187,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:355",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_200",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 26",
+      "x": 861,
+      "y": 217,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:356",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_201",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 27",
+      "x": 861,
+      "y": 246,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:357",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_202",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 28",
+      "x": 861,
+      "y": 275,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:358",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_203",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 29",
+      "x": 861,
+      "y": 304,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:359",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_204",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 30",
+      "x": 861,
+      "y": 333,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:360",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_205",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 31",
+      "x": 861,
+      "y": 362,
+      "width": 128,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:361",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_189",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_206",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia 2",
+      "x": 1016,
+      "y": 124,
+      "width": 398,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791926348829_207",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 32",
+      "x": 1101,
+      "y": 159,
+      "width": 130,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:370",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_208",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 33",
+      "x": 1101,
+      "y": 188,
+      "width": 130,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:371",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_209",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 34",
+      "x": 1101,
+      "y": 217,
+      "width": 130,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:372",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_210",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 35",
+      "x": 1101,
+      "y": 246,
+      "width": 130,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:373",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_211",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 36",
+      "x": 1101,
+      "y": 275,
+      "width": 130,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:374",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_212",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 37",
+      "x": 1101,
+      "y": 304,
+      "width": 130,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:375",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_213",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 38",
+      "x": 1101,
+      "y": 333,
+      "width": 130,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:376",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_214",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 39",
+      "x": 1101,
+      "y": 362,
+      "width": 130,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:378",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_215",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 40",
+      "x": 1271,
+      "y": 159,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:370",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_216",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 41",
+      "x": 1271,
+      "y": 188,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:371",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_217",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 42",
+      "x": 1271,
+      "y": 217,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:372",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_218",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 43",
+      "x": 1272,
+      "y": 246,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:373",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_219",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 44",
+      "x": 1271,
+      "y": 275,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:374",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_220",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 45",
+      "x": 1271,
+      "y": 304,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:375",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_221",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 46",
+      "x": 1271,
+      "y": 333,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:376",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_222",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 47",
+      "x": 1271,
+      "y": 362,
+      "width": 128,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:378",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_206",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_223",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia 3",
+      "x": 401,
+      "y": 412,
+      "width": 398,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791926348829_224",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 48",
+      "x": 485,
+      "y": 446,
+      "width": 131,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:346",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_225",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 49",
+      "x": 485,
+      "y": 476,
+      "width": 131,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:347",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_226",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 50",
+      "x": 485,
+      "y": 505,
+      "width": 131,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:348",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_227",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 51",
+      "x": 485,
+      "y": 534,
+      "width": 131,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:349",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_228",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 52",
+      "x": 485,
+      "y": 563,
+      "width": 131,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:350",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_229",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 53",
+      "x": 485,
+      "y": 592,
+      "width": 131,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:351",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_230",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 54",
+      "x": 485,
+      "y": 621,
+      "width": 131,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:352",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_231",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 55",
+      "x": 485,
+      "y": 650,
+      "width": 131,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:353",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_232",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 56",
+      "x": 656,
+      "y": 447,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:346",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_233",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 57",
+      "x": 656,
+      "y": 476,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:347",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_234",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 58",
+      "x": 656,
+      "y": 505,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:348",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_235",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 59",
+      "x": 656,
+      "y": 534,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:349",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_236",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 60",
+      "x": 656,
+      "y": 563,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:350",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_237",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 61",
+      "x": 656,
+      "y": 592,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:351",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_238",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 62",
+      "x": 656,
+      "y": 621,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:352",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_239",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 63",
+      "x": 656,
+      "y": 650,
+      "width": 128,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:353",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_223",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_240",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia 4",
+      "x": 812,
+      "y": 412,
+      "width": 398,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791926348829_241",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 64",
+      "x": 896,
+      "y": 447,
+      "width": 132,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:362",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_242",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 65",
+      "x": 896,
+      "y": 476,
+      "width": 132,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:363",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_243",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 66",
+      "x": 896,
+      "y": 505,
+      "width": 132,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:364",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_244",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 67",
+      "x": 896,
+      "y": 534,
+      "width": 132,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:365",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_245",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 68",
+      "x": 896,
+      "y": 563,
+      "width": 132,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:366",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_246",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 69",
+      "x": 896,
+      "y": 592,
+      "width": 132,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:367",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_247",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 70",
+      "x": 896,
+      "y": 621,
+      "width": 132,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:368",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_248",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 71",
+      "x": 896,
+      "y": 650,
+      "width": 132,
+      "height": 28,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:369",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_249",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 72",
+      "x": 1067,
+      "y": 447,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:362",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_250",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 73",
+      "x": 1067,
+      "y": 476,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:363",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_251",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 74",
+      "x": 1067,
+      "y": 505,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:364",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_252",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 75",
+      "x": 1067,
+      "y": 534,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:365",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_253",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 76",
+      "x": 1067,
+      "y": 563,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:366",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_254",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 77",
+      "x": 1067,
+      "y": 592,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:367",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_255",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 78",
+      "x": 1067,
+      "y": 621,
+      "width": 128,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:368",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926348829_256",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 79",
+      "x": 1067,
+      "y": 650,
+      "width": 128,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:18:369",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791926348829_240",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926361445_257",
+      "kind": "custom:receta-contador",
+      "name": "Contador de recetas 245",
+      "x": 1404,
+      "y": 12,
+      "width": 203,
+      "height": 64,
+      "text": "Contador de recetas",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926361445_258",
+      "kind": "custom:receta-guardar",
+      "name": "Guardar receta 230",
+      "x": 180,
+      "y": 78,
+      "width": 155,
+      "height": 37,
+      "text": "Guardar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "enlaces": {},
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926361445_259",
+      "kind": "custom:receta-nueva",
+      "name": "Nueva receta 227",
+      "x": 28,
+      "y": 78,
+      "width": 145,
+      "height": 37,
+      "text": "Nueva receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926361445_260",
+      "kind": "custom:receta-cargar",
+      "name": "Cargar receta 232",
+      "x": 341,
+      "y": 78,
+      "width": 148,
+      "height": 37,
+      "text": "Cargar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926361445_261",
+      "kind": "custom:receta-eliminar",
+      "name": "Eliminar receta 235",
+      "x": 1423,
+      "y": 78,
+      "width": 158,
+      "height": 37,
+      "text": "Eliminar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791926371309_262",
+      "kind": "rectangle",
+      "name": "Rectángulo 236",
+      "x": 15,
+      "y": 706,
+      "width": 145,
+      "height": 36,
+      "text": "Rectángulo",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "#cbd5e1",
+        "borderColor": "#94a3b8",
+        "borderWidth": 1,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791926376925_263",
+      "kind": "custom:receta-aplicar",
+      "name": "Aplicar todos 233",
+      "x": 15,
+      "y": 706,
+      "width": 145,
+      "height": 36,
+      "text": "Aplicar todos",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 18,
+        "nombre": "L4 RECETA DE LAZOS CRÍTICOS DE  PRE-ESTIRO Y ESTIRO"
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

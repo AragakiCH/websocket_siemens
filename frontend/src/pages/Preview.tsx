@@ -68,6 +68,12 @@ import { Logo } from '../components/ui/Logo';
 import { RealPLCService } from '../services/RealPLCService';
 import CapaPopups from '../components/hmi/custom/faceplate/CapaPopups';
 import {
+  precargarPantallas,
+  precargarModulos,
+} from '../components/hmi/custom/navegacion/PantallaEmbebida';
+import { pantallasReferenciadas } from '../components/hmi/custom/navegacion/referencias';
+import { indiceDe } from '../components/hmi/rendimiento';
+import {
   useVistaActiva,
   usePanel,
   sigueConPanelAbierto,
@@ -355,13 +361,17 @@ export function Preview() {
   // ese elemento antes de buscar el valor. `revRecetas` sube cuando se
   // entera de un tag nuevo, y es lo que hace repetir la búsqueda.
   const revRecetas = useRevisionEnlacesReceta();
+  // Por índice y no con `find`: con cientos de tags y cientos de widgets,
+  // recorrer la lista por cada enlace en cada lectura era la mayor parte del
+  // trabajo de cada tick. El índice se calcula una vez por lista.
+  const indice = useMemo(() => indiceDe(variables), [variables]);
   const resolverVariable = useCallback(
     (id: string | null | undefined) => {
       const real = idRealDeEnlace(id);
-      return real ? variables.find((v) => v.id === real) : undefined;
+      return real ? indice.get(real) : undefined;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [variables, revRecetas]
+    [indice, revRecetas]
   );
 
   // Vista abierta en la navegación. Al pulsar un botón del Menú Lateral
@@ -473,6 +483,10 @@ export function Preview() {
 
   const [pantallaId, setPantallaId] = useState<string>(arranque);
   const [pantallas, setPantallas] = useState<ResumenPantalla[]>([]);
+  // La misma lista, legible desde `cargar` sin volver a crearlo cada vez
+  // que cambie (es lo que precalienta el resto del proyecto).
+  const pantallasRef = useRef<ResumenPantalla[]>([]);
+  pantallasRef.current = pantallas;
 
   // El catálogo de pantallas hace falta también AQUÍ, no sólo en el
   // Diseñador: lo lee todo el que tenga que poner el NOMBRE de una pantalla
@@ -614,6 +628,16 @@ export function Preview() {
         setDesign({ widgets: p.widgets, canvas: p.canvas });
         setDesfasado(p.desdeCache === true);
         versionRef.current = p.desdeCache ? 0 : p.version;
+        // ── PRECALENTAR ──────────────────────────────────────────
+        // Lo que esta pantalla puede abrir dentro de un panel se pide ya,
+        // en segundo plano, para que el primer clic no espere al servidor.
+        // Primero lo referenciado desde aquí; luego el resto del proyecto.
+        // Ver `precargarPantallas` en PantallaEmbebida.tsx.
+        precargarModulos();
+        precargarPantallas([
+          ...pantallasReferenciadas(p.widgets, id),
+          ...pantallasRef.current.map((x) => x.project_id).filter((x) => x !== id),
+        ]);
       } else {
         // null = la pantalla ya no existe en el servidor. Antes se quedaba
         // lo que hubiera pintado, que es como enseñar algo ya borrado.

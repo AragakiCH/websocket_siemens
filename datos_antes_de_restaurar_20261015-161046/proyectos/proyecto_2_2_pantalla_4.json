@@ -1,0 +1,65 @@
+{
+  "project_id": "proyecto_2_2_pantalla_4",
+  "nombre": "Pantalla 4",
+  "proyecto": "proyecto_2_2",
+  "version": 14,
+  "creado_en": "2026-09-17T15:22:36.997547Z",
+  "actualizado_en": "2026-09-17T16:05:20.200268Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1280,
+    "height": 760
+  },
+  "widgets": [
+    {
+      "id": "w_1789658559147_1",
+      "kind": "custom:trend",
+      "name": "Tendencia 1",
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 760,
+      "text": "Tendencia",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "series": [],
+        "origen": "vivo",
+        "grupoId": "",
+        "rango": "1h",
+        "desde": "",
+        "hasta": "",
+        "limiteSerie": 1000,
+        "mostrarRegla": true,
+        "ventanaSeg": 60,
+        "retencionSeg": 1800,
+        "mostrarLeyenda": true,
+        "mostrarRejilla": true,
+        "autoEscala": true,
+        "min": "",
+        "max": ""
+      },
+      "enlaces": {
+        "var1": ""
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

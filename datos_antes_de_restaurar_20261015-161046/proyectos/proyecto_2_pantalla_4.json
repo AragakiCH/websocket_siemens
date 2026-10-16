@@ -1,0 +1,151 @@
+{
+  "project_id": "proyecto_2_pantalla_4",
+  "nombre": "Pantalla 4",
+  "proyecto": "proyecto_2",
+  "version": 25,
+  "creado_en": "2026-10-12T16:30:18.652908Z",
+  "actualizado_en": "2026-10-15T18:49:41.142202Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 1280,
+    "height": 760
+  },
+  "widgets": [
+    {
+      "id": "w_1791822620808_4",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 4",
+      "x": 960,
+      "y": 0,
+      "width": 320,
+      "height": 220,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": true
+      }
+    },
+    {
+      "id": "w_1791822625134_5",
+      "kind": "gaugeLinear",
+      "name": "Medidor Lineal 5",
+      "x": 670,
+      "y": 291,
+      "width": 200,
+      "height": 64,
+      "text": "Medidor Lineal",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791822630481_6",
+      "kind": "custom:cuba-pre-estiramiento",
+      "name": "Cuba Pre-Estiramiento 6",
+      "x": 477,
+      "y": 410,
+      "width": 800,
+      "height": 350,
+      "text": "Cuba Pre-Estiramiento",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "funciones": {
+        "activo": true,
+        "porSalida": {}
+      },
+      "enlaces": {}
+    },
+    {
+      "id": "w_1792089971050_2",
+      "kind": "custom:tanque-nivel",
+      "name": "Tanque de Nivel 2",
+      "x": 824,
+      "y": 9,
+      "width": 130,
+      "height": 190,
+      "text": "Tanque de Nivel",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "enlaces": {
+        "var1": "",
+        "var2": ""
+      },
+      "funciones": {
+        "activo": true,
+        "porSalida": {
+          "@principal": {
+            "entradas": [],
+            "internas": [
+              {
+                "nombre": "variable01_p",
+                "tipo": "bool"
+              }
+            ],
+            "expresion": ""
+          }
+        }
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

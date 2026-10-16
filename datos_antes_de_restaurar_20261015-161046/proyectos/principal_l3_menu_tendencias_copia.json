@@ -1,0 +1,45 @@
+{
+  "project_id": "principal_l3_menu_tendencias_copia",
+  "nombre": "L4 Menú Tendencias",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-15T21:10:08.092607Z",
+  "actualizado_en": "2026-10-15T21:10:08.093606Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1791409839670_2",
+      "kind": "custom:l4_panel_tendencias",
+      "name": "LÍNEA 4 / TENDENCIAS//Seguimiento de las principales variables del proceso",
+      "x": 0,
+      "y": 0,
+      "width": 1610,
+      "height": 755,
+      "text": "L4 Panel Tendencias",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

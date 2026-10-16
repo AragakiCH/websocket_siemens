@@ -63,23 +63,68 @@ export function inferUnit(name: string): string | undefined {
  *                la vista pinta «—» en vez de un dato viejo que parezca
  *                actual.
  */
+// La última `PlcVariable` entregada por cada id. Ver la nota de abajo.
+const anteriores = new Map<string, PlcVariable>();
+
+/** ¿Mismo valor? Los escalares por `===`; un array o un UDT, por contenido. */
+function mismoValor(a: PlcVariable['value'], b: PlcVariable['value']): boolean {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * De los tags crudos del WebSocket a `PlcVariable[]`.
+ *
+ * CON IDENTIDAD ESTABLE, y esto es lo que importa para el rendimiento: si
+ * una variable no cambió (mismo valor, tipo, unidad y selección), se
+ * devuelve EL MISMO OBJETO que la vez anterior. Antes se fabricaba un objeto
+ * nuevo por variable en cada lectura, y como React y los `useMemo` comparan
+ * por identidad, cada lectura de UN tag redibujaba TODOS los widgets de la
+ * pantalla —y de las pantallas empotradas— aunque su valor fuera el mismo.
+ * Con objetos estables, un widget cuya variable no cambió no hace nada.
+ *
+ * La lista sí es nueva cada vez (es lo que avisa a React de que hubo
+ * lectura); lo que se conserva es cada elemento.
+ */
 export function toPlcVariables(
   tags: Record<string, any>,
   selection: Map<string, boolean>,
   sinConexion?: (plcId: string) => boolean
 ): PlcVariable[] {
-  return Object.entries(tags).map(([key, t]) => {
+  const vistos = new Set<string>();
+  const salida = Object.entries(tags).map(([key, t]) => {
+    vistos.add(key);
     const name: string = t.tag ?? key;
     // selected: si el usuario ya decidió algo, se respeta; si es un tag nuevo,
     // por defecto TRUE (visible). Cambia a `false` si prefieres lo contrario.
     const selected = selection.has(key) ? (selection.get(key) as boolean) : true;
-    return {
-      id: key,
-      name,
-      type: mapOpcType(t.type),
-      value: sinConexion && sinConexion(String(t.plc ?? '')) ? null : t.value,
-      unit: inferUnit(name),
-      selected,
-    };
+    const type = mapOpcType(t.type);
+    const value = sinConexion && sinConexion(String(t.plc ?? '')) ? null : t.value;
+    const unit = inferUnit(name);
+
+    const previa = anteriores.get(key);
+    if (
+      previa &&
+      previa.name === name &&
+      previa.type === type &&
+      previa.unit === unit &&
+      previa.selected === selected &&
+      mismoValor(previa.value, value)
+    ) {
+      return previa;
+    }
+    const nueva: PlcVariable = { id: key, name, type, value, unit, selected };
+    anteriores.set(key, nueva);
+    return nueva;
   });
+  // Un tag que desapareció (se quitó su PLC) no debe quedarse en memoria.
+  if (anteriores.size > vistos.size) {
+    for (const k of Array.from(anteriores.keys())) if (!vistos.has(k)) anteriores.delete(k);
+  }
+  return salida;
 }

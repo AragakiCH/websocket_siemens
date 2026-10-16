@@ -92,7 +92,10 @@ export default defineConfig({
       '/internas': BACKEND,
       // Escritura en el PLC y variables sobre huecos de reserva.
       '/escritura': BACKEND,
-      '/variables': BACKEND
+      '/variables': BACKEND,
+      // «Modo función» de los widgets: validar, probar y evaluar el código
+      // Python en el servidor.
+      '/funciones': BACKEND
       
     },
   },

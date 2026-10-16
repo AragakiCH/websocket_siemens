@@ -1,0 +1,5013 @@
+{
+  "project_id": "principal_l3_tablas_error_lazos_2_copia",
+  "nombre": "L3 receta lazos criticos 1",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-15T21:10:08.027891Z",
+  "actualizado_en": "2026-10-15T21:10:08.030211Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1790798767008_7",
+      "kind": "custom:receta_lazos_criticos_l3",
+      "name": "LÍNEA 3 / RECETA DE LAZOS CRÍTICOS//Configuración de parámetros de los lazos críticos del proceso",
+      "x": 0,
+      "y": 0,
+      "width": 1610,
+      "height": 755,
+      "text": "L3 Receta lazos críticos 1",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "enlaces": {}
+    },
+    {
+      "id": "w_1791829417239_161",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161",
+      "x": 30,
+      "y": 124,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791840742849_6",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6",
+      "x": 115,
+      "y": 159,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:50",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791840834769_7",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia",
+      "x": 115,
+      "y": 188,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:51",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791840856945_8",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 2",
+      "x": 115,
+      "y": 217,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:52",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791840856945_9",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 3",
+      "x": 115,
+      "y": 246,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:53",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791840867354_10",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 4",
+      "x": 115,
+      "y": 275,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:54",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791840867354_11",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 5",
+      "x": 115,
+      "y": 304,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:55",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791840867354_12",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 6",
+      "x": 115,
+      "y": 333,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:56",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791840867354_13",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 7",
+      "x": 115,
+      "y": 362,
+      "width": 118,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:57",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791840905605_14",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 8",
+      "x": 276,
+      "y": 159,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:50",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791840905605_15",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 9",
+      "x": 276,
+      "y": 188,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:51",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791840905605_16",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 10",
+      "x": 276,
+      "y": 217,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:52",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791840905605_17",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 11",
+      "x": 276,
+      "y": 246,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:53",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791840905605_18",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 12",
+      "x": 276,
+      "y": 275,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:54",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791840905605_19",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 13",
+      "x": 276,
+      "y": 304,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:55",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791840905605_20",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 14",
+      "x": 276,
+      "y": 333,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:56",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791840905605_21",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 15",
+      "x": 276,
+      "y": 362,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:57",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791829417239_161",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_22",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia",
+      "x": 420,
+      "y": 124,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791841035721_23",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 16",
+      "x": 506,
+      "y": 159,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:66",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_24",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 17",
+      "x": 506,
+      "y": 188,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:67",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_25",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 18",
+      "x": 506,
+      "y": 217,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:68",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_26",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 19",
+      "x": 506,
+      "y": 246,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:69",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_27",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 20",
+      "x": 506,
+      "y": 275,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:70",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_28",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 21",
+      "x": 506,
+      "y": 304,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:71",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_29",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 22",
+      "x": 506,
+      "y": 333,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:72",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_30",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 23",
+      "x": 506,
+      "y": 362,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:73",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_31",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 24",
+      "x": 666,
+      "y": 159,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:66",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_32",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 25",
+      "x": 666,
+      "y": 188,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:67",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_33",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 26",
+      "x": 666,
+      "y": 217,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:68",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_34",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 27",
+      "x": 666,
+      "y": 246,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:69",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_35",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 28",
+      "x": 666,
+      "y": 275,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:70",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_36",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 29",
+      "x": 666,
+      "y": 304,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:71",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_37",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 30",
+      "x": 666,
+      "y": 333,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:72",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841035721_38",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 31",
+      "x": 666,
+      "y": 362,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:73",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841035721_22",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_39",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia 2",
+      "x": 811,
+      "y": 124,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791841051384_40",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 32",
+      "x": 896,
+      "y": 159,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:82",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_41",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 33",
+      "x": 896,
+      "y": 188,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:83",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_42",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 34",
+      "x": 896,
+      "y": 217,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:84",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_43",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 35",
+      "x": 896,
+      "y": 246,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:85",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_44",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 36",
+      "x": 896,
+      "y": 275,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:86",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_45",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 37",
+      "x": 896,
+      "y": 304,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:87",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_46",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 38",
+      "x": 896,
+      "y": 333,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:88",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_47",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 39",
+      "x": 896,
+      "y": 362,
+      "width": 118,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:89",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_48",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 40",
+      "x": 1057,
+      "y": 159,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:82",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_49",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 41",
+      "x": 1057,
+      "y": 188,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:83",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_50",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 42",
+      "x": 1057,
+      "y": 217,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:84",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_51",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 43",
+      "x": 1057,
+      "y": 246,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:85",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_52",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 44",
+      "x": 1057,
+      "y": 275,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:86",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_53",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 45",
+      "x": 1057,
+      "y": 304,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:87",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_54",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 46",
+      "x": 1057,
+      "y": 333,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:88",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841051384_55",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 47",
+      "x": 1057,
+      "y": 362,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:89",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841051384_39",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_56",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia 3",
+      "x": 1201,
+      "y": 124,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791841066338_57",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 48",
+      "x": 1287,
+      "y": 159,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:98",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_58",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 49",
+      "x": 1287,
+      "y": 188,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:99",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_59",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 50",
+      "x": 1287,
+      "y": 217,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:100",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_60",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 51",
+      "x": 1287,
+      "y": 246,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:101",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_61",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 52",
+      "x": 1287,
+      "y": 275,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:102",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_62",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 53",
+      "x": 1287,
+      "y": 304,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:103",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_63",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 54",
+      "x": 1287,
+      "y": 333,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:104",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_64",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 55",
+      "x": 1287,
+      "y": 362,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:105",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_65",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 56",
+      "x": 1447,
+      "y": 159,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:98",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_66",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 57",
+      "x": 1447,
+      "y": 188,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:99",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_67",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 58",
+      "x": 1447,
+      "y": 217,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:100",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_68",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 59",
+      "x": 1447,
+      "y": 246,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:101",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_69",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 60",
+      "x": 1447,
+      "y": 275,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:102",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_70",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 61",
+      "x": 1447,
+      "y": 304,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:103",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_71",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 62",
+      "x": 1447,
+      "y": 333,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:104",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841066338_72",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 63",
+      "x": 1447,
+      "y": 362,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:105",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841066338_56",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_73",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia 4",
+      "x": 30,
+      "y": 412,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791841075877_74",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 64",
+      "x": 115,
+      "y": 447,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:58",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_75",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 65",
+      "x": 115,
+      "y": 476,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:59",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_76",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 66",
+      "x": 115,
+      "y": 505,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:60",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_77",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 67",
+      "x": 115,
+      "y": 534,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:61",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_78",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 68",
+      "x": 115,
+      "y": 563,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:62",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_79",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 69",
+      "x": 115,
+      "y": 592,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:63",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_80",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 70",
+      "x": 115,
+      "y": 621,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:64",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_81",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 71",
+      "x": 115,
+      "y": 650,
+      "width": 118,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:65",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_82",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 72",
+      "x": 276,
+      "y": 447,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:58",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_83",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 73",
+      "x": 276,
+      "y": 476,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:59",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_84",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 74",
+      "x": 276,
+      "y": 505,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:60",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_85",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 75",
+      "x": 276,
+      "y": 534,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:61",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_86",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 76",
+      "x": 276,
+      "y": 563,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:62",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_87",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 77",
+      "x": 276,
+      "y": 592,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:63",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_88",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 78",
+      "x": 276,
+      "y": 621,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:64",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_89",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 79",
+      "x": 276,
+      "y": 650,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:65",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_73",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_90",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia 5",
+      "x": 420,
+      "y": 412,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791841075877_91",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 80",
+      "x": 506,
+      "y": 447,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:74",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_92",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 81",
+      "x": 506,
+      "y": 476,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:75",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_93",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 82",
+      "x": 506,
+      "y": 505,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:76",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_94",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 83",
+      "x": 506,
+      "y": 534,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:77",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_95",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 84",
+      "x": 506,
+      "y": 563,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:78",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_96",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 85",
+      "x": 506,
+      "y": 592,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:79",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_97",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 86",
+      "x": 506,
+      "y": 621,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:80",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_98",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 87",
+      "x": 506,
+      "y": 650,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:81",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_99",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 88",
+      "x": 666,
+      "y": 447,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:74",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_100",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 89",
+      "x": 666,
+      "y": 476,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:75",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_101",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 90",
+      "x": 666,
+      "y": 505,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:76",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_102",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 91",
+      "x": 666,
+      "y": 534,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:77",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_103",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 92",
+      "x": 666,
+      "y": 563,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:78",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_104",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 93",
+      "x": 666,
+      "y": 592,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:79",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_105",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 94",
+      "x": 666,
+      "y": 621,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:80",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_106",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 95",
+      "x": 666,
+      "y": 650,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:81",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_90",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_107",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia 6",
+      "x": 811,
+      "y": 412,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791841075877_108",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 96",
+      "x": 896,
+      "y": 447,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:90",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_109",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 97",
+      "x": 896,
+      "y": 476,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:91",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_110",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 98",
+      "x": 896,
+      "y": 505,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:92",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_111",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 99",
+      "x": 896,
+      "y": 534,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:93",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_112",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 100",
+      "x": 896,
+      "y": 563,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:94",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_113",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 101",
+      "x": 896,
+      "y": 592,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:95",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_114",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 102",
+      "x": 896,
+      "y": 621,
+      "width": 118,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:96",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_115",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 103",
+      "x": 896,
+      "y": 650,
+      "width": 118,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:97",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_116",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 104",
+      "x": 1057,
+      "y": 447,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:90",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_117",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 105",
+      "x": 1057,
+      "y": 476,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:91",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_118",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 106",
+      "x": 1057,
+      "y": 505,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:92",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_119",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 107",
+      "x": 1057,
+      "y": 534,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:93",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_120",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 108",
+      "x": 1057,
+      "y": 563,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:94",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_121",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 109",
+      "x": 1057,
+      "y": 592,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:95",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_122",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 110",
+      "x": 1057,
+      "y": 621,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:96",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_123",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 111",
+      "x": 1057,
+      "y": 650,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:97",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_107",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_124",
+      "kind": "custom:contenedor",
+      "name": "Contenedor 161 copia 7",
+      "x": 1201,
+      "y": 412,
+      "width": 379,
+      "height": 276,
+      "text": "Contenedor",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "titulo": "Grupo",
+        "mostrarTitulo": false
+      }
+    },
+    {
+      "id": "w_1791841075877_125",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 112",
+      "x": 1287,
+      "y": 447,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:106",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_126",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 113",
+      "x": 1287,
+      "y": 476,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:107",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_127",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 114",
+      "x": 1287,
+      "y": 505,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:108",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_128",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 115",
+      "x": 1287,
+      "y": 534,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:109",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_129",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 116",
+      "x": 1287,
+      "y": 563,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:110",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_130",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 117",
+      "x": 1287,
+      "y": 592,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:111",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_131",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 118",
+      "x": 1287,
+      "y": 621,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:112",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_132",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 119",
+      "x": 1287,
+      "y": 650,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:113",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_133",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 120",
+      "x": 1447,
+      "y": 447,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:106",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_134",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 121",
+      "x": 1447,
+      "y": 476,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:107",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_135",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 122",
+      "x": 1447,
+      "y": 505,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:108",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_136",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 123",
+      "x": 1447,
+      "y": 534,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:109",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_137",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 124",
+      "x": 1447,
+      "y": 563,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:110",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_138",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 125",
+      "x": 1447,
+      "y": 592,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:111",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_139",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 126",
+      "x": 1447,
+      "y": 621,
+      "width": 116,
+      "height": 26,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:112",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791841075877_140",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 127",
+      "x": 1447,
+      "y": 650,
+      "width": 116,
+      "height": 27,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:10:113",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "padre": "w_1791841075877_124",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "R_L3_LAZOS_CRITICOS"
+      }
+    },
+    {
+      "id": "w_1791845660452_237",
+      "kind": "custom:navegador-panel",
+      "name": "Navegador de Pantallas 237",
+      "x": 745,
+      "y": 699,
+      "width": 123,
+      "height": 56,
+      "text": "Navegador de Pantallas",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "grupo": "principal",
+        "pantallas": [
+          "principal_l3_receta_lazos_criticos_1_copia"
+        ],
+        "mostrarInicio": true,
+        "mostrarNombre": false
+      }
+    },
+    {
+      "id": "w_1791909279930_5",
+      "kind": "custom:receta-contador",
+      "name": "Contador de recetas 245",
+      "x": 1404,
+      "y": 12,
+      "width": 203,
+      "height": 64,
+      "text": "Contador de recetas",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "L3 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791909279930_6",
+      "kind": "custom:receta-guardar",
+      "name": "Guardar receta 230",
+      "x": 180,
+      "y": 78,
+      "width": 155,
+      "height": 37,
+      "text": "Guardar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "enlaces": {},
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "L3 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791909279930_7",
+      "kind": "custom:receta-nueva",
+      "name": "Nueva receta 227",
+      "x": 28,
+      "y": 78,
+      "width": 145,
+      "height": 37,
+      "text": "Nueva receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "L3 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791909279930_8",
+      "kind": "custom:receta-cargar",
+      "name": "Cargar receta 232",
+      "x": 341,
+      "y": 78,
+      "width": 148,
+      "height": 37,
+      "text": "Cargar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "L3 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791909279930_9",
+      "kind": "custom:receta-eliminar",
+      "name": "Eliminar receta 235",
+      "x": 1423,
+      "y": 78,
+      "width": 158,
+      "height": 37,
+      "text": "Eliminar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "L3 RECETA DE LAZOS CRÍTICOS"
+      }
+    },
+    {
+      "id": "w_1791909288915_10",
+      "kind": "rectangle",
+      "name": "Rectángulo 236",
+      "x": 15,
+      "y": 706,
+      "width": 145,
+      "height": 36,
+      "text": "Rectángulo",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "#cbd5e1",
+        "borderColor": "#94a3b8",
+        "borderWidth": 1,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791909296782_11",
+      "kind": "custom:receta-aplicar",
+      "name": "Aplicar todos 233",
+      "x": 15,
+      "y": 706,
+      "width": 145,
+      "height": 36,
+      "text": "Aplicar todos",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 10,
+        "nombre": "L3 RECETA DE LAZOS CRÍTICOS"
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}
