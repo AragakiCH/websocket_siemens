@@ -70,6 +70,7 @@ import {
 } from './store';
 import { CampoGrupo, AvisoVistaPropia } from './inspector';
 import { estiloDeParte } from '../../partes';
+import { ContextoVisible } from '../../rendimiento';
 import type { ModoAjuste } from './PantallaEmbebida';
 
 /**
@@ -302,11 +303,15 @@ function Screen({ widget, interactivo }: RenderCtx) {
                   </div>
                 }
               >
-                <PantallaEmbebida
-                  projectId={id}
-                  modo={cfg.ajuste}
-                  interactivo={!!interactivo && id === destino}
-                />
+                {/* Las capas ocultas no reciben lecturas del PLC: ver
+                    `ContextoVisible` en rendimiento.ts. */}
+                <ContextoVisible.Provider value={id === destino}>
+                  <PantallaEmbebida
+                    projectId={id}
+                    modo={cfg.ajuste}
+                    interactivo={!!interactivo && id === destino}
+                  />
+                </ContextoVisible.Provider>
               </Suspense>
             </div>
           ))}

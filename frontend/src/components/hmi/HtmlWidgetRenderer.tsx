@@ -115,13 +115,11 @@ export function HtmlWidgetRenderer({
   // un buen rato y no atiende clics. Por turnos, lo ligero de la pantalla
   // aparece ya y los iframes van llegando de dos en dos sin bloquear.
   //
-  // En una MINIATURA (Tarjeta de Acceso) también se construye —el dibujo
-  // del ZIP ES la miniatura cuando una pantalla entera es un ZIP, y sin él
-  // la tarjeta salía como una caja gris—, pero igual que aquí: por turnos.
-  // Lo que congelaba la vista general no era que las tarjetas tuvieran ZIP,
-  // sino que los nueve se montaran en el mismo instante. (El contexto de
-  // miniatura lo usan tendencias, alarmas y recetas, que sí consultan al
-  // servidor; ver WidgetRenderer.)
+  // En una MINIATURA (Tarjeta de Acceso) este componente ya NO se usa: ahí
+  // el ZIP se dibuja sin iframe, con su HTML y su CSS en un Shadow DOM (ver
+  // MiniaturaZip.tsx y el desvío en WidgetRenderer). Diez tarjetas con
+  // treinta ZIP cada una eran trescientos iframes por turnos: segundos de
+  // tarjetas grises cada vez que se volvía a la vista general.
   const turno = usarTurno();
   const montarIframe = turno;
 

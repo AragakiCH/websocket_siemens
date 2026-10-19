@@ -27,6 +27,11 @@ nohup.out
 
 # --- Datos locales del backend (conexiones a BD + clave de cifrado) ---
 datos/
+# Los respaldos que deja «Restaurar» (Configuración → Carpeta de datos) son
+# una copia entera de `datos/`: llevan `.clave` y `conexiones.json`, o sea
+# las contraseñas de las bases de datos y la clave que las descifra. Nunca
+# al repositorio.
+datos_antes_de_restaurar_*/
 
 # --- Archivos que deja la app de escritorio de Claude (pantallazos, etc.) ---
 Claude outputs/

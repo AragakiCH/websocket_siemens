@@ -100,6 +100,12 @@ export function CrearBaseDatos({
     !esSqlite &&
     !!String(config.usuario || '').trim() &&
     String(config.password || '').length >= 8;
+  // `sa` no se "crea": ya existe en todo SQL Server y es administrador. Lo
+  // que el backend hace con él es habilitarlo si está apagado. El texto de
+  // la casilla tiene que decir eso y no prometer "permisos de solo filas"
+  // que a un sysadmin no se le pueden poner.
+  const esSa =
+    motor === 'mssql' && String(config.usuario || '').trim().toLowerCase() === 'sa';
 
   const crear = async () => {
     setTrabajando(true);
@@ -233,11 +239,15 @@ export function CrearBaseDatos({
                 className="mt-0.5 rounded border-slate-300 text-siemens focus:ring-siemens"
               />
               <span className="min-w-0">
-                Crear el usuario «{String(config.usuario || '—')}» con permisos
+                {esSa
+                  ? 'Activar «sa» si está deshabilitado'
+                  : `Crear el usuario «${String(config.usuario || '—')}» con permisos`}
                 <span className="block text-[11px] text-slate-400">
-                  {puedeCrearUsuario
-                    ? 'Solo leer y escribir filas. Nunca modificar la estructura. Si ya existe, no se le cambia la contraseña: solo se le aplican los permisos.'
-                    : 'Rellena usuario y una contraseña de 8+ caracteres arriba para habilitarlo.'}
+                  {!puedeCrearUsuario
+                    ? 'Rellena usuario y una contraseña de 8+ caracteres arriba para habilitarlo.'
+                    : esSa
+                      ? '«sa» es administrador del servidor: entra en todas las bases sin mapearlo. Si está deshabilitado (instalación en modo «solo Windows»), se habilita con la contraseña de arriba; si ya está activo, no se toca.'
+                      : 'Solo leer y escribir filas. Nunca modificar la estructura. Si ya existe, no se le cambia la contraseña: solo se le aplican los permisos.'}
                 </span>
               </span>
             </label>

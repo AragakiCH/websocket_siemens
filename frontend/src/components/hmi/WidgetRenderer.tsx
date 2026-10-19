@@ -17,6 +17,7 @@ import { useAppStore } from "../../context/AppStore";
 import { customByKind, zipByKind, zipCatalogoListo } from "./custom/registry";
 import { estiloDeParte } from "./partes";
 import { HtmlWidgetRenderer } from "./HtmlWidgetRenderer";
+import { MiniaturaZip } from "./MiniaturaZip";
 import { leerConfigImagen } from "./inspectores";
 import { useFuncionesEnVivo } from "./funcion/enVivo";
 
@@ -220,6 +221,22 @@ function WidgetRendererBase({
 
     // 👇 luego checa si es un widget HTML cargado por ZIP
     const zip = zipByKind(widget.kind);
+    if (zip && miniatura) {
+      // EN MINIATURA, SIN IFRAME. Una vista general con diez tarjetas, cada
+      // una enseñando una pantalla de treinta ZIP, son trescientos iframes:
+      // segundos de tarjetas grises, y otra vez cada vez que se vuelve. El
+      // mismo HTML y CSS en un Shadow DOM se ve igual de lejos y cuesta
+      // milisegundos. Ver MiniaturaZip.tsx.
+      return (
+        <MiniaturaZip
+          zipWidget={zip}
+          widget={pintado}
+          variable={variable}
+          enlaces={enlacesResueltos}
+          style={style}
+        />
+      );
+    }
     if (zip) {
       return (
         <HtmlWidgetRenderer

@@ -1,0 +1,66 @@
+{
+  "project_id": "principal_faceplate3_pid_pirc_copia",
+  "nombre": "faceplate2_LxMotorJSGN",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-19T15:53:49.181695Z",
+  "actualizado_en": "2026-10-19T15:53:49.183759Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 700,
+    "height": 550,
+    "fondo": "#edf0f5"
+  },
+  "widgets": [
+    {
+      "id": "w_1790360149376_115",
+      "kind": "custom:lxmotorjsgn",
+      "name": "ㅤ",
+      "x": 0,
+      "y": 0,
+      "width": 700,
+      "height": 550,
+      "text": "LxMotorJSGN",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "ninguna",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

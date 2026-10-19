@@ -1,0 +1,18 @@
+{
+  "project_id": "principal_pantalla_2",
+  "nombre": "Pantalla 2",
+  "proyecto": "principal",
+  "version": 17,
+  "creado_en": "2026-09-14T15:16:59.567001Z",
+  "actualizado_en": "2026-09-22T20:46:24.185863Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1280,
+    "height": 760
+  },
+  "widgets": [],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

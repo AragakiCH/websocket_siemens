@@ -1,0 +1,973 @@
+{
+  "project_id": "principal_l3_habilita_alarmas_copia_2",
+  "nombre": "L4 Habilita Alarmas",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-19T15:53:49.344313Z",
+  "actualizado_en": "2026-10-19T15:53:49.346682Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1791414844192_14",
+      "kind": "custom:l4_habilitacion_alarmas_proceso",
+      "name": "LÍNEA 4 / HABILITACIÓN DE ALARMAS//Habilitación de alarmas del proceso de lavado, secado, rizado y Fleibner",
+      "x": 0,
+      "y": 0,
+      "width": 1610,
+      "height": 755,
+      "text": "L4 Habilita Alarmas",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1792018441890_97",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 10",
+      "x": 393,
+      "y": 456,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018441890_98",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 11",
+      "x": 393,
+      "y": 501,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018441890_99",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 12",
+      "x": 393,
+      "y": 546,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018441890_100",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 13",
+      "x": 393,
+      "y": 591,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018441890_101",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 14",
+      "x": 393,
+      "y": 635,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018441890_102",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 15",
+      "x": 393,
+      "y": 680,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018441890_103",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia",
+      "x": 393,
+      "y": 187,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018441890_104",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 2",
+      "x": 393,
+      "y": 232,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018441890_105",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 3",
+      "x": 393,
+      "y": 277,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018441890_106",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 4",
+      "x": 393,
+      "y": 322,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018441890_107",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 5",
+      "x": 393,
+      "y": 366,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018441890_108",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 6",
+      "x": 393,
+      "y": 411,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018441890_109",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 7",
+      "x": 393,
+      "y": 96,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018441890_110",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 8",
+      "x": 393,
+      "y": 141,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018463944_125",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 9",
+      "x": 832,
+      "y": 456,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018463944_126",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 16",
+      "x": 832,
+      "y": 501,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018463944_127",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 17",
+      "x": 832,
+      "y": 546,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018463944_128",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 18",
+      "x": 832,
+      "y": 591,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018463944_129",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 19",
+      "x": 832,
+      "y": 635,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018463944_130",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 20",
+      "x": 832,
+      "y": 680,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018463944_131",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 21",
+      "x": 832,
+      "y": 187,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018463944_132",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 22",
+      "x": 832,
+      "y": 232,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018463944_133",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 23",
+      "x": 832,
+      "y": 277,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018463944_134",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 24",
+      "x": 832,
+      "y": 322,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018463944_135",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 25",
+      "x": 832,
+      "y": 366,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018463944_136",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 26",
+      "x": 832,
+      "y": 411,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018463944_137",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 27",
+      "x": 832,
+      "y": 96,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018463944_138",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 28",
+      "x": 832,
+      "y": 141,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018504870_139",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 29",
+      "x": 1242,
+      "y": 187,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018504870_140",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 30",
+      "x": 1242,
+      "y": 232,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018504870_141",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 31",
+      "x": 1242,
+      "y": 96,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792018504870_142",
+      "kind": "custom:boton_activa_inactiva",
+      "name": "Botón ACTIVA / INACTIVA 12 copia 32",
+      "x": 1242,
+      "y": 141,
+      "width": 183,
+      "height": 47,
+      "text": "Botón ACTIVA / INACTIVA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

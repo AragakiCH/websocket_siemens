@@ -34,9 +34,18 @@ import type { PlcVariable } from '../../models/plc';
 
 // ─── 1 · La cola de montaje ──────────────────────────────────────
 
-/** Cuántos turnos se conceden por tanda, y cada cuánto. */
-const POR_TANDA = 2;
-const CADA_MS = 40;
+/**
+ * Cuántos turnos se conceden por tanda, y cada cuánto.
+ *
+ * Estaba en 2 cada 40 ms, pensado para cuando las miniaturas también
+ * montaban iframes y había cientos en cola. Ahora una miniatura no monta
+ * ninguno (ver MiniaturaZip.tsx) y lo que pasa por aquí son los ZIP de la
+ * pantalla que se está mirando: treinta, como mucho. A 2 por 40 ms eso era
+ * más de medio segundo de huecos; a 6 por fotograma son 5 tandas, y el
+ * navegador sigue teniendo hueco entre una y otra para atender clics.
+ */
+const POR_TANDA = 6;
+const CADA_MS = 16;
 
 let cola: Array<() => void> = [];
 let programado = false;
@@ -109,6 +118,26 @@ export const KINDS_CAROS_EN_MINIATURA = new Set<string>([
   'custom:alarmas',
   'custom:recetas-proceso',
 ]);
+
+// ─── 2b · Visibilidad ────────────────────────────────────────────
+
+/**
+ * `false` dentro de una capa que está montada pero OCULTA: las pantallas
+ * que el Panel de Sección conserva vivas (`display: none`) para que volver
+ * a ellas sea instantáneo.
+ *
+ * Sin esto, cada lectura del PLC seguía redibujando esas pantallas y
+ * mandando `postMessage` a sus treinta iframes aunque nadie las viera: con
+ * cuatro guardadas, tres cuartas partes del trabajo de cada tick se iban a
+ * pantallas invisibles, y se notaba en la que sí se veía. Lo ponen las
+ * capas; lo lee `PantallaEmbebida`, que congela sus variables mientras no
+ * se ve y las pone al día en cuanto vuelve a verse.
+ */
+export const ContextoVisible = createContext(true);
+
+export function useEsVisible(): boolean {
+  return useContext(ContextoVisible);
+}
 
 // ─── 3 · Índice de variables ─────────────────────────────────────
 

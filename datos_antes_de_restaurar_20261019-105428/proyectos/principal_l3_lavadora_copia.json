@@ -1,0 +1,247 @@
+{
+  "project_id": "principal_l3_lavadora_copia",
+  "nombre": "L4-LAVADORA",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-19T15:53:49.145695Z",
+  "actualizado_en": "2026-10-19T15:53:49.148313Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 1640,
+    "height": 750
+  },
+  "widgets": [
+    {
+      "id": "w_1789748417437_64",
+      "kind": "custom:faceplate",
+      "name": "Faceplate 55 copia 3",
+      "x": 1168,
+      "y": 163,
+      "width": 472,
+      "height": 587,
+      "text": "Faceplate",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "#edf0f5",
+        "borderWidth": 1,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "tipo": "principal_pantalla_26",
+        "params": {},
+        "ajuste": "ajustar"
+      }
+    },
+    {
+      "id": "w_1789748417437_63",
+      "kind": "custom:faceplate",
+      "name": "Faceplate 55 copia 2",
+      "x": 783,
+      "y": 162,
+      "width": 412,
+      "height": 588,
+      "text": "Faceplate",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "#edf0f5",
+        "borderWidth": 1,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "tipo": "principal_pantalla_25",
+        "params": {},
+        "ajuste": "ajustar"
+      }
+    },
+    {
+      "id": "w_1789748417437_62",
+      "kind": "custom:faceplate",
+      "name": "Faceplate 54 copia",
+      "x": 415,
+      "y": 161,
+      "width": 387,
+      "height": 589,
+      "text": "Faceplate",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "#edf0f5",
+        "borderWidth": 1,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "tipo": "principal_pantalla_24",
+        "params": {},
+        "ajuste": "ajustar"
+      }
+    },
+    {
+      "id": "w_1789748417437_61",
+      "kind": "custom:faceplate",
+      "name": "Faceplate 52 copia 4",
+      "x": 0,
+      "y": 161,
+      "width": 417,
+      "height": 589,
+      "text": "Faceplate",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "#edf0f5",
+        "borderWidth": 1,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "tipo": "principal_pantalla_23",
+        "params": {},
+        "ajuste": "ajustar"
+      }
+    },
+    {
+      "id": "w_1789748417437_65",
+      "kind": "custom:linea_vertical_punteada",
+      "name": "LINEA_VERTICAL_PUNTEADA 59 copia 5",
+      "x": 397,
+      "y": 192,
+      "width": 38,
+      "height": 530,
+      "text": "LINEA_VERTICAL_PUNTEADA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1789748956757_73",
+      "kind": "custom:linea_vertical_punteada",
+      "name": "LINEA_VERTICAL_PUNTEADA 59 copia",
+      "x": 781,
+      "y": 192,
+      "width": 38,
+      "height": 530,
+      "text": "LINEA_VERTICAL_PUNTEADA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1789748969911_74",
+      "kind": "custom:linea_vertical_punteada",
+      "name": "LINEA_VERTICAL_PUNTEADA 59 copia 2",
+      "x": 1152,
+      "y": 192,
+      "width": 38,
+      "height": 530,
+      "text": "LINEA_VERTICAL_PUNTEADA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1789748417437_72",
+      "kind": "custom:cabecera_subprocesos_lavadora",
+      "name": "LÍNEA 4 / LAVADORA",
+      "x": 0,
+      "y": 21,
+      "width": 1640,
+      "height": 224,
+      "text": "CABECERA_SUBPROCESOS_LAVADORA",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

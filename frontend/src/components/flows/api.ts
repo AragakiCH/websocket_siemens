@@ -263,18 +263,32 @@ export function probarConexion(dbId: string): Promise<any> {
  */
 export async function cargarDriversOdbc(): Promise<{
   drivers: string[];
+  /** Instancias de SQL Server instaladas en la máquina del backend. */
+  instancias: string[];
+  /**
+   * Host con el que llegar a ellas desde el backend: `localhost` si existe
+   * la instancia por defecto, `localhost\NOMBRE` si solo hay con nombre
+   * (p. ej. `localhost\TEW_SQLEXPRESS` en un PC con TIA Portal). Vacío si
+   * el backend no supo decirlo.
+   */
+  hostSugerido: string;
   mensaje: string;
 }> {
   try {
-    const d = await apiGet<{ drivers?: string[]; mensaje?: string }>(
-      '/db/drivers'
-    );
+    const d = await apiGet<{
+      drivers?: string[];
+      instancias?: string[];
+      host_sugerido?: string;
+      mensaje?: string;
+    }>('/db/drivers');
     return {
       drivers: Array.isArray(d?.drivers) ? d.drivers : [],
+      instancias: Array.isArray(d?.instancias) ? d.instancias : [],
+      hostSugerido: String(d?.host_sugerido ?? ''),
       mensaje: d?.mensaje ?? '',
     };
   } catch (e: any) {
-    return { drivers: [], mensaje: e?.message ?? '' };
+    return { drivers: [], instancias: [], hostSugerido: '', mensaje: e?.message ?? '' };
   }
 }
 

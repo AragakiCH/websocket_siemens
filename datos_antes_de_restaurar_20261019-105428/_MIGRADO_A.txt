@@ -1,0 +1,5 @@
+Los datos de PsiCore se movieron a:
+/sessions/rcw-01nxh5ynmekrz3qbrlw38bvw/prueba_datos
+
+Fecha: 2026-09-21T15:20:33.579532+00:00
+Esta carpeta ya NO la usa la aplicación. Se conserva como respaldo; puedes borrarla cuando compruebes que todo va bien.

@@ -45,6 +45,12 @@ export function PanelCarpetaDatos() {
   const [error, setError] = useState('');
   const [trabajando, setTrabajando] = useState('');
   const inputZip = useRef<HTMLInputElement>(null);
+  // Las conexiones a base de datos (y la clave que abre sus contraseñas)
+  // son de ESTE equipo, no del proyecto: al traer las pantallas de otro PC
+  // no se quiere perder la propia instancia de SQL Server. Marcado de
+  // salida; se desmarca solo para una restauración completa en el mismo
+  // equipo (tras reinstalar, por ejemplo).
+  const [conservarConexiones, setConservarConexiones] = useState(true);
 
   const cargar = useCallback(async () => {
     try {
@@ -111,6 +117,7 @@ export function PanelCarpetaDatos() {
     try {
       const cuerpo = new FormData();
       cuerpo.append('archivo', archivo);
+      cuerpo.append('conservar_conexiones', conservarConexiones ? 'true' : 'false');
       const token = getToken();
       const r = await fetch(`${API_BASE}/sistema/datos/restaurar`, {
         method: 'POST',
@@ -218,6 +225,25 @@ export function PanelCarpetaDatos() {
           }}
         />
       </div>
+
+      <label className="mt-3 flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300">
+        <input
+          type="checkbox"
+          checked={conservarConexiones}
+          onChange={(e) => setConservarConexiones(e.target.checked)}
+          disabled={!!trabajando}
+          className="mt-0.5 rounded border-slate-300 text-siemens focus:ring-siemens"
+        />
+        <span className="min-w-0">
+          Al restaurar, conservar las conexiones a base de datos de este equipo
+          <span className="block text-[11px] text-slate-400">
+            Para traer las pantallas y los PLCs de otro PC sin perder tu
+            instancia de SQL Server. Las conexiones del zip que no choquen se
+            añaden desactivadas. Desmárcalo solo para una restauración completa
+            en el mismo equipo.
+          </span>
+        </span>
+      </label>
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-slate-400">
         La copia incluye la clave que descifra las contraseñas de base de datos:

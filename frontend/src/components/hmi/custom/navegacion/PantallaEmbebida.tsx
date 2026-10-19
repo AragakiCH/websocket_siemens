@@ -61,7 +61,7 @@ import {
 } from '../../../../utils/aplicarCambio';
 import { WidgetRenderer } from '../../WidgetRenderer';
 import { ContextoEmbebido, esWidgetDeNavegacion } from './store';
-import { indiceDe } from '../../rendimiento';
+import { indiceDe, useEsVisible } from '../../rendimiento';
 import { ContextoMapaTags } from '../faceplate/contexto';
 
 /** Cómo encaja el lienzo de la pantalla dentro del marco del panel. */
@@ -418,7 +418,17 @@ export default function PantallaEmbebida({
   soloVista,
   mapaTags,
 }: Props) {
-  const { variables } = useAppStore();
+  const { variables: variablesEnVivo } = useAppStore();
+  // MIENTRAS NO SE VE, LAS VARIABLES SE CONGELAN. El Panel de Sección
+  // conserva montadas las últimas pantallas visitadas (ocultas) para que
+  // volver sea instantáneo; sin esto, cada lectura del PLC redibujaba
+  // también esas y mandaba sus valores a treinta iframes que nadie miraba.
+  // Al volver a verse, `visible` cambia, se toma la lista actual y todo se
+  // pone al día en un solo repintado.
+  const visible = useEsVisible();
+  const congeladas = useRef(variablesEnVivo);
+  if (visible) congeladas.current = variablesEnVivo;
+  const variables = visible ? variablesEnVivo : congeladas.current;
   // Vuelve a dibujar cuando se conoce el tag de un elemento de receta.
   useRevisionEnlacesReceta();
   const { design, cargando, error } = usePantallaEmpotrada(projectId);

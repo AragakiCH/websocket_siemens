@@ -1,0 +1,18 @@
+{
+  "kind": "navegacion_planta",
+  "nombre": "NAVEGACION PLANTA",
+  "html": "<div class=\"navegacion-planta-widget\">\n  <svg\n    class=\"navegacion-planta-svg\"\n    viewBox=\"0 0 707 93\"\n    preserveAspectRatio=\"xMidYMid meet\"\n    xmlns=\"http://www.w3.org/2000/svg\"\n    role=\"img\"\n    aria-label=\"Navegación de planta\"\n  >\n    <text\n      class=\"navegacion-planta-titulo\"\n      x=\"353.5\"\n      y=\"62\"\n      text-anchor=\"middle\"\n      textLength=\"655\"\n      lengthAdjust=\"spacing\"\n    >NAVEGACIÓN DE PLANTA</text>\n  </svg>\n</div>",
+  "css": "html,\nbody {\n  width: 100%;\n  height: 100%;\n  margin: 0;\n  padding: 0;\n  overflow: hidden;\n  background: transparent !important;\n}\n\n.navegacion-planta-widget {\n  --navegacion-color-texto: #758594;\n\n  width: 100%;\n  height: 100%;\n  overflow: hidden;\n  background: transparent !important;\n  pointer-events: none;\n}\n\n.navegacion-planta-widget .navegacion-planta-svg {\n  display: block;\n  width: 100%;\n  height: 100%;\n  overflow: hidden;\n  background: transparent !important;\n  shape-rendering: geometricPrecision;\n}\n\n.navegacion-planta-widget .navegacion-planta-titulo {\n  fill: var(--navegacion-color-texto);\n  stroke: none;\n  font-family: Arial, Helvetica, sans-serif;\n  font-size: 46px;\n  font-weight: 700;\n}\n\n.navegacion-planta-widget,\n.navegacion-planta-widget * {\n  animation: none !important;\n  transition: none !important;\n}",
+  "js": "\"use strict\";\n\n/*\n * Navegación de planta.\n *\n * Widget de título completamente estático.\n * No recibe variables del PLC ni utiliza tags,\n * eventos, temporizadores o recursos externos.\n * Su presentación se define mediante SVG y CSS.\n */",
+  "meta": {
+    "kind": "NAVEGACION_PLANTA",
+    "label": "NAVEGACION PLANTA",
+    "category": "MENÚ DESPLEGABLE",
+    "defaultWidth": 707,
+    "defaultHeight": 93,
+    "accepts": []
+  },
+  "creado_en": "2026-10-19T15:53:49.376474+00:00",
+  "actualizado_en": "2026-10-19T15:53:49.376489+00:00",
+  "creado_por": "operador01"
+}

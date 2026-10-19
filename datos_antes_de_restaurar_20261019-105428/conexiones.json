@@ -1,0 +1,17 @@
+[
+  {
+    "db_id": "local",
+    "motor": "mssql",
+    "nombre": "HMI local",
+    "host": "localhost\\TEW_SQLEXPRESS",
+    "puerto": 0,
+    "base_datos": "HMI_pruebas",
+    "usuario": "psi",
+    "password": "enc:gAAAAABqlabvQVcbMug_vi_IMwaG7sxtgpXBPn0_apqnXEmlq3419aDKU4A7Bqt_A-4Vw-hGEeTd6MTLxkfYK9IiX3K8w3SdoQ==",
+    "opciones": {
+      "driver": "ODBC Driver 18 for SQL Server",
+      "TrustServerCertificate": "yes"
+    },
+    "autoconectar": true
+  }
+]

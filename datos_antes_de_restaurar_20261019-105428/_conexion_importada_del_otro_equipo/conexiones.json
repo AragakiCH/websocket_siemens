@@ -1,0 +1,17 @@
+[
+  {
+    "db_id": "local",
+    "motor": "mssql",
+    "nombre": "scada_34",
+    "host": "localhost",
+    "puerto": 1433,
+    "base_datos": "scada_34",
+    "usuario": "scada_34",
+    "password": "enc:gAAAAABqlcMXX9G9kIdFRal7CHHgGqITyi10zESSNmoKbYtiLeiD60wJgm7ckClYciV-wx2n5_lLBeq5e3cXbxcWCD9NEx7lpw==",
+    "opciones": {
+      "driver": "ODBC Driver 18 for SQL Server",
+      "TrustServerCertificate": "yes"
+    },
+    "autoconectar": true
+  }
+]

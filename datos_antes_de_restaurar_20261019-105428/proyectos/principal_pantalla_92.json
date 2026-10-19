@@ -1,0 +1,95 @@
+{
+  "project_id": "principal_pantalla_92",
+  "nombre": "Pantalla 92",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-19T15:53:49.369541Z",
+  "actualizado_en": "2026-10-19T15:53:49.372477Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 1280,
+    "height": 760,
+    "fondo": "#ffffff"
+  },
+  "widgets": [
+    {
+      "id": "w_1792095351715_53",
+      "kind": "custom:trend",
+      "name": "Tendencia 53",
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 760,
+      "text": "Tendencia",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "series": [
+          {
+            "id": "smv9zaz1z1th1",
+            "variableId": "interno|var1",
+            "etiqueta": "",
+            "color": "",
+            "grosor": 2
+          },
+          {
+            "id": "smv9zb1hr5fm1",
+            "variableId": "interno|var12",
+            "etiqueta": "",
+            "color": "",
+            "grosor": 2
+          },
+          {
+            "id": "smv9zb2fzxb54",
+            "variableId": "interno|var17",
+            "etiqueta": "",
+            "color": "",
+            "grosor": 2
+          },
+          {
+            "id": "smv9zb3ewlfjt",
+            "variableId": "interno|var10",
+            "etiqueta": "",
+            "color": "",
+            "grosor": 2
+          }
+        ],
+        "origen": "vivo",
+        "grupoId": "",
+        "rango": "1h",
+        "desde": "",
+        "hasta": "",
+        "limiteSerie": 1000,
+        "mostrarRegla": true,
+        "ventanaSeg": 60,
+        "retencionSeg": 1800,
+        "mostrarLeyenda": true,
+        "mostrarRejilla": true,
+        "autoEscala": true,
+        "min": "",
+        "max": "",
+        "exportar": false,
+        "grabIntervaloMs": 1000,
+        "grabDuracionS": 0
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}
