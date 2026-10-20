@@ -336,7 +336,7 @@ export function ZipLigero(props: Props) {
       if (!ctx.escrituraOk) return fin(false, 'Este widget está en sólo lectura.');
       const v = nombre ? ctx.enlaces?.[nombre] : ctx.variable;
       const enCrudo = String(ctx.widget.variableId ?? '');
-      const id = v?.id ?? (!nombre && !enCrudo.startsWith('param:') ? enCrudo : '');
+      const id = v?.id ?? (!nombre && !enCrudo.startsWith('param:') && !enCrudo.startsWith('salida:') ? enCrudo : '');
       if (!id) {
         return fin(
           false,

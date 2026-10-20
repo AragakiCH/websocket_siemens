@@ -196,7 +196,7 @@ export function HtmlWidgetRenderer({
       const v = nombre ? ctx.enlaces?.[nombre] : ctx.variable;
       const enCrudo = String(ctx.widget.variableId ?? '');
       const id =
-        v?.id ?? (!nombre && !enCrudo.startsWith('param:') ? enCrudo : '');
+        v?.id ?? (!nombre && !enCrudo.startsWith('param:') && !enCrudo.startsWith('salida:') ? enCrudo : '');
       if (!id) {
         return fin(
           false,

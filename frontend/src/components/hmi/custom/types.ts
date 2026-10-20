@@ -79,6 +79,18 @@ export interface InspectorCtx {
    * pedirlos.
    */
   paramsPantalla?: ParametroFaceplate[];
+  /**
+   * Las variables del PROPIO widget que se pueden elegir como tag
+   * (`salida:@principal` = varPrincipal, `salida:var1`…). Las usa el panel
+   * de acciones para los parámetros de un faceplate.
+   */
+  variablesWidget?: { value: string; label: string }[];
+  /**
+   * Las variables del PLC (y las internas) para un tipo de dato, en dos
+   * grupos: compatibles y otras. Las mismas etiquetas que «Variable
+   * asociada» (con «· Interna», el PLC…).
+   */
+  gruposTags?: (tipo: string) => { label: string; options: { label: string; value: string }[] }[];
 }
 
 export interface RenderCtx {

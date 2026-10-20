@@ -31,6 +31,7 @@ import {
   renombrarEnlace,
   nombreLibre,
   validarNombreEnlace,
+  idFinalDeSalida,
   type DeclaracionEnlace } from
 '../../utils/enlaces';
 import { formatValue } from '../../utils/format';
@@ -40,7 +41,10 @@ import {
   quitarSalida,
   tieneContenido,
   SALIDA_PRINCIPAL,
-  NOMBRE_PRINCIPAL } from
+  NOMBRE_PRINCIPAL,
+  PREFIJO_SALIDA,
+  idDeSalida,
+  salidaDeEntrada } from
 '../../utils/funciones';
 import { ModalFuncion, type SalidaFuncion } from './funcion/ModalFuncion';
 import {
@@ -847,11 +851,51 @@ export function PropertyInspector({
     (k) => !declaradas.some((d) => d.id === k)
   );
   const nombresUsados = [...declaradas.map((d) => d.id), ...libres];
-  const variablePorId = (id: string) =>
-  id && !id.startsWith('param:') ?
-  // Un elemento de receta se busca por el tag que tiene puesto.
-  selectedVariables.find((v) => v.id === idRealDeEnlace(id)) :
-  undefined;
+  const variablePorId = (id0: string) => {
+    // `salida:x` (otra variable de este widget): la del tag al que lleva.
+    const id = id0.startsWith(PREFIJO_SALIDA) ? idFinalDeSalida(widget, id0) ?? '' : id0;
+    return id && !id.startsWith('param:') ?
+    // Un elemento de receta se busca por el tag que tiene puesto.
+    selectedVariables.find((v) => v.id === idRealDeEnlace(id)) :
+    undefined;
+  };
+
+  /**
+   * «Variables del widget»: las OTRAS variables de este mismo widget que se
+   * pueden elegir en un desplegable (`salida:…`). `excluir` es la que se
+   * está editando: una variable no puede apuntarse a sí misma. Si lo puesto
+   * apunta a una que ya no existe, se enseña igual (si no, el <select>
+   * saltaría a «Ninguna» y parecería que se perdió).
+   */
+  const grupoWidget = (excluir: string, asignada?: string | null) => {
+    const opciones = [
+    ...(leeVariables && excluir !== SALIDA_PRINCIPAL ?
+    [{ label: NOMBRE_PRINCIPAL, value: idDeSalida(SALIDA_PRINCIPAL) }] :
+    []),
+    ...nombresUsados.
+    filter((k) => k !== excluir).
+    map((k) => ({ label: k, value: idDeSalida(k) }))];
+
+    const huerfana = salidaDeEntrada(asignada ?? '');
+    if (huerfana !== null && !opciones.some((o) => o.value === asignada)) {
+      opciones.push({
+        label: huerfana === excluir ? `${huerfana} (es ella misma)` : `${huerfana} (ya no existe)`,
+        value: asignada as string
+      });
+    }
+    return opciones.length ? [{ label: 'Variables del widget', options: opciones }] : [];
+  };
+  /** Mete «Variables del widget» justo después de «— Ninguna —». */
+  const conGrupoWidget = <G extends { label: string; options: { label: string; value: string }[] }>(
+    grupos: G[],
+    excluir: string,
+    asignada?: string | null
+  ): G[] => {
+    const g = grupoWidget(excluir, asignada) as unknown as G[];
+    if (!g.length) return grupos;
+    const conNinguna = grupos.length > 0 && grupos[0].options.some((o) => o.value === '');
+    return conNinguna ? [grupos[0], ...g, ...grupos.slice(1)] : [...g, ...grupos];
+  };
 
   // ── Modo función ─────────────────────────────────────────────
   //
@@ -916,12 +960,12 @@ export function PropertyInspector({
   { label: t('insp.varsCompatible'), options: compatibles.map(opcion) },
   { label: t('insp.varsOther'), options: otras.map(opcion) }],
   widget.variableId);
+  // Las variables con nombre de este widget, para la principal.
+  const varGroupsConWidget = conGrupoWidget(varGroups, SALIDA_PRINCIPAL, widget.variableId);
 
   // Variable enlazada ahora mismo, para avisar si no calza. Puede venir de un
   // diseño guardado antes de que existiera esta validación.
-  const variableActual = selectedVariables.find(
-    (v) => v.id === idRealDeEnlace(widget.variableId)
-  );
+  const variableActual = variablePorId(String(widget.variableId ?? ''));
   // Un `param:` no es una variable: no hay tipo que comparar todavía —lo
   // pondrá cada instancia— así que avisar de incompatibilidad ahí sería
   // avisar de algo que aún no se ha decidido.
@@ -1098,7 +1142,7 @@ export function PropertyInspector({
           buscable
           label={t('insp.associatedVar')}
           value={widget.variableId ?? ''}
-          groups={varGroups}
+          groups={varGroupsConWidget}
           onChange={(v) =>
           onChange({
             variableId: v === '' ? null : v
@@ -1172,7 +1216,7 @@ export function PropertyInspector({
           etiqueta={d.label}
           ayuda={d.ayuda}
           variableId={enlaces[d.id] ?? ''}
-          grupos={gruposDe(d.accepts, enlaces[d.id])}
+          grupos={conGrupoWidget(gruposDe(d.accepts, enlaces[d.id]), d.id, enlaces[d.id])}
           variable={variablePorId(enlaces[d.id] ?? '')}
           onVariable={(v) =>
           onChange({
@@ -1191,7 +1235,7 @@ export function PropertyInspector({
           fijo={false}
           etiqueta={k}
           variableId={enlaces[k] ?? ''}
-          grupos={gruposDe(undefined, enlaces[k])}
+          grupos={conGrupoWidget(gruposDe(undefined, enlaces[k]), k, enlaces[k])}
           variable={variablePorId(enlaces[k] ?? '')}
           onVariable={(v) => onChange({ enlaces: conEnlace(widget, k, v) })}
           onRenombrar={(nuevo) => {
@@ -1201,8 +1245,34 @@ export function PropertyInspector({
             );
             // La función de esa salida se va con el nombre nuevo.
             if (!fallo) {
+              // Lo que apuntaba a ella (`salida:viejo`) pasa al nombre nuevo:
+              // otras variables con nombre, la principal y los parámetros
+              // del faceplate de su acción.
+              const idViejo = idDeSalida(k);
+              const idNuevo = idDeSalida(nuevo.trim());
+              const cambiar = (v: string) => v === idViejo ? idNuevo : v;
+              const enlacesNuevos = Object.fromEntries(
+                Object.entries(renombrarEnlace(widget, k, nuevo)).map(([n, v]) => [n, cambiar(v)])
+              );
+              const acc = (widget.config as any)?.accion;
+              const paramsAcc: Record<string, string> | undefined = acc?.params;
+              const tocaAccion = !!paramsAcc && Object.values(paramsAcc).includes(idViejo);
               onChange({
-                enlaces: renombrarEnlace(widget, k, nuevo),
+                enlaces: enlacesNuevos,
+                ...(widget.variableId === idViejo ? { variableId: idNuevo } : {}),
+                ...(tocaAccion ?
+                {
+                  config: {
+                    ...(widget.config ?? {}),
+                    accion: {
+                      ...acc,
+                      params: Object.fromEntries(
+                        Object.entries(paramsAcc!).map(([n, v]) => [n, cambiar(v)])
+                      )
+                    }
+                  }
+                } :
+                {}),
                 ...(widget.funciones ? { funciones: renombrarSalida(funciones, k, nuevo.trim()) } : {})
               });
             }
@@ -1301,6 +1371,14 @@ export function PropertyInspector({
           widget={widget}
           config={widget.config ?? {}}
           paramsPantalla={paramsFaceplate}
+          variablesWidget={grupoWidget('')[0]?.options ?? []}
+          gruposTags={(tipo) => {
+            const r = repartirPorCompatibilidad(selectedVariables, [tipo as DataType]);
+            return [
+            { label: t('insp.varsCompatible'), options: r.compatibles.map(opcion) },
+            { label: t('insp.varsOther'), options: r.otras.map(opcion) }];
+
+          }}
           /* MEZCLA, no reemplaza.
            *
            * Reemplazaba, y eso obligaba a que cada panel esparciera la config

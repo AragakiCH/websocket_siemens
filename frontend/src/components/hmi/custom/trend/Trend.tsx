@@ -203,6 +203,8 @@ export interface ConfigTrend {
   /** Panel de herramientas (Eje X, Eje Y, Etiquetas). Por ahora solo diseño. */
   herramientas: boolean;
   herramientasAncho: number;
+  /** Relleno alrededor de TODO el trend (gráfico + panel), en px. */
+  espaciado: number;
 }
 
 // ── LÍMITES DE LA GRABACIÓN ──────────────────────────────────────
@@ -251,6 +253,7 @@ export const CONFIG_TREND: ConfigTrend = {
   logoAlto: 70,
   herramientas: false,
   herramientasAncho: 210,
+  espaciado: 8,
 };
 
 /** Opciones del desplegable de retención, en segundos. */
@@ -378,6 +381,7 @@ export function leerConfigTrend(config: any): ConfigTrend {
     logoAlto: limitar(c.logoAlto, 20, 1200, 70),
     herramientas: c.herramientas === true,
     herramientasAncho: limitar(c.herramientasAncho, 150, 600, 210),
+    espaciado: limitar(c.espaciado, 0, 40, 8),
   };
 }
 
@@ -1376,13 +1380,16 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
 
 
 
-  // Leyenda: 1 columna hasta 3 variables y 2 desde ahí (nunca más). Hasta 8
-  // se llena por columnas; con más, se enseñan 4 filas y el resto con SCROLL,
+  // Leyenda: 2 columnas. Hasta 8 se llena por columnas; con más, se enseñan 4 filas y el resto con SCROLL,
   // y entonces se llena por filas (1 2 / 3 4 …) para que al bajar se siga
   // el orden sin saltar de columna.
-  const columnasLeyenda = dibujables.length <= 3 ? 1 : 2;
+  // SIEMPRE 2 columnas de medio ancho: con 1–3 variables, una sola
+  // columna a todo lo ancho dejaba el nombre en un extremo y el valor en el
+  // otro. Mínimo 2 filas, para que con 2 variables queden una debajo de
+  // otra en la columna izquierda (como con 4), no separadas a los lados.
+  const columnasLeyenda = 2;
   const leyendaConScroll = dibujables.length > 8;
-  const filasLeyenda = Math.max(1, Math.ceil(dibujables.length / columnasLeyenda));
+  const filasLeyenda = Math.max(2, Math.ceil(dibujables.length / columnasLeyenda));
   const columnaDe = (pos: number) =>
     leyendaConScroll ? pos % columnasLeyenda : Math.floor(pos / filasLeyenda);
   // 4 filas (alto de línea 1.6) + 3 huecos de 2 px (el relleno va aparte).
@@ -1701,6 +1708,8 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
   const marco: React.CSSProperties = conColumna
     ? { ...marcoWidget(pCaja, fondo, tema), width: 'auto', flex: 1, minWidth: 0 }
     : marcoWidget(pCaja, fondo, tema);
+  // ESPACIADO: un relleno alrededor de todo (gráfico y panel) para que
+  // nada quede pegado al borde del widget.
   const envolver = (nucleo: React.ReactElement): React.ReactElement =>
     conColumna ? (
       <div
@@ -1709,6 +1718,7 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
           width: '100%',
           height: '100%',
           gap: 12,
+          padding: cfg.espaciado,
           boxSizing: 'border-box',
         }}
       >
@@ -1764,6 +1774,18 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
             agregando: etiquetando,
           }}
         />
+      </div>
+    ) : cfg.espaciado > 0 ? (
+      <div
+        style={{
+          display: 'flex',
+          width: '100%',
+          height: '100%',
+          padding: cfg.espaciado,
+          boxSizing: 'border-box',
+        }}
+      >
+        {nucleo}
       </div>
     ) : (
       nucleo
@@ -3359,6 +3381,16 @@ function InspectorTrend({ config, setConfig }: InspectorCtx) {
           onChange={(e) => set({ mostrarRejilla: e.target.checked })}
           className="h-4 w-4 rounded border-slate-300 text-siemens focus:ring-2 focus:ring-siemens/40 dark:border-navy-slate dark:bg-navy"
         />
+      </label>
+
+      <label className="block">
+        <span className="mb-1 block text-[11px] text-slate-500 dark:text-slate-400">
+          Espaciado (px)
+        </span>
+        <NumeroPx valor={cfg.espaciado} min={0} max={40} alCambiar={(n) => set({ espaciado: n })} />
+        <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
+          Margen alrededor de todo el trend, para que no quede pegado al borde.
+        </span>
       </label>
 
       {/* ── Columna derecha: logo y herramientas ── */}

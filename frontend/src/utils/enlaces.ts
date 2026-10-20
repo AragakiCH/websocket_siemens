@@ -29,6 +29,7 @@
 // =========================================================================
 import type { HmiWidget } from '../models/widget';
 import type { DataType, PlcVariable } from '../models/plc';
+import { PREFIJO_SALIDA, SALIDA_PRINCIPAL } from './funciones';
 
 /** `{ fallo: 'plc1|DB.fault', velocidad: 'param:rpm' }`. */
 export type Enlaces = Record<string, string>;
@@ -119,7 +120,7 @@ export function resolverEnlaces(
   const enlaces = leerEnlaces(widget);
   const r: Record<string, PlcVariable | undefined> = {};
   for (const [nombre, id] of Object.entries(enlaces)) {
-    r[nombre] = id ? resolver(id) : undefined;
+    r[nombre] = id ? resolver(idFinalDeSalida(widget, id)) : undefined;
   }
   return r;
 }
@@ -166,4 +167,32 @@ export function nombreLibre(enlaces: Enlaces, base = 'var'): string {
     if (!(n in enlaces)) return n;
   }
   return `${base}${Date.now()}`;
+}
+
+/**
+ * Sigue las referencias a OTRAS variables del mismo widget hasta el tag.
+ *
+ * Una variable con nombre (o la principal) puede apuntar a otra del widget:
+ * `salida:var1`, `salida:@principal`. Esto recorre la cadena —var2 → var1 →
+ * `plc|DB.x`— y devuelve el id final. Un ciclo (var1 → var2 → var1) o un
+ * hueco devuelve `null`: sin valor, nunca un bucle.
+ *
+ * No sabe de funciones: da el TAG. Lo calculado lo pone `funcion/enVivo.ts`.
+ */
+export function idFinalDeSalida(
+  widget: HmiWidget | null | undefined,
+  id: string | null | undefined
+): string | null {
+  let actual = id ?? '';
+  const vistos = new Set<string>();
+  while (actual.startsWith(PREFIJO_SALIDA)) {
+    const clave = actual.slice(PREFIJO_SALIDA.length);
+    if (vistos.has(clave)) return null;
+    vistos.add(clave);
+    actual =
+      clave === SALIDA_PRINCIPAL
+        ? String(widget?.variableId ?? '')
+        : leerEnlaces(widget)[clave] ?? '';
+  }
+  return actual || null;
 }

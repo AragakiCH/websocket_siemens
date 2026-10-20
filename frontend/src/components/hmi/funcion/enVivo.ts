@@ -43,6 +43,8 @@ import {
   type FuncionSalida,
 } from '../../../utils/funciones';
 import { evaluarFuncion } from '../../../services/funcionesApi';
+import { leerEnlaces } from '../../../utils/enlaces';
+import { PREFIJO_SALIDA } from '../../../utils/funciones';
 
 const ESPERA_MS = 250;
 
@@ -100,13 +102,27 @@ export function useFuncionesEnVivo(
   // entrada puede leer OTRA salida del widget (`salida:var3`).
   const [valores, setValores] = useState<Record<string, unknown>>({});
 
-  /** Valor de una salida del widget: lo calculado si tiene función, si no su tag. */
+  /**
+   * Valor de una salida del widget: lo calculado si tiene función; si no,
+   * y apunta a otra salida (`salida:x`), lo de esa; si no, su tag.
+   */
   const valorDeSalida = (clave: string): unknown => {
-    if (clave in valores) {
-      const v = valores[clave];
-      return v === undefined ? null : v;
+    let k = clave;
+    const vistos = new Set<string>();
+    for (;;) {
+      if (k in valores) {
+        const v = valores[k];
+        return v === undefined ? null : v;
+      }
+      if (vistos.has(k)) return null;
+      vistos.add(k);
+      const enlace =
+        k === SALIDA_PRINCIPAL ? String(widget.variableId ?? '') : leerEnlaces(widget)[k] ?? '';
+      if (!enlace.startsWith(PREFIJO_SALIDA)) {
+        return valorDe(k === SALIDA_PRINCIPAL ? variable : enlaces?.[k]);
+      }
+      k = enlace.slice(PREFIJO_SALIDA.length);
     }
-    return valorDe(clave === SALIDA_PRINCIPAL ? variable : enlaces?.[clave]);
   };
 
   // Las entradas de todas las salidas, con su valor de ahora. La firma es
@@ -221,4 +237,52 @@ export function useFuncionesEnVivo(
     }
     return { variable: v, enlaces: en, errores };
   }, [hay, salidas, valores, variable, enlaces, errores, widget.id]);
+}
+
+/**
+ * Una salida SIN función que apunta a otra (`salida:x`) que SÍ la tiene:
+ * recibe lo calculado. La parte de tags (apuntar a una salida que lee un
+ * tag) ya la resolvió `idFinalDeSalida`; aquí solo falta lo que pone Python.
+ * Sin funciones devuelve lo mismo que entró.
+ */
+export function aplicarAliasCalculados(
+  widget: HmiWidget,
+  variable: PlcVariable | undefined,
+  enlaces: Record<string, PlcVariable | undefined> | undefined
+): { variable: PlcVariable | undefined; enlaces: Record<string, PlcVariable | undefined> | undefined } {
+  const cfg = leerFunciones(widget);
+  if (!cfg.activo) return { variable, enlaces };
+  const conFuncion = (k: string) => !!cfg.porSalida[k]?.expresion.trim();
+  if (!Object.keys(cfg.porSalida).some(conFuncion)) return { variable, enlaces };
+
+  const mapa = leerEnlaces(widget);
+  const enlaceDe = (k: string) =>
+    k === SALIDA_PRINCIPAL ? String(widget.variableId ?? '') : mapa[k] ?? '';
+  const valorDeK = (k: string) => (k === SALIDA_PRINCIPAL ? variable : enlaces?.[k]);
+  /** La primera salida CON función a la que lleva la cadena, o null. */
+  const destino = (origen: string): string | null => {
+    let id = enlaceDe(origen);
+    const vistos = new Set([origen]);
+    while (id.startsWith(PREFIJO_SALIDA)) {
+      const k = id.slice(PREFIJO_SALIDA.length);
+      if (vistos.has(k)) return null;
+      vistos.add(k);
+      if (conFuncion(k)) return k;
+      id = enlaceDe(k);
+    }
+    return null;
+  };
+
+  let v = variable;
+  let en = enlaces;
+  if (!conFuncion(SALIDA_PRINCIPAL)) {
+    const k = destino(SALIDA_PRINCIPAL);
+    if (k) v = valorDeK(k);
+  }
+  for (const nombre of Object.keys(mapa)) {
+    if (conFuncion(nombre)) continue;
+    const k = destino(nombre);
+    if (k) en = { ...(en ?? {}), [nombre]: valorDeK(k) };
+  }
+  return { variable: v, enlaces: en };
 }

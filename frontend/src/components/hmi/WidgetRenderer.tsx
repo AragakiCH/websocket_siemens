@@ -5,8 +5,8 @@ import { HmiWidget } from "../../models/widget";
 import { PlcVariable } from "../../models/plc";
 import { formatValue, valueFraction, isTruthy } from "../../utils/format";
 import { leerAccion, tieneAccion, ejecutarAccion } from "./acciones";
-import { resolverEnlaces, leerEnlaces } from "../../utils/enlaces";
-import { leerFunciones } from "../../utils/funciones";
+import { resolverEnlaces, leerEnlaces, idFinalDeSalida } from "../../utils/enlaces";
+import { leerFunciones, PREFIJO_SALIDA } from "../../utils/funciones";
 import {
   useEsMiniatura,
   KINDS_CAROS_EN_MINIATURA,
@@ -20,7 +20,7 @@ import { HtmlWidgetRenderer } from "./HtmlWidgetRenderer";
 import { MiniaturaZip } from "./MiniaturaZip";
 import { ZipLigero, esLigero } from "./ZipLigero";
 import { leerConfigImagen } from "./inspectores";
-import { useFuncionesEnVivo } from "./funcion/enVivo";
+import { useFuncionesEnVivo, aplicarAliasCalculados } from "./funcion/enVivo";
 
 interface Props {
   widget: HmiWidget;
@@ -73,9 +73,26 @@ function WidgetRendererBase({
   // `PlcVariable` calculada y no se entera de que la escribió Python. Sin
   // función configurada devuelve exactamente lo que entró (mismos objetos),
   // así que el camino de un widget normal no cambia. Ver funcion/enVivo.ts.
-  const calculado = useFuncionesEnVivo(widget, variableLeida, enlacesLeidos, resolver);
-  const variable = calculado.variable;
-  const enlacesResueltos = calculado.enlaces;
+  //
+  // VARIABLES QUE APUNTAN A OTRAS DEL WIDGET (`salida:var1`). Quien dibuja
+  // la pantalla resuelve `widget.variableId` tal cual y con `salida:` no
+  // encuentra nada: aquí se sigue la cadena hasta el tag. Lo calculado por
+  // Python se aplica después (`aplicarAliasCalculados`).
+  const principalEsAlias = String(widget.variableId ?? '').startsWith(PREFIJO_SALIDA);
+  const variableBase = React.useMemo(
+    () =>
+      principalEsAlias && resolver
+        ? resolver(idFinalDeSalida(widget, widget.variableId))
+        : variableLeida,
+    [principalEsAlias, resolver, widget, variableLeida]
+  );
+  const calculado = useFuncionesEnVivo(widget, variableBase, enlacesLeidos, resolver);
+  const conAlias = React.useMemo(
+    () => aplicarAliasCalculados(widget, calculado.variable, calculado.enlaces),
+    [widget, calculado.variable, calculado.enlaces]
+  );
+  const variable = conAlias.variable;
+  const enlacesResueltos = conAlias.enlaces;
 
   /**
    * El aspecto que mandan las dinámicas, y el widget ya repintado con él.
@@ -139,6 +156,9 @@ function WidgetRendererBase({
       // tag AL QUE VAN A ESCRIBIR, y no de la variable principal del widget.
       // Ver `EntornoAccion.resolver`.
       resolver,
+      // Para traducir `salida:x` (otra variable del widget) a su tag al
+      // abrir un faceplate.
+      widget,
     });
     setMandando(false);
     // Cancelar en la confirmación no es un error: no se dice nada.
@@ -927,7 +947,14 @@ function MiniChart({ color, frac }: { color: string; frac: number }) {
  * (que «alternar» lee antes de escribir) y las entradas de sus funciones.
  */
 function idsQueUsa(widget: HmiWidget): string[] {
-  const ids: string[] = Object.values(leerEnlaces(widget));
+  // Las que apuntan a otra variable del widget (`salida:x`) se comparan por
+  // el tag al que llevan; si no, un cambio de ese tag no redibujaría.
+  const ids: string[] = Object.values(leerEnlaces(widget)).map(
+    (id) => idFinalDeSalida(widget, id) ?? ''
+  );
+  if (String(widget.variableId ?? '').startsWith(PREFIJO_SALIDA)) {
+    ids.push(idFinalDeSalida(widget, widget.variableId) ?? '');
+  }
   const accion = leerAccion(widget.config);
   if (accion.tag) ids.push(accion.tag);
   const f = leerFunciones(widget);

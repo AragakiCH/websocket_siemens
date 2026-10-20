@@ -343,6 +343,31 @@ function fundir(g: Grabador, r: { t: number[]; cols: Record<string, (number | nu
   b.podar(g.retencion);
 }
 
+/**
+ * Graba los valores de `vars` para las variables del grabador. También se
+ * llama al ASIGNARLE las variables: la foto inicial de `subscribe` llega
+ * cuando todavía no sabe cuáles son, y una variable que no cambia (una
+ * interna fija) no vuelve a emitir nunca — sin esto no se dibujaba.
+ */
+function tomarValores(g: Grabador, vars: PlcVariable[]): void {
+  if (!g.ids.length) return;
+  const valores = new Map<string, number | null>();
+  let alguno = false;
+  for (const id of g.ids) {
+    const v = vars.find((x) => x.id === id);
+    if (!v || v.value === null || v.value === undefined) {
+      valores.set(id, null);
+      continue;
+    }
+    const num = typeof v.value === 'number' ? v.value : Number(v.value);
+    valores.set(id, Number.isFinite(num) ? num : null);
+    alguno = true;
+  }
+  if (!alguno) return;
+  g.vigentes = valores;
+  muestrearGrabador(g, valores);
+}
+
 function crearGrabador(clave: string): Grabador {
   const g: Grabador = {
     buffer: new BufferTrend(),
@@ -363,24 +388,7 @@ function crearGrabador(clave: string): Grabador {
   });
 
   // Valores nuevos: lo mismo que hacía el efecto de `useBufferLocal`.
-  RealPLCService.subscribe((vars) => {
-    if (!g.ids.length) return;
-    const valores = new Map<string, number | null>();
-    let alguno = false;
-    for (const id of g.ids) {
-      const v = vars.find((x) => x.id === id);
-      if (!v || v.value === null || v.value === undefined) {
-        valores.set(id, null);
-        continue;
-      }
-      const num = typeof v.value === 'number' ? v.value : Number(v.value);
-      valores.set(id, Number.isFinite(num) ? num : null);
-      alguno = true;
-    }
-    if (!alguno) return;
-    g.vigentes = valores;
-    muestrearGrabador(g, valores);
-  });
+  RealPLCService.subscribe((vars) => tomarValores(g, vars));
 
   // Latido: la traza avanza aunque el PLC no cambie (y corta si se cae).
   setInterval(() => {
@@ -434,6 +442,8 @@ function useBufferDeSesion(
     if (!g) return;
     g.ids = ids;
     g.buffer.sincronizar(ids);
+    // Lo que valen AHORA (las internas fijas no volverían a avisar).
+    tomarValores(g, RealPLCService.getVariables());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clave, idsClave]);
 

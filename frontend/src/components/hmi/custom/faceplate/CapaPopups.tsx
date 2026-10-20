@@ -22,7 +22,7 @@
 // que ya no está en pantalla, creyendo que son del que sí está. Eso es peor
 // que cerrar de más.
 // =========================================================================
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { XIcon, Loader2Icon } from 'lucide-react';
 import { usePopups, cerrarPopup, cerrarTodos, type PopupAbierto } from './popups';
 import { useVistaActiva, GRUPO_POR_DEFECTO } from '../navegacion/store';
@@ -184,15 +184,8 @@ export default function CapaPopups() {
     cerrarTodos();
   }, [vista]);
 
-  const alTeclado = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') cerrarPopup();
-  }, []);
-
-  useEffect(() => {
-    if (!hay) return;
-    window.addEventListener('keydown', alTeclado);
-    return () => window.removeEventListener('keydown', alTeclado);
-  }, [hay, alTeclado]);
+  // Escape NO cierra el faceplate: se cierra con su X (o al cambiar de
+  // sección). Un Escape pulsado para otra cosa lo cerraba sin querer.
 
   if (!hay) return null;
 

@@ -17,7 +17,7 @@
 // La barrera de verdad sigue estando en el servidor: esto es comodidad, no
 // seguridad. Quien llame al endpoint a mano se topa con lo mismo.
 // =========================================================================
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import type { InspectorCtx } from '../custom/types';
 import {
   leerAccion,
@@ -43,6 +43,59 @@ import {
 import { useTipos } from '../custom/faceplate/Faceplate';
 import { useAppStore } from '../../../context/AppStore';
 import { PREFIJO_PARAM } from '../../../utils/designStorage';
+import { BuscadorOpciones, filtrarGrupos } from '../../ui/Field';
+import { salidaDeEntrada } from '../../../utils/funciones';
+
+type GrupoOpc = { label: string; options: { label: string; value: string }[] };
+
+/**
+ * El desplegable de UN parámetro del faceplate, con su propio buscador
+ * encima (filtra solo su lista). Lo elegido nunca se esconde al buscar.
+ */
+function SelectorParametro({
+  valor,
+  grupos,
+  onCambiar,
+}: {
+  valor: string;
+  grupos: GrupoOpc[];
+  onCambiar: (v: string) => void;
+}) {
+  const [busca, setBusca] = useState('');
+  const filtro = filtrarGrupos(grupos, busca, valor);
+  return (
+    <>
+      <BuscadorOpciones
+        valor={busca}
+        onCambiar={setBusca}
+        coinciden={filtro.coinciden}
+        total={filtro.total}
+        compacto
+      />
+      <select
+        value={valor}
+        onChange={(e) => onCambiar(e.target.value)}
+        className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+      >
+        {filtro.grupos.map((g, i) => {
+          if (g.options.length === 0) return null;
+          const opciones = g.options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ));
+          return g.label ? (
+            <optgroup key={g.label + i} label={g.label}>
+              {opciones}
+            </optgroup>
+          ) : (
+            <Fragment key={'_' + i}>{opciones}</Fragment>
+          );
+        })}
+      </select>
+    </>
+  );
+}
 
 const TIPOS: { valor: TipoAccion; label: string; ayuda: string }[] = [
   { valor: 'ninguna', label: 'Ninguna', ayuda: 'El widget sólo se mira; no manda nada.' },
@@ -234,6 +287,8 @@ export function InspectorAccion({
   config,
   setConfig,
   paramsPantalla = [],
+  variablesWidget = [],
+  gruposTags,
 }: InspectorCtx) {
   const accion = leerAccion(config);
   const [permitidos, setPermitidos] = useState<TagPermitido[]>([]);
@@ -533,52 +588,70 @@ export function InspectorAccion({
                 Tags de esta ventana
               </p>
               {parametros.map((p) => {
-                // Sólo lo del tipo que el parámetro pide. Ofrecer una
-                // booleana para una corriente es ofrecer un enlace que no
-                // funciona y que sólo se descubre en planta.
-                const compatibles = variables.filter((v) => v.type === p.tipo);
+                // Primero lo del mismo tipo (compatibles) y después el resto
+                // (otras), como en «Variable asociada»: las internas suelen
+                // ser de otro tipo y antes ni aparecían.
                 const propios = paramsPantalla.filter((x) => x.tipo === p.tipo);
+                const valor = accion.params?.[p.id] ?? '';
+                const tags: GrupoOpc[] = gruposTags
+                  ? gruposTags(p.tipo)
+                  : [
+                      {
+                        label: 'Variables',
+                        options: variables
+                          .filter((v) => v.type === p.tipo)
+                          .map((v) => ({ label: v.name, value: v.id })),
+                      },
+                    ];
+                const grupos: GrupoOpc[] = [
+                  { label: '', options: [{ label: '— Sin asignar —', value: '' }] },
+                  // Los parámetros de ESTA pantalla van primero y sólo
+                  // aparecen si es un tipo de faceplate. Es lo que hace que
+                  // un botón «Histórico» dentro del faceplate de un motor
+                  // abra el histórico DE ESE motor, en las cuarenta
+                  // instancias, sin tocar ninguna.
+                  ...(propios.length
+                    ? [{
+                        label: 'Parámetros de esta pantalla',
+                        options: propios.map((x) => ({
+                          label: x.nombre,
+                          value: `${PREFIJO_PARAM}${x.id}`,
+                        })),
+                      }]
+                    : []),
+                  // varPrincipal y las variables con nombre de este widget.
+                  ...(variablesWidget.length
+                    ? [{ label: 'Variables del widget', options: variablesWidget }]
+                    : []),
+                  ...tags,
+                ];
+                // Lo puesto que ya no está en ninguna lista: se enseña igual,
+                // si no el <select> saltaría a «Sin asignar».
+                if (valor && !grupos.some((g) => g.options.some((o) => o.value === valor))) {
+                  const s = salidaDeEntrada(valor);
+                  grupos.push({
+                    label: 'Asignada',
+                    options: [{ label: s !== null ? `${s} (ya no existe)` : `${valor} (no disponible)`, value: valor }],
+                  });
+                }
                 return (
-                  <label key={p.id} className="block">
+                  <div key={p.id} className="block">
                     <span className="mb-1 flex items-baseline justify-between gap-2">
                       <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                         {p.nombre}
                       </span>
                       <code className="text-[10px] text-slate-400">{p.tipo}</code>
                     </span>
-                    <select
-                      value={accion.params?.[p.id] ?? ''}
-                      onChange={(e) =>
+                    <SelectorParametro
+                      valor={valor}
+                      grupos={grupos}
+                      onCambiar={(v) =>
                         set({
-                          params: { ...accion.params, [p.id]: e.target.value },
+                          params: { ...accion.params, [p.id]: v },
                         })
                       }
-                      className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
-                    >
-                      <option value="">— Sin asignar —</option>
-                      {/* Los parámetros de ESTA pantalla van primero y sólo
-                          aparecen si es un tipo de faceplate. Es lo que hace
-                          que un botón «Histórico» dentro del faceplate de un
-                          motor abra el histórico DE ESE motor, en las
-                          cuarenta instancias, sin tocar ninguna. */}
-                      {propios.length > 0 && (
-                        <optgroup label="Parámetros de esta pantalla">
-                          {propios.map((x) => (
-                            <option key={x.id} value={`${PREFIJO_PARAM}${x.id}`}>
-                              {x.nombre}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      <optgroup label="Variables">
-                        {compatibles.map((v) => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    </select>
-                  </label>
+                    />
+                  </div>
                 );
               })}
             </div>

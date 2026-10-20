@@ -36,6 +36,9 @@ import {
 } from './custom/navegacion/store';
 import { abrirPopup, cerrarPopup, cerrarTodos } from './custom/faceplate/popups';
 import { PREFIJO_PARAM } from '../../utils/designStorage';
+import { idFinalDeSalida } from '../../utils/enlaces';
+import { PREFIJO_SALIDA } from '../../utils/funciones';
+import type { HmiWidget } from '../../models/widget';
 
 export type TipoAccion =
   | 'ninguna'
@@ -102,6 +105,11 @@ export interface EntornoAccion {
    * pasandole los mismos tags. Ver `faceplate/contexto.ts`.
    */
   mapaTags?: Record<string, string>;
+  /**
+   * El widget que ejecuta la acción. Para traducir `salida:x` —otra
+   * variable del mismo widget— al tag al que apunta.
+   */
+  widget?: HmiWidget;
 }
 
 export interface AccionWidget {
@@ -428,7 +436,12 @@ export async function ejecutarAccion(
         // quien lo abrio, y dos ventanas del mismo tipo con equipos distintos
         // se distinguen por su contenido y no por su procedencia.
         const params: Record<string, string> = {};
-        for (const [k, v] of Object.entries(accion.params ?? {})) {
+        for (const [k, v0] of Object.entries(accion.params ?? {})) {
+          // `salida:x`: una variable de ESTE widget → el tag al que apunta.
+          // Si es una salida en modo función sin tag, queda sin asignar.
+          const v = v0.startsWith(PREFIJO_SALIDA)
+            ? idFinalDeSalida(entorno.widget, v0) ?? ''
+            : v0;
           const real = v.startsWith(PREFIJO_PARAM)
             ? entorno.mapaTags?.[v.slice(PREFIJO_PARAM.length)]
             : v;
