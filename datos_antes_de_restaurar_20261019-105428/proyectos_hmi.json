@@ -1,0 +1,18 @@
+{
+  "proyectos": [
+    {
+      "proyecto_id": "principal",
+      "nombre": "Proyecto principal",
+      "creado_en": "",
+      "actualizado_en": "2026-09-14T15:12:19.042496Z",
+      "actualizado_por": ""
+    },
+    {
+      "proyecto_id": "principal_2",
+      "nombre": "SDF",
+      "creado_en": "2026-10-19T15:53:48.916901Z",
+      "actualizado_en": "2026-10-19T15:53:48.916914Z",
+      "actualizado_por": "operador01"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "project_id": "principal_pantalla_44",
+  "nombre": "5.12",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-19T15:53:49.117818Z",
+  "actualizado_en": "2026-10-19T15:53:49.121081Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 1280,
+    "height": 760
+  },
+  "widgets": [
+    {
+      "id": "w_1789496325060_36",
+      "kind": "custom:l5_12_zona_tanques",
+      "name": "L5_12_ZONA_TANQUES 36",
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 760,
+      "text": "L5_12_ZONA_TANQUES",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

@@ -1,3 +1,4 @@
+import { contar } from '../utils/traza';
 import React, {
   useCallback,
   useEffect,
@@ -240,7 +241,12 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
   const [widgetsVersion, setWidgetsVersion] = useState(0);
   // Subscribe to the emulated PLC value stream.
   useEffect(() => {
-    const unsub = MockPLCService.subscribe(setVariables);
+    const unsub = MockPLCService.subscribe((v) => {
+      // Cuántas lecturas llegan y de cuántas variables: es el ruido de fondo
+      // contra el que compite cualquier pintado. Ver utils/traza.ts.
+      contar('plc.lecturas', v.length);
+      setVariables(v);
+    });
     MockPLCService.start(config.updateRate);
     return () => {
       unsub();

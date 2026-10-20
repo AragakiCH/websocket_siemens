@@ -31,6 +31,7 @@ reinicio que fingir que no hace falta.
 from __future__ import annotations
 
 import io
+import json
 import logging
 import os
 import shutil
@@ -41,13 +42,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import (APIRouter, Depends, File, Form, HTTPException, Request,
+                     UploadFile)
 from fastapi.responses import StreamingResponse
 
 from app.api.auth_routes import exigir_rol, usuario_de
+from app.api.origen import es_local
 from app.config.rutas import (describir, es_configuracion,
                               resolver_carpeta_datos)
 from app.core.auth_manager import Sesion
+from app.db.store import PREFIJO_CIFRADO
 
 logger = logging.getLogger("sistema_routes")
 
@@ -56,6 +60,157 @@ router = APIRouter()
 # Tope de la copia. La configuración son unos pocos KB; si alguien sube 200 MB
 # es que se equivocó de fichero, y conviene decirlo antes de descomprimirlo.
 MAX_ZIP = 50 * 1024 * 1024
+
+
+# ====================================================================== #
+# Lo que es DE ESTE EQUIPO y no viaja en una copia de otro
+# ====================================================================== #
+# Una copia de seguridad se restaura por dos motivos muy distintos:
+#
+#   * en el MISMO equipo, tras reinstalar o tras una metedura de pata: ahí
+#     quiere decir "déjalo todo como estaba";
+#   * en OTRO equipo, para llevarse las pantallas, los PLCs y las consultas:
+#     ahí NO quiere decir "pisa mi base de datos con la del otro PC".
+#
+# Lo segundo es lo que pasaba: alguien traía las pantallas de un compañero y
+# se encontraba con que su conexión a SQL Server —la de su instancia, su
+# base y su usuario, que llevaba semanas funcionando— había desaparecido, y
+# en su lugar había una que apuntaba a una base que en su equipo no existe.
+# Y, de regalo, `.clave` también era la del otro, así que ni restaurando a
+# mano `conexiones.json` volvían a leerse sus contraseñas.
+#
+# `conexiones.json` y `.clave` describen ESTE servidor, no el proyecto. Por
+# defecto se conservan: las conexiones del equipo se quedan, las del zip que
+# no choquen por `db_id` se añaden (con su contraseña re-cifrada con la clave
+# local), y las que choquen se descartan, porque la del equipo es la que
+# funciona aquí. Quien de verdad quiera pisarlas lo pide explícitamente con
+# `conservar_conexiones=false`.
+FICHERO_CONEXIONES = "conexiones.json"
+FICHERO_CLAVE = ".clave"
+# Ficheros con contraseñas cifradas por la clave: si se conserva la clave
+# local, lo que venga del zip hay que re-cifrarlo con ella.
+FICHEROS_CON_CIFRADO = (FICHERO_CONEXIONES, "plcs.json")
+
+
+def _fernet(clave: Optional[bytes]):
+    """Fernet a partir de una clave leída de disco, o None si no vale."""
+    if not clave:
+        return None
+    try:
+        from cryptography.fernet import Fernet
+        return Fernet(clave.strip())
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _recifrar(valor: Any, origen, destino) -> str:
+    """
+    Pasa una contraseña de la clave del zip a la clave local.
+
+    Si no se puede descifrar (el zip venía sin `.clave`, o con otra), se deja
+    en blanco: mejor una contraseña vacía que pide volver a escribirla que un
+    `enc:...` que nunca va a abrir y da "credenciales incorrectas" sin decir
+    por qué.
+    """
+    v = str(valor or "")
+    if not v:
+        return ""
+    if not v.startswith(PREFIJO_CIFRADO):
+        # Texto plano (alguien editó el JSON a mano): se cifra con la local.
+        return (PREFIJO_CIFRADO + destino.encrypt(v.encode()).decode()
+                if destino else v)
+    if origen is None or destino is None:
+        return ""
+    try:
+        claro = origen.decrypt(v[len(PREFIJO_CIFRADO):].encode())
+    except Exception:  # noqa: BLE001
+        return ""
+    return PREFIJO_CIFRADO + destino.encrypt(claro).decode()
+
+
+def _fusionar_conexiones(locales: List[Dict[str, Any]],
+                         importadas: List[Dict[str, Any]],
+                         f_zip, f_local) -> tuple:
+    """
+    Conexiones locales + las del zip que no choquen por `db_id`.
+
+    Devuelve `(lista_final, añadidas, descartadas)` con los `db_id` de cada
+    grupo, para que el mensaje al usuario diga exactamente qué pasó con cada
+    una en vez de un "restaurado" que no explica por qué su base sigue ahí.
+    """
+    ids_locales = {str(c.get("db_id", "")) for c in locales}
+    final = list(locales)
+    anadidas: List[str] = []
+    descartadas: List[str] = []
+    for c in importadas:
+        db_id = str(c.get("db_id", ""))
+        if db_id in ids_locales:
+            descartadas.append(db_id)
+            continue
+        c = dict(c)
+        c["password"] = _recifrar(c.get("password", ""), f_zip, f_local)
+        # Que no arranque sola apuntando a un servidor que quizá no existe
+        # aquí: se deja dada de alta para revisarla, no para que falle cada
+        # arranque.
+        c["autoconectar"] = False
+        final.append(c)
+        anadidas.append(db_id)
+    return final, anadidas, descartadas
+
+
+# ====================================================================== #
+# Traza de rendimiento del runtime
+# ====================================================================== #
+# La vista manda, con `navigator.sendBeacon`, lotes de marcas de tiempo:
+# cuándo se pidió una pantalla, cuándo llegó, cuánto tardó cada widget en
+# montarse, cuánto bloqueó el hilo principal. Es lo que permite responder a
+# «¿por qué tarda?» con números de ESE equipo en vez de con conjeturas.
+#
+# Va a `traza_rendimiento.log` en la carpeta de datos: con extensión `.log`
+# a propósito, para que `es_configuracion()` lo deje fuera de las copias de
+# seguridad. Se acepta solo desde la propia máquina y se recorta a un tamaño
+# fijo: un visor encendido una semana no puede llenar el disco.
+TRAZA_FICHERO = "traza_rendimiento.log"
+TRAZA_MAX_BYTES = 4 * 1024 * 1024
+
+
+@router.post(
+    "/sistema/traza",
+    tags=["Sistema"],
+    summary="Guardar marcas de rendimiento de la vista",
+    description="Solo desde la máquina del servidor. Cada lote se añade como "
+                "líneas JSON a `traza_rendimiento.log` en la carpeta de datos.",
+    include_in_schema=False,
+)
+async def guardar_traza(request: Request) -> Dict[str, Any]:
+    if not es_local(request):
+        raise HTTPException(403, "Solo desde el equipo servidor.")
+    try:
+        cuerpo = await request.json()
+    except Exception:  # noqa: BLE001
+        return {"ok": False}
+    lote = cuerpo.get("lote") if isinstance(cuerpo, dict) else None
+    if not isinstance(lote, list) or not lote:
+        return {"ok": True, "guardadas": 0}
+
+    ruta = resolver_carpeta_datos() / TRAZA_FICHERO
+    try:
+        if ruta.is_file() and ruta.stat().st_size > TRAZA_MAX_BYTES:
+            # Se queda con la mitad final: lo reciente es lo que interesa.
+            datos = ruta.read_bytes()[-TRAZA_MAX_BYTES // 2:]
+            ruta.write_bytes(datos[datos.find(b"\n") + 1:])
+        ahora = datetime.now().isoformat(timespec="milliseconds")
+        pagina = str(cuerpo.get("pagina", ""))[:200]
+        with ruta.open("a", encoding="utf-8") as f:
+            for m in lote[:2000]:
+                if not isinstance(m, dict):
+                    continue
+                m = {"recibido": ahora, "pagina": pagina, **m}
+                f.write(json.dumps(m, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        logger.warning("No se pudo escribir la traza: %s", exc)
+        return {"ok": False}
+    return {"ok": True, "guardadas": len(lote)}
 
 
 @router.get(
@@ -195,6 +350,14 @@ async def descargar_backup() -> StreamingResponse:
                 "**Antes de tocar nada** guarda lo que hay ahora en una "
                 "carpeta hermana `datos_antes_de_restaurar_<fecha>`: si el "
                 "respaldo resulta ser el equivocado, no se ha perdido nada.\n\n"
+                "**Las conexiones a base de datos de este equipo se "
+                "conservan** (`conservar_conexiones=true`, el valor por "
+                "defecto): `conexiones.json` y la clave de cifrado describen "
+                "ESTE servidor, no el proyecto. Las del zip que no choquen "
+                "por `db_id` se añaden desactivadas, con su contraseña "
+                "re-cifrada con la clave local; las que choquen se descartan. "
+                "Con `false` se pisa todo, como una restauración en el mismo "
+                "equipo tras reinstalar.\n\n"
                 "**Hay que reiniciar el servicio después.** Los pools de base "
                 "de datos, las sesiones y los PLCs conectados viven en "
                 "memoria; cambiarles el disco por debajo dejaría el proceso a "
@@ -203,6 +366,11 @@ async def descargar_backup() -> StreamingResponse:
 async def restaurar_backup(
     request: Request,
     archivo: UploadFile = File(..., description="El .zip descargado antes."),
+    conservar_conexiones: bool = Form(
+        default=True,
+        description="Conservar `conexiones.json` y `.clave` de este equipo y "
+                    "fusionar las conexiones del zip en vez de sustituirlas.",
+    ),
     # La sesión se recibe como PARÁMETRO y no en `dependencies=[...]`.
     #
     # Comprobar el permiso se comprueba igual de las dos formas, pero en la
@@ -263,12 +431,64 @@ async def restaurar_backup(
             500, f"No se pudo respaldar la configuración actual antes de "
                  f"sustituirla, así que no se sustituye nada: {exc}")
 
+    # ¿Hay conexiones de ESTE equipo que proteger? Solo si existen las dos
+    # piezas: la lista y la clave que abre sus contraseñas. En un equipo recién
+    # instalado no hay nada que conservar y la copia se restaura entera, que
+    # es justo lo que se quiere tras reinstalar.
+    ruta_conexiones = destino / FICHERO_CONEXIONES
+    ruta_clave = destino / FICHERO_CLAVE
+    conservar = (conservar_conexiones and ruta_conexiones.is_file()
+                 and ruta_clave.is_file())
+    locales: List[Dict[str, Any]] = []
+    if conservar:
+        try:
+            cargadas = json.loads(ruta_conexiones.read_text(encoding="utf-8"))
+            locales = [c for c in cargadas if isinstance(c, dict)] \
+                if isinstance(cargadas, list) else []
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("conexiones.json local ilegible (%s); se "
+                           "restaura el del zip tal cual.", exc)
+            conservar = False
+
+    f_local = _fernet(ruta_clave.read_bytes()) if conservar else None
+    f_zip = (_fernet(z.read(FICHERO_CLAVE))
+             if conservar and FICHERO_CLAVE in nombres else None)
+
     restaurados = 0
+    anadidas: List[str] = []
+    descartadas: List[str] = []
     for nombre in nombres:
         if nombre == "_LEEME.txt":
             continue
         salida = destino / nombre
         salida.parent.mkdir(parents=True, exist_ok=True)
+
+        if conservar and nombre == FICHERO_CLAVE:
+            # La clave de este equipo se queda: es la que abre sus
+            # contraseñas, y todo lo que entra del zip se re-cifra con ella.
+            continue
+
+        if conservar and nombre in FICHEROS_CON_CIFRADO:
+            try:
+                datos = json.loads(z.read(nombre).decode("utf-8"))
+            except Exception:  # noqa: BLE001
+                datos = None
+            if isinstance(datos, list):
+                if nombre == FICHERO_CONEXIONES:
+                    datos, anadidas, descartadas = _fusionar_conexiones(
+                        locales, [c for c in datos if isinstance(c, dict)],
+                        f_zip, f_local)
+                else:
+                    for d in datos:
+                        if isinstance(d, dict) and d.get("password"):
+                            d["password"] = _recifrar(
+                                d["password"], f_zip, f_local)
+                salida.write_text(
+                    json.dumps(datos, ensure_ascii=False, indent=2),
+                    encoding="utf-8")
+                restaurados += 1
+                continue
+
         salida.write_bytes(z.read(nombre))
         restaurados += 1
 
@@ -280,21 +500,43 @@ async def restaurar_backup(
                       detalle={"ficheros": restaurados,
                                "respaldo": str(respaldo),
                                "archivo": archivo.filename or "",
-                               "bytes": len(contenido)},
+                               "bytes": len(contenido),
+                               "conexiones_conservadas": conservar,
+                               "conexiones_anadidas": anadidas,
+                               "conexiones_descartadas": descartadas},
                       sesion=sesion)
+
+    nota_conexiones = ""
+    if conservar:
+        nota_conexiones = (
+            f" Las {len(locales)} conexión(es) a base de datos de este equipo "
+            f"se han conservado")
+        if anadidas:
+            nota_conexiones += (
+                f"; del zip se añadieron {', '.join(anadidas)} (desactivadas, "
+                f"revísalas antes de usarlas)")
+        if descartadas:
+            nota_conexiones += (
+                f"; se descartaron {', '.join(descartadas)} del zip porque "
+                f"aquí ya existen con ese id")
+        nota_conexiones += "."
 
     # `usuario_de` devuelve '' cuando no hay sesión, que pasa de verdad en dos
     # casos legítimos: con `auth_requerida=false`, y en el arranque en frío
     # mientras todavía no existe ninguna cuenta. Se escribe 'anónimo' para que
     # el registro no quede con un hueco que parezca un fallo del programa.
-    logger.warning("Configuración restaurada por %s (%d ficheros). Respaldo en %s",
-                   usuario_de(sesion) or "anónimo", restaurados, respaldo)
+    logger.warning("Configuración restaurada por %s (%d ficheros). Respaldo en %s.%s",
+                   usuario_de(sesion) or "anónimo", restaurados, respaldo,
+                   nota_conexiones)
     return {
         "ok": True,
         "ficheros": restaurados,
         "ruta": str(destino),
         "respaldo_anterior": str(respaldo),
-        "mensaje": f"{restaurados} fichero(s) restaurados. "
+        "conexiones_conservadas": conservar,
+        "conexiones_anadidas": anadidas,
+        "conexiones_descartadas": descartadas,
+        "mensaje": f"{restaurados} fichero(s) restaurados.{nota_conexiones} "
                    f"REINICIA el servicio para que se apliquen. La "
                    f"configuración anterior quedó en {respaldo.name}.",
     }

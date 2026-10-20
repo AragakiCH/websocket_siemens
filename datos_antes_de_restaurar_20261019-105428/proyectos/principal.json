@@ -1,0 +1,129 @@
+{
+  "project_id": "principal",
+  "nombre": "HMI Principal",
+  "version": 49,
+  "actualizado_en": "2026-09-22T20:44:21.808304Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1280,
+    "height": 760
+  },
+  "widgets": [
+    {
+      "id": "w_1789399009168_4",
+      "kind": "custom:sidebar-navegacion",
+      "name": "Menú Lateral 4",
+      "x": 0,
+      "y": 0,
+      "width": 238,
+      "height": 760,
+      "text": "Menú Lateral",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "grupo": "principal",
+        "secciones": [
+          {
+            "id": "general",
+            "label": "General",
+            "tipo": "nivel"
+          },
+          {
+            "id": "inicio",
+            "label": "Inicio",
+            "tipo": "seccion",
+            "pantalla": "principal_pantalla_2"
+          },
+          {
+            "id": "detalles",
+            "label": "Detalles",
+            "tipo": "seccion",
+            "pantalla": "principal_pantalla_3"
+          },
+          {
+            "id": "graficos",
+            "label": "Gráficos",
+            "tipo": "seccion"
+          }
+        ]
+      }
+    },
+    {
+      "id": "w_1789399013799_5",
+      "kind": "custom:pantalla-screen",
+      "name": "Panel de Sección 5",
+      "x": 240,
+      "y": 0,
+      "width": 1040,
+      "height": 760,
+      "text": "Panel de Sección",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "grupo": "principal",
+        "mostrarCabecera": true,
+        "ajuste": "ajustar"
+      }
+    },
+    {
+      "id": "w_1790005012467_1",
+      "kind": "button",
+      "name": "Botón 1",
+      "x": 370,
+      "y": 388,
+      "width": 153,
+      "height": 139,
+      "text": "Botón",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "inicio"
+    }
+  ],
+  "creado_en": "",
+  "proyecto": "principal",
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

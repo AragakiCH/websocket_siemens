@@ -1,0 +1,335 @@
+{
+  "project_id": "principal_l3_habilita_alarmas_copia",
+  "nombre": "L3 Arranque Motores",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-19T15:53:49.255264Z",
+  "actualizado_en": "2026-10-19T15:53:49.257134Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1790810931025_1",
+      "kind": "custom:l3_tablero_arranque_motores",
+      "name": "LÍNEA 3 / TABLERO DE MOTORES//Arranque y parada de motores e inicio y fin del proceso",
+      "x": 0,
+      "y": 0,
+      "width": 1610,
+      "height": 755,
+      "text": "L3 Arranque Motores",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1792082261506_1",
+      "kind": "custom:boton_tablero_motores",
+      "name": "VERDE",
+      "x": 419,
+      "y": 125,
+      "width": 90,
+      "height": 95,
+      "text": "BOTON TABLERO MOTORES",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792082851939_4",
+      "kind": "custom:boton_tablero_motores",
+      "name": "ROJO",
+      "x": 526,
+      "y": 125,
+      "width": 90,
+      "height": 95,
+      "text": "BOTON TABLERO MOTORES",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792083550329_5",
+      "kind": "custom:boton_tablero_motores",
+      "name": "VERDE",
+      "x": 419,
+      "y": 298,
+      "width": 90,
+      "height": 95,
+      "text": "BOTON TABLERO MOTORES",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792083550329_6",
+      "kind": "custom:boton_tablero_motores",
+      "name": "ROJO",
+      "x": 526,
+      "y": 298,
+      "width": 90,
+      "height": 95,
+      "text": "BOTON TABLERO MOTORES",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792083562363_7",
+      "kind": "custom:boton_tablero_motores",
+      "name": "VERDE",
+      "x": 419,
+      "y": 466,
+      "width": 90,
+      "height": 95,
+      "text": "BOTON TABLERO MOTORES",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792083562363_8",
+      "kind": "custom:boton_tablero_motores",
+      "name": "ROJO",
+      "x": 526,
+      "y": 466,
+      "width": 90,
+      "height": 95,
+      "text": "BOTON TABLERO MOTORES",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792083568654_9",
+      "kind": "custom:boton_tablero_motores",
+      "name": "VERDE",
+      "x": 419,
+      "y": 637,
+      "width": 90,
+      "height": 95,
+      "text": "BOTON TABLERO MOTORES",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792083568654_10",
+      "kind": "custom:boton_tablero_motores",
+      "name": "ROJO",
+      "x": 526,
+      "y": 637,
+      "width": 90,
+      "height": 95,
+      "text": "BOTON TABLERO MOTORES",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792083580344_12",
+      "kind": "custom:boton_tablero_motores",
+      "name": "VERDE",
+      "x": 798,
+      "y": 125,
+      "width": 90,
+      "height": 95,
+      "text": "BOTON TABLERO MOTORES",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    },
+    {
+      "id": "w_1792083580344_13",
+      "kind": "custom:boton_tablero_motores",
+      "name": "ROJO",
+      "x": 1079,
+      "y": 125,
+      "width": 90,
+      "height": 95,
+      "text": "BOTON TABLERO MOTORES",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "escritura": true
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

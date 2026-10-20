@@ -39,6 +39,8 @@ from pydantic import BaseModel, Field
 from app.api.auth_routes import exigir_rol, sesion_actual, usuario_de
 from app.api.origen import es_local
 from app.core.auth_manager import Sesion
+from app.db.entorno import host_sugerido as sugerir_host
+from app.db.entorno import instancias_sql_server
 from app.db.entorno import revisar as revisar_entorno
 from app.db.migraciones import asegurar_columnas_hmi, resumir
 from app.db.provision import provisionar
@@ -295,16 +297,31 @@ async def entorno_bd(
                 "quien abre la conexión — no los del PC del navegador.",
     responses={200: {"content": {"application/json": {"example": {
         "ok": True, "drivers": ["ODBC Driver 18 for SQL Server"],
+        "instancias": ["TEW_SQLEXPRESS"],
+        "host_sugerido": "localhost\\TEW_SQLEXPRESS",
         "mensaje": "",
     }}}}},
 )
 async def drivers_odbc() -> dict:
-    """Nombres de driver ODBC disponibles, filtrando los de SQL Server."""
+    """
+    Nombres de driver ODBC disponibles, filtrando los de SQL Server.
+
+    Devuelve además las **instancias** de SQL Server instaladas en la máquina
+    del backend y el **host sugerido** para llegar a ellas. Es lo que el
+    formulario propone de salida: en un equipo con TIA Portal, por ejemplo,
+    no hay instancia por defecto y la única es `TEW_SQLEXPRESS`, así que
+    `localhost` a secas nunca va a responder y `localhost\\TEW_SQLEXPRESS` sí.
+    Mejor escribirlo ya que dejar que lo descubra el usuario a base de
+    errores de timeout.
+    """
+    instancias = instancias_sql_server()
+    host = sugerir_host(instancias)
     try:
         import pyodbc  # llega como dependencia de aioodbc
     except ModuleNotFoundError:
         return {
             "ok": False, "drivers": [], "todos": [],
+            "instancias": instancias, "host_sugerido": host,
             "mensaje": "Falta el paquete 'aioodbc' (que trae pyodbc). "
                        "Instálalo con: pip install aioodbc",
         }
@@ -312,7 +329,9 @@ async def drivers_odbc() -> dict:
     try:
         todos = sorted(pyodbc.drivers())
     except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "drivers": [], "todos": [], "mensaje": str(exc)}
+        return {"ok": False, "drivers": [], "todos": [],
+                "instancias": instancias, "host_sugerido": host,
+                "mensaje": str(exc)}
 
     # Solo los de SQL Server: son los únicos que sirven para `motor=mssql`.
     #
@@ -339,7 +358,9 @@ async def drivers_odbc() -> dict:
             "del servidor. Instala el 'Microsoft ODBC Driver 18 for SQL "
             "Server' desde la web de Microsoft y reinicia el backend."
         )
-    return {"ok": True, "drivers": sql, "todos": todos, "mensaje": mensaje}
+    return {"ok": True, "drivers": sql, "todos": todos,
+            "instancias": instancias, "host_sugerido": host,
+            "mensaje": mensaje}
 
 
 class Provision(BaseModel):

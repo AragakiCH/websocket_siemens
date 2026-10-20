@@ -85,6 +85,7 @@ import {
   esNivel,
   type Seccion,
   setPantalla,
+  esWidgetDeNavegacion,
   GRUPO_POR_DEFECTO,
 } from '../components/hmi/custom/navegacion/store';
 
@@ -830,9 +831,21 @@ export function Preview() {
   // Variable de cada widget por id, en O(1) (igual que en el Diseñador): con
   // muchos widgets y muchos tags, un `find` por widget en cada dato del PLC
   // era la parte más cara de repintar la pantalla.
-  const variablePorId = useMemo(
-    () => new Map(variables.map((v) => [v.id, v])),
-    [variables]
+  // El mismo índice que usa `resolverVariable` (y las pantallas empotradas):
+  // un `Map` por lista, compartido. Antes se construía aquí OTRO con todas
+  // las variables en cada lectura del PLC.
+  const variablePorId = indice;
+
+  // ¿Esta pantalla lleva navegación (menú, panel, pestañas)? Si la lleva,
+  // hasta que el menú publique su primera vista no se sabe qué sección
+  // toca, y pintar «todo» mientras tanto es montar las 172 piezas de una
+  // pantalla principal —cuarenta tarjetas con sus miniaturas— para tirar
+  // tres cuartas partes un instante después. En ese hueco se pintan solo
+  // las piezas de todas las vistas y la propia navegación, que es la que
+  // tiene que montarse para decidir. Sin navegación, todo, como siempre.
+  const conNavegacion = useMemo(
+    () => (design?.widgets ?? []).some((w) => esWidgetDeNavegacion(w.kind)),
+    [design]
   );
 
   return (
@@ -1063,7 +1076,9 @@ export function Preview() {
               .filter((w) => {
                 const v = (w.vista ?? '').trim();
                 if (!v) return true;          // "En todas"
-                if (!vistaActiva) return true; // aún sin navegación montada
+                // Aún sin vista: con navegación, solo el armazón (ver
+                // `conNavegacion`); sin ella, todo.
+                if (!vistaActiva) return !conNavegacion || esWidgetDeNavegacion(w.kind);
                 if (v !== vistaActiva) return false;
                 // Es de la sección abierta. Pero si el Panel de Sección está
                 // enseñando OTRA pantalla por encima —abierta con uno de sus

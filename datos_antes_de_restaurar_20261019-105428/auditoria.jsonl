@@ -1,0 +1,239 @@
+{"ts": "2026-08-25T21:05:01.521387Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-25T21:07:36.952996Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-25T21:07:42.741572Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:08:52.534278Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:08:56.967639Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:08:57.895767Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:08:59.136410Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:09:18.985705Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:09:20.072347Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:09:20.822486Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:09:21.856888Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:09:22.277703Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:09:25.303083Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:10:02.277896Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:10:03.224670Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:10:03.739891Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:10:04.543146Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:10:05.101598Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:10:05.935667Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:10:06.427642Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-25T21:10:07.309798Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-31T15:01:36.574337Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-31T15:03:21.288581Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-31T15:53:31.278214Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-31T15:58:46.941177Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-31T15:58:49.201728Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-31T16:05:45.171596Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-08-31T16:08:13.755778Z", "usuario": "anónimo", "accion": "bd.provisionada", "recurso": "HMI_pruebas", "resultado": "ok", "detalle": {"motor": "mssql", "host": "localhost\\TEW_SQLEXPRESS", "esquema": true, "usuario_creado": "psi"}}
+{"ts": "2026-08-31T16:08:15.047756Z", "usuario": "anónimo", "accion": "bd.conexiones.alta", "recurso": "conexiones", "resultado": "ok"}
+{"ts": "2026-08-31T16:08:35.183508Z", "usuario": "anónimo", "accion": "usuario.creado", "recurso": "operador01", "resultado": "ok", "detalle": {"categoria": "Supervisor", "db_id": "local"}}
+{"ts": "2026-08-31T16:08:56.795805Z", "usuario": "operador01", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-08-31T16:09:23.612074Z", "usuario": "operador01", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T14:50:05.875864Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-07T14:51:09.810049Z", "usuario": "anónimo", "accion": "plc.baja", "recurso": "192.168.50.1", "resultado": "ok"}
+{"ts": "2026-09-07T14:51:17.061125Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T14:51:18.256329Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T14:51:26.215334Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T14:51:27.014956Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T14:51:46.932349Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T14:51:50.456013Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T14:51:57.590406Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T14:51:59.003989Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T14:52:08.014466Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T15:00:49.371233Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-07T15:01:02.108804Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T15:01:03.076568Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T15:01:16.381174Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T15:01:16.860505Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T15:01:25.934117Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T15:01:28.099587Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T15:02:36.621802Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T15:02:50.525285Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.widget_borrado", "recurso": "principal", "resultado": "ok", "detalle": {"widget": "w_1788793363586_1"}}
+{"ts": "2026-09-07T15:02:53.260841Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T15:06:27.547429Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T15:06:28.783039Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T16:18:15.991381Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-07T16:28:16.825403Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T16:28:20.525121Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T16:28:20.724249Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T16:28:23.571017Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T16:30:33.706816Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T16:30:35.155214Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T16:30:45.420775Z", "usuario": "operador01", "usuario_id": 1, "accion": "crud.alarmas_def.creado", "recurso": "alarmas_def", "resultado": "ok", "detalle": {"id": 1}}
+{"ts": "2026-09-07T16:30:50.501764Z", "usuario": "operador01", "usuario_id": 1, "accion": "crud.alarmas_def.actualizado", "recurso": "alarmas_def", "resultado": "ok", "detalle": {"id": 1}}
+{"ts": "2026-09-07T16:37:42.445394Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T16:37:43.041032Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T18:09:16.585276Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-07T18:09:31.637123Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T18:09:32.416068Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T18:09:38.805405Z", "usuario": "operador01", "usuario_id": 1, "accion": "crud.alarmas_def.creado", "recurso": "alarmas_def", "resultado": "ok", "detalle": {"id": 2}}
+{"ts": "2026-09-07T18:09:42.899555Z", "usuario": "operador01", "usuario_id": 1, "accion": "crud.alarmas_def.actualizado", "recurso": "alarmas_def", "resultado": "ok", "detalle": {"id": 2}}
+{"ts": "2026-09-07T18:10:42.504136Z", "usuario": "operador01", "usuario_id": 1, "accion": "crud.recetas.creado", "recurso": "recetas", "resultado": "ok", "detalle": {"id": 1}}
+{"ts": "2026-09-07T19:34:06.290456Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-07T19:34:25.358415Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T19:34:26.311825Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T19:35:02.128827Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T19:35:03.003411Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T19:35:29.552260Z", "usuario": "operador01", "usuario_id": 1, "accion": "crud.alarmas_def.actualizado", "recurso": "alarmas_def", "resultado": "ok", "detalle": {"id": 1}}
+{"ts": "2026-09-07T19:35:30.987619Z", "usuario": "operador01", "usuario_id": 1, "accion": "crud.alarmas_def.actualizado", "recurso": "alarmas_def", "resultado": "ok", "detalle": {"id": 1}}
+{"ts": "2026-09-07T19:35:33.970107Z", "usuario": "operador01", "usuario_id": 1, "accion": "crud.alarmas_def.actualizado", "recurso": "alarmas_def", "resultado": "ok", "detalle": {"id": 1}}
+{"ts": "2026-09-07T19:35:44.088340Z", "usuario": "operador01", "usuario_id": 1, "accion": "crud.alarmas_def.actualizado", "recurso": "alarmas_def", "resultado": "ok", "detalle": {"id": 1}}
+{"ts": "2026-09-07T19:39:22.522736Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-07T19:40:14.474499Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-07T19:40:33.399183Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T19:40:38.686769Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.widget_borrado", "recurso": "principal", "resultado": "ok", "detalle": {"widget": "w_1788810035163_1"}}
+{"ts": "2026-09-07T19:40:40.569495Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-07T20:46:34.153846Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-07T21:27:55.469371Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-07T21:28:05.736200Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-14T15:12:19.047469Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-14T15:12:44.896776Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-14T15:12:52.556400Z", "usuario": "anónimo", "accion": "proyecto.exportado", "recurso": "principal", "resultado": "ok", "detalle": {"pantallas": 1, "widgets_personalizados": 0}}
+{"ts": "2026-09-14T15:13:02.407101Z", "usuario": "anónimo", "accion": "pantalla.widget_borrado", "recurso": "principal", "resultado": "ok", "detalle": {"widget": "w_1789398767651_1"}}
+{"ts": "2026-09-14T15:13:04.207562Z", "usuario": "anónimo", "accion": "pantalla.widget_borrado", "recurso": "principal", "resultado": "ok", "detalle": {"widget": "w_1789398768896_2"}}
+{"ts": "2026-09-14T15:13:09.019642Z", "usuario": "anónimo", "accion": "proyecto.exportado", "recurso": "principal", "resultado": "ok", "detalle": {"pantallas": 1, "widgets_personalizados": 0}}
+{"ts": "2026-09-14T15:13:34.791898Z", "usuario": "anónimo", "accion": "pantalla.widget_borrado", "recurso": "principal", "resultado": "ok", "detalle": {"widget": "w_1789398785744_3"}}
+{"ts": "2026-09-14T15:16:59.569062Z", "usuario": "anónimo", "accion": "pantalla.creada", "recurso": "principal_pantalla_2", "resultado": "ok", "detalle": {"proyecto": "principal"}}
+{"ts": "2026-09-14T15:16:59.606614Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-14T15:16:59.612731Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T15:17:09.149668Z", "usuario": "anónimo", "accion": "pantalla.creada", "recurso": "principal_pantalla_3", "resultado": "ok", "detalle": {"proyecto": "principal"}}
+{"ts": "2026-09-14T15:17:09.185090Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T15:17:09.195101Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-14T15:17:48.340084Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-14T15:17:48.340813Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T15:17:49.100349Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T15:17:49.100952Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-14T15:17:49.977509Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-14T15:17:49.978141Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T15:17:50.540755Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-14T15:17:50.540906Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T15:17:51.045100Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-14T15:17:51.045239Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T15:17:51.594858Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T15:17:51.597888Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-14T15:21:13.783043Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-14T16:24:18.205271Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-14T16:26:03.058788Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T16:26:05.336737Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T16:50:11.948691Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-14T16:50:39.734159Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T16:50:41.790939Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T16:50:54.830180Z", "usuario": "anónimo", "accion": "internas.creada", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "maquinaria", "tipo": "bool"}}
+{"ts": "2026-09-14T16:51:02.037040Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T16:51:03.261052Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T16:51:05.915629Z", "usuario": "anónimo", "accion": "internas.valor", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "maquinaria", "valor": true}}
+{"ts": "2026-09-14T16:51:06.547451Z", "usuario": "anónimo", "accion": "internas.valor", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "maquinaria", "valor": false}}
+{"ts": "2026-09-14T16:51:07.050756Z", "usuario": "anónimo", "accion": "internas.valor", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "maquinaria", "valor": true}}
+{"ts": "2026-09-14T16:51:07.523708Z", "usuario": "anónimo", "accion": "internas.valor", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "maquinaria", "valor": true}}
+{"ts": "2026-09-14T16:51:08.962457Z", "usuario": "anónimo", "accion": "internas.valor", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "maquinaria", "valor": false}}
+{"ts": "2026-09-14T16:51:10.618877Z", "usuario": "anónimo", "accion": "internas.valor", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "maquinaria", "valor": true}}
+{"ts": "2026-09-14T16:51:12.291021Z", "usuario": "anónimo", "accion": "internas.valor", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "maquinaria", "valor": false}}
+{"ts": "2026-09-14T16:51:28.658155Z", "usuario": "anónimo", "accion": "internas.creada", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "maquinaria02", "tipo": "bool"}}
+{"ts": "2026-09-14T16:51:47.830305Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T16:51:49.071756Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T16:56:43.724162Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-14T16:56:56.866677Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T16:56:57.995239Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T16:57:00.315677Z", "usuario": "anónimo", "accion": "internas.valor", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "maquinaria", "valor": true}}
+{"ts": "2026-09-14T16:57:01.145483Z", "usuario": "anónimo", "accion": "internas.valor", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "maquinaria", "valor": false}}
+{"ts": "2026-09-14T16:57:17.011369Z", "usuario": "anónimo", "accion": "internas.creada", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "variable_02", "tipo": "int"}}
+{"ts": "2026-09-14T16:57:24.331811Z", "usuario": "anónimo", "accion": "internas.valor", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "variable_02", "valor": 100}}
+{"ts": "2026-09-14T16:57:32.035364Z", "usuario": "anónimo", "accion": "internas.valor", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "maquinaria", "valor": true}}
+{"ts": "2026-09-14T16:57:33.202056Z", "usuario": "anónimo", "accion": "internas.valor", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "maquinaria02", "valor": true}}
+{"ts": "2026-09-14T16:57:34.273457Z", "usuario": "anónimo", "accion": "internas.valor", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "maquinaria02", "valor": false}}
+{"ts": "2026-09-14T16:57:34.937520Z", "usuario": "anónimo", "accion": "internas.valor", "recurso": "internas", "resultado": "ok", "detalle": {"nombre": "maquinaria", "valor": false}}
+{"ts": "2026-09-14T16:57:43.481338Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T16:58:30.476934Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T16:58:36.640301Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T16:58:37.518686Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T16:58:38.319129Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-14T19:23:31.693606Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-15T21:03:23.572001Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-15T21:03:59.136686Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-15T21:04:03.782094Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-15T21:04:03.783604Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:22:35.919424Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-21T15:23:25.827274Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:24:07.176781Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:24:13.617017Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:24:59.430910Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:25:01.248695Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:25:31.987076Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:26:07.120519Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:26:33.961281Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:28:22.971472Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:29:01.327734Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:29:03.027608Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:29:10.327491Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:29:14.013616Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:29:41.559133Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:30:12.737237Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:30:49.333058Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:31:36.695791Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:31:37.863146Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:33:57.843862Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:34:06.418233Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:34:29.142291Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:34:48.583735Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:34:55.585131Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:35:11.471397Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T15:35:14.579152Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-21T18:12:38.641852Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-22T15:42:27.988399Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-22T15:44:14.909430Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-22T15:44:16.181414Z", "usuario": "operador01", "usuario_id": 1, "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-22T16:38:28.415048Z", "usuario": "anónimo", "accion": "plc.baja", "recurso": "192.168.50.1", "resultado": "ok"}
+{"ts": "2026-09-22T16:38:35.804728Z", "usuario": "anónimo", "accion": "plc.alta", "recurso": "192.168.0.10", "resultado": "ok", "detalle": {"vendor": "siemens"}}
+{"ts": "2026-09-22T16:38:47.942553Z", "usuario": "anónimo", "accion": "plc.alta", "recurso": "192.168.0.1", "resultado": "ok", "detalle": {"vendor": "siemens"}}
+{"ts": "2026-09-22T16:39:18.006724Z", "usuario": "anónimo", "accion": "plc.alta", "recurso": "192.168.1.20", "resultado": "ok", "detalle": {"vendor": "siemens"}}
+{"ts": "2026-09-22T16:42:36.807546Z", "usuario": "anónimo", "accion": "plc.alta", "recurso": "192.168.17.60", "resultado": "ok", "detalle": {"vendor": "rexroth"}}
+{"ts": "2026-09-22T17:03:40.377452Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-22T17:03:54.283579Z", "usuario": "anónimo", "accion": "plc.baja", "recurso": "192.168.0.10", "resultado": "ok"}
+{"ts": "2026-09-22T17:03:56.240891Z", "usuario": "anónimo", "accion": "plc.baja", "recurso": "192.168.50.1", "resultado": "ok"}
+{"ts": "2026-09-22T17:04:23.621868Z", "usuario": "anónimo", "accion": "plc.alta", "recurso": "192.168.0.10", "resultado": "ok", "detalle": {"vendor": "siemens"}}
+{"ts": "2026-09-22T17:04:27.384810Z", "usuario": "anónimo", "accion": "plc.baja", "recurso": "192.168.0.10", "resultado": "ok"}
+{"ts": "2026-09-22T17:55:27.042437Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-22T17:55:37.406020Z", "usuario": "anónimo", "accion": "plc.baja", "recurso": "192.168.50.1", "resultado": "ok"}
+{"ts": "2026-09-22T17:57:37.948116Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-22T17:58:51.968908Z", "usuario": "anónimo", "accion": "plc.alta", "recurso": "192.168.0.10", "resultado": "ok", "detalle": {"vendor": "siemens"}}
+{"ts": "2026-09-22T18:11:48.376243Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-22T18:12:03.977979Z", "usuario": "anónimo", "accion": "plc.baja", "recurso": "192.168.0.10", "resultado": "ok"}
+{"ts": "2026-09-22T20:32:43.981536Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-22T20:35:14.838288Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-22T20:40:34.219331Z", "usuario": "anónimo", "accion": "plc.alta", "recurso": "192.168.0.10", "resultado": "ok", "detalle": {"vendor": "siemens"}}
+{"ts": "2026-09-22T20:42:04.847075Z", "usuario": "anónimo", "accion": "plc.baja", "recurso": "192.168.0.10", "resultado": "ok"}
+{"ts": "2026-09-22T20:43:54.782329Z", "usuario": "anónimo", "accion": "plc.alta", "recurso": "192.168.0.10", "resultado": "ok", "detalle": {"vendor": "siemens"}}
+{"ts": "2026-09-22T20:44:03.846558Z", "usuario": "anónimo", "accion": "plc.baja", "recurso": "192.168.50.1", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:06.792731Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:10.982114Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:11.246558Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:15.897023Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:15.897799Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:16.647159Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:16.648295Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:21.811192Z", "usuario": "anónimo", "accion": "pantalla.widget_borrado", "recurso": "principal", "resultado": "ok", "detalle": {"widget": "w_1790004230073_1"}}
+{"ts": "2026-09-22T20:44:22.862759Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:22.876723Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:24.072028Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_3", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:24.072651Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:24.667569Z", "usuario": "anónimo", "accion": "pantalla.creada", "recurso": "principal_pantalla_4", "resultado": "ok", "detalle": {"proyecto": "principal"}}
+{"ts": "2026-09-22T20:44:24.709418Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:24.715086Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:26.262680Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_4", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:26.264125Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-22T20:44:28.210864Z", "usuario": "anónimo", "accion": "pantalla.widget_borrado", "recurso": "principal_pantalla_2", "resultado": "ok", "detalle": {"widget": "w_1789399024263_6"}}
+{"ts": "2026-09-22T20:44:54.381055Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-22T20:45:14.082433Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-22T20:45:29.107455Z", "usuario": "anónimo", "accion": "pantalla.widget_borrado", "recurso": "principal_pantalla_2", "resultado": "ok", "detalle": {"widget": "w_1790109870634_1"}}
+{"ts": "2026-09-22T20:46:24.188428Z", "usuario": "anónimo", "accion": "pantalla.widget_borrado", "recurso": "principal_pantalla_2", "resultado": "ok", "detalle": {"widget": "w_1790109931090_2"}}
+{"ts": "2026-09-22T20:46:26.081990Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-22T21:23:42.896305Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-22T21:23:51.614681Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-22T21:27:53.583088Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-22T21:37:50.998425Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-09-22T21:37:59.312799Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.adquirido", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-09-22T21:38:16.172788Z", "usuario": "anónimo@127.0.0.1", "accion": "lock.liberado", "recurso": "designer:principal_pantalla_2", "resultado": "ok"}
+{"ts": "2026-10-19T15:49:46.332107Z", "usuario": "anónimo", "accion": "servicio.arranque", "recurso": "", "resultado": "ok", "detalle": {"auth_requerida": false}}
+{"ts": "2026-10-19T15:53:49.635794Z", "usuario": "operador01", "usuario_id": 1, "accion": "proyecto.importado", "recurso": "principal_2", "resultado": "ok", "detalle": {"pantallas": 92, "widgets_nuevos": ["logo_sdf", "navegacion_planta", "lectura_temperatura_linea", "lectura_presion_vapor_linea", "lectura_status_linea", "leyenda_lineas_colores", "usuario_inicio", "lectura_arranques_linea_3", "lectura_arranques_linea_2", "lectura_arranques_linea_4", "tirc_id", "lectura_arranques_linea_5", "boton_ver_detalle", "texto_detalle", "lectura_velocidad_linea", "l2_1_lava_secc_1", "l2_2_lava_secc_2", "l2_3_lava_secc_3", "l2_4_lava_secc_4", "l2_5_seca_secc_1", "l2_6_seca_secc_2", "l2_7_seca_secc_3", "l2_8_rizado", "l2_9_zona_tanques", "linea_vertical", "l3_1_lava_secc_1", "lectura_dato_temperatura", "lectura_dato_porcentaje", "lectura_titulo_unidad", "lectura_titulo_doble_unidad", "boton_motor_peque", "texto_ajustable", "l3_2_lava_secc_2", "l3_3_lava_secc_3", "firc_pirc_id", "linea_horizontal", "l3_4_lava_secc_4", "lectura_multiple", "boton_motor_grande", "l3_5_seca_secc_1", "lectura_dato_corriente", "boton_helice", "estado_puerta", "l3_6_seca_secc_2", "l3_7_seca_secc_3", "l3_8_rizado", "lectura_dato_presion", "l3_9_zona_tanques", "estado_motor_peque", "estado_eje_aspas", "l4_1_lava_secc_1", "l4_2_lava_secc_2", "l4_3_lava_secc_3", "l4_4_lava_secc_4", "l4_5_seca_secc_1", "l4_6_seca_secc_2", "l4_7_seca_secc_3", "l4_8_rizado", "l4_9_vaporizador", "lectura_dato_kg", "lectura_dato_rpm", "estado_desmenuzador", "boton_banda_transp", "boton_circulo", "l4_10_zona_tanques", "l5_1_lava_secc_1", "l5_2_lava_secc_2", "l5_3_lava_secc_3", "l5_4_lava_secc_4", "l5_5_seca_secc_1", "l5_6_seca_secc_2", "l5_7_seca_secc_3", "l5_8_rizado_1", "l5_9_rizado_2", "l5_10_rizado_3", "l5_11_rizado_4", "l5_12_zona_tanques", "linea_vertical_punteada", "cabecera_subprocesos_secador", "cabecera_subprocesos_lavadora", "cabecera_subprocesos_lavadora_5", "cabecera_subprocesos_rizado", "lxpid1", "lxmotorjsgn", "lxmotor", "lxmp", "panel_tendencias", "tabla_barras_cubas_8_11", "receta_lazos_criticos_l3", "receta_lazos_criticos_l3_estiro", "receta_valores_nominales_l3", "receta_tolerancias_l3", "receta_tolerancia_final_l3", "l3_receta_apertura_valvulas", "receta_posicion_valvula_final_l3", "l3_habilitacion_alarmas", "boton_activa_inactiva", "l3_habilitacion_alarmas_proceso", "l3_tablero_arranque_motores", "boton_tablero_motores", "l3_control_calidad_cinta_continua", "1_autefa_vista_general_01", "2_autefa_vista_general_02", "3_autefa_plegador_frontal_01", "4_autefa_plegador_superior_01", "5_autefa_prensa", "6_autefa_transportador", "7_autefa_carro_transportador", "l4_panel_tendencias", "l4_error_lazos_1", "l4_error_lazos_2", "receta_lazos_criticos_l4", "receta_lazos_criticos_l4_estiro", "receta_valores_nominales_l4", "receta_tolerancias_l4", "receta_tolerancia_final_l4", "l4_receta_apertura_valvulas", "receta_posicion_valvula_final_l4", "l4_habilitacion_alarmas", "l4_habilitacion_alarmas_proceso", "l4_tablero_arranque_motores", "l4_control_calidad_cinta_continua", "tabla_barras_27", "columna_de_tags_tabla_error"], "widgets_ya_existentes": ["logo_sdf"], "variables_nuevas": ["bool1", "bool2", "bool3", "var1", "var12", "var17", "var10"]}}
+{"ts": "2026-10-19T15:53:49.857463Z", "usuario": "operador01", "usuario_id": 1, "accion": "runtime.publicado", "recurso": "principal_2", "resultado": "ok", "detalle": {"anterior": "principal"}}

@@ -1,0 +1,18 @@
+{
+  "kind": "linea_vertical",
+  "nombre": "Línea vertical ajustable",
+  "html": "<div class=\"line-widget\" aria-hidden=\"true\">\n  <div class=\"line-element\"></div>\n</div>",
+  "css": ":root {\n  --line-color: var(--w-color, #930606);\n\n  /*\n   * Valor alternativo de tamaño 4:\n   * 4 / 16 = 0.25 px en un ancho de 40 px.\n   */\n  --line-thickness: 0.625%;\n}\n\nhtml,\nbody {\n  width: 100%;\n  height: 100%;\n  margin: 0;\n  padding: 0;\n  overflow: hidden;\n\n  background: transparent !important;\n}\n\n.line-widget,\n.line-widget * {\n  box-sizing: border-box;\n}\n\n.line-widget {\n  position: relative;\n  width: 100%;\n  height: 100%;\n  margin: 0;\n  padding: 0;\n  overflow: hidden;\n\n  background: transparent;\n  pointer-events: none;\n  user-select: none;\n  opacity: var(--w-opacity, 1);\n}\n\n/* Línea centrada y adaptada a toda la altura. */\n.line-element {\n  position: absolute;\n  left: 50%;\n  top: 0;\n\n  width: var(--line-thickness);\n  max-width: 100%;\n  height: 100%;\n\n  transform: translateX(-50%);\n\n  border: none;\n  border-radius: 999px;\n  background: var(--line-color);\n}",
+  "js": "\"use strict\";\n\n(function () {\n  const BASE_WIDTH = 40;\n  const DEFAULT_THICKNESS = 4;\n\n  // Conversión solicitada: tamaño 8 equivale a 0.5 px.\n  const THICKNESS_FACTOR = 0.5 / 8;\n\n  let container = null;\n  let lastUpdate = null;\n\n  function getBaseThickness(widget) {\n    const configuredSize = parseFloat(widget.fontSize);\n\n    if (\n      Number.isFinite(configuredSize) &&\n      configuredSize > 0\n    ) {\n      return configuredSize;\n    }\n\n    const cssSize = parseFloat(\n      getComputedStyle(container)\n        .getPropertyValue(\"--w-font-size\")\n    );\n\n    if (Number.isFinite(cssSize) && cssSize > 0) {\n      return cssSize;\n    }\n\n    return DEFAULT_THICKNESS;\n  }\n\n  function render(w) {\n    if (!container) return;\n\n    const widget = w || {};\n\n    // Color del apartado TEXTO.\n    container.style.removeProperty(\"--line-color\");\n\n    if (\n      typeof widget.color === \"string\" &&\n      widget.color.trim() !== \"\"\n    ) {\n      container.style.setProperty(\n        \"--line-color\",\n        widget.color\n      );\n    }\n\n    /*\n     * Conversión para el ancho base de 40 px:\n     *\n     * Tamaño 8  → 0.5 px\n     * Tamaño 16 → 1 px\n     * Tamaño 24 → 1.5 px\n     * Tamaño 32 → 2 px\n     *\n     * El grosor también varía proporcionalmente\n     * al modificar el ancho del widget.\n     */\n    const baseThickness = getBaseThickness(widget);\n\n    const convertedThickness =\n      baseThickness * THICKNESS_FACTOR;\n\n    const thicknessPercent =\n      (convertedThickness / BASE_WIDTH) * 100;\n\n    container.style.setProperty(\n      \"--line-thickness\",\n      thicknessPercent + \"%\"\n    );\n  }\n\n  window.onWidgetUpdate = function (w) {\n    lastUpdate = w;\n    render(w);\n  };\n\n  function initialize() {\n    container = document.querySelector(\".line-widget\");\n\n    if (!container) return;\n\n    render(lastUpdate || window.WIDGET || null);\n  }\n\n  if (document.readyState === \"loading\") {\n    document.addEventListener(\n      \"DOMContentLoaded\",\n      initialize,\n      { once: true }\n    );\n  } else {\n    initialize();\n  }\n})();",
+  "meta": {
+    "kind": "LINEA_VERTICAL",
+    "label": "Línea vertical ajustable",
+    "category": "ELEMENTOS GRÁFICOS VARIOS",
+    "defaultWidth": 40,
+    "defaultHeight": 200,
+    "accepts": []
+  },
+  "creado_en": "2026-10-19T15:53:49.414166+00:00",
+  "actualizado_en": "2026-10-19T15:53:49.414178+00:00",
+  "creado_por": "operador01"
+}

@@ -1,0 +1,1724 @@
+{
+  "project_id": "principal_l3_tablas_error_lazos_1_copia",
+  "nombre": "L4 tablas error lazos 1",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-19T15:53:49.292260Z",
+  "actualizado_en": "2026-10-19T15:53:49.294570Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1791411005580_3",
+      "kind": "custom:l4_error_lazos_1",
+      "name": "LÍNEA 4 / ERROR DE LAZOS//Desviación de los lazos de control del proceso",
+      "x": 0,
+      "y": 0,
+      "width": 1610,
+      "height": 755,
+      "text": "L4 Tabla Error Lazos 1",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "interno|bool_3",
+      "vista": "",
+      "enlaces": {
+        "var1": "interno|varprueba1",
+        "var2": "interno|bool_4",
+        "var3": "interno|var_5"
+      }
+    },
+    {
+      "id": "w_1791828839367_92",
+      "kind": "button",
+      "name": "Botón 74 copia 8",
+      "x": 163,
+      "y": 84,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828839367_93",
+      "kind": "button",
+      "name": "Botón 74 copia",
+      "x": 252,
+      "y": 84,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828839367_94",
+      "kind": "button",
+      "name": "Botón 74 copia 2",
+      "x": 339,
+      "y": 84,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828839367_95",
+      "kind": "button",
+      "name": "Botón 74 copia 3",
+      "x": 428,
+      "y": 84,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828839367_96",
+      "kind": "button",
+      "name": "Botón 74 copia 4",
+      "x": 516,
+      "y": 84,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828839367_97",
+      "kind": "button",
+      "name": "Botón 74 copia 5",
+      "x": 605,
+      "y": 84,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828839367_98",
+      "kind": "button",
+      "name": "Botón 74 copia 6",
+      "x": 692,
+      "y": 84,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828839367_99",
+      "kind": "button",
+      "name": "Botón 74 copia 7",
+      "x": 781,
+      "y": 84,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828839367_100",
+      "kind": "button",
+      "name": "Botón 74 copia 9",
+      "x": 867,
+      "y": 83,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828839367_101",
+      "kind": "button",
+      "name": "Botón 74 copia 10",
+      "x": 956,
+      "y": 83,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828839367_102",
+      "kind": "button",
+      "name": "Botón 74 copia 11",
+      "x": 1043,
+      "y": 83,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828839367_103",
+      "kind": "button",
+      "name": "Botón 74 copia 12",
+      "x": 1132,
+      "y": 83,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828839367_104",
+      "kind": "button",
+      "name": "Botón 74 copia 13",
+      "x": 1219,
+      "y": 84,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828861603_105",
+      "kind": "button",
+      "name": "Botón 74 copia 14",
+      "x": 1327,
+      "y": 83,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828861603_106",
+      "kind": "button",
+      "name": "Botón 74 copia 15",
+      "x": 1416,
+      "y": 83,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828861603_107",
+      "kind": "button",
+      "name": "Botón 74 copia 16",
+      "x": 1503,
+      "y": 84,
+      "width": 67,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828907609_109",
+      "kind": "button",
+      "name": "Botón 74 copia 17",
+      "x": 155,
+      "y": 436,
+      "width": 60,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828930697_110",
+      "kind": "button",
+      "name": "Botón 74 copia 18",
+      "x": 224,
+      "y": 436,
+      "width": 60,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828939830_111",
+      "kind": "button",
+      "name": "Botón 74 copia 19",
+      "x": 291,
+      "y": 436,
+      "width": 60,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828939830_112",
+      "kind": "button",
+      "name": "Botón 74 copia 20",
+      "x": 360,
+      "y": 436,
+      "width": 60,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828950924_113",
+      "kind": "button",
+      "name": "Botón 74 copia 21",
+      "x": 427,
+      "y": 436,
+      "width": 60,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828969687_115",
+      "kind": "button",
+      "name": "Botón 74 copia 22",
+      "x": 496,
+      "y": 436,
+      "width": 60,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828969687_116",
+      "kind": "button",
+      "name": "Botón 74 copia 23",
+      "x": 565,
+      "y": 436,
+      "width": 60,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828969687_117",
+      "kind": "button",
+      "name": "Botón 74 copia 24",
+      "x": 632,
+      "y": 436,
+      "width": 60,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828969687_118",
+      "kind": "button",
+      "name": "Botón 74 copia 25",
+      "x": 701,
+      "y": 436,
+      "width": 60,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828969687_119",
+      "kind": "button",
+      "name": "Botón 74 copia 26",
+      "x": 768,
+      "y": 436,
+      "width": 60,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828978416_120",
+      "kind": "button",
+      "name": "Botón 74 copia 27",
+      "x": 905,
+      "y": 436,
+      "width": 60,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828978416_121",
+      "kind": "button",
+      "name": "Botón 74 copia 28",
+      "x": 973,
+      "y": 436,
+      "width": 60,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828978416_122",
+      "kind": "button",
+      "name": "Botón 74 copia 29",
+      "x": 1041,
+      "y": 436,
+      "width": 60,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828978416_123",
+      "kind": "button",
+      "name": "Botón 74 copia 30",
+      "x": 1107,
+      "y": 436,
+      "width": 60,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    },
+    {
+      "id": "w_1791828978416_124",
+      "kind": "button",
+      "name": "Botón 74 copia 31",
+      "x": 1177,
+      "y": 436,
+      "width": 60,
+      "height": 24,
+      "text": ".",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 0.22
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "config": {
+        "accion": {
+          "tipo": "abrir-faceplate",
+          "tag": "",
+          "paso": 1,
+          "confirmar": false,
+          "mensaje": "",
+          "seccion": "pre-estiramiento",
+          "grupo": "principal",
+          "modo": "auto",
+          "temaId": "",
+          "faceplate": "principal_faceplate1_lxpid1_copia",
+          "params": {},
+          "titulo": "",
+          "ancho": 0,
+          "alto": 0,
+          "modal": false,
+          "cerrarTodas": false
+        }
+      },
+      "partes": {
+        "boton": {
+          "color": "#000000",
+          "fontSize": 8,
+          "background": "#edf0f5",
+          "borderRadius": 0
+        }
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

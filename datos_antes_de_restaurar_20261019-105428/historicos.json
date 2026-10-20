@@ -1,0 +1,12 @@
+[
+  {
+    "grupo_id": "45",
+    "db_id": "local",
+    "tags": [],
+    "tabla": "plc_prg",
+    "nombre": "45",
+    "activo": true,
+    "banda_muerta": 0.0,
+    "intervalo_min_ms": 0
+  }
+]

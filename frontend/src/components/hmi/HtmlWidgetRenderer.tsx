@@ -34,7 +34,8 @@
 // colocarlo.
 // =========================================================================
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { usarTurno } from './rendimiento';
+import { usarTurno, useEsVisible } from './rendimiento';
+import { ahora, traza } from '../../utils/traza';
 import type { HmiWidget, WidgetStyle } from '../../models/widget';
 import type { PlcVariable } from '../../models/plc';
 import type { ZipWidget } from '../../services/zipWidgetLoader';
@@ -115,14 +116,25 @@ export function HtmlWidgetRenderer({
   // un buen rato y no atiende clics. Por turnos, lo ligero de la pantalla
   // aparece ya y los iframes van llegando de dos en dos sin bloquear.
   //
-  // En una MINIATURA (Tarjeta de Acceso) también se construye —el dibujo
-  // del ZIP ES la miniatura cuando una pantalla entera es un ZIP, y sin él
-  // la tarjeta salía como una caja gris—, pero igual que aquí: por turnos.
-  // Lo que congelaba la vista general no era que las tarjetas tuvieran ZIP,
-  // sino que los nueve se montaran en el mismo instante. (El contexto de
-  // miniatura lo usan tendencias, alarmas y recetas, que sí consultan al
-  // servidor; ver WidgetRenderer.)
-  const turno = usarTurno();
+  // En una MINIATURA (Tarjeta de Acceso) este componente ya NO se usa: ahí
+  // el ZIP se dibuja sin iframe, con su HTML y su CSS en un Shadow DOM (ver
+  // MiniaturaZip.tsx y el desvío en WidgetRenderer). Diez tarjetas con
+  // treinta ZIP cada una eran trescientos iframes por turnos: segundos de
+  // tarjetas grises cada vez que se volvía a la vista general.
+  //
+  // LA PANTALLA QUE SE ESTÁ MIRANDO NO ESPERA. La cola se introdujo cuando
+  // las miniaturas también montaban iframes y había cientos en vuelo; eso
+  // ya no pasa (MiniaturaZip.tsx). Lo que queda son los treinta ZIP de la
+  // pantalla visible, y repartirlos en tandas era justo el «van apareciendo
+  // de a poco» que se veía. Se montan todos en el mismo commit; el
+  // navegador analiza cada documento en su propia tarea, así que el resto
+  // de la pantalla pinta igual de rápido. Las capas que el Panel de Sección
+  // conserva OCULTAS sí van por la cola: no corre prisa y así no compiten
+  // con la visible. Y el Diseñador (`interactivo` en falso) también: ahí
+  // el lienzo enseña TODAS las secciones a la vez —sesenta ZIP en una
+  // pantalla principal— y nadie está esperando a operar.
+  const visible = useEsVisible();
+  const turno = usarTurno(visible && interactivo);
   const montarIframe = turno;
 
   /**
@@ -262,6 +274,57 @@ export function HtmlWidgetRenderer({
   // sin `transform` para siempre.
   useLayoutEffect(() => () => { onModal?.(false); }, [onModal]);
 
+  // --- El paquete de valores, el mismo para el postMessage y para el
+  //     primer pintado (ver `inicialScript`) --------------------------------- //
+  const payload = useMemo(() => ({
+      type: 'widget-update',
+      // Fuera de `widget` porque no es un dato del proceso: es cómo se
+      // comporta el puntero. Si fuera dentro, aparecería en `WIDGET.clicable`
+      // y parecería algo que el autor del ZIP puede usar.
+      clicable: clicable && interactivo,
+      widget: {
+        // DENTRO de `widget`, al revés que `clicable`. Ese se esconde porque
+        // es cosa del puntero y el autor del ZIP no pinta nada con él; éste
+        // es justo lo contrario: el widget TIENE que leerlo para saber si
+        // enseña su campo abierto o bloqueado. En el Diseñador va siempre
+        // false, como el propio cerrojo del anfitrión.
+        escritura: escrituraOk && interactivo,
+        unidad,
+        // Las variables con nombre, ya masticadas igual que la principal: el
+        // widget no tiene que saber formatear ni normalizar nada.
+        vars: Object.fromEntries(
+          Object.entries(enlaces ?? {}).map(([k, v]) => [
+            k,
+            {
+              value: v?.value ?? '',
+              on: isTruthy(v),
+              frac: valueFraction(v),
+              label: v ? formatValue(v) : '—',
+            },
+          ])
+        ),
+        value: rawValue,
+        on,
+        frac,
+        label: String(label),
+        name: widget.name || '',
+        color: style.color,
+        bg: style.background,
+        borderColor: style.borderColor,
+        fontSize: style.fontSize,
+        bold: style.bold,
+        opacity: style.opacity,
+      },
+    }), [enlaces, rawValue, on, frac, label, widget.name,
+      style.color, style.background, style.borderColor,
+      style.fontSize, style.bold, style.opacity,
+      clicable, interactivo, escrituraOk, unidad]);
+
+  // Siempre el último paquete, legible desde el `useMemo` del srcDoc sin
+  // que éste dependa de él (ver la nota allí).
+  const ultimoPayload = useRef(payload);
+  ultimoPayload.current = payload;
+
   // --- srcDoc se genera UNA vez (solo cambia si el ZIP cambia) ----------- //
   const srcDoc = useMemo(() => {
     // Placeholders iniciales
@@ -272,8 +335,12 @@ export function HtmlWidgetRenderer({
 
     // Listener de postMessage para actualizaciones sin recarga
     const bridgeScript = `<script>
-window.addEventListener('message', function(e) {
-  var d = e.data;
+// Aplica un paquete de valores al documento. Lo llama el listener de
+// postMessage en cada lectura, y TAMBIÉN se llama una vez al final del
+// documento con los valores que había al montar (ver __W_INICIAL): así el
+// primer pintado del iframe ya sale con sus datos, sin pasar por un
+// fotograma en blanco esperando al primer mensaje.
+function __wAplicar(d) {
   if (!d || d.type !== 'widget-update') return;
 
   // Actualizar objeto global WIDGET
@@ -316,7 +383,8 @@ window.addEventListener('message', function(e) {
   if (typeof window.onWidgetUpdate === 'function') {
     window.onWidgetUpdate(d.widget);
   }
-});
+}
+window.addEventListener('message', function(e) { __wAplicar(e.data); });
 
 // Respuesta a una escritura pedida por el widget.
 window.addEventListener('message', function (e) {
@@ -498,6 +566,23 @@ window.WIDGET = {
     // Script del usuario
     const userScript = hasJs ? `<script>${zipWidget.js}</script>` : '';
 
+    // LOS VALORES QUE HAY AHORA, DENTRO DEL DOCUMENTO.
+    //
+    // Antes el iframe nacía con sus marcadores vacíos y las variables CSS en
+    // sus valores por defecto, y solo tras el evento `load` llegaba el
+    // primer postMessage con los datos reales. En una pantalla con treinta
+    // ZIP eso se veía como treinta cajas que aparecen primero sin nada y se
+    // rellenan un instante después, uno a uno. Con el paquete embebido, el
+    // último script del body lo aplica ANTES del primer pintado, y después
+    // del script del usuario para que su `onWidgetUpdate` reciba datos de
+    // verdad desde el primer momento.
+    //
+    // `<\/script` evita que un valor de texto cierre la etiqueta; el resto
+    // ya es JSON válido y, por tanto, JavaScript válido.
+    const inicialScript = `<script>
+try { __wAplicar(${JSON.stringify(ultimoPayload.current).replace(/<\//g, '<\\/')}); } catch (e) {}
+</script>`;
+
     // Convertir placeholders a spans con data-attributes para actualización dinámica
     html = html.replace(/__W_LABEL__/g, '<span data-w-label></span>');
     html = html.replace(/__W_VALUE__/g, '<span data-w-value></span>');
@@ -555,55 +640,26 @@ ${bridgeScript}
 ${initScript}
 ${modalScript}
 ${userScript}
+${inicialScript}
 </body>
 </html>`;
+    // `ultimoPayload` se lee a propósito sin estar en las dependencias: el
+    // srcDoc se construye UNA vez por ZIP (reconstruirlo recargaría el
+    // iframe en cada lectura), y lo que lleva es la foto de ese momento.
+    // Las lecturas siguientes llegan por postMessage, como siempre.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zipWidget.html, zipWidget.css, zipWidget.js, hasJs]);
 
+
   // --- Enviar datos actualizados por postMessage (sin recargar iframe) --- //
+  //
+  // MIENTRAS LA PANTALLA ESTÁ OCULTA (capa conservada por el Panel de
+  // Sección) no se manda nada: `PantallaEmbebida` ya congela sus variables,
+  // y `visible` está en las dependencias para que al volver a verse se
+  // mande el paquete al día.
   useEffect(() => {
     const iframe = iframeRef.current;
-    if (!iframe) return;
-
-    const payload = {
-      type: 'widget-update',
-      // Fuera de `widget` porque no es un dato del proceso: es cómo se
-      // comporta el puntero. Si fuera dentro, aparecería en `WIDGET.clicable`
-      // y parecería algo que el autor del ZIP puede usar.
-      clicable: clicable && interactivo,
-      widget: {
-        // DENTRO de `widget`, al revés que `clicable`. Ese se esconde porque
-        // es cosa del puntero y el autor del ZIP no pinta nada con él; éste
-        // es justo lo contrario: el widget TIENE que leerlo para saber si
-        // enseña su campo abierto o bloqueado. En el Diseñador va siempre
-        // false, como el propio cerrojo del anfitrión.
-        escritura: escrituraOk && interactivo,
-        unidad,
-        // Las variables con nombre, ya masticadas igual que la principal: el
-        // widget no tiene que saber formatear ni normalizar nada.
-        vars: Object.fromEntries(
-          Object.entries(enlaces ?? {}).map(([k, v]) => [
-            k,
-            {
-              value: v?.value ?? '',
-              on: isTruthy(v),
-              frac: valueFraction(v),
-              label: v ? formatValue(v) : '—',
-            },
-          ])
-        ),
-        value: rawValue,
-        on,
-        frac,
-        label: String(label),
-        name: widget.name || '',
-        color: style.color,
-        bg: style.background,
-        borderColor: style.borderColor,
-        fontSize: style.fontSize,
-        bold: style.bold,
-        opacity: style.opacity,
-      },
-    };
+    if (!iframe || !visible) return;
 
     // El iframe puede no estar listo aún en el primer render
     const send = () => {
@@ -614,12 +670,14 @@ ${userScript}
 
     // Enviar inmediatamente + al cargar (por si el iframe aún no terminó)
     send();
-    iframe.addEventListener('load', send);
-    return () => iframe.removeEventListener('load', send);
-  }, [enlaces, rawValue, on, frac, label, widget.name,
-      style.color, style.background, style.borderColor,
-      style.fontSize, style.bold, style.opacity,
-      clicable, interactivo, escrituraOk, unidad,
+    const t0 = ahora();
+    const alCargar = () => {
+      send();
+      traza('zip.iframe', { kind: zipWidget.meta.kind, ms: Math.round(ahora() - t0) });
+    };
+    iframe.addEventListener('load', alCargar);
+    return () => iframe.removeEventListener('load', alCargar);
+  }, [payload, visible,
       // El iframe puede no existir todavía cuando corre la primera vez (ver
       // `montarIframe`): al aparecer hay que volver a mandarle los datos.
       montarIframe]);

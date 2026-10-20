@@ -61,7 +61,8 @@ import {
 } from '../../../../utils/aplicarCambio';
 import { WidgetRenderer } from '../../WidgetRenderer';
 import { ContextoEmbebido, esWidgetDeNavegacion } from './store';
-import { indiceDe } from '../../rendimiento';
+import { indiceDe, useEsVisible } from '../../rendimiento';
+import { ahora, traza, trazaTrasPintar } from '../../../../utils/traza';
 import { ContextoMapaTags } from '../faceplate/contexto';
 
 /** Cómo encaja el lienzo de la pantalla dentro del marco del panel. */
@@ -180,8 +181,10 @@ function usePantallaEmpotrada(projectId: string): EstadoCarga {
 
   const pedir = useCallback(
     (id: string, vivo: () => boolean) => {
+      const t0 = ahora();
       traer(id)
         .then((d) => {
+          traza('panel.cargada', { id, ms: Math.round(ahora() - t0), widgets: d?.widgets.length ?? 0 });
           if (!vivo()) return;
           // `null` es un 404: esa pantalla ya no existe. Es definitivo, así
           // que se tira lo que hubiera pintado — seguir enseñando el diseño
@@ -239,6 +242,7 @@ function usePantallaEmpotrada(projectId: string): EstadoCarga {
     // Revalidar siempre cuesta un GET por acción del usuario, y `enVuelo`
     // impide que dos paneles pidiendo lo mismo hagan dos peticiones.
     const enCache = cache.get(projectId) ?? null;
+    traza('panel.montar', { id: projectId, cache: !!enCache });
     setEstado({ design: enCache, cargando: !enCache, error: '' });
     pedir(projectId, () => vivo);
 
@@ -418,7 +422,17 @@ export default function PantallaEmbebida({
   soloVista,
   mapaTags,
 }: Props) {
-  const { variables } = useAppStore();
+  const { variables: variablesEnVivo } = useAppStore();
+  // MIENTRAS NO SE VE, LAS VARIABLES SE CONGELAN. El Panel de Sección
+  // conserva montadas las últimas pantallas visitadas (ocultas) para que
+  // volver sea instantáneo; sin esto, cada lectura del PLC redibujaba
+  // también esas y mandaba sus valores a treinta iframes que nadie miraba.
+  // Al volver a verse, `visible` cambia, se toma la lista actual y todo se
+  // pone al día en un solo repintado.
+  const visible = useEsVisible();
+  const congeladas = useRef(variablesEnVivo);
+  if (visible) congeladas.current = variablesEnVivo;
+  const variables = visible ? variablesEnVivo : congeladas.current;
   // Vuelve a dibujar cuando se conoce el tag de un elemento de receta.
   useRevisionEnlacesReceta();
   const { design, cargando, error } = usePantallaEmpotrada(projectId);
@@ -468,6 +482,16 @@ export default function PantallaEmbebida({
     const real = idRealDeEnlace(variableId);
     return real ? indice.get(real) : undefined;
   }, [indice, mapaTags]);
+
+  // Cuándo se PINTÓ de verdad lo montado (dos fotogramas tras el commit).
+  // Una marca por cada diseño distinto que pase por aquí: la primera es la
+  // que cuenta para «cuánto tardó en aparecer».
+  const pintado = useRef<SavedDesign | null>(null);
+  useEffect(() => {
+    if (!design || pintado.current === design) return;
+    pintado.current = design;
+    trazaTrasPintar('panel.pintada', { id: projectId, widgets: aDibujar.length });
+  }, [design, projectId, aDibujar.length]);
 
   const cw = design?.canvas?.width ?? 0;
   const ch = design?.canvas?.height ?? 0;

@@ -1,0 +1,15 @@
+{
+  "project_id": "principal_pantalla_4",
+  "nombre": "Pantalla 4",
+  "proyecto": "principal",
+  "version": 1,
+  "creado_en": "2026-09-22T20:44:24.665747Z",
+  "actualizado_en": "2026-09-22T20:44:24.665759Z",
+  "actualizado_por": "",
+  "canvas": {},
+  "widgets": [],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

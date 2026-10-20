@@ -1,0 +1,46 @@
+{
+  "project_id": "principal_faceplate4_lxmotorjsgn_copia",
+  "nombre": "faceplate3_LxMotorJSG",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-19T15:53:49.186691Z",
+  "actualizado_en": "2026-10-19T15:53:49.191315Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 700,
+    "height": 550,
+    "fondo": "#edf0f5"
+  },
+  "widgets": [
+    {
+      "id": "w_1790361262308_116",
+      "kind": "custom:lxmotorjsgn",
+      "name": "ㅤ",
+      "x": 0,
+      "y": 0,
+      "width": 700,
+      "height": 550,
+      "text": "LxMotorJSGN",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

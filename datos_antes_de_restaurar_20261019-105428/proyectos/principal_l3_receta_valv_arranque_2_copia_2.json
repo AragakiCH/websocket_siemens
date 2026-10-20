@@ -1,0 +1,666 @@
+{
+  "project_id": "principal_l3_receta_valv_arranque_2_copia_2",
+  "nombre": "L4 Receta Valv Arranque 2",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-19T15:53:49.335116Z",
+  "actualizado_en": "2026-10-19T15:53:49.337265Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1791414073588_11",
+      "kind": "custom:receta_posicion_valvula_final_l4",
+      "name": "LÍNEA 4 / RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO//Configuración de la posición de las válvulas en pre-estiro y estiro",
+      "x": 0,
+      "y": 0,
+      "width": 1610,
+      "height": 755,
+      "text": "L4 Receta Válvula Arranque 2",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791934998684_306",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6",
+      "x": 722,
+      "y": 272,
+      "width": 189,
+      "height": 40,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:23:472",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791934998684_307",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia",
+      "x": 997,
+      "y": 272,
+      "width": 189,
+      "height": 40,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:23:472",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791934998684_308",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 2",
+      "x": 722,
+      "y": 325,
+      "width": 189,
+      "height": 40,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:23:473",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791934998684_309",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 3",
+      "x": 997,
+      "y": 325,
+      "width": 189,
+      "height": 40,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:23:473",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791934998684_310",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 4",
+      "x": 722,
+      "y": 376,
+      "width": 189,
+      "height": 40,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:23:474",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791934998684_311",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 5",
+      "x": 997,
+      "y": 376,
+      "width": 189,
+      "height": 40,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:23:474",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791934998684_312",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 6",
+      "x": 722,
+      "y": 448,
+      "width": 189,
+      "height": 40,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:23:475",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791934998684_313",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 7",
+      "x": 997,
+      "y": 448,
+      "width": 189,
+      "height": 40,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:23:475",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791934998684_314",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 8",
+      "x": 722,
+      "y": 500,
+      "width": 189,
+      "height": 40,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:23:476",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791934998684_315",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 9",
+      "x": 997,
+      "y": 500,
+      "width": 189,
+      "height": 40,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:23:476",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791935006036_316",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 10",
+      "x": 722,
+      "y": 552,
+      "width": 189,
+      "height": 40,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:23:477",
+      "vista": "",
+      "config": {
+        "escritura": true
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791935006036_317",
+      "kind": "custom:receta-campo",
+      "name": "Campo de receta 6 copia 11",
+      "x": 997,
+      "y": 552,
+      "width": 189,
+      "height": 40,
+      "text": "Campo de receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "receta:23:477",
+      "vista": "",
+      "config": {
+        "escritura": false
+      },
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791935268555_318",
+      "kind": "custom:receta-contador",
+      "name": "Contador de recetas 245",
+      "x": 1404,
+      "y": 12,
+      "width": 203,
+      "height": 64,
+      "text": "Contador de recetas",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791935268555_319",
+      "kind": "custom:receta-guardar",
+      "name": "Guardar receta 230",
+      "x": 180,
+      "y": 78,
+      "width": 155,
+      "height": 37,
+      "text": "Guardar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "enlaces": {},
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791935268555_320",
+      "kind": "custom:receta-nueva",
+      "name": "Nueva receta 227",
+      "x": 28,
+      "y": 78,
+      "width": 145,
+      "height": 37,
+      "text": "Nueva receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791935268555_321",
+      "kind": "custom:receta-cargar",
+      "name": "Cargar receta 232",
+      "x": 341,
+      "y": 78,
+      "width": 148,
+      "height": 37,
+      "text": "Cargar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791935268555_322",
+      "kind": "custom:receta-eliminar",
+      "name": "Eliminar receta 235",
+      "x": 1423,
+      "y": 78,
+      "width": 158,
+      "height": 37,
+      "text": "Eliminar receta",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    },
+    {
+      "id": "w_1791935327145_325",
+      "kind": "rectangle",
+      "name": "Rectángulo 236",
+      "x": 15,
+      "y": 706,
+      "width": 145,
+      "height": 36,
+      "text": "Rectángulo",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "#cbd5e1",
+        "borderColor": "#94a3b8",
+        "borderWidth": 1,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    },
+    {
+      "id": "w_1791935334246_326",
+      "kind": "custom:receta-aplicar",
+      "name": "Aplicar todos 233",
+      "x": 15,
+      "y": 706,
+      "width": 145,
+      "height": 36,
+      "text": "Aplicar todos",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 0,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": "",
+      "receta": {
+        "habilitada": true,
+        "id": 23,
+        "nombre": "L4 RECETA DE APERTURA DE VÁLVULAS DE PRE-ESTIRO Y ESTIRO"
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

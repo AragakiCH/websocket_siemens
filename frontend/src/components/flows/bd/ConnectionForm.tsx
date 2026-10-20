@@ -93,22 +93,51 @@ export function ConnectionForm({
   const [drivers, setDrivers] = useState<string[]>([]);
   const [avisoDriver, setAvisoDriver] = useState('');
   const [consultado, setConsultado] = useState(false);
+  // ── Instancias de SQL Server REALES de la máquina del backend ──
+  //
+  // `localhost` a secas solo responde si existe la instancia por defecto. En
+  // un PC con TIA Portal la única instancia es `TEW_SQLEXPRESS`, y la gente
+  // perdía la primera media hora con "Login timeout expired" hasta descubrir
+  // que había que escribir `localhost\TEW_SQLEXPRESS`. El backend lee las
+  // instancias del registro y propone el host correcto; aquí se pone de
+  // salida y se enseñan todas para cambiar con un clic.
+  const [instancias, setInstancias] = useState<string[]>([]);
+  const [hostSugerido, setHostSugerido] = useState('');
 
   useEffect(() => {
     if (!isMssql || consultado) return;
     setConsultado(true);
-    void cargarDriversOdbc().then(({ drivers: lista, mensaje }) => {
-      setDrivers(lista);
-      setAvisoDriver(mensaje);
-      // Si el driver preseleccionado no está instalado, se cambia por uno que
-      // sí lo esté. Dejarlo puesto sería que el usuario pulse "Probar" y
-      // reciba un error sobre algo que nunca eligió.
-      const actual = config.opciones?.driver;
-      if (lista.length > 0 && (!actual || !lista.includes(actual))) {
-        onChange({ opciones: { ...config.opciones, driver: lista[0] } });
+    void cargarDriversOdbc().then(
+      ({ drivers: lista, instancias: inst, hostSugerido: sugerido, mensaje }) => {
+        setDrivers(lista);
+        setInstancias(inst);
+        setHostSugerido(sugerido);
+        setAvisoDriver(mensaje);
+        const patch: Record<string, any> = {};
+        // Si el driver preseleccionado no está instalado, se cambia por uno
+        // que sí lo esté. Dejarlo puesto sería que el usuario pulse "Probar"
+        // y reciba un error sobre algo que nunca eligió.
+        const actual = config.opciones?.driver;
+        if (lista.length > 0 && (!actual || !lista.includes(actual))) {
+          patch.opciones = { ...config.opciones, driver: lista[0] };
+        }
+        // El host sugerido SOLO sustituye al genérico `localhost` de un
+        // formulario todavía en blanco (sin base de datos). Un host que la
+        // persona escribió, o el de una conexión ya configurada, no se toca.
+        const hostActual = String(config.host || '').trim().toLowerCase();
+        const enBlanco = !String(config.base_datos || '').trim() && !config.usar_existente;
+        if (
+          sugerido &&
+          enBlanco &&
+          (hostActual === '' || hostActual === 'localhost') &&
+          sugerido.toLowerCase() !== hostActual
+        ) {
+          patch.host = sugerido;
+        }
+        if (Object.keys(patch).length > 0) onChange(patch);
       }
-    });
-  }, [isMssql, consultado, config.opciones, onChange]);
+    );
+  }, [isMssql, consultado, config.opciones, config.host, config.base_datos, config.usar_existente, onChange]);
 
   /**
    * Valores de partida para un motor. Un solo sitio, porque hacen falta en
@@ -117,12 +146,12 @@ export function ConnectionForm({
   const porDefecto = (newMotor: string) => ({
     motor: newMotor,
     puerto: MOTOR_PORTS[newMotor] ?? 3306,
-    // ANTES, para mssql se proponía `localhost\SQLEXPRESS` Y ADEMÁS puerto
-    // 1433. Los dos juntos no funcionan: ODBC ignora el nombre de instancia
-    // cuando hay puerto, así que la URL apuntaba a `localhost,1433` y fallaba
-    // con "Login timeout expired" en cualquier SQL Express (puerto dinámico).
-    // Hay que elegir uno de los dos, y `localhost` + puerto fijo falla menos.
-    host: 'localhost',
+    // Para SQL Server, el host que el backend detectó en SU máquina
+    // (`localhost\TEW_SQLEXPRESS`, por ejemplo). El backend ya sabe que con
+    // instancia con nombre el puerto se ignora y lo resuelve SQL Browser, así
+    // que no pasa nada por dejar el 1433 puesto. Si aún no se consultó, el
+    // `localhost` de siempre.
+    host: newMotor === 'mssql' && hostSugerido ? hostSugerido : 'localhost',
     // ODBC Driver 18 es el que instala Microsoft hoy. Cifra por defecto, y
     // como los certificados de un contenedor o de una instancia local son
     // autofirmados, sin TrustServerCertificate rechaza la conexión. Se marca
@@ -286,14 +315,45 @@ export function ConnectionForm({
               type="text"
               value={config.host || ''}
               onChange={(e) => onChange({ host: e.target.value })}
-              placeholder="localhost"
+              placeholder={hostSugerido || 'localhost'}
               className="input-field"
             />
+            {isMssql && instancias.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                <span>En este equipo:</span>
+                {instancias.map((inst) => {
+                  const valor =
+                    inst.toUpperCase() === 'MSSQLSERVER' ? 'localhost' : `localhost\\${inst}`;
+                  const activo =
+                    String(config.host || '').trim().toLowerCase() === valor.toLowerCase();
+                  return (
+                    <button
+                      key={inst}
+                      type="button"
+                      onClick={() => onChange({ host: valor })}
+                      title={
+                        inst.toUpperCase() === 'MSSQLSERVER'
+                          ? 'Instancia por defecto: responde en localhost'
+                          : `Instancia con nombre «${inst}»`
+                      }
+                      className={`rounded-md border px-1.5 py-0.5 font-mono transition-colors ${
+                        activo
+                          ? 'border-siemens bg-siemens/10 text-siemens-700 dark:text-siemens-200'
+                          : 'border-slate-300 hover:border-siemens hover:text-siemens dark:border-slate-600'
+                      }`}
+                    >
+                      {valor}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             {isMssql && instanciaConPuerto && (
-              <p className="mt-1 text-[11px] leading-relaxed text-amber-600 dark:text-amber-400">
-                Con un nombre de instancia (<code>\SQLEXPRESS</code>) hay que
-                dejar el puerto vacío: ODBC ignora la instancia si hay puerto.
-                O usa <code>localhost</code> con el puerto 1433.
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                Con un nombre de instancia el puerto se ignora: lo resuelve el
+                servicio «SQL Server Browser» (UDP 1434). Solo si fijaste un
+                puerto estático a la instancia añade la opción{' '}
+                <code>puerto_fijo = si</code>.
               </p>
             )}
           </Field>

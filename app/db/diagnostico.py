@@ -109,6 +109,11 @@ def _texto(exc: BaseException) -> str:
 def _destino(host: str, puerto: Optional[int]) -> str:
     if not host:
         return "el servidor"
+    # Con instancia con nombre (`localhost\TEW_SQLEXPRESS`) el puerto no se
+    # usa —lo resuelve SQL Browser—, así que enseñarlo sería mentir sobre a
+    # dónde se intentó conectar.
+    if "\\" in host or "/" in host:
+        return host
     return f"{host}:{puerto}" if puerto else host
 
 

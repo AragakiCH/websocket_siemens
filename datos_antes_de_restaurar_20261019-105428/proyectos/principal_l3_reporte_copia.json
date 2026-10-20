@@ -1,0 +1,48 @@
+{
+  "project_id": "principal_l3_reporte_copia",
+  "nombre": "1 Autefa Vista General 01",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-19T15:53:49.263255Z",
+  "actualizado_en": "2026-10-19T15:53:49.264536Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 1610,
+    "height": 755
+  },
+  "widgets": [
+    {
+      "id": "w_1791224102663_1",
+      "kind": "custom:1_autefa_vista_general_01",
+      "name": "AUTEFA / VISTA GENERAL 01 // Vista general del carro transportador, depositadores y prensa",
+      "x": 0,
+      "y": 0,
+      "width": 1610,
+      "height": 755,
+      "text": "1 Autefa Vista General 01",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": "interno|var_5",
+      "vista": "",
+      "enlaces": {
+        "var1": "interno|varprueba2"
+      }
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

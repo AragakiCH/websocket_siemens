@@ -1,0 +1,41 @@
+{
+  "project_id": "principal_pantalla_3",
+  "nombre": "Pantalla 3",
+  "proyecto": "principal",
+  "version": 4,
+  "creado_en": "2026-09-14T15:17:09.147511Z",
+  "actualizado_en": "2026-09-14T15:17:50.982750Z",
+  "actualizado_por": "",
+  "canvas": {
+    "width": 1280,
+    "height": 760
+  },
+  "widgets": [
+    {
+      "id": "w_1789399044640_7",
+      "kind": "custom:tren-poleas-pid-transparente",
+      "name": "Tren de Poleas P&ID 7",
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 760,
+      "text": "Tren de Poleas P&ID",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    }
+  ]
+}

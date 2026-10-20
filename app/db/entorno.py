@@ -128,6 +128,31 @@ def instancias_sql_server() -> List[str]:
         return []
 
 
+# Instancia por defecto de SQL Server: responde en `localhost` a secas.
+INSTANCIA_DEFECTO = "MSSQLSERVER"
+
+
+def host_sugerido(instancias: Optional[List[str]] = None) -> str:
+    """
+    El host que el formulario debería proponer para SQL Server en ESTE equipo.
+
+    `localhost` solo vale si existe la instancia por defecto. En un PC con
+    TIA Portal o WinCC, por ejemplo, la única instancia es `TEW_SQLEXPRESS`,
+    y `localhost` a secas da "Login timeout expired" sin más pistas. Si hay
+    varias con nombre se propone la primera; la vista enseña la lista
+    completa para cambiarla con un clic.
+
+    Siempre devuelve algo: sin Windows, sin registro o sin instancias, cae
+    en `localhost`, que es lo que había antes.
+    """
+    if instancias is None:
+        instancias = instancias_sql_server()
+    nombres = [str(i or "").strip() for i in instancias if str(i or "").strip()]
+    if not nombres or INSTANCIA_DEFECTO in nombres:
+        return "localhost"
+    return f"localhost\\{nombres[0]}"
+
+
 def puerto_abierto(host: str, puerto: int, espera: float = 0.8) -> bool:
     """¿Contesta algo en ese puerto? Timeout corto: esto bloquea una pantalla."""
     if not puerto:

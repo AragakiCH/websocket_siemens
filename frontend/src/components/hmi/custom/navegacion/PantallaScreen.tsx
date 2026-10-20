@@ -70,6 +70,8 @@ import {
 } from './store';
 import { CampoGrupo, AvisoVistaPropia } from './inspector';
 import { estiloDeParte } from '../../partes';
+import { ContextoVisible } from '../../rendimiento';
+import { traza } from '../../../../utils/traza';
 import type { ModoAjuste } from './PantallaEmbebida';
 
 /**
@@ -179,9 +181,15 @@ function Screen({ widget, interactivo }: RenderCtx) {
   //
   // Es estado de montaje, no de navegación: vive en un `ref` y no en el
   // store, y se pierde al desmontar el panel, que es lo que toca.
-  const MAX_VIVAS = 4;
+  //
+  // Seis y no cuatro: las ocultas ya no cuestan nada por lectura del PLC
+  // (congelan sus variables; ver `ContextoVisible`), así que lo único que
+  // pesa es la memoria de sus iframes, y un operador que va y viene entre
+  // Lavadora, Secador, Rizado y Tanques de una misma línea cabe entero.
+  const MAX_VIVAS = 6;
   const vivas = useRef<string[]>([]);
   const montadas = useMemo(() => {
+    traza('seccion.destino', { destino, viva: vivas.current.includes(destino) });
     const lista = vivas.current.filter((id) => id !== destino);
     if (destino) lista.push(destino);
     while (lista.length > MAX_VIVAS) lista.shift();
@@ -302,11 +310,15 @@ function Screen({ widget, interactivo }: RenderCtx) {
                   </div>
                 }
               >
-                <PantallaEmbebida
-                  projectId={id}
-                  modo={cfg.ajuste}
-                  interactivo={!!interactivo && id === destino}
-                />
+                {/* Las capas ocultas no reciben lecturas del PLC: ver
+                    `ContextoVisible` en rendimiento.ts. */}
+                <ContextoVisible.Provider value={id === destino}>
+                  <PantallaEmbebida
+                    projectId={id}
+                    modo={cfg.ajuste}
+                    interactivo={!!interactivo && id === destino}
+                  />
+                </ContextoVisible.Provider>
               </Suspense>
             </div>
           ))}

@@ -1,0 +1,45 @@
+{
+  "project_id": "principal_5_autefa_prensador_copia",
+  "nombre": "6 Autefa Transportador",
+  "proyecto": "principal_2",
+  "version": 2,
+  "creado_en": "2026-10-19T15:53:49.281147Z",
+  "actualizado_en": "2026-10-19T15:53:49.282522Z",
+  "actualizado_por": "operador01",
+  "canvas": {
+    "width": 920,
+    "height": 642
+  },
+  "widgets": [
+    {
+      "id": "w_1791329977739_17",
+      "kind": "custom:6_autefa_transportador",
+      "name": "AUTEFA / TRANSPORTADOR // Vista del levantador y carro transportador",
+      "x": 0,
+      "y": 0,
+      "width": 920,
+      "height": 642,
+      "text": "6 Autefa Transportador",
+      "style": {
+        "color": "var(--psi-primary)",
+        "background": "transparent",
+        "borderColor": "var(--psi-outline)",
+        "borderWidth": 0,
+        "borderRadius": 8,
+        "fontSize": 14,
+        "bold": false,
+        "align": "center",
+        "rotation": 0,
+        "opacity": 1
+      },
+      "visible": true,
+      "enabled": true,
+      "variableId": null,
+      "vista": ""
+    }
+  ],
+  "faceplate": {
+    "es_tipo": false,
+    "parametros": []
+  }
+}

@@ -647,24 +647,95 @@ async def _crear_usuario(
     if motor == "mssql":
         # El login vive en el servidor (master) y el usuario dentro de la base:
         # son dos objetos distintos y hacen falta los dos.
+        #
+        # ...salvo que el login sea ADMINISTRADOR DEL SERVIDOR (`sa` o
+        # cualquier miembro de `sysadmin`). Esos entran en todas las bases
+        # como `dbo` sin estar mapeados, y SQL Server se niega a mapearlos:
+        #
+        #   Msg 15405 · Cannot use the special principal 'sa'.
+        #
+        # Así que con ellos no hay usuario que crear ni rol que dar. Lo único
+        # que puede hacer falta es ENCENDERLOS: cuando SQL Server se instala
+        # en modo "solo Windows" (lo que hace, por ejemplo, el instalador de
+        # TIA Portal con su instancia TEW_SQLEXPRESS), `sa` queda deshabilitado
+        # y con una contraseña aleatoria que nadie conoce. Habilitarlo sin
+        # ponerle contraseña sería dejarlo igual de inservible, por eso en ese
+        # caso —y SOLO en ese, con la cuenta muerta— sí se le pone la que el
+        # usuario acaba de escribir. Un login activo no se toca, como siempre.
+        es_sysadmin = False
         eng = _motor_autocommit(
             _url(motor, host, puerto, "master", admin_usuario,
                  admin_password, opciones))
         try:
             async with eng.connect() as conn:
-                existe = await conn.execute(
-                    text("SELECT 1 FROM sys.server_principals WHERE name = :n"),
-                    {"n": usuario})
-                if existe.first() is None:
+                # `sid = 0x01` es `sa` aunque lo hayan renombrado; el resto de
+                # sysadmin se mira por pertenencia al rol, no por nombre.
+                fila = (await conn.execute(text(
+                    "SELECT p.is_disabled, "
+                    "  CASE WHEN p.sid = 0x01 OR EXISTS ("
+                    "    SELECT 1 FROM sys.server_role_members rm "
+                    "    JOIN sys.server_principals r "
+                    "      ON r.principal_id = rm.role_principal_id "
+                    "    WHERE rm.member_principal_id = p.principal_id "
+                    "      AND r.name = 'sysadmin') THEN 1 ELSE 0 END "
+                    "FROM sys.server_principals p WHERE p.name = :n"),
+                    {"n": usuario})).first()
+                es_sysadmin = fila is not None and int(fila[1] or 0) == 1
+                if fila is None:
                     await conn.execute(text(
                         f"CREATE LOGIN [{usuario}] WITH PASSWORD = N'{pwd}', "
                         f"DEFAULT_DATABASE = [{base}]"))
                     notas.append(f"Login '{usuario}' creado.")
+                elif es_sysadmin:
+                    if bool(fila[0]):
+                        await conn.execute(text(
+                            f"ALTER LOGIN [{usuario}] ENABLE"))
+                        if pwd:
+                            await conn.execute(text(
+                                f"ALTER LOGIN [{usuario}] WITH PASSWORD = "
+                                f"N'{pwd}'"))
+                        notas.append(
+                            f"El login '{usuario}' estaba DESHABILITADO "
+                            f"(típico de una instalación en modo 'solo "
+                            f"Windows'): se ha habilitado y se le ha puesto "
+                            f"la contraseña indicada.")
+                    else:
+                        notas.append(f"El login '{usuario}' ya existía y está "
+                                     f"activo (no se toca su contraseña).")
+                    notas.append(
+                        f"'{usuario}' es administrador del servidor "
+                        f"(sysadmin): entra en '{base}' como dbo con todos "
+                        f"los permisos, así que no hace falta mapearlo ni "
+                        f"darle roles. Para producción conviene una cuenta "
+                        f"limitada, pero funcionar, funciona.")
                 else:
                     notas.append(f"El login '{usuario}' ya existía "
                                  f"(no se toca su contraseña).")
+
+                # Un login de SQL (con contraseña) no sirve de nada si el
+                # servidor solo admite autenticación de Windows: el intento
+                # de entrar fallaría con 18456 por mucho que exista. Se
+                # comprueba aquí, que es donde todavía se puede avisar con
+                # contexto; cambiarlo exige tocar el registro y REINICIAR el
+                # servicio, cosa que un backend no debe hacer por su cuenta.
+                modo = (await conn.execute(text(
+                    "SELECT CONVERT(int, SERVERPROPERTY("
+                    "'IsIntegratedSecurityOnly'))"))).scalar()
+                if int(modo or 0) == 1:
+                    notas.append(
+                        "ATENCIÓN: este SQL Server está en modo de "
+                        "autenticación 'solo Windows', así que NINGÚN login "
+                        "con contraseña (ni este) podrá entrar hasta activar "
+                        "el modo mixto: en SSMS → clic derecho en el servidor "
+                        "→ Propiedades → Seguridad → 'Modo de autenticación "
+                        "de SQL Server y Windows', y reinicia el servicio. O "
+                        "marca 'Usar la autenticación de Windows' en la "
+                        "conexión del HMI y olvídate de la contraseña.")
         finally:
             await eng.dispose()
+
+        if es_sysadmin:
+            return notas
 
         eng = _motor_autocommit(
             _url(motor, host, puerto, base, admin_usuario,
