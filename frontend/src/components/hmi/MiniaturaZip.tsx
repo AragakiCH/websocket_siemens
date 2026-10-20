@@ -65,6 +65,7 @@ const CSS_BASE = `
   :host {
     display: flex; align-items: center; justify-content: center;
     width: 100%; height: 100%; overflow: hidden;
+    container-type: size;
     background: transparent; font-family: Arial, sans-serif;
     --w-color: #009999; --w-bg: transparent; --w-border-color: #94a3b8;
     --w-on: 0; --w-frac: 0; --w-font-size: 14px; --w-bold: normal; --w-opacity: 1;
@@ -80,12 +81,21 @@ const CSS_BASE = `
  * dentro de nombres como `.body-card` o `[data-body]`.
  */
 function adaptarCss(css: string): string {
-  return css
-    .replace(/:root\b/g, ':host')
-    .replace(/(^|[\s,>+~}])(?:html|body)\b(?![-_\w])/g, '$1:host');
+  return (
+    css
+      .replace(/:root\b/g, ':host')
+      .replace(/(^|[\s,>+~}])(?:html|body)\b(?![-_\w])/g, '$1:host')
+      // Dentro de un iframe, `1vw` es el 1 % del ANCHO DEL WIDGET (el iframe
+      // es su propia ventana). Aquí la ventana es la de verdad, así que
+      // `100vmin` pasaría de «el lado corto de la caja» a «el lado corto del
+      // monitor». Las unidades de contenedor (`cqw`, `cqh`, `cqmin`,
+      // `cqmax`) miden exactamente lo que medía el iframe, porque el host
+      // se declara contenedor de tamaño (ver CSS_BASE).
+      .replace(/(\d*\.?\d+)v(w|h|min|max)\b/gi, '$1cq$2')
+  );
 }
 
-type Hoja = CSSStyleSheet | string;
+export type Hoja = CSSStyleSheet | string;
 const hojas = new Map<string, Hoja>();
 
 const soportaAdopted =
@@ -94,7 +104,7 @@ const soportaAdopted =
   'adoptedStyleSheets' in Document.prototype &&
   'replaceSync' in CSSStyleSheet.prototype;
 
-function hojaDe(zip: ZipWidget): Hoja {
+export function hojaDe(zip: ZipWidget): Hoja {
   // La clave lleva el `actualizado_en`: si alguien reimporta el ZIP con otro
   // CSS, la hoja se reconstruye en vez de seguir sirviendo la vieja.
   const clave = `${zip.meta.kind}|${zip.actualizado_en ?? ''}|${zip.css.length}`;
@@ -124,17 +134,32 @@ function hojaDe(zip: ZipWidget): Hoja {
  * sin volver a analizar el HTML. El `<script>` del ZIP, si lo lleva inline,
  * no corre: `innerHTML` nunca ejecuta scripts, y es justo lo que se quiere.
  */
-function htmlEstatico(html: string): string {
+export function htmlEstatico(html: string): string {
   return html
     .replace(/\{\{label\}\}/g, '<span data-w-label></span>')
     .replace(/\{\{value\}\}/g, '<span data-w-value></span>')
     .replace(/\{\{name\}\}/g, '<span data-w-name></span>');
 }
 
-function poner(root: ShadowRoot, selector: string, texto: string): void {
+export function poner(root: ShadowRoot, selector: string, texto: string): void {
   root.querySelectorAll(selector).forEach((el) => {
     if (el.textContent !== texto) el.textContent = texto;
   });
+}
+
+/**
+ * Deja el HTML del ZIP y su hoja dentro del shadow root del `host` (lo
+ * crea si no existe). Lo usan la miniatura y el modo ligero.
+ */
+export function montarEnShadow(host: HTMLElement, hoja: Hoja, html: string): ShadowRoot {
+  const root = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
+  if (typeof hoja === 'string') {
+    root.innerHTML = `<style>${hoja}</style>${html}`;
+  } else {
+    root.adoptedStyleSheets = [hoja];
+    root.innerHTML = html;
+  }
+  return root;
 }
 
 // ─── Componente ───────────────────────────────────────────────────
@@ -149,13 +174,7 @@ export function MiniaturaZip({ zipWidget, widget, variable, enlaces, style }: Pr
   useLayoutEffect(() => {
     const host = ref.current;
     if (!host) return;
-    const root = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
-    if (typeof hoja === 'string') {
-      root.innerHTML = `<style>${hoja}</style>${html}`;
-    } else {
-      root.adoptedStyleSheets = [hoja];
-      root.innerHTML = html;
-    }
+    montarEnShadow(host, hoja, html);
   }, [html, hoja]);
 
   // Valores: lo mismo que manda el puente por postMessage, pero directo.

@@ -47,6 +47,7 @@ from fastapi import (APIRouter, Depends, File, Form, HTTPException, Request,
 from fastapi.responses import StreamingResponse
 
 from app.api.auth_routes import exigir_rol, usuario_de
+from app.api.origen import es_local
 from app.config.rutas import (describir, es_configuracion,
                               resolver_carpeta_datos)
 from app.core.auth_manager import Sesion
@@ -155,6 +156,61 @@ def _fusionar_conexiones(locales: List[Dict[str, Any]],
         final.append(c)
         anadidas.append(db_id)
     return final, anadidas, descartadas
+
+
+# ====================================================================== #
+# Traza de rendimiento del runtime
+# ====================================================================== #
+# La vista manda, con `navigator.sendBeacon`, lotes de marcas de tiempo:
+# cuándo se pidió una pantalla, cuándo llegó, cuánto tardó cada widget en
+# montarse, cuánto bloqueó el hilo principal. Es lo que permite responder a
+# «¿por qué tarda?» con números de ESE equipo en vez de con conjeturas.
+#
+# Va a `traza_rendimiento.log` en la carpeta de datos: con extensión `.log`
+# a propósito, para que `es_configuracion()` lo deje fuera de las copias de
+# seguridad. Se acepta solo desde la propia máquina y se recorta a un tamaño
+# fijo: un visor encendido una semana no puede llenar el disco.
+TRAZA_FICHERO = "traza_rendimiento.log"
+TRAZA_MAX_BYTES = 4 * 1024 * 1024
+
+
+@router.post(
+    "/sistema/traza",
+    tags=["Sistema"],
+    summary="Guardar marcas de rendimiento de la vista",
+    description="Solo desde la máquina del servidor. Cada lote se añade como "
+                "líneas JSON a `traza_rendimiento.log` en la carpeta de datos.",
+    include_in_schema=False,
+)
+async def guardar_traza(request: Request) -> Dict[str, Any]:
+    if not es_local(request):
+        raise HTTPException(403, "Solo desde el equipo servidor.")
+    try:
+        cuerpo = await request.json()
+    except Exception:  # noqa: BLE001
+        return {"ok": False}
+    lote = cuerpo.get("lote") if isinstance(cuerpo, dict) else None
+    if not isinstance(lote, list) or not lote:
+        return {"ok": True, "guardadas": 0}
+
+    ruta = resolver_carpeta_datos() / TRAZA_FICHERO
+    try:
+        if ruta.is_file() and ruta.stat().st_size > TRAZA_MAX_BYTES:
+            # Se queda con la mitad final: lo reciente es lo que interesa.
+            datos = ruta.read_bytes()[-TRAZA_MAX_BYTES // 2:]
+            ruta.write_bytes(datos[datos.find(b"\n") + 1:])
+        ahora = datetime.now().isoformat(timespec="milliseconds")
+        pagina = str(cuerpo.get("pagina", ""))[:200]
+        with ruta.open("a", encoding="utf-8") as f:
+            for m in lote[:2000]:
+                if not isinstance(m, dict):
+                    continue
+                m = {"recibido": ahora, "pagina": pagina, **m}
+                f.write(json.dumps(m, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        logger.warning("No se pudo escribir la traza: %s", exc)
+        return {"ok": False}
+    return {"ok": True, "guardadas": len(lote)}
 
 
 @router.get(

@@ -20,6 +20,7 @@
 // decide si recargar o forzar. Es lo que evita que un guardado pise el trabajo
 // que otro acaba de hacer.
 // =========================================================================
+import { ahora, traza } from './traza';
 import { HmiWidget } from '../models/widget';
 import type { ConflictoVariable } from './proyectoStorage';
 import { fetchAuth } from '../services/authApi';
@@ -438,8 +439,14 @@ export async function duplicarPantalla(
 export async function cargarProyecto(
   projectId: string = PANTALLA_POR_DEFECTO
 ): Promise<Proyecto | null> {
+  const t0 = ahora();
   try {
     const d = await fetchAuth(`/pantallas/${projectId}`);
+    traza('pantalla.fetch', {
+      id: projectId,
+      ms: Math.round(ahora() - t0),
+      widgets: Array.isArray(d.widgets) ? d.widgets.length : 0,
+    });
     const proyecto: Proyecto = {
       project_id: d.project_id,
       nombre: d.nombre,

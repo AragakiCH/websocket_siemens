@@ -18,6 +18,7 @@ import { customByKind, zipByKind, zipCatalogoListo } from "./custom/registry";
 import { estiloDeParte } from "./partes";
 import { HtmlWidgetRenderer } from "./HtmlWidgetRenderer";
 import { MiniaturaZip } from "./MiniaturaZip";
+import { ZipLigero, esLigero } from "./ZipLigero";
 import { leerConfigImagen } from "./inspectores";
 import { useFuncionesEnVivo } from "./funcion/enVivo";
 
@@ -234,6 +235,26 @@ function WidgetRendererBase({
           variable={variable}
           enlaces={enlacesResueltos}
           style={style}
+        />
+      );
+    }
+    if (zip && esLigero(zip)) {
+      // SIN IFRAME TAMBIÉN EN LA PANTALLA QUE SE OPERA, cuando el ZIP lo
+      // permite (casi todos): su HTML y CSS en un Shadow DOM y su script
+      // corriendo en la página con un `window`/`document` interpuestos.
+      // Noventa de estos aparecen en el mismo fotograma; noventa iframes,
+      // no. Ver ZipLigero.tsx (y lo que supone en aislamiento).
+      return (
+        <ZipLigero
+          zipWidget={zip}
+          widget={pintado}
+          variable={variable}
+          enlaces={enlacesResueltos}
+          style={style}
+          interactivo={interactivo}
+          onModal={setModalZip}
+          onClic={pulsar}
+          clicable={mandaAlgo}
         />
       );
     }
