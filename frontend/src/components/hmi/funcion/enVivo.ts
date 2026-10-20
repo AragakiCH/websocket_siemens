@@ -39,6 +39,7 @@ import {
   leerFunciones,
   NOMBRE_PRINCIPAL,
   SALIDA_PRINCIPAL,
+  salidaDeEntrada,
   type FuncionSalida,
 } from '../../../utils/funciones';
 import { evaluarFuncion } from '../../../services/funcionesApi';
@@ -95,6 +96,19 @@ export function useFuncionesEnVivo(
   const salidas = useMemo(() => salidasActivas(widget), [widget]);
   const hay = salidas.length > 0;
 
+  // Lo calculado por salida (clave → valor). Va aquí arriba porque una
+  // entrada puede leer OTRA salida del widget (`salida:var3`).
+  const [valores, setValores] = useState<Record<string, unknown>>({});
+
+  /** Valor de una salida del widget: lo calculado si tiene función, si no su tag. */
+  const valorDeSalida = (clave: string): unknown => {
+    if (clave in valores) {
+      const v = valores[clave];
+      return v === undefined ? null : v;
+    }
+    return valorDe(clave === SALIDA_PRINCIPAL ? variable : enlaces?.[clave]);
+  };
+
   // Las entradas de todas las salidas, con su valor de ahora. La firma es
   // lo que decide si hay que volver a pedir: cambia solo cuando cambia un
   // valor de entrada o el código.
@@ -105,7 +119,10 @@ export function useFuncionesEnVivo(
       for (const e of s.f.entradas) {
         const n = e.nombre.trim();
         if (!n) continue;
-        entradas[n] = e.variableId
+        const deSalida = salidaDeEntrada(e.variableId);
+        entradas[n] = deSalida !== null
+          ? valorDeSalida(deSalida)
+          : e.variableId
           ? valorDe(resolver ? resolver(e.variableId) : undefined)
           : null;
       }
@@ -123,11 +140,10 @@ export function useFuncionesEnVivo(
     // `resolver` cambia de identidad por render en algunos padres; la firma
     // de abajo es la que evita trabajo de más.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [salidas, widget.id, resolver, hay]);
+  }, [salidas, widget.id, resolver, hay, valores, variable, enlaces]);
 
   const firma = useMemo(() => (hay ? JSON.stringify(peticiones) : ''), [peticiones, hay]);
 
-  const [valores, setValores] = useState<Record<string, unknown>>({});
   const [errores, setErrores] = useState<Record<string, string>>({});
   const reloj = useRef<number | null>(null);
   const ultimaFirma = useRef('');

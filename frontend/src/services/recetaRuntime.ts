@@ -806,14 +806,18 @@ export interface ResultadoCargar {
  *   * Lo que no se pudo enviar se queda en su campo, en ámbar, con su motivo
  *     en `envio.fallos`.
  *
- * No se carga encima de cambios sin guardar: se perderían sin avisar.
+ * No se carga encima de cambios sin guardar: se perderían sin avisar. Salvo
+ * con `descartar` —el operario contestó «Sí» a «¿Descartar los cambios?»—:
+ * entonces se carga igual y, si sale bien, se borran también los borradores
+ * de los campos que esta receta no trae. Nada se descarta si la carga falla.
  */
 export async function cargarDataRecord(
   recetaId: number,
-  registro: RegistroExistente
+  registro: RegistroExistente,
+  opciones: { descartar?: boolean } = {}
 ): Promise<ResultadoCargar> {
   const actual = recetaActual(recetaId);
-  if (actual && hayCambiosSinGuardar(recetaId)) {
+  if (!opciones.descartar && actual && hayCambiosSinGuardar(recetaId)) {
     return {
       ok: false,
       error: `Hay cambios sin guardar en «${actual.nombre}». Guárdalos primero con «Guardar receta».`,
@@ -862,6 +866,17 @@ export async function cargarDataRecord(
   }
 
   fijarRecetaActual(recetaId, { registroId: registro.id, nombre: registro.nombre });
+
+  // Descartar: lo escrito y sin enviar en campos que esta receta no trae
+  // también se va (los cargados ya tienen el valor de la receta).
+  if (opciones.descartar) {
+    const prefijo = `${recetaId}:`;
+    for (const llave of [...borradores.keys()]) {
+      if (!llave.startsWith(prefijo)) continue;
+      if (cargados.has(Number(llave.slice(prefijo.length)))) continue;
+      quitarBorrador(llave);
+    }
+  }
 
   // Al PLC, solo lo que se acaba de cargar.
   const envio = await enviarPendientes(recetaId, cargados);

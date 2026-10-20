@@ -41,7 +41,8 @@
 //   AL PLC, uno por uno — así el campo negro del mismo elemento enseña ya el
 //   valor nuevo. La cargada pasa a ser la receta actual. Lo que no se pudo
 //   enviar se queda en su campo, en ámbar, y la ventana dice cuál y por qué.
-//   Con cambios sin guardar no deja cargar: primero se guardan.
+//   Con cambios sin guardar pregunta «¿Desea descartar los cambios?»: Sí
+//   abre Cargar (y al cargar se descartan); No abre Guardar y luego Cargar.
 //
 //   A SU DERECHA se pinta solo el bloque «RECETA ACTUAL»: el nombre de la
 //   que está cargada y su estado («Guardada» / «Sin guardar»). Va pegado a
@@ -283,12 +284,15 @@ function VentanaReceta({
   recetaNombre,
   conOpciones,
   onCerrar,
+  onGuardada,
 }: {
   recetaId: number;
   recetaNombre: string;
   /** `true` = «Guardar receta» (dos opciones). `false` = «Nueva receta». */
   conOpciones: boolean;
   onCerrar: () => void;
+  /** Se guardó: en vez de solo cerrar, sigue con esto (Cargar → «No»). */
+  onGuardada?: () => void;
 }) {
   // La receta actual, tal como está al abrir: es la que se ofrece modificar.
   const [actual] = useState(() => recetaActual(recetaId));
@@ -342,7 +346,7 @@ function VentanaReceta({
       if (r.envio && r.envio.fallos.length > 0) {
         setHecho({ nombre: r.nombre ?? '', envio: r.envio });
       } else {
-        onCerrar();
+        (onGuardada ?? onCerrar)();
       }
       return;
     }
@@ -469,7 +473,7 @@ function VentanaReceta({
                 borderTop: `1px solid ${C.franja}`,
               }}
             >
-              <button type="button" onClick={onCerrar} style={estiloBotonVentana(true, false)}>
+              <button type="button" onClick={onGuardada ?? onCerrar} style={estiloBotonVentana(true, false)}>
                 Entendido
               </button>
             </div>
@@ -714,6 +718,93 @@ function GuardarReceta(ctx: RenderCtx) {
 
 // ─── «Cargar receta» ─────────────────────────────────────────────
 
+/** «¿Desea descartar los cambios?» — solo Sí o No. Escape la cierra sin más. */
+function VentanaDescartar({
+  receta,
+  onSi,
+  onNo,
+  onCerrar,
+}: {
+  receta: string;
+  onSi: () => void;
+  onNo: () => void;
+  onCerrar: () => void;
+}) {
+  const si = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    si.current?.focus();
+  }, []);
+  return createPortal(
+    <div
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onCerrar();
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(15,23,42,.45)',
+        fontFamily: FUENTE,
+      }}
+    >
+      <div
+        role="alertdialog"
+        aria-label="Cambios sin guardar"
+        style={{
+          width: 420,
+          maxWidth: 'calc(100vw - 32px)',
+          boxSizing: 'border-box',
+          background: '#f8fafb',
+          color: C.tinta,
+          borderRadius: 12,
+          boxShadow: '0 24px 70px rgba(0,0,0,.38)',
+          padding: '22px 24px 20px',
+        }}
+      >
+        <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1.4, color: C.verde }}>
+          GESTIÓN DE RECETAS
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 700, marginTop: 3 }}>Cambios sin guardar</div>
+        <div
+          style={{
+            marginTop: 12,
+            padding: '10px 12px',
+            borderRadius: 6,
+            background: '#fdf3dc',
+            borderLeft: `4px solid ${C.ambar}`,
+            fontSize: 13,
+            lineHeight: 1.5,
+          }}
+        >
+          Hay cambios sin guardar en <b>«{receta}»</b>.
+          <div style={{ marginTop: 4, fontWeight: 700 }}>¿Desea descartar los cambios?</div>
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 10,
+            marginTop: 18,
+            paddingTop: 16,
+            borderTop: `1px solid ${C.franja}`,
+          }}
+        >
+          <button type="button" onClick={onNo} style={estiloBotonVentana(false, false)}>
+            No
+          </button>
+          <button type="button" ref={si} onClick={onSi} style={estiloBotonVentana(true, false)}>
+            Sí
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 /** «1 campo» / «3 campos». */
 function plural(n: number, uno: string, varios: string): string {
   return n === 1 ? `1 ${uno}` : `${n} ${varios}`;
@@ -724,9 +815,12 @@ function VentanaCargar({
   recetaNombre,
   onCerrar,
   onCargada,
+  descartar = false,
 }: {
   recetaId: number;
   recetaNombre: string;
+  /** Se contestó «Sí» a «¿Descartar los cambios?»: carga encima de ellos. */
+  descartar?: boolean;
   onCerrar: () => void;
   /** Se cargó y se envió todo: el aviso lo enseña el botón. */
   onCargada: (r: ResultadoCargar) => void;
@@ -759,7 +853,7 @@ function VentanaCargar({
     if (noSePuede || !registro) return;
     setOcupado(true);
     setFallo('');
-    const r = await cargarDataRecord(recetaId, registro);
+    const r = await cargarDataRecord(recetaId, registro, { descartar });
     setOcupado(false);
     if (!r.ok) {
       setFallo(r.error ?? 'No se pudo cargar la receta.');
@@ -1165,24 +1259,31 @@ function BloqueRecetaActual({
 function CargarReceta(ctx: RenderCtx) {
   const cfg = leerCfgReceta(ctx.widget);
   const recetaId = cfg.habilitada ? cfg.id : null;
-  const [abierta, setAbierta] = useState(false);
+  // Con cambios sin guardar se PREGUNTA primero: «Sí» descarta y abre
+  // Cargar; «No» abre Guardar y, al guardar, sigue con Cargar.
+  const [paso, setPaso] = useState<null | 'preguntar' | 'guardar' | 'cargar'>(null);
+  const [descartar, setDescartar] = useState(false);
+  const [conCambiosEn, setConCambiosEn] = useState('');
   const boton = useRef<HTMLButtonElement>(null);
+  const abierta = paso === 'cargar';
+  const cerrar = () => {
+    setPaso(null);
+    setDescartar(false);
+  };
 
   const pulsar = () => {
     if (!recetaId) {
       notificar(SIN_RECETA, 'aviso');
       return;
     }
-    // Cargar pisaría lo escrito: primero se guarda.
     const cargada = recetaActual(recetaId);
     if (cargada && hayCambiosSinGuardar(recetaId)) {
-      notificar(
-        `Hay cambios sin guardar en «${cargada.nombre}». Guárdalos primero con «Guardar receta» y después carga la otra.`,
-        'aviso'
-      );
+      setConCambiosEn(cargada.nombre);
+      setPaso('preguntar');
       return;
     }
-    setAbierta(true);
+    setDescartar(false);
+    setPaso('cargar');
   };
 
   return (
@@ -1195,11 +1296,37 @@ function CargarReceta(ctx: RenderCtx) {
         onPulsar={pulsar}
       />
 
+      {paso === 'preguntar' && recetaId && (
+        <VentanaDescartar
+          receta={conCambiosEn}
+          onSi={() => {
+            setDescartar(true);
+            setPaso('cargar');
+          }}
+          onNo={() => setPaso('guardar')}
+          onCerrar={cerrar}
+        />
+      )}
+
+      {paso === 'guardar' && recetaId && (
+        <VentanaReceta
+          recetaId={recetaId}
+          recetaNombre={cfg.nombre}
+          conOpciones
+          onCerrar={cerrar}
+          onGuardada={() => {
+            setDescartar(false);
+            setPaso('cargar');
+          }}
+        />
+      )}
+
       {abierta && recetaId && (
         <VentanaCargar
           recetaId={recetaId}
           recetaNombre={cfg.nombre}
-          onCerrar={() => setAbierta(false)}
+          descartar={descartar}
+          onCerrar={cerrar}
           onCargada={(r) =>
             notificar(
               `Receta «${r.nombre}» cargada: ${plural(r.cargados ?? 0, 'campo', 'campos')}` +

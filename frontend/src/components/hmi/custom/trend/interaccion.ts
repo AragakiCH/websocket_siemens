@@ -15,7 +15,15 @@
 // táctil de planta arrastrar para moverse es lo que espera cualquiera que haya
 // usado un mapa. Encuadrar una caja es lo raro, y para eso están los botones.
 //
-// EL ZOOM NO TE SACA DEL PRESENTE  ← esto estaba mal antes
+// EL ZOOM PAUSA (cambio pedido en planta)
+// Ahora cualquier zoom —rueda, pellizco o los botones del panel— PAUSA la
+// vista igual que deslizar: se queda quieta en el tramo que se está mirando
+// y los datos se siguen guardando. Y NO se reanuda sola aunque el borde
+// derecho toque el último dato: para volver a EN VIVO está «Restablecer X»
+// (o el doble clic). Lo de abajo explica cómo era antes; `zoom()` se
+// conserva por si algo lo usa, pero los gestos usan `zoomPausando()`.
+//
+// EL ZOOM NO TE SACA DEL PRESENTE  ← comportamiento anterior
 // La primera versión centraba el zoom en el medio de la vista SIEMPRE. Al
 // acercar, el borde derecho se despegaba del último dato, y como «seguir en
 // vivo» significa justamente tener ese borde pegado al presente, el gráfico se
@@ -155,6 +163,43 @@ export function desplazar(
   aplicar(u, min + d, max + d, o);
 }
 
+/** Pone la escala SIN reanudar el seguimiento aunque toque el borde. */
+function aplicarQuieto(u: uPlot, min: number, max: number, o: OpcionesInteraccion): void {
+  u.setScale('x', encajar(min, max, o.limites()));
+}
+
+/**
+ * Zoom que PAUSA: se deja de seguir en vivo y la vista se queda en el tramo
+ * que se mira. `ancla` es el instante que no se mueve (el del cursor con la
+ * rueda); sin él, el centro de la vista (botones).
+ */
+export function zoomPausando(
+  u: uPlot,
+  factor: number,
+  o: OpcionesInteraccion,
+  ancla?: number
+): void {
+  const { min, max } = u.scales.x;
+  if (min == null || max == null) return;
+  const span = acotarSpan((max - min) * factor);
+  o.alTomarControl();
+  const valor = ancla ?? (min + max) / 2;
+  const prop = ancla != null && max - min > 0 ? (valor - min) / (max - min) : 0.5;
+  aplicarQuieto(u, valor - span * prop, valor + span * (1 - prop), o);
+}
+
+/**
+ * Mueve la vista un número fijo de SEGUNDOS (−3600 = una hora atrás).
+ * Atrás pausa; adelante, si llega al presente, vuelve a EN VIVO como las
+ * flechas. Solo llega hasta donde haya datos guardados.
+ */
+export function desplazarSegundos(u: uPlot, segundos: number, o: OpcionesInteraccion): void {
+  const { min, max } = u.scales.x;
+  if (min == null || max == null) return;
+  if (segundos < 0) o.alTomarControl();
+  aplicar(u, min + segundos, max + segundos, o);
+}
+
 /** Encuadra TODO lo que hay en el búfer. */
 export function ajustar(u: uPlot, o: OpcionesInteraccion): void {
   const lim = o.limites();
@@ -204,23 +249,10 @@ export function pluginInteraccion(o: OpcionesInteraccion): uPlot.Plugin {
           const { min, max } = u.scales.x;
           if (min == null || max == null) return;
           const factor = e.deltaY < 0 ? 1 / 1.25 : 1.25;
-          const span = acotarSpan((max - min) * factor);
-
-          if (o.siguiendo()) {
-            // En vivo el ancla es el presente, no el cursor: acercar para ver
-            // mejor lo que pasa AHORA no puede echarte del ahora.
-            const lim = o.limites();
-            const fin = lim ? lim[1] : max;
-            aplicar(u, fin - span, fin, o);
-            return;
-          }
-
-          // Pausado: se ancla el punto bajo el cursor, que es lo que uno está
-          // señalando cuando inspecciona el pasado.
+          // Pausa y ancla el punto bajo el cursor (ver «EL ZOOM PAUSA»).
           const rect = over.getBoundingClientRect();
           const valor = u.posToVal(e.clientX - rect.left, 'x');
-          const prop = (max - min) > 0 ? (valor - min) / (max - min) : 0.5;
-          aplicar(u, valor - span * prop, valor + span * (1 - prop), o);
+          zoomPausando(u, factor, o, valor);
         };
         over.addEventListener('wheel', alaRueda, { passive: false });
 
@@ -232,6 +264,10 @@ export function pluginInteraccion(o: OpcionesInteraccion): uPlot.Plugin {
 
         const abajo = (e: PointerEvent) => {
           if (e.pointerType === 'mouse' && e.button !== 0) return;
+          // Un chip de etiqueta (o cualquier control marcado así) se pulsa,
+          // no se arrastra: si el gráfico capturara el puntero, el clic no
+          // le llegaría nunca al botón.
+          if ((e.target as HTMLElement | null)?.closest?.('[data-trend-ui]')) return;
           punteros.set(e.pointerId, { x: e.clientX });
           try {
             over.setPointerCapture(e.pointerId);
@@ -264,14 +300,10 @@ export function pluginInteraccion(o: OpcionesInteraccion): uPlot.Plugin {
             const span = acotarSpan(
               (pellizco.max - pellizco.min) * (pellizco.dist / dist)
             );
-            if (o.siguiendo()) {
-              const lim = o.limites();
-              const fin = lim ? lim[1] : pellizco.max;
-              aplicar(u, fin - span, fin, o);
-              return;
-            }
+            // El pellizco también es zoom: pausa y no se reanuda solo.
+            o.alTomarControl();
             const centro = (pellizco.min + pellizco.max) / 2;
-            aplicar(u, centro - span / 2, centro + span / 2, o);
+            aplicarQuieto(u, centro - span / 2, centro + span / 2, o);
             return;
           }
 

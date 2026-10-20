@@ -51,6 +51,7 @@
 import { useEffect, useRef } from 'react';
 import type { PlcVariable } from '../../../../models/plc';
 import { RealPLCService } from '../../../../services/RealPLCService';
+import { guardarBuffer, leerBuffer } from './sesionTrend';
 
 /** Tope duro de muestras. Protege la memoria del navegador. */
 export const MAX_PUNTOS = 120_000;
@@ -182,6 +183,23 @@ export function useBufferTrend(
   variables: PlcVariable[],
   ids: string[],
   retencionSeg: number,
+  alActualizar: (buffer: BufferTrend) => void,
+  /**
+   * En la Vista Previa: el búfer es de la SESIÓN, no del widget (ver
+   * «GRABADORES DE SESIÓN» abajo). `clave` identifica al Trend. Sin esto
+   * (Diseñador), el búfer vive y muere con el widget, como siempre.
+   */
+  sesion?: { clave: string }
+): BufferTrend {
+  const global = useBufferDeSesion(sesion?.clave ?? null, ids, retencionSeg, alActualizar);
+  const local = useBufferLocal(sesion ? [] : variables, sesion ? [] : ids, retencionSeg, alActualizar);
+  return global ?? local;
+}
+
+function useBufferLocal(
+  variables: PlcVariable[],
+  ids: string[],
+  retencionSeg: number,
   alActualizar: (buffer: BufferTrend) => void
 ): BufferTrend {
   const buffer = useRef(new BufferTrend());
@@ -262,4 +280,174 @@ export function useBufferTrend(
   }, [clave]);
 
   return buffer.current;
+}
+
+
+// =========================================================================
+// GRABADORES DE SESIÓN (Vista Previa)
+//
+// El búfer de un Trend ya no vive DENTRO del widget en la Vista Previa: vive
+// aquí, uno por Trend, mientras la ventana siga abierta. Por eso:
+//
+//   * Cambiar de sección o de pantalla (el widget se desmonta) NO borra lo
+//     graficado, y el grabador SIGUE muestreando aunque no se esté viendo:
+//     al volver no hay hueco.
+//   * Cada 2 s se copia a IndexedDB con la llave de la sesión, así que al
+//     RECARGAR (F5) se recupera. Cerrar la ventana empieza una sesión nueva
+//     y lo viejo se borra (ver sesionTrend.ts).
+//
+// Los valores llegan directamente de `RealPLCService.subscribe`, que es lo
+// mismo que alimenta `useAppStore().variables`: no hace falta React para
+// seguir grabando.
+// =========================================================================
+
+const GUARDAR_CADA_MS = 2000;
+
+interface Grabador {
+  buffer: BufferTrend;
+  ids: string[];
+  retencion: number;
+  vigentes: Map<string, number | null>;
+  ultimoPush: number;
+  oyentes: Set<(b: BufferTrend) => void>;
+  sucio: boolean;
+}
+
+const grabadores = new Map<string, Grabador>();
+
+function muestrearGrabador(g: Grabador, valores: Map<string, number | null>): void {
+  const ahora = Date.now();
+  g.buffer.push(ahora / 1000, valores);
+  g.buffer.podar(g.retencion);
+  g.ultimoPush = ahora;
+  g.sucio = true;
+  g.oyentes.forEach((f) => f(g.buffer));
+}
+
+/** Mete lo recuperado de IndexedDB DELANTE de lo que ya se haya grabado. */
+function fundir(g: Grabador, r: { t: number[]; cols: Record<string, (number | null)[]> }): void {
+  const b = g.buffer;
+  const primero = b.t.length ? b.t[0] : Infinity;
+  let n = 0;
+  while (n < r.t.length && r.t[n] < primero) n++;
+  if (n === 0) return;
+  const tViejo = r.t.slice(0, n);
+  const ids = new Set([...b.cols.keys(), ...Object.keys(r.cols)]);
+  for (const id of ids) {
+    const viejo = (r.cols[id] ?? []).slice(0, n);
+    while (viejo.length < n) viejo.push(null);
+    const actual = b.cols.get(id) ?? new Array(b.t.length).fill(null);
+    b.cols.set(id, viejo.concat(actual));
+  }
+  b.t = tViejo.concat(b.t);
+  b.podar(g.retencion);
+}
+
+function crearGrabador(clave: string): Grabador {
+  const g: Grabador = {
+    buffer: new BufferTrend(),
+    ids: [],
+    retencion: 1800,
+    vigentes: new Map(),
+    ultimoPush: 0,
+    oyentes: new Set(),
+    sucio: false,
+  };
+
+  // Lo que se grabó antes de recargar.
+  void leerBuffer(clave).then((r) => {
+    if (!r) return;
+    fundir(g, r);
+    if (g.ids.length) g.buffer.sincronizar(g.ids);
+    g.oyentes.forEach((f) => f(g.buffer));
+  });
+
+  // Valores nuevos: lo mismo que hacía el efecto de `useBufferLocal`.
+  RealPLCService.subscribe((vars) => {
+    if (!g.ids.length) return;
+    const valores = new Map<string, number | null>();
+    let alguno = false;
+    for (const id of g.ids) {
+      const v = vars.find((x) => x.id === id);
+      if (!v || v.value === null || v.value === undefined) {
+        valores.set(id, null);
+        continue;
+      }
+      const num = typeof v.value === 'number' ? v.value : Number(v.value);
+      valores.set(id, Number.isFinite(num) ? num : null);
+      alguno = true;
+    }
+    if (!alguno) return;
+    g.vigentes = valores;
+    muestrearGrabador(g, valores);
+  });
+
+  // Latido: la traza avanza aunque el PLC no cambie (y corta si se cae).
+  setInterval(() => {
+    if (!g.ids.length) return;
+    if (Date.now() - g.ultimoPush < LATIDO_MS * 0.9) return;
+    const fila = new Map<string, number | null>();
+    for (const k of g.ids) {
+      const plc = k.slice(0, k.indexOf('|'));
+      fila.set(k, RealPLCService.plcDisponible(plc) ? (g.vigentes.get(k) ?? null) : null);
+    }
+    muestrearGrabador(g, fila);
+  }, LATIDO_MS);
+
+  // Copia para sobrevivir a F5.
+  const guardar = () => {
+    if (!g.sucio || !g.buffer.t.length) return;
+    g.sucio = false;
+    const cols: Record<string, (number | null)[]> = {};
+    for (const [id, col] of g.buffer.cols) cols[id] = col;
+    void guardarBuffer(clave, { t: g.buffer.t, cols });
+  };
+  setInterval(guardar, GUARDAR_CADA_MS);
+  try {
+    window.addEventListener('pagehide', guardar);
+  } catch {
+    /* sin ventana (pruebas) */
+  }
+  return g;
+}
+
+function useBufferDeSesion(
+  clave: string | null,
+  ids: string[],
+  retencionSeg: number,
+  alActualizar: (buffer: BufferTrend) => void
+): BufferTrend | null {
+  const cb = useRef(alActualizar);
+  cb.current = alActualizar;
+  let g: Grabador | null = null;
+  if (clave) {
+    g = grabadores.get(clave) ?? null;
+    if (!g) {
+      g = crearGrabador(clave);
+      grabadores.set(clave, g);
+    }
+    g.retencion = retencionSeg;
+  }
+  const idsClave = ids.join('|');
+
+  useEffect(() => {
+    if (!g) return;
+    g.ids = ids;
+    g.buffer.sincronizar(ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clave, idsClave]);
+
+  useEffect(() => {
+    if (!g) return;
+    const oyente = (b: BufferTrend) => cb.current(b);
+    g.oyentes.add(oyente);
+    // Lo que ya había (al volver a la sección o tras recargar): de una vez.
+    if (g.buffer.t.length) cb.current(g.buffer);
+    return () => {
+      g!.oyentes.delete(oyente);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clave]);
+
+  return g ? g.buffer : null;
 }

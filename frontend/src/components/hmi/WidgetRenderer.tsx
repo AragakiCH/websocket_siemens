@@ -895,7 +895,8 @@ function idsQueUsa(widget: HmiWidget): string[] {
   const f = leerFunciones(widget);
   if (f.activo) {
     for (const salida of Object.values(f.porSalida)) {
-      for (const e of salida.entradas) if (e.variableId) ids.push(e.variableId);
+      // `salida:x` es otra salida del widget: su tag ya va en los enlaces.
+      for (const e of salida.entradas) if (e.variableId && !e.variableId.startsWith('salida:')) ids.push(e.variableId);
     }
   }
   return ids;

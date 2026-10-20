@@ -28,6 +28,18 @@ export const SALIDA_PRINCIPAL = '@principal';
 /** Cómo se llama la variable principal dentro de la expresión. */
 export const NOMBRE_PRINCIPAL = 'varPrincipal';
 
+/**
+ * Una entrada puede leer OTRA salida del mismo widget (varPrincipal o una
+ * variable con nombre) en vez de un tag: su `variableId` es
+ * `salida:<clave>` (p. ej. `salida:@principal`, `salida:var3`).
+ */
+export const PREFIJO_SALIDA = 'salida:';
+export const idDeSalida = (clave: string): string => PREFIJO_SALIDA + clave;
+/** La clave de salida a la que apunta una entrada, o `null` si es un tag. */
+export function salidaDeEntrada(variableId: string): string | null {
+  return variableId.startsWith(PREFIJO_SALIDA) ? variableId.slice(PREFIJO_SALIDA.length) : null;
+}
+
 export type TipoInterna = 'bool' | 'entero' | 'decimal' | 'texto';
 
 export const TIPOS_INTERNA: { valor: TipoInterna; label: string }[] = [
@@ -106,12 +118,28 @@ export function tieneContenido(f: FuncionSalida | undefined): boolean {
   return !!f && (f.entradas.length > 0 || f.internas.length > 0 || f.expresion.trim() !== '');
 }
 
-/** Se renombró una variable con nombre: su función la sigue. */
+/**
+ * Se renombró una variable con nombre: su función la sigue, y las entradas
+ * de otras funciones que la leían pasan a leerla con el nombre nuevo.
+ */
 export function renombrarSalida(cfg: ConfigFunciones, viejo: string, nuevo: string): ConfigFunciones {
-  if (!(viejo in cfg.porSalida) || viejo === nuevo) return cfg;
+  if (viejo === nuevo) return cfg;
+  const idViejo = idDeSalida(viejo);
+  let cambio = viejo in cfg.porSalida;
   const porSalida: Record<string, FuncionSalida> = {};
-  for (const [k, v] of Object.entries(cfg.porSalida)) porSalida[k === viejo ? nuevo : k] = v;
-  return { ...cfg, porSalida };
+  for (const [k, v] of Object.entries(cfg.porSalida)) {
+    const lee = v.entradas.some((e) => e.variableId === idViejo);
+    if (lee) cambio = true;
+    porSalida[k === viejo ? nuevo : k] = lee
+      ? {
+          ...v,
+          entradas: v.entradas.map((e) =>
+            e.variableId === idViejo ? { ...e, variableId: idDeSalida(nuevo) } : e
+          ),
+        }
+      : v;
+  }
+  return cambio ? { ...cfg, porSalida } : cfg;
 }
 
 /** Se quitó una variable con nombre: su función se va con ella. */

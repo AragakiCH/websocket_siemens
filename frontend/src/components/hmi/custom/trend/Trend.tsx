@@ -54,10 +54,6 @@ import {
   PlusIcon,
   Trash2Icon,
   ActivityIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ZoomInIcon,
-  ZoomOutIcon,
   MaximizeIcon,
   Loader2Icon,
   DownloadIcon,
@@ -82,12 +78,24 @@ import {
 import { listarGrupos, type GrupoHistorico } from '../../../../services/historicoApi';
 import { useDescargaHistorico, useGrabacionTrend } from './grabacion';
 import { partirId } from '../../../../services/escrituraApi';
+import { ColumnaTrend } from './ColumnaTrend';
+import {
+  CapaEtiquetas,
+  CuadroNombre,
+  ModalEtiquetas,
+  PuntoEtiqueta,
+  siguienteNombre,
+  useEtiquetasGuardadas,
+  type EtiquetaTrend,
+} from './Etiquetas';
 import {
   ajustar,
+  encajar,
   desplazar,
   pluginInteraccion,
-  zoom,
   type OpcionesInteraccion,
+  zoomPausando,
+  desplazarSegundos,
 } from './interaccion';
 
 // ─── Config ──────────────────────────────────────────────────────
@@ -180,6 +188,21 @@ export interface ConfigTrend {
    * cuando pasa lo que se quería ver.
    */
   grabDuracionS: number;
+
+  // ── TÍTULO, LOGO Y HERRAMIENTAS ─────────────────────────────────
+  //
+  // Todo opcional y apagado por defecto: un Trend guardado antes de que
+  // existiera esto se ve exactamente igual.
+
+  /** Título del gráfico, a la derecha de la barra de arriba. Vacío = no sale. */
+  titulo: string;
+  /** Reservar un hueco a la derecha, arriba, para un widget de Imagen (logo). */
+  logo: boolean;
+  logoAncho: number;
+  logoAlto: number;
+  /** Panel de herramientas (Eje X, Eje Y, Etiquetas). Por ahora solo diseño. */
+  herramientas: boolean;
+  herramientasAncho: number;
 }
 
 // ── LÍMITES DE LA GRABACIÓN ──────────────────────────────────────
@@ -222,6 +245,12 @@ export const CONFIG_TREND: ConfigTrend = {
   exportar: false,
   grabIntervaloMs: 1000,
   grabDuracionS: 0,
+  titulo: '',
+  logo: false,
+  logoAncho: 200,
+  logoAlto: 70,
+  herramientas: false,
+  herramientasAncho: 210,
 };
 
 /** Opciones del desplegable de retención, en segundos. */
@@ -343,6 +372,12 @@ export function leerConfigTrend(config: any): ConfigTrend {
     grabIntervaloMs: limitar(
       c.grabIntervaloMs, GRAB_INTERVALO_MIN_MS, GRAB_INTERVALO_MAX_MS, 1000),
     grabDuracionS: limitar(c.grabDuracionS, 0, GRAB_DURACION_MAX_S, 0),
+    titulo: typeof c.titulo === 'string' ? c.titulo : '',
+    logo: c.logo === true,
+    logoAncho: limitar(c.logoAncho, 20, 1200, 200),
+    logoAlto: limitar(c.logoAlto, 20, 1200, 70),
+    herramientas: c.herramientas === true,
+    herramientasAncho: limitar(c.herramientasAncho, 150, 600, 210),
   };
 }
 
@@ -373,6 +408,19 @@ function fmtHora(t: number, span: number): string {
   if (span <= 180) return `${hm}:${dos(d.getSeconds())}`;
   if (span <= 86400) return hm;
   return `${dos(d.getDate())}/${dos(d.getMonth() + 1)} ${hm}`;
+}
+
+/**
+ * Fecha y hora completas (dd/mm/aaaa hh:mm:ss) para la barra de arriba: el
+ * tramo que se mira y el instante que señala el cursor. Con solo la hora,
+ * un tramo de ayer se confundía con el de hoy.
+ */
+function fmtFechaHora(t: number): string {
+  const d = new Date(t * 1000);
+  return (
+    `${dos(d.getDate())}/${dos(d.getMonth() + 1)}/${d.getFullYear()} ` +
+    `${dos(d.getHours())}:${dos(d.getMinutes())}:${dos(d.getSeconds())}`
+  );
 }
 
 /** Hora completa, para el instante que señala el cursor. */
@@ -454,7 +502,22 @@ function asegurarEstilos(): void {
   estilosPuestos = true;
   const st = document.createElement('style');
   st.setAttribute('data-psi', 'trend');
-  st.textContent = `.${CLASE_TREND} .u-cursor-x{display:none!important}`;
+  // Mientras se coloca una etiqueta se ocultan los puntitos propios de uPlot:
+  // van a la muestra más cercana, no bajo el ratón, y junto al punto de la
+  // etiqueta se veían «descuadrados».
+  st.textContent =
+    `.${CLASE_TREND} .u-cursor-x{display:none!important}` +
+    `.${CLASE_TREND}.trend-etiquetando .u-cursor-pt{display:none!important}` +
+    // SCROLL DE LA LEYENDA: fino, redondeado, sin flechas y del color del
+    // tema (llega por las variables --tl-barra / --tl-barra-encima).
+    `.psi-trend-leyenda::-webkit-scrollbar{width:10px}` +
+    `.psi-trend-leyenda::-webkit-scrollbar-button{display:none;width:0;height:0}` +
+    `.psi-trend-leyenda::-webkit-scrollbar-track{background:transparent}` +
+    `.psi-trend-leyenda::-webkit-scrollbar-corner{background:transparent}` +
+    `.psi-trend-leyenda::-webkit-scrollbar-thumb{background:var(--tl-barra);border-radius:999px;border:3px solid transparent;background-clip:padding-box;min-height:24px}` +
+    `.psi-trend-leyenda::-webkit-scrollbar-thumb:hover{background:var(--tl-barra-encima);background-clip:padding-box}` +
+    // Firefox no tiene los ::-webkit-: solo fino y del color del tema.
+    `@supports (-moz-appearance:none){.psi-trend-leyenda{scrollbar-width:thin;scrollbar-color:var(--tl-barra) transparent}}`;
   document.head.appendChild(st);
 }
 
@@ -484,6 +547,10 @@ interface ParamsOpciones {
   interaccion: OpcionesInteraccion;
   alCambiarEscala: (u: uPlot) => void;
   alMoverCursor: (u: uPlot) => void;
+  /** Rango Y puesto con las herramientas del EJE Y (null = el de la config). */
+  rangoY: () => [number, number] | null;
+  /** Cambió cualquier escala o el tamaño: las etiquetas se recolocan. */
+  alCambiarVista: () => void;
 }
 
 function construirOpciones(p: ParamsOpciones): uPlot.Options {
@@ -522,7 +589,21 @@ function construirOpciones(p: ParamsOpciones): uPlot.Options {
       points: { show: true, size: 6 },
       // El arrastre es para DESPLAZARSE en el tiempo (ver interaccion.ts), así
       // que se desactiva el zoom por caja que uPlot trae de fábrica.
-      drag: { x: false, y: false, setScale: false },
+      drag: {
+        x: false,
+        y: false,
+        setScale: false,
+        // ESTO ES LO QUE HACÍA QUE LA ETIQUETA NO SE GUARDARA.
+        //
+        // uPlot, al hacer clic, compara dónde se APRETÓ y dónde se SOLTÓ el
+        // ratón; si no coinciden, cree que fue un arrastre y se «come» el clic
+        // (`stopPropagation`). En la Vista Previa el lienzo va escalado y
+        // uPlot mide esas dos posiciones con correcciones distintas, así que
+        // SIEMPRE le parecían distintas: ningún clic llegaba al gráfico.
+        // Aquí no hay arrastre de uPlot (el desplazamiento es nuestro, en
+        // interaccion.ts), así que no hay nada que proteger: el clic pasa.
+        click: () => {},
+      },
 
       // ── LA CAUSA REAL DEL DESCUADRE DE LA REGLA ────────────────────────
       //
@@ -567,7 +648,20 @@ function construirOpciones(p: ParamsOpciones): uPlot.Options {
     },
     scales: {
       x: { time: true },
-      y: manual ? { auto: false, range: [yMin, yMax] as [number, number] } : { auto: true },
+      // EL RANGO Y SE DECIDE AQUÍ, EN CADA CÁLCULO DE ESCALA: primero el que
+      // haya puesto el operario con el EJE Y (zoom / desplazamiento), luego el
+      // fijo de la config, y si no, el automático de uPlot. Al ser una
+      // función, un dato nuevo no deshace el zoom Y del operario.
+      y: {
+        auto: !manual,
+        range: (_u: uPlot, dMin: number | null, dMax: number | null): [number, number] => {
+          const r = p.rangoY();
+          if (r) return r;
+          if (manual) return [yMin, yMax];
+          if (dMin == null || dMax == null) return [0, 1];
+          return uPlot.rangeNum(dMin, dMax, 0.1, true) as [number, number];
+        },
+      },
     },
     axes: [
       {
@@ -615,8 +709,10 @@ function construirOpciones(p: ParamsOpciones): uPlot.Options {
       setScale: [
         (u: uPlot, clave: string) => {
           if (clave === 'x') p.alCambiarEscala(u);
+          p.alCambiarVista();
         },
       ],
+      setSize: [() => p.alCambiarVista()],
       setCursor: [(u: uPlot) => p.alMoverCursor(u)],
     },
     plugins: p.interactivo ? [pluginInteraccion(p.interaccion)] : [],
@@ -686,6 +782,52 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
   // leyenda enseña el valor en vivo.
   const [idxCursor, setIdxCursor] = useState<number | null>(null);
 
+  // ── EJE Y DEL OPERARIO ──
+  // Zoom y desplazamiento del EJE Y. En un ref porque lo lee la función de
+  // rango de uPlot, que vive fuera del render. null = el de la config.
+  const yManualRef = useRef<[number, number] | null>(null);
+  // ¿El zoom Y lo puso «Mostrar/Ocultar»? Entonces Restablecer X lo quita
+  // también (al volver a EN VIVO no debe quedarse pegado). Uno puesto a mano
+  // con los botones del EJE Y no se toca.
+  const yDeEtiquetasRef = useRef(false);
+
+  // ── VARIABLE RESALTADA (clic en la leyenda) ── `s.id` de la serie.
+  const [resaltada, setResaltada] = useState<string | null>(null);
+
+  // ── ETIQUETAS ──
+  const [etiquetas, setEtiquetas] = useEtiquetasGuardadas(widget.id);
+  const [etiquetando, setEtiquetando] = useState(false);
+  const etiquetandoRef = useRef(false);
+  etiquetandoRef.current = etiquetando;
+  const [nombreEtiqueta, setNombreEtiqueta] = useState('');
+  const [avisoEtiqueta, setAvisoEtiqueta] = useState('');
+  const [modalEtiquetas, setModalEtiquetas] = useState<null | 'mostrar' | 'eliminar'>(null);
+  // Altura del puntero dentro del área de dibujo: solo hace falta (y solo se
+  // actualiza) mientras se coloca una etiqueta.
+  const [cursorY, setCursorY] = useState<number | null>(null);
+
+  // Las etiquetas se recolocan cuando cambia la vista. Sin limitarlo, en vivo
+  // serían diez renders por segundo; con esto, como mucho ~7.
+  const hayEtiquetasRef = useRef(false);
+  hayEtiquetasRef.current = interactivo && etiquetas.some((e) => e.visible);
+  const [, setRevVista] = useState(0);
+  const ultimaRev = useRef(0);
+  const revPendiente = useRef<number | null>(null);
+  const pedirRevVista = useCallback(() => {
+    if (!hayEtiquetasRef.current) return;
+    const ahora = performance.now();
+    if (ahora - ultimaRev.current > 150) {
+      ultimaRev.current = ahora;
+      setRevVista((n) => n + 1);
+    } else if (revPendiente.current == null) {
+      revPendiente.current = window.setTimeout(() => {
+        revPendiente.current = null;
+        ultimaRev.current = performance.now();
+        setRevVista((n) => n + 1);
+      }, 150);
+    }
+  }, []);
+
   const alCambiarEscala = useCallback((u: uPlot) => {
     const min = u.scales.x.min;
     const max = u.scales.x.max;
@@ -716,6 +858,12 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     const i = u.cursor.idx;
     const nuevo = i === null || i === undefined ? null : i;
     setIdxCursor((prev) => (prev === nuevo ? prev : nuevo));
+    if (etiquetandoRef.current) {
+      const top = u.cursor.top;
+      const y = top == null || top < 0 ? null : Math.round(top);
+      setCursorY((prev) => (prev === y ? prev : y));
+      setAvisoEtiqueta((prev) => (prev ? '' : prev));
+    }
 
     const izq = u.cursor.left;
     const over = u.over as HTMLDivElement | undefined;
@@ -817,6 +965,23 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     setSiguiendo(true);
     const r = bufferRef.current?.rango();
     if (u && r) u.setScale('x', { min: r[1] - cfg.ventanaSeg, max: r[1] });
+  }, [cfg.ventanaSeg]);
+
+  /**
+   * «Reanudar»: vuelve al último dato y sigue en vivo, PERO con el zoom que
+   * haya —el ancho X actual y el Y tal cual—. Restablecer X es el que además
+   * devuelve la ventana configurada.
+   */
+  const reanudar = useCallback(() => {
+    if (esHistoricoRef.current) return;
+    const u = plot.current;
+    siguiendoRef.current = true;
+    setSiguiendo(true);
+    const r = bufferRef.current?.rango();
+    if (!u || !r) return;
+    const { min, max } = u.scales.x;
+    const ancho = min != null && max != null && max > min ? max - min : cfg.ventanaSeg;
+    u.setScale('x', { min: r[1] - ancho, max: r[1] });
   }, [cfg.ventanaSeg]);
 
   // ---- MODO HISTÓRICO --------------------------------------------------- //
@@ -938,7 +1103,12 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
         u.setScale('x', { min: r[1] - ancho, max: r[1] });
       }
     }
-  });
+  },
+  // EN LA VISTA PREVIA el búfer es de la SESIÓN: sobrevive a cambiar de
+  // sección (sigue grabando aunque no se vea) y a recargar; cerrar la ventana
+  // lo empieza de cero. La llave lleva las variables: si dos copias de una
+  // pantalla repiten el id del widget con otras series, no se mezclan.
+  interactivo ? { clave: `${widget.id}|${ids.join(',')}` } : undefined);
 
   // ---- Creación del gráfico (y su ResizeObserver) ---------------------- //
   //
@@ -1000,6 +1170,8 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
         interaccion,
         alCambiarEscala,
         alMoverCursor,
+        rangoY: () => yManualRef.current,
+        alCambiarVista: pedirRevVista,
       }),
       (bufferRef.current ?? new BufferTrend()).datos(ids),
       destino
@@ -1040,6 +1212,26 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firma]);
+
+  // ---- Variable resaltada (clic en la leyenda) -------------------------- //
+  //
+  // Solo cambia el TRAZO: la elegida más gruesa y las demás tenues. No toca
+  // los datos ni el seguimiento: el gráfico sigue corriendo. Va después del
+  // efecto que crea el gráfico (misma `firma`) para reaplicarse si se rehace.
+  useEffect(() => {
+    const u = plot.current;
+    if (!u) return;
+    const pos = resaltada ? dibujables.findIndex((d) => d.s.id === resaltada) : -1;
+    dibujables.forEach(({ s }, k) => {
+      const serie = u.series[k + 1];
+      if (!serie) return;
+      const base = s.grosor ?? 2;
+      serie.alpha = pos < 0 || pos === k ? 1 : 0.16;
+      serie.width = pos === k ? Math.max(3.6, base + 1.6) : base;
+    });
+    u.redraw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resaltada, firma]);
 
   // Los refs que leen los gestos, al día en cada render. Se escriben en el
   // cuerpo y no en un efecto a propósito: un efecto corre DESPUÉS de pintar, y
@@ -1108,12 +1300,9 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
   })();
 
   const etiquetaVista = señalando && tSeñalado != null
-    ? fmtInstante(tSeñalado)
+    ? fmtFechaHora(tSeñalado)
     : vista
-    ? `${fmtHora(vista.min, vista.max - vista.min)} → ${fmtHora(
-        vista.max,
-        vista.max - vista.min
-      )}`
+    ? `${fmtFechaHora(vista.min)}  →  ${fmtFechaHora(vista.max)}`
     : '';
   const duracionVista = vista ? fmtDuracion(vista.max - vista.min) : '';
 
@@ -1187,10 +1376,403 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
 
 
 
+  // Leyenda: 1 columna hasta 3 variables y 2 desde ahí (nunca más). Hasta 8
+  // se llena por columnas; con más, se enseñan 4 filas y el resto con SCROLL,
+  // y entonces se llena por filas (1 2 / 3 4 …) para que al bajar se siga
+  // el orden sin saltar de columna.
+  const columnasLeyenda = dibujables.length <= 3 ? 1 : 2;
+  const leyendaConScroll = dibujables.length > 8;
+  const filasLeyenda = Math.max(1, Math.ceil(dibujables.length / columnasLeyenda));
+  const columnaDe = (pos: number) =>
+    leyendaConScroll ? pos % columnasLeyenda : Math.floor(pos / filasLeyenda);
+  // 4 filas (alto de línea 1.6) + 3 huecos de 2 px (el relleno va aparte).
+  const altoLeyenda4 = Math.ceil(4 * tamLeyenda * 1.6 + 3 * 2);
+
+  // ---- EJE Y -------------------------------------------------------------- //
+  //
+  // Como el ejemplo de planta: zoom ×1.25 / ×0.8 sobre el CENTRO del rango
+  // visible, flechas que mueven un 20 % del alto, y Restablecer Y que vuelve
+  // a la config (autoescala o mín/máx fijos). NADA de esto pausa: el gráfico
+  // sigue corriendo; solo cambia qué franja de valores se ve.
+  const yMinCfg = Number(cfg.min);
+  const yMaxCfg = Number(cfg.max);
+  const yFijoCfg =
+    !cfg.autoEscala && Number.isFinite(yMinCfg) && Number.isFinite(yMaxCfg) && yMaxCfg > yMinCfg;
+  const aplicarY = () => {
+    const u = plot.current;
+    if (!u) return;
+    const r = yManualRef.current;
+    if (r) u.setScale('y', { min: r[0], max: r[1] });
+    else if (yFijoCfg) u.setScale('y', { min: yMinCfg, max: yMaxCfg });
+    else {
+      // Autoescala: recalcular X tal cual hace que uPlot vuelva a medir Y.
+      const { min, max } = u.scales.x;
+      if (min != null && max != null) u.setScale('x', { min, max });
+    }
+  };
+  const rangoYActual = (): [number, number] | null => {
+    const u = plot.current;
+    const min = u?.scales.y.min;
+    const max = u?.scales.y.max;
+    return min == null || max == null ? null : [min, max];
+  };
+  const zoomY = (factor: number) => {
+    yDeEtiquetasRef.current = false;
+    const r = rangoYActual();
+    if (!r) return;
+    const c = (r[0] + r[1]) / 2;
+    const alto = Math.min(1e9, Math.max(0.01, (r[1] - r[0]) * factor));
+    yManualRef.current = [c - alto / 2, c + alto / 2];
+    aplicarY();
+  };
+  const moverY = (signo: 1 | -1) => {
+    yDeEtiquetasRef.current = false;
+    const r = rangoYActual();
+    if (!r) return;
+    const d = (r[1] - r[0]) * 0.2 * signo;
+    yManualRef.current = [r[0] + d, r[1] + d];
+    aplicarY();
+  };
+  const restablecerY = () => {
+    yDeEtiquetasRef.current = false;
+    yManualRef.current = null;
+    aplicarY();
+  };
+
+  // ---- ETIQUETAS ---------------------------------------------------------- //
+
+  /** Píxeles dentro del área de dibujo, o null si (t, y) no está en la vista. */
+  const posEnArea = (t: number, y: number) => {
+    const u = plot.current;
+    if (!u) return null;
+    const { min: x0, max: x1 } = u.scales.x;
+    const { min: y0, max: y1 } = u.scales.y;
+    if (x0 == null || x1 == null || y0 == null || y1 == null) return null;
+    if (t < x0 || t > x1 || y < y0 || y > y1) return null;
+    return { x: u.valToPos(t, 'x'), y: u.valToPos(y, 'y') };
+  };
+
+  /** Nombre completo de una serie, como en la leyenda. */
+  const nombreSerie = (variableId: string, etiqueta: string, i: number) =>
+    etiqueta || variables.find((v) => v.id === variableId)?.name || `Serie ${i + 1}`;
+
+  /**
+   * Mientras se coloca una etiqueta: dónde va el punto.
+   *
+   * PRECISO SOBRE LO QUE SE VE DIBUJADO. Con datos densos (muchas muestras
+   * por píxel, o una señal que sube y baja muy rápido) la línea, en una misma
+   * columna de píxeles, cubre todo un TRAMO vertical, no un punto. Antes se
+   * tomaba un único valor interpolado y el punto saltaba a un extremo aunque
+   * el ratón estuviera encima de la línea. Ahora, por cada curva, se mira qué
+   * tramo vertical ocupa en ±2 px alrededor del ratón:
+   *   - si el ratón está DENTRO de ese tramo, el punto va exactamente a la
+   *     altura del ratón (está sobre la línea);
+   *   - si no, al borde más cercano del tramo.
+   * Gana la curva más cercana. Así se puede poner en cualquier parte de
+   * cualquier línea dibujada.
+   */
+  const puntoEtiqueta = (() => {
+    if (!etiquetando || !señalando || cursorY == null || !posRegla) return null;
+    const u = plot.current;
+    if (!u) return null;
+    const xs = u.data[0] as unknown as number[];
+    if (!xs || xs.length === 0) return null;
+    const t = u.posToVal(posRegla.x, 'x');
+    if (!Number.isFinite(t) || t < xs[0] || t > xs[xs.length - 1]) return null;
+
+    /** Último índice con tiempo <= tt. */
+    const indiceHasta = (tt: number): number => {
+      let lo = 0;
+      let hi = xs.length - 1;
+      if (tt <= xs[0]) return 0;
+      while (hi - lo > 1) {
+        const m = (lo + hi) >> 1;
+        if (xs[m] <= tt) lo = m;
+        else hi = m;
+      }
+      return xs[hi] <= tt ? hi : lo;
+    };
+    /** Valor de la curva k en el instante tt (interpolado), o null en un hueco. */
+    const valorEn = (k: number, tt: number): number | null => {
+      const col = u.data[k + 1] as unknown as (number | null)[] | undefined;
+      if (!col) return null;
+      const i = indiceHasta(tt);
+      const j = Math.min(i + 1, xs.length - 1);
+      const a = col[i];
+      const b = col[j];
+      if (a == null || !Number.isFinite(a)) return b == null || !Number.isFinite(b) ? null : b;
+      if (b == null || !Number.isFinite(b) || xs[j] === xs[i]) return a;
+      return a + ((b - a) * (tt - xs[i])) / (xs[j] - xs[i]);
+    };
+
+    const tIzq = u.posToVal(posRegla.x - 2, 'x');
+    const tDer = u.posToVal(posRegla.x + 2, 'x');
+    const iIzq = indiceHasta(tIzq);
+    const iDer = indiceHasta(tDer);
+
+    let mejor: { k: number; y: number; d: number } | null = null;
+    dibujables.forEach((_d, k) => {
+      const col = u.data[k + 1] as unknown as (number | null)[] | undefined;
+      if (!col) return;
+      let mn = Infinity;
+      let mx = -Infinity;
+      const ver = (v: number | null | undefined) => {
+        if (v == null || !Number.isFinite(v)) return;
+        if (v < mn) mn = v;
+        if (v > mx) mx = v;
+      };
+      ver(valorEn(k, tIzq));
+      ver(valorEn(k, tDer));
+      for (let i = iIzq + 1; i <= iDer; i++) ver(col[i]);
+      if (mn === Infinity) return;
+      const arriba = u.valToPos(mx, 'y');
+      const abajo = u.valToPos(mn, 'y');
+      const y = Math.min(abajo, Math.max(arriba, cursorY));
+      const d = Math.abs(cursorY - y);
+      if (!mejor || d < mejor.d) mejor = { k, y, d };
+    });
+    const m = mejor as { k: number; y: number; d: number } | null;
+    if (!m) return null;
+    const v = u.posToVal(m.y, 'y');
+    const { s, i } = dibujables[m.k];
+    // Lo que valía cada variable en ese instante; la elegida, el valor
+    // exacto del punto (es lo que se ve sobre la línea).
+    const valores = dibujables.map((_d, k) => (k === m.k ? v : valorEn(k, t)));
+    return {
+      t,
+      v,
+      x: posRegla.x,
+      y: m.y,
+      valores,
+      color: colorEfectivo(s.color, i, isDark),
+      nombre: nombreSerie(s.variableId, s.etiqueta, i),
+    };
+  })();
+
+  const terminarEtiquetado = () => {
+    setEtiquetando(false);
+    setAvisoEtiqueta('');
+    setCursorY(null);
+  };
+  const empezarEtiquetado = () => {
+    if (etiquetando) {
+      terminarEtiquetado();
+      return;
+    }
+    // Pausa la VISTA (como el zoom): los datos se siguen guardando.
+    interaccion.alTomarControl();
+    setNombreEtiqueta(siguienteNombre(etiquetas));
+    setAvisoEtiqueta('');
+    setEtiquetando(true);
+  };
+  const guardarEtiqueta = () => {
+    const nombre = nombreEtiqueta.trim();
+    if (!nombre) {
+      setAvisoEtiqueta('Escribe un nombre antes de hacer clic en el gráfico.');
+      return;
+    }
+    const p = puntoEtiqueta;
+    const u = plot.current;
+    if (!p || !u) {
+      setAvisoEtiqueta('Acércate a una de las líneas de la gráfica para guardar la etiqueta.');
+      return;
+    }
+    // La FOTO de todas las variables en ese instante: la etiqueta no depende
+    // de que el dato siga en memoria mañana.
+    const lecturas = dibujables.map(({ s, i }, k) => {
+      const v = p.valores[k];
+      return {
+        nombre: nombreSerie(s.variableId, s.etiqueta, i),
+        color: colorEfectivo(s.color, i, isDark),
+        valor: v == null || !Number.isFinite(v) ? null : v,
+        unidad: variables.find((x) => x.id === s.variableId)?.unit,
+      };
+    });
+    const nueva: EtiquetaTrend = {
+      id: `e${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`,
+      nombre,
+      t: p.t,
+      y: p.v,
+      color: p.color,
+      curva: p.nombre,
+      lecturas,
+      visible: true,
+      expandida: false,
+    };
+    setEtiquetas((l) => [...l, nueva]);
+    terminarEtiquetado();
+  };
+  const guardarEtiquetaRef = useRef(guardarEtiqueta);
+  guardarEtiquetaRef.current = guardarEtiqueta;
+
+  // El clic que guarda: directo sobre el área de dibujo de uPlot.
+  useEffect(() => {
+    if (!etiquetando || !areaDibujo) return;
+    const alClic = (e: MouseEvent) => {
+      if ((e.target as HTMLElement | null)?.closest?.('[data-trend-ui]')) return;
+      guardarEtiquetaRef.current();
+    };
+    areaDibujo.addEventListener('click', alClic);
+    areaDibujo.style.cursor = 'copy';
+    return () => {
+      areaDibujo.removeEventListener('click', alClic);
+      areaDibujo.style.cursor = 'crosshair';
+    };
+  }, [etiquetando, areaDibujo]);
+
+  // Escape cancela.
+  useEffect(() => {
+    if (!etiquetando) return;
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') terminarEtiquetado();
+    };
+    window.addEventListener('keydown', tecla);
+    return () => window.removeEventListener('keydown', tecla);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etiquetando]);
+
+  const alternarEtiqueta = (id: string) =>
+    setEtiquetas((l) => l.map((e) => (e.id === id ? { ...e, expandida: !e.expandida } : e)));
+
+  /**
+   * «Aplicar» de Mostrar/Ocultar: quedan visibles las marcadas y el gráfico
+   * se lleva a ellas (a las 3 más recientes si son más), como el ejemplo.
+   */
+  const aplicarMostrar = (ids: Set<string>) => {
+    setEtiquetas((l) => l.map((e) => ({ ...e, visible: ids.has(e.id) })));
+    setModalEtiquetas(null);
+    const elegidas = etiquetas.filter((e) => ids.has(e.id));
+    const u = plot.current;
+    if (!elegidas.length || !u) return;
+    const recientes = [...elegidas].sort((a, b) => b.t - a.t).slice(0, 3);
+    const primero = Math.min(...recientes.map((e) => e.t));
+    const ultimo = Math.max(...recientes.map((e) => e.t));
+    // ZOOM X AJUSTADO a las etiquetas: lo que las separa más un margen a
+    // cada lado (un 25 %, mínimo 20 s), y como mínimo 1 minuto. Antes eran
+    // 15 min como poco: con el preview recién abierto, casi todo era vacío.
+    const separacion = ultimo - primero;
+    // Tramo REAL grabado (primer y último instante con algún valor): la
+    // ventana no debe mostrar vacío antes del primer dato.
+    const xs = u.data[0] as ArrayLike<number>;
+    let t0 = Infinity;
+    let t1 = -Infinity;
+    for (let i = 0; i < xs.length; i++) {
+      let hay = false;
+      for (let k = 1; k < u.data.length && !hay; k++) hay = u.data[k][i] != null;
+      if (hay) { t0 = Math.min(t0, xs[i]); t1 = Math.max(t1, xs[i]); }
+    }
+    let ancho = Math.max(60, separacion + 2 * Math.max(separacion * 0.25, 20));
+    // Si lo grabado es más corto que esa ventana, se ajusta a lo grabado
+    // (sin cortar las etiquetas).
+    if (t1 > t0) ancho = Math.max(Math.min(ancho, t1 - t0), separacion * 1.2, 2);
+    let centro = (primero + ultimo) / 2;
+    if (t1 > t0) {
+      if (centro - ancho / 2 < t0) centro = Math.min(t0 + ancho / 2, primero + ancho / 2);
+      if (centro + ancho / 2 > t1) centro = Math.max(t1 - ancho / 2, ultimo - ancho / 2);
+    }
+    // Pausa la VISTA (los datos se siguen guardando) y la lleva a ellas.
+    interaccion.alTomarControl();
+    //
+    // ZOOM Y a las etiquetas, como el ejemplo de planta.
+    const lo = Math.min(...recientes.map((e) => e.y));
+    const hi = Math.max(...recientes.map((e) => e.y));
+    const visto = rangoYActual();
+    const altoVisto = visto ? visto[1] - visto[0] : 0;
+    // Ajustado pero con algo de contexto: un 25 % de lo que separa las
+    // etiquetas, o un 12 % de lo que se estaba viendo, lo que sea mayor.
+    const margen = Math.max((hi - lo) * 0.25, altoVisto * 0.12, Math.abs(hi) * 0.01, 1e-6);
+    yManualRef.current = [lo - margen, hi + margen];
+    yDeEtiquetasRef.current = true;
+    // OJO con el orden: uPlot aplica `setScale` un instante DESPUÉS. Primero
+    // el Y (la función de rango ya devuelve el de las etiquetas) y X al final.
+    u.setScale('y', { min: lo - margen, max: hi + margen });
+    u.setScale('x', encajar(centro - ancho / 2, centro + ancho / 2, interaccion.limites()));
+  };
+  const aplicarEliminar = (ids: Set<string>) => {
+    setEtiquetas((l) => l.filter((e) => !ids.has(e.id)));
+    setModalEtiquetas(null);
+  };
+
+  // ---- Columna derecha: logo y herramientas ---------------------------- //
+  //
+  // Si está, el widget pasa a ser una FILA: el Trend de siempre (que se
+  // achica) y, separada 12 px, la columna. Sin ella, todo queda como antes.
+  const conColumna = cfg.logo || cfg.herramientas;
+  const marco: React.CSSProperties = conColumna
+    ? { ...marcoWidget(pCaja, fondo, tema), width: 'auto', flex: 1, minWidth: 0 }
+    : marcoWidget(pCaja, fondo, tema);
+  const envolver = (nucleo: React.ReactElement): React.ReactElement =>
+    conColumna ? (
+      <div
+        style={{
+          display: 'flex',
+          width: '100%',
+          height: '100%',
+          gap: 12,
+          boxSizing: 'border-box',
+        }}
+      >
+        {nucleo}
+        <ColumnaTrend
+          tema={tema}
+          interactivo={!!interactivo}
+          logo={cfg.logo}
+          logoAncho={cfg.logoAncho}
+          logoAlto={cfg.logoAlto}
+          herramientas={cfg.herramientas}
+          herramientasAncho={cfg.herramientasAncho}
+          // DETENER / REANUDAR (en histórico no hay «en vivo»: sin acción).
+          detener={
+            esHistorico ?
+            undefined :
+            { siguiendo, alternar: siguiendo ? interaccion.alTomarControl : reanudar }
+          }
+          // EJE X: lo mismo que hacían las flechas y las lupas de la barra.
+          ejeX={{
+            atras: () => plot.current && desplazar(plot.current, -0.3, interaccion),
+            adelante: () => plot.current && desplazar(plot.current, 0.3, interaccion),
+            // El zoom pausa la vista (los datos se siguen guardando).
+            alejar: () => plot.current && zoomPausando(plot.current, 1.5, interaccion),
+            acercar: () => plot.current && zoomPausando(plot.current, 1 / 1.5, interaccion),
+            menosHora: () => plot.current && desplazarSegundos(plot.current, -3600, interaccion),
+            masHora: () => plot.current && desplazarSegundos(plot.current, 3600, interaccion),
+            // De vuelta a EN VIVO con la ventana configurada (o, en
+            // histórico, al rango completo que se pidió).
+            restablecer: () => {
+              // Si el Y venía de «Mostrar/Ocultar», se suelta ANTES de mover
+              // X: al moverse X la autoescala Y se recalcula sola.
+              if (yDeEtiquetasRef.current) {
+                yDeEtiquetasRef.current = false;
+                yManualRef.current = null;
+                if (yFijoCfg) plot.current?.setScale('y', { min: yMinCfg, max: yMaxCfg });
+              }
+              volverAVivo();
+            },
+          }}
+          // EJE Y: no pausa nada.
+          ejeY={{
+            alejar: () => zoomY(1.25),
+            acercar: () => zoomY(0.8),
+            bajar: () => moverY(-1),
+            subir: () => moverY(1),
+            restablecer: restablecerY,
+          }}
+          etiquetas={{
+            agregar: empezarEtiquetado,
+            mostrar: () => setModalEtiquetas('mostrar'),
+            eliminar: () => setModalEtiquetas('eliminar'),
+            agregando: etiquetando,
+          }}
+        />
+      </div>
+    ) : (
+      nucleo
+    );
+
   // ---- Estado vacío: ni siquiera hay series configuradas --------------- //
   if (sinSeries) {
-    return (
-      <div style={marcoWidget(pCaja, fondo, tema)}>
+    return envolver(
+      <div style={marco}>
         <div
           style={{
             flex: 1,
@@ -1225,8 +1807,8 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     );
   }
 
-  return (
-    <div style={marcoWidget(pCaja, fondo, tema)}>
+  return envolver(
+    <div style={marco}>
       {/* ── Cabecera ─────────────────────────────────────────────────
           Estado, qué tramo se está mirando y los mandos. En el Diseñador se
           pinta apagada: sigue explicando qué hace el widget, pero no se queda
@@ -1515,35 +2097,8 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
             border: `1px solid ${tema.borde}`,
           }}
         >
-          <BotonBarra
-            tema={tema}
-            titulo="Atrás en el tiempo"
-            onClick={() => plot.current && desplazar(plot.current, -0.3, interaccion)}
-          >
-            <ChevronLeftIcon style={{ width: 13, height: 13 }} />
-          </BotonBarra>
-          <BotonBarra
-            tema={tema}
-            titulo="Adelante en el tiempo"
-            onClick={() => plot.current && desplazar(plot.current, 0.3, interaccion)}
-          >
-            <ChevronRightIcon style={{ width: 13, height: 13 }} />
-          </BotonBarra>
-          <span style={{ width: 1, height: 14, background: tema.borde, margin: '0 3px' }} />
-          <BotonBarra
-            tema={tema}
-            titulo="Alejar (ver más tiempo)"
-            onClick={() => plot.current && zoom(plot.current, 1.5, interaccion)}
-          >
-            <ZoomOutIcon style={{ width: 13, height: 13 }} />
-          </BotonBarra>
-          <BotonBarra
-            tema={tema}
-            titulo="Acercar (ver menos tiempo)"
-            onClick={() => plot.current && zoom(plot.current, 1 / 1.5, interaccion)}
-          >
-            <ZoomInIcon style={{ width: 13, height: 13 }} />
-          </BotonBarra>
+          {/* Las flechas y el zoom del tiempo ya no van aquí: están en el
+              panel de herramientas de la derecha (EJE X). */}
           <BotonBarra
             tema={tema}
             titulo="Ver todo lo guardado en memoria"
@@ -1552,6 +2107,28 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
             <MaximizeIcon style={{ width: 13, height: 13 }} />
           </BotonBarra>
         </div>
+
+        {/* ── Título ── a la derecha de la barra, como en las pantallas
+            de planta. Toma el color del texto del widget. */}
+        {cfg.titulo.trim() && (
+          <span
+            title={cfg.titulo}
+            style={{
+              flexShrink: 1,
+              minWidth: 0,
+              maxWidth: '50%',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              marginLeft: 4,
+              fontSize: 13.5,
+              fontWeight: 700,
+              color: colorTinta,
+            }}
+          >
+            {cfg.titulo}
+          </span>
+        )}
       </div>
 
       {/* ── El gráfico ────────────────────────────────────────────── */}
@@ -1566,7 +2143,7 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
       >
         <div
           ref={contenedor}
-          className={CLASE_TREND}
+          className={etiquetando ? `${CLASE_TREND} trend-etiquetando` : CLASE_TREND}
           style={{ position: 'absolute', inset: 0 }}
         />
 
@@ -1706,6 +2283,52 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
             />,
             areaDibujo
           )}
+
+        {/* ── ETIQUETAS ── las guardadas, el punto que sigue a la curva y
+            el cuadro del nombre mientras se coloca una. */}
+        {interactivo && areaDibujo && etiquetas.some((e) => e.visible) && (
+          <CapaEtiquetas
+            area={areaDibujo}
+            etiquetas={etiquetas}
+            posDe={posEnArea}
+            tema={tema}
+            fuerte={fuerte}
+            onAlternar={alternarEtiqueta}
+          />
+        )}
+        {etiquetando && areaDibujo && puntoEtiqueta && (
+          <PuntoEtiqueta
+            area={areaDibujo}
+            x={puntoEtiqueta.x}
+            y={puntoEtiqueta.y}
+            color={puntoEtiqueta.color}
+          />
+        )}
+        {etiquetando && (
+          <CuadroNombre
+            tema={tema}
+            fuerte={fuerte}
+            valor={nombreEtiqueta}
+            onCambiar={setNombreEtiqueta}
+            ayuda={
+              avisoEtiqueta ||
+              (puntoEtiqueta
+                ? `Haz clic para guardar la etiqueta sobre ${puntoEtiqueta.nombre}.`
+                : 'Acércate a una de las líneas para guardar la etiqueta.')
+            }
+            onCancelar={terminarEtiquetado}
+          />
+        )}
+        {modalEtiquetas && (
+          <ModalEtiquetas
+            modo={modalEtiquetas}
+            etiquetas={etiquetas}
+            tema={tema}
+            fuerte={fuerte}
+            onAceptar={modalEtiquetas === 'mostrar' ? aplicarMostrar : aplicarEliminar}
+            onCerrar={() => setModalEtiquetas(null)}
+          />
+        )}
       </div>
 
       {/* ── Leyenda ───────────────────────────────────────────────────
@@ -1718,12 +2341,22 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
           hace dos minutos» en un número que se puede leer. */}
       {cfg.mostrarLeyenda && (
         <div
+          className="psi-trend-leyenda"
           style={{
+            ['--tl-barra' as any]: tema.borde,
+            ['--tl-barra-encima' as any]: tema.tintaSuave,
+            // EN COLUMNAS, LLENADAS DE ARRIBA ABAJO (como la pantalla de
+            // planta): nombre a la izquierda, valor alineado a la derecha y
+            // todas las filas a la misma altura. Antes cada elemento medía lo
+            // que le tocaba y los valores quedaban a saltos.
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(172px, 1fr))',
-            gap: '1px 14px',
-            padding: '6px 10px',
-            maxHeight: '40%',
+            gridTemplateColumns: `repeat(${columnasLeyenda}, minmax(0, 1fr))`,
+            gridTemplateRows: leyendaConScroll ? undefined : `repeat(${filasLeyenda}, auto)`,
+            gridAutoFlow: leyendaConScroll ? 'row' : 'column',
+            columnGap: 28,
+            rowGap: 2,
+            padding: '6px 14px',
+            maxHeight: leyendaConScroll ? altoLeyenda4 : '40%',
             overflowY: 'auto',
             flexShrink: 0,
             background: tema.chapa,
@@ -1737,10 +2370,24 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
             const corto = prefijo && completo.startsWith(prefijo)
               ? completo.slice(prefijo.length)
               : completo;
+            const esResaltada = resaltada === s.id;
             return (
               <span
                 key={s.id}
-                title={completo}
+                title={
+                  interactivo
+                    ? `${completo} — clic para ${esResaltada ? 'quitar el resaltado' : 'resaltarla en el gráfico'}`
+                    : completo
+                }
+                // Clic en el nombre o el valor: resalta su línea (otro clic
+                // lo quita). No pausa nada.
+                onClick={
+                  interactivo
+                    ? () => setResaltada((prev) => (prev === s.id ? null : s.id))
+                    : undefined
+                }
+                role={interactivo ? 'button' : undefined}
+                aria-pressed={interactivo ? esResaltada : undefined}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1748,12 +2395,18 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
                   minWidth: 0,
                   fontSize: tamLeyenda,
                   lineHeight: 1.6,
+                  cursor: interactivo ? 'pointer' : 'default',
+                  fontWeight: esResaltada ? 700 : undefined,
+                  // Separador entre columnas (salvo en la primera).
+                  paddingLeft: columnaDe(pos) > 0 ? 14 : 0,
+                  borderLeft:
+                    columnaDe(pos) > 0 ? `1px solid ${tema.borde}` : 'none',
                 }}
               >
                 <span
                   style={{
                     width: 12,
-                    height: 3,
+                    height: esResaltada ? 5 : 3,
                     borderRadius: 2,
                     background: colorEfectivo(s.color, i, isDark),
                     flexShrink: 0,
@@ -1766,7 +2419,7 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
-                    color: tema.tintaSuave,
+                    color: esResaltada ? fuerte : tema.tintaSuave,
                   }}
                 >
                   {corto}
@@ -1774,6 +2427,8 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
                 <b
                   style={{
                     flexShrink: 0,
+                    minWidth: 64,
+                    textAlign: 'right',
                     fontWeight: 600,
                     color: fuerte,
                     fontVariantNumeric: 'tabular-nums',
@@ -2070,6 +2725,67 @@ function SelectorVarias({
 
 }
 
+/**
+ * Campo de píxeles que SE PUEDE ESCRIBIR: el texto es local mientras se
+ * edita (se puede borrar todo y teclear otro número) y se aplica en cuanto es
+ * válido. Al salir o con Enter se ajusta al rango; Escape devuelve el valor.
+ * Antes el campo iba atado al valor ya limitado: al borrar quedaba 0, saltaba
+ * al mínimo y solo servían las flechas.
+ */
+function NumeroPx({
+  valor,
+  min,
+  max,
+  alCambiar,
+}: {
+  valor: number;
+  min: number;
+  max: number;
+  alCambiar: (n: number) => void;
+}) {
+  const [texto, setTexto] = useState(String(valor));
+  const editando = useRef(false);
+  useEffect(() => {
+    if (!editando.current) setTexto(String(valor));
+  }, [valor]);
+  const confirmar = () => {
+    editando.current = false;
+    const n = Number(texto);
+    const final = texto.trim() !== '' && Number.isFinite(n)
+      ? Math.min(max, Math.max(min, Math.round(n)))
+      : valor;
+    setTexto(String(final));
+    if (final !== valor) alCambiar(final);
+  };
+  return (
+    <input
+      type="number"
+      min={min}
+      max={max}
+      value={texto}
+      onFocus={() => { editando.current = true; }}
+      onChange={(e) => {
+        editando.current = true;
+        setTexto(e.target.value);
+        const n = Number(e.target.value);
+        if (e.target.value.trim() !== '' && Number.isFinite(n) && n >= min && n <= max) {
+          alCambiar(Math.round(n));
+        }
+      }}
+      onBlur={confirmar}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        if (e.key === 'Escape') {
+          editando.current = false;
+          setTexto(String(valor));
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      className={INPUT}
+    />
+  );
+}
+
 function InspectorTrend({ config, setConfig }: InspectorCtx) {
   const cfg = leerConfigTrend(config);
   const { selectedVariables, isDark } = useAppStore();
@@ -2185,6 +2901,19 @@ function InspectorTrend({ config, setConfig }: InspectorCtx) {
         ))}
       </datalist>
 
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+          Título del gráfico
+        </span>
+        <input
+          type="text"
+          value={cfg.titulo}
+          onChange={(e) => set({ titulo: e.target.value })}
+          placeholder="p. ej. Variables Lazos Críticos - Lavado Línea 3"
+          className={INPUT}
+        />
+      </label>
+
       <div>
         <div className="mb-1.5 flex items-center justify-between">
           <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -2257,19 +2986,25 @@ function InspectorTrend({ config, setConfig }: InspectorCtx) {
                       </option>
                     ))}
                   </select>
+                  {/* El nombre en su PROPIA fila, a todo el ancho. Compartía
+                      fila con el grosor y quedaba aplastado en un cuadrito
+                      donde no se veía lo escrito. */}
+                  <input
+                    type="text"
+                    value={s.etiqueta}
+                    onChange={(e) => editar(s.id, { etiqueta: e.target.value })}
+                    placeholder={`Nombre en el gráfico (${
+                      numericas.find((v) => v.id === s.variableId)?.name ?? 'opcional'
+                    })`}
+                    title="Nombre que sale en la leyenda y en la regla. Vacío = el de la variable."
+                    className={`${INPUT} text-[11px]`}
+                  />
                   <div className="flex gap-1">
-                    <input
-                      type="text"
-                      value={s.etiqueta}
-                      onChange={(e) => editar(s.id, { etiqueta: e.target.value })}
-                      placeholder="Nombre en la leyenda (opcional)"
-                      className={`${INPUT} text-[11px]`}
-                    />
                     <select
                       value={String(s.grosor ?? 2)}
                       onChange={(e) => editar(s.id, { grosor: Number(e.target.value) })}
                       title="Grosor de la línea"
-                      className={`${INPUT} w-[86px] shrink-0 text-[11px]`}
+                      className={`${INPUT} text-[11px]`}
                     >
                       {GROSORES.map((g) => (
                         <option key={g.v} value={g.v}>
@@ -2625,6 +3360,82 @@ function InspectorTrend({ config, setConfig }: InspectorCtx) {
           className="h-4 w-4 rounded border-slate-300 text-siemens focus:ring-2 focus:ring-siemens/40 dark:border-navy-slate dark:bg-navy"
         />
       </label>
+
+      {/* ── Columna derecha: logo y herramientas ── */}
+      <label className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+          Reservar espacio para logo
+        </span>
+        <input
+          type="checkbox"
+          checked={cfg.logo}
+          onChange={(e) => set({ logo: e.target.checked })}
+          className="h-4 w-4 rounded border-slate-300 text-siemens focus:ring-2 focus:ring-siemens/40 dark:border-navy-slate dark:bg-navy"
+        />
+      </label>
+      {cfg.logo && (
+        <div className="space-y-1.5">
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="mb-1 block text-[11px] text-slate-500 dark:text-slate-400">
+                Ancho (px)
+              </span>
+              <NumeroPx
+                valor={cfg.logoAncho}
+                min={20}
+                max={1200}
+                alCambiar={(n) => set({ logoAncho: n })}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] text-slate-500 dark:text-slate-400">
+                Alto (px)
+              </span>
+              <NumeroPx
+                valor={cfg.logoAlto}
+                min={20}
+                max={1200}
+                alCambiar={(n) => set({ logoAlto: n })}
+              />
+            </label>
+          </div>
+          <p className="text-[10px] leading-relaxed text-slate-400">
+            Deja un hueco vacío arriba a la derecha del gráfico. Coloca encima
+            un widget de Imagen con el logo.
+          </p>
+        </div>
+      )}
+
+      <label className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+          Mostrar herramientas
+        </span>
+        <input
+          type="checkbox"
+          checked={cfg.herramientas}
+          onChange={(e) => set({ herramientas: e.target.checked })}
+          className="h-4 w-4 rounded border-slate-300 text-siemens focus:ring-2 focus:ring-siemens/40 dark:border-navy-slate dark:bg-navy"
+        />
+      </label>
+      {cfg.herramientas && (
+        <div className="space-y-1.5">
+          <label className="block">
+            <span className="mb-1 block text-[11px] text-slate-500 dark:text-slate-400">
+              Ancho del panel (px)
+            </span>
+            <NumeroPx
+              valor={cfg.herramientasAncho}
+              min={150}
+              max={600}
+              alCambiar={(n) => set({ herramientasAncho: n })}
+            />
+          </label>
+          <p className="text-[10px] leading-relaxed text-slate-400">
+            Detener/Reanudar, Eje X, Eje Y y Etiquetas a la derecha del
+            gráfico. Funcionan en la vista previa.
+          </p>
+        </div>
+      )}
 
       <p className="rounded-lg bg-slate-100 px-2.5 py-2 text-[11px] leading-relaxed text-slate-500 dark:bg-navy-slate/40 dark:text-slate-400">
         {esHistorico ? (

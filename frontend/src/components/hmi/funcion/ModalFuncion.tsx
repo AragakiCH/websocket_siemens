@@ -25,17 +25,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertCircleIcon,
-  CheckCircle2Icon,
-  Loader2Icon,
-  PlayIcon,
   PlusIcon,
   XIcon,
 } from 'lucide-react';
 import {
   identificadoresEn,
-  probarFuncion,
   validarFuncion,
-  type ResultadoFuncion,
   type Validacion,
 } from '../../../services/funcionesApi';
 import type { PlcVariable } from '../../../models/plc';
@@ -44,9 +39,10 @@ import {
   TIPOS_INTERNA,
   errorDeFuncion,
   funcionVacia,
+  idDeSalida,
+  salidaDeEntrada,
   type ConfigFunciones,
   type FuncionSalida,
-  type InternaFuncion,
   type TipoInterna,
 } from '../../../utils/funciones';
 
@@ -206,6 +202,8 @@ function FilaEntrada({
   const filtro = filtrarGrupos(grupos, busca, variableId);
   const tipo = !variableId
     ? '—'
+    : salidaDeEntrada(variableId) !== null
+    ? 'Variable del widget'
     : variableId.startsWith('param:')
     ? 'Parámetro'
     : variable?.type ?? 'Sin dato';
@@ -372,174 +370,6 @@ function Chip({
   );
 }
 
-/** Valor de prueba de una entrada, escrito como se escribiría en Python. */
-function leerValorPrueba(texto: string): unknown {
-  const t = texto.trim();
-  if (t === '') return null;
-  if (t === 'True' || t.toLowerCase() === 'true') return true;
-  if (t === 'False' || t.toLowerCase() === 'false') return false;
-  if (t === 'None' || t.toLowerCase() === 'null') return null;
-  if (/^-?\d+(\.\d+)?$/.test(t)) return Number(t);
-  return t.replace(/^['"]|['"]$/g, '');
-}
-
-function mostrarValor(v: unknown): string {
-  if (v === null || v === undefined) return 'None';
-  if (typeof v === 'boolean') return v ? 'True' : 'False';
-  if (typeof v === 'string') return JSON.stringify(v);
-  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(Math.round(v * 1e6) / 1e6);
-  return JSON.stringify(v);
-}
-
-/**
- * «Valores de prueba y resultado»: se escriben valores para las entradas y
- * las internas, se pulsa Probar, y el servidor ejecuta EXACTAMENTE lo que
- * ejecutará en vivo. Las entradas arrancan con su lectura actual, si la hay.
- */
-function Pruebas({
-  f,
-  nombreSalida,
-  variablePorId,
-}: {
-  f: FuncionSalida;
-  nombreSalida: string;
-  variablePorId: (id: string) => PlcVariable | undefined;
-}) {
-  const [valores, setValores] = useState<Record<string, string>>({});
-  const [iniciales, setIniciales] = useState<Record<string, string>>({});
-  const [resultado, setResultado] = useState<ResultadoFuncion | null>(null);
-  const [probando, setProbando] = useState(false);
-  const [fallo, setFallo] = useState('');
-
-  const valorDe = (e: { nombre: string; variableId: string }): string => {
-    if (e.nombre in valores) return valores[e.nombre];
-    const v = e.variableId ? variablePorId(e.variableId)?.value : undefined;
-    return v === undefined || v === null ? '' : mostrarValor(v);
-  };
-  const inicialDe = (i: InternaFuncion): string => {
-    if (i.nombre in iniciales) return iniciales[i.nombre];
-    return { bool: 'False', entero: '0', decimal: '0.0', texto: '' }[i.tipo];
-  };
-
-  const probar = async () => {
-    setProbando(true);
-    setFallo('');
-    try {
-      const entradas: Record<string, unknown> = {};
-      for (const e of f.entradas) {
-        if (e.nombre.trim()) entradas[e.nombre.trim()] = leerValorPrueba(valorDe(e));
-      }
-      const internas = f.internas
-        .filter((i) => i.nombre.trim())
-        .map((i) => ({ nombre: i.nombre.trim(), tipo: i.tipo, valor: leerValorPrueba(inicialDe(i)) }));
-      setResultado(await probarFuncion(f.expresion, nombreSalida, entradas, internas));
-    } catch (e: any) {
-      setFallo(e?.message ?? 'No se pudo probar.');
-    } finally {
-      setProbando(false);
-    }
-  };
-
-  const CAMPO_CHICO =
-    'h-8 w-full rounded-md border border-slate-200 bg-white px-2 font-mono text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/25 dark:border-navy-slate dark:bg-navy dark:text-slate-100';
-
-  return (
-    <div className="mt-3 space-y-3">
-      {f.entradas.length === 0 && f.internas.length === 0 ? (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Sin entradas ni internas: la función se prueba tal cual.
-        </p>
-      ) : (
-        <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
-          {f.entradas
-            .filter((e) => e.nombre.trim())
-            .map((e) => (
-              <label key={`e-${e.nombre}`} className="flex items-center gap-2 text-xs">
-                <span className="w-28 shrink-0 truncate font-mono text-siemens dark:text-siemens-200" title={e.nombre}>
-                  {e.nombre}
-                </span>
-                <input
-                  value={valorDe(e)}
-                  onChange={(ev) => setValores((v) => ({ ...v, [e.nombre]: ev.target.value }))}
-                  placeholder="None"
-                  spellCheck={false}
-                  className={CAMPO_CHICO}
-                  title="Valor de prueba. Vacío = None (tag sin lectura)."
-                />
-              </label>
-            ))}
-          {f.internas
-            .filter((i) => i.nombre.trim())
-            .map((i) => (
-              <label key={`i-${i.nombre}`} className="flex items-center gap-2 text-xs">
-                <span className="w-28 shrink-0 truncate font-mono text-violet-700 dark:text-violet-300" title={`${i.nombre} (interna, valor inicial)`}>
-                  {i.nombre}
-                </span>
-                <input
-                  value={inicialDe(i)}
-                  onChange={(ev) => setIniciales((v) => ({ ...v, [i.nombre]: ev.target.value }))}
-                  spellCheck={false}
-                  className={CAMPO_CHICO}
-                  title="Con qué valor arranca esta interna en la prueba."
-                />
-              </label>
-            ))}
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void probar()}
-          disabled={probando || f.expresion.trim() === ''}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-siemens px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110 disabled:opacity-40"
-        >
-          {probando ? <Loader2Icon className="h-3.5 w-3.5 animate-spin" /> : <PlayIcon className="h-3.5 w-3.5" />}
-          Probar
-        </button>
-        {resultado && resultado.exito && (
-          <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
-            <CheckCircle2Icon className="h-3.5 w-3.5 text-state-ok" />
-            <span className="font-mono">{nombreSalida}</span> ={' '}
-            <span className="rounded bg-emerald-400/15 px-1.5 py-0.5 font-mono text-sm font-bold text-emerald-700 dark:text-emerald-300">
-              {mostrarValor(resultado.valor)}
-            </span>
-            <span className="text-slate-400">· {resultado.ms} ms</span>
-          </span>
-        )}
-      </div>
-
-      {(fallo || (resultado && !resultado.exito)) && (
-        <p className="flex items-start gap-2 rounded-lg border border-state-error/30 bg-state-error/5 px-3 py-2 text-xs leading-relaxed text-state-error">
-          <AlertCircleIcon className="mt-px h-3.5 w-3.5 shrink-0" />
-          <span className="min-w-0 break-words">
-            {fallo ||
-              (resultado?.linea ? `Línea ${resultado.linea}: ${resultado.error}` : resultado?.error)}
-          </span>
-        </p>
-      )}
-
-      {resultado && f.internas.some((i) => i.nombre.trim()) && (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Internas después:{' '}
-          {Object.entries(resultado.internas).map(([k, v], i) => (
-            <span key={k} className="font-mono">
-              {i > 0 ? ' · ' : ''}
-              {k} = {mostrarValor(v)}
-            </span>
-          ))}
-        </p>
-      )}
-
-      {resultado && resultado.impreso.length > 0 && (
-        <pre className="mp-scroll max-h-32 overflow-auto rounded-lg bg-[#0f1729] px-3 py-2 font-mono text-[11px] leading-relaxed text-slate-200">
-          {resultado.impreso.join('\n')}
-        </pre>
-      )}
-    </div>
-  );
-}
-
 export function ModalFuncion({
   salidas,
   config,
@@ -606,6 +436,31 @@ export function ModalFuncion({
   };
 
   const nombreSalida = salida?.nombre ?? '—';
+
+  /**
+   * «Tag asociado» = las OTRAS salidas del widget (varPrincipal y las
+   * variables con nombre, menos la que se está calculando) + los tags de
+   * siempre. Van justo después de «— Ninguna —».
+   */
+  const gruposConSalidas = (asignada: string): Grupos => {
+    const base = gruposPara(asignada);
+    const opciones = salidas
+      .filter((s) => s.clave !== salida?.clave)
+      .map((s) => ({ value: idDeSalida(s.clave), label: s.nombre }));
+    // Apunta a una salida que ya no está (se quitó): que se vea, no que
+    // el desplegable salte solo a otra opción.
+    const huerfana = salidaDeEntrada(asignada);
+    if (huerfana !== null && !opciones.some((o) => o.value === asignada)) {
+      opciones.push({
+        value: asignada,
+        label: huerfana === salida?.clave ? `${nombreSalida} (es esta misma salida)` : `${huerfana} (ya no existe)`,
+      });
+    }
+    if (opciones.length === 0) return base;
+    const grupo = { label: 'Variables del widget', options: opciones };
+    const conNinguna = base.length > 0 && base[0].options.some((o) => o.value === '');
+    return conNinguna ? [base[0], grupo, ...base.slice(1)] : [grupo, ...base];
+  };
 
   // ── El código y sus nombres ──────────────────────────────────
   const area = useRef<HTMLTextAreaElement>(null);
@@ -761,7 +616,7 @@ export function ModalFuncion({
                         key={`${salida!.clave}-${i}`}
                         nombre={e.nombre}
                         variableId={e.variableId}
-                        grupos={gruposPara(e.variableId)}
+                        grupos={gruposConSalidas(e.variableId)}
                         variable={variablePorId(e.variableId)}
                         onNombre={(v) =>
                           cambiar({ entradas: f.entradas.map((x, j) => (j === i ? { ...x, nombre: v } : x)) })
@@ -939,12 +794,6 @@ export function ModalFuncion({
                   </p>
                 )}
 
-                <details className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 dark:border-navy-slate dark:bg-navy-soft">
-                  <summary className="cursor-pointer text-xs font-semibold text-siemens dark:text-siemens-200">
-                    Valores de prueba y resultado
-                  </summary>
-                  <Pruebas key={salida!.clave} f={f} nombreSalida={nombreSalida} variablePorId={variablePorId} />
-                </details>
               </Bloque>
             </>
           )}
