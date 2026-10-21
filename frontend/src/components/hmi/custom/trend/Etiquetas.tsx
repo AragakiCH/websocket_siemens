@@ -12,9 +12,13 @@
 //   etiqueta lleva su propia copia de los valores.
 //
 // DÓNDE VIVEN
-//   En `sessionStorage`, una lista por widget: sobreviven a RECARGAR el
-//   preview y desaparecen al CERRAR su ventana (ver sesionTrend.ts). No van a
-//   la base de datos ni se comparten entre equipos.
+//   En el SERVIDOR (`datos/etiquetas_trend.json`, ver
+//   app/api/etiquetas_trend_routes.py), que es la fuente de verdad: en vivo
+//   se ven las de HOY de ese trend; filtrando el historizador, las del rango.
+//   Crear y borrar es solo para Supervisor. En el navegador solo queda qué se
+//   ve y qué está desplegado (`sessionStorage`), que es de cada pantalla.
+//   Las que antes vivían solo en `sessionStorage` (useEtiquetasGuardadas) ya
+//   no se usan.
 //
 // LO QUE SE DIBUJA
 //   Va dentro de `.u-over` (el área de dibujo de uPlot) con un portal, igual
@@ -24,10 +28,17 @@
 //   `data-trend-ui` marca lo que se puede pulsar dentro del área: el plugin
 //   de gestos lo respeta y no empieza un arrastre al pulsarlo.
 // =========================================================================
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { TemaGrafico } from './paleta';
 import { sesionTrend } from './sesionTrend';
+import {
+  borrarEtiquetaTrend,
+  crearEtiquetaTrend,
+  listarEtiquetasTrend,
+  type EtiquetaGuardada,
+  type NuevaEtiquetaGuardada,
+} from '../../../../services/etiquetasTrendApi';
 
 export interface LecturaEtiqueta {
   nombre: string;
@@ -50,6 +61,170 @@ export interface EtiquetaTrend {
   lecturas: LecturaEtiqueta[];
   visible: boolean;
   expandida: boolean;
+  /** Variable (`plc|tag`) de la curva elegida. */
+  variable?: string;
+  /** Quién la puso y cuándo (lo apunta el servidor). */
+  autor?: string;
+  creado?: string;
+}
+
+// ─── En el servidor ───────────────────────────────────────────────
+
+type EstadoUI = Record<string, { v?: boolean; x?: boolean }>;
+const claveUI = (widgetId: string) => `hmi.trend.etiquetasUI.${widgetId}`;
+
+function leerUI(widgetId: string): EstadoUI {
+  try {
+    const d = JSON.parse(sessionStorage.getItem(claveUI(widgetId)) ?? '{}');
+    return d && typeof d === 'object' && !Array.isArray(d) ? d : {};
+  } catch {
+    return {};
+  }
+}
+function guardarUI(widgetId: string, ui: EstadoUI): void {
+  try {
+    sessionStorage.setItem(claveUI(widgetId), JSON.stringify(ui));
+  } catch {
+    /* sin almacenamiento: queda en memoria */
+  }
+}
+
+function desdeServidor(g: EtiquetaGuardada, ui: EstadoUI): EtiquetaTrend {
+  return {
+    id: g.id,
+    nombre: g.nombre,
+    t: Date.parse(g.ts) / 1000,
+    y: Number(g.valor),
+    color: g.color || '#6883c4',
+    curva: g.curva || '',
+    variable: g.variable || undefined,
+    lecturas: (g.lecturas ?? []).map((l) => ({
+      nombre: String(l.nombre ?? ''),
+      color: l.color || '#999',
+      valor: typeof l.valor === 'number' && Number.isFinite(l.valor) ? l.valor : null,
+      unidad: l.unidad || undefined,
+    })),
+    visible: ui[g.id]?.v !== false,
+    expandida: ui[g.id]?.x === true,
+    autor: g.autor,
+    creado: g.creado,
+  };
+}
+
+export interface EtiquetasServidor {
+  etiquetas: EtiquetaTrend[];
+  /** '' si se guardó; si no, el motivo. */
+  crear: (n: NuevaEtiquetaGuardada) => Promise<string>;
+  /** '' si se borraron todas; si no, el motivo. */
+  borrar: (ids: Set<string>) => Promise<string>;
+  alternar: (id: string) => void;
+  /** Deja visibles SOLO estas. */
+  mostrarSolo: (ids: Set<string>) => void;
+  error: string;
+}
+
+/**
+ * Las etiquetas de un trend, del servidor, dentro de `ventana` (ISO, UTC;
+ * `hasta` vacío = sin límite). Se vuelven a pedir cuando otra pantalla crea
+ * o borra alguna (`config.updated` · `etiquetas_trend` por el WebSocket).
+ */
+export function useEtiquetasServidor(
+  widgetId: string,
+  ventana: { desde: string; hasta: string } | null,
+  activo: boolean
+): EtiquetasServidor {
+  const [lista, setLista] = useState<EtiquetaGuardada[]>([]);
+  const [ui, setUi] = useState<EstadoUI>(() => leerUI(widgetId));
+  const [error, setError] = useState('');
+  const [rev, setRev] = useState(0);
+  const desde = ventana?.desde ?? '';
+  const hasta = ventana?.hasta ?? '';
+
+  useEffect(() => {
+    setUi(leerUI(widgetId));
+  }, [widgetId]);
+
+  useEffect(() => {
+    if (!activo || !ventana) {
+      setLista([]);
+      return;
+    }
+    let vivo = true;
+    listarEtiquetasTrend(widgetId, desde, hasta)
+      .then((l) => {
+        if (!vivo) return;
+        setLista(l);
+        setError('');
+      })
+      .catch((e: any) => {
+        if (vivo) setError(e?.message ?? 'No se pudieron leer las etiquetas.');
+      });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widgetId, desde, hasta, activo, !!ventana, rev]);
+
+  // Otra pantalla (u otro operador) creó o borró una: se vuelve a pedir.
+  useEffect(() => {
+    const alAviso = (ev: Event) => {
+      const m = (ev as CustomEvent).detail;
+      if (m?.type === 'config.updated' && m.recurso === 'etiquetas_trend') setRev((n) => n + 1);
+    };
+    window.addEventListener('hmi:ws', alAviso);
+    return () => window.removeEventListener('hmi:ws', alAviso);
+  }, []);
+
+  const cambiarUI = useCallback(
+    (fn: (prev: EstadoUI) => EstadoUI) =>
+      setUi((prev) => {
+        const n = fn(prev);
+        guardarUI(widgetId, n);
+        return n;
+      }),
+    [widgetId]
+  );
+
+  const etiquetas = useMemo(() => lista.map((g) => desdeServidor(g, ui)), [lista, ui]);
+
+  const crear = async (n: NuevaEtiquetaGuardada): Promise<string> => {
+    try {
+      const g = await crearEtiquetaTrend(n);
+      setLista((l) => (l.some((x) => x.id === g.id) ? l : [...l, g]));
+      return '';
+    } catch (e: any) {
+      return e?.message ?? 'No se pudo guardar la etiqueta.';
+    }
+  };
+
+  const borrar = async (ids: Set<string>): Promise<string> => {
+    let fallo = '';
+    const borradas = new Set<string>();
+    for (const id of ids) {
+      try {
+        await borrarEtiquetaTrend(id);
+        borradas.add(id);
+      } catch (e: any) {
+        // Ya no estaba (la borró otro): da igual, el resultado es el mismo.
+        if (/ya no existe/i.test(e?.message ?? '')) borradas.add(id);
+        else fallo = e?.message ?? 'No se pudo borrar la etiqueta.';
+      }
+    }
+    setLista((l) => l.filter((x) => !borradas.has(x.id)));
+    return fallo;
+  };
+
+  const alternar = (id: string) =>
+    cambiarUI((u) => ({ ...u, [id]: { ...u[id], x: !(u[id]?.x === true) } }));
+
+  const mostrarSolo = (ids: Set<string>) =>
+    cambiarUI((u) => {
+      const n: EstadoUI = { ...u };
+      for (const g of lista) n[g.id] = { ...n[g.id], v: ids.has(g.id) };
+      return n;
+    });
+
+  return { etiquetas, crear, borrar, alternar, mostrarSolo, error };
 }
 
 // ─── Guardado en el navegador ─────────────────────────────────────
@@ -160,9 +335,19 @@ export function CapaEtiquetas({
   tema,
   fuerte,
   onAlternar,
+  atravesable = false,
+  onSobre,
 }: {
   area: HTMLDivElement;
   etiquetas: EtiquetaTrend[];
+  /**
+   * Colocando otra etiqueta: las cajas se atenúan y dejan pasar el clic,
+   * para poder poner una nueva JUSTO al lado de otra (antes la caja tapaba
+   * las líneas de su derecha y el clic no llegaba).
+   */
+  atravesable?: boolean;
+  /** El ratón entra o sale de una caja (para esconder la regla). */
+  onSobre?: (sobre: boolean) => void;
   /** Posición en píxeles del área de dibujo, o null si cae fuera de la vista. */
   posDe: (t: number, y: number) => PosEtiqueta | null;
   tema: TemaGrafico;
@@ -259,11 +444,24 @@ export function CapaEtiquetas({
           {/* El chip (y su detalle) */}
           <div
             data-trend-ui
+            // Sobre la caja NO se mueve el cursor de uPlot: si el movimiento
+            // le llegara, la regla saltaría por debajo de la caja y se vería
+            // cruzándola y trabándose. Se corta aquí, en nativo, porque uPlot
+            // escucha en `.u-over` antes de que React se entere.
+            ref={(el) => {
+              if (!el || (el as any).__sinCursor) return;
+              (el as any).__sinCursor = true;
+              el.addEventListener('mousemove', (ev) => ev.stopPropagation());
+            }}
+            onMouseEnter={() => onSobre?.(true)}
+            onMouseLeave={() => onSobre?.(false)}
             style={{
               position: 'absolute',
               left: l,
               top: t,
-              zIndex: 5,
+              zIndex: 8,
+              pointerEvents: atravesable ? 'none' : undefined,
+              opacity: atravesable ? 0.45 : 1,
               minWidth: e.expandida ? 220 : undefined,
               maxWidth: 240,
               borderRadius: 6,
@@ -389,6 +587,7 @@ export function CuadroNombre({
   onCambiar,
   ayuda,
   onCancelar,
+  lado = 'derecha',
 }: {
   tema: TemaGrafico;
   fuerte: string;
@@ -396,6 +595,8 @@ export function CuadroNombre({
   onCambiar: (v: string) => void;
   ayuda: string;
   onCancelar: () => void;
+  /** Se pasa al otro lado cuando el ratón se acerca, para no tapar la zona donde se quiere poner la etiqueta. */
+  lado?: 'derecha' | 'izquierda';
 }) {
   return (
     <div
@@ -403,7 +604,8 @@ export function CuadroNombre({
       style={{
         position: 'absolute',
         top: 8,
-        right: 10,
+        right: lado === 'derecha' ? 10 : undefined,
+        left: lado === 'izquierda' ? 64 : undefined,
         zIndex: 20,
         width: 250,
         padding: '10px 12px',
@@ -466,9 +668,15 @@ export function ModalEtiquetas({
   fuerte,
   onAceptar,
   onCerrar,
+  notaDe,
+  vacio,
 }: {
   modo: 'mostrar' | 'eliminar';
   etiquetas: EtiquetaTrend[];
+  /** Una nota bajo una etiqueta (p. ej. «fuera de lo grabado en esta sesión»). */
+  notaDe?: (e: EtiquetaTrend) => string;
+  /** El texto cuando no hay ninguna. */
+  vacio?: string;
   tema: TemaGrafico;
   fuerte: string;
   /** Los ids marcados. */
@@ -555,7 +763,7 @@ export function ModalEtiquetas({
         {etiquetas.length === 0 ? (
           <>
             <p style={{ margin: '4px 0 16px', fontSize: 13, color: tema.tintaSuave }}>
-              Aún no hay etiquetas guardadas.
+              {vacio || 'Aún no hay etiquetas guardadas.'}
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button type="button" onClick={onCerrar} style={boton(true)}>
@@ -610,6 +818,14 @@ export function ModalEtiquetas({
                   />
                   <span style={{ minWidth: 0 }}>
                     {e.nombre} · {fmtInstanteEtiqueta(e.t)}
+                    {e.autor ? (
+                      <span style={{ color: tema.tintaSuave }}> · {e.autor}</span>
+                    ) : null}
+                    {notaDe && notaDe(e) ? (
+                      <span style={{ display: 'block', fontSize: 11, color: tema.pausa, marginTop: 2 }}>
+                        {notaDe(e)}
+                      </span>
+                    ) : null}
                   </span>
                 </label>
               ))}

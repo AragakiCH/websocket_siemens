@@ -95,7 +95,9 @@ export default defineConfig({
       '/variables': BACKEND,
       // «Modo función» de los widgets: validar, probar y evaluar el código
       // Python en el servidor.
-      '/funciones': BACKEND
+      '/funciones': BACKEND,
+      // Etiquetas del widget Tendencia (datos/etiquetas_trend.json).
+      '/trend/etiquetas': BACKEND
       
     },
   },

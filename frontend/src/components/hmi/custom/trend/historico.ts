@@ -26,15 +26,26 @@
 // el gráfico, un hueco se dibuja como un hueco, que es lo honesto: en ese
 // instante no se guardó nada de esa variable.
 //
-// ── POR QUÉ NO SE INTERPOLA ─────────────────────────────────────────────
-// Sería fácil rellenar el hueco con el último valor conocido (escalón) y la
-// línea quedaría preciosa y continua. No se hace: en una tendencia de planta,
-// una línea continua afirma que había dato, y quien la mire para explicar por
-// qué se paró la línea a las 03:14 no tiene por qué saber que ese tramo se lo
-// inventó el frontend. Si algún día hace falta, va como una opción explícita
-// llamada por su nombre, no como un comportamiento silencioso.
+// ── EL ÚLTIMO VALOR SE MANTIENE (ESCALÓN) ───────────────────────────────
+// Antes cada serie dejaba `null` en los instantes de las demás y, con
+// `spanGaps: false`, las líneas salían partidas en rayitas: el historizador
+// escribe por LOTES y dentro de un lote cada tag lleva su propia hora (con
+// microsegundos de diferencia), así que nunca coinciden.
+//
+// Pero el historizador guarda POR CAMBIO (ver app/db/historian.py): que un
+// tag no tenga fila en un instante significa que NO CAMBIÓ, no que no hubiera
+// dato. Por eso cada serie mantiene su último valor hasta el siguiente cambio
+// y se dibuja en escalón — es lo que dice la tabla, no un invento.
+//
+//   * Valor al INICIO: se pide además la última fila de cada tag ANTES de
+//     «desde»; así un tag que no cambió dentro del rango (un setpoint fijo)
+//     sale como línea desde el principio.
+//   * Hasta el FINAL: solo si el grupo está GRABANDO (`finSeg`). Con el grupo
+//     pausado la línea acaba en su último registro: no se inventa nada
+//     después de que dejó de grabar.
+//   * Antes del primer valor conocido, la serie queda vacía.
 // =========================================================================
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { leerHistorico, type FilaHistorico } from '../../../../services/historicoApi';
 import { partirId } from '../../../../services/escrituraApi';
 
@@ -113,6 +124,43 @@ function aSegundos(iso: string): number | null {
  * puede llamar condicionalmente — y meterlo en un componente aparte por esto
  * solo habría partido el widget en dos por un detalle de React.
  */
+/** Lo que llegó de cada serie, ya en segundos y en orden ascendente. */
+interface Crudo {
+  series: [number, number][][];
+  /** Inicio del rango pedido (s), donde va el valor previo de cada serie. */
+  desdeSeg: number | null;
+}
+
+/**
+ * Une las series en una sola línea de tiempo MANTENIENDO el último valor de
+ * cada una (ver la cabecera). `finSeg`: hasta dónde se alarga el último
+ * valor (grupo grabando), o `null` para cortar en el último registro.
+ */
+function armar(c: Crudo, finSeg: number | null): { datos: any; puntos: number } {
+  const todos = new Set<number>();
+  for (const s of c.series) for (const [t] of s) todos.add(t);
+  if (todos.size === 0) return { datos: VACIO, puntos: 0 };
+  const ultimoReal = Math.max(...todos);
+  if (finSeg != null && finSeg > ultimoReal) todos.add(finSeg);
+  const tiempos = Array.from(todos).sort((a, b) => a - b);
+  const columnas = c.series.map((s) => {
+    const col: (number | null)[] = new Array(tiempos.length).fill(null);
+    let j = 0;
+    let actual: number | null = null;
+    for (let i = 0; i < tiempos.length; i++) {
+      while (j < s.length && s[j][0] <= tiempos[i]) {
+        actual = s[j][1];
+        j++;
+      }
+      // Sin «fin» (grupo pausado): la serie acaba en SU último registro.
+      if (finSeg == null && s.length && tiempos[i] > s[s.length - 1][0]) break;
+      col[i] = actual;
+    }
+    return col;
+  });
+  return { datos: [tiempos, ...columnas], puntos: tiempos.length };
+}
+
 export function useHistorico(
   activo: boolean,
   grupoId: string,
@@ -120,8 +168,11 @@ export function useHistorico(
   ids: string[],
   desde: string,
   hasta: string,
-  limitePorSerie: number
+  limitePorSerie: number,
+  /** Hasta dónde se mantiene el último valor (s): fin del rango si el grupo graba; `null` si está pausado. */
+  finSeg: number | null = null
 ): DatosHistoricos {
+  const [crudo, setCrudo] = useState<Crudo | null>(null);
   const [estado, setEstado] = useState<Omit<DatosHistoricos, 'recargar'>>({
     datos: VACIO,
     rango: null,
@@ -148,6 +199,7 @@ export function useHistorico(
 
   useEffect(() => {
     if (!activo || !grupoId || ids.length === 0) {
+      setCrudo(null);
       setEstado({
         datos: VACIO,
         rango: null,
@@ -163,6 +215,23 @@ export function useHistorico(
 
     const mio = ++turno.current;
     setEstado((p) => ({ ...p, cargando: true, error: '' }));
+    const desdeSeg = desde ? aSegundos(desde) : null;
+
+    // El valor que tenía cada tag JUSTO ANTES del rango (su última fila hasta
+    // «desde»). Si falla, no pasa nada: la serie empieza en su primer cambio.
+    const previos = desde
+      ? Promise.all(
+          ids.map((id) =>
+            leerHistorico(grupoId, { tag: partirId(id).tag, hasta: desde, limite: 1 })
+              .then((r) => {
+                const f = (r?.filas ?? [])[0];
+                const t = f ? aSegundos(f.ts) : null;
+                return f && t !== null && typeof f.valor_num === 'number' ? f.valor_num : null;
+              })
+              .catch(() => null)
+          )
+        )
+      : Promise.resolve(ids.map(() => null as number | null));
 
     // UNA LLAMADA POR SERIE. El porqué está en `historicoApi.ts`: el límite del
     // endpoint es por CONSULTA, no por tag, así que pedirlas juntas repartiría
@@ -179,11 +248,14 @@ export function useHistorico(
           mensaje: e?.message ?? 'Error leyendo el histórico.',
         }))
       )
-    ).then((respuestas) => {
+    ).then(async (respuestas) => {
+      if (turno.current !== mio) return;
+      const valoresPrevios = await previos;
       if (turno.current !== mio) return;
 
       const falló = respuestas.find((r) => r && r.ok === false);
       if (falló) {
+        setCrudo(null);
         setEstado({
           datos: VACIO,
           rango: null,
@@ -202,16 +274,21 @@ export function useHistorico(
       // Un Map por serie (ts -> valor) y un Set con todos los ts. El Set evita
       // el O(n²) de buscar cada instante en un array, que con 4 series de 1000
       // puntos serían cuatro millones de comparaciones por recarga.
-      const porSerie: Map<number, number | null>[] = [];
-      const todos = new Set<number>();
+      const series: [number, number][][] = [];
+      const reales = new Set<number>();
       const vacias: string[] = [];
       let truncado = false;
 
       respuestas.forEach((r, i) => {
-        const mapa = new Map<number, number | null>();
+        const puntosSerie: [number, number][] = [];
         const filas: FilaHistorico[] = (r as any).filas ?? [];
         if ((r as any).truncado) truncado = true;
-        if (filas.length === 0) vacias.push(partirId(ids[i]).tag || ids[i]);
+        // El valor de antes del rango, en el borde izquierdo. NO si la serie
+        // llegó recortada por el límite de puntos: faltaría el tramo del
+        // principio y el valor previo se estiraría sobre él como si no hubiera
+        // cambiado.
+        const previo = (r as any).truncado ? null : valoresPrevios[i];
+        if (previo != null && desdeSeg != null) puntosSerie.push([desdeSeg, previo]);
         for (const f of filas) {
           const t = aSegundos(f.ts);
           if (t === null) continue;
@@ -219,24 +296,25 @@ export function useHistorico(
           // de meter un 0 que dibujaría una línea plana que nunca existió.
           const v = typeof f.valor_num === 'number' ? f.valor_num : null;
           if (v === null) continue;
-          mapa.set(t, v);
-          todos.add(t);
+          puntosSerie.push([t, v]);
+          reales.add(t);
         }
-        porSerie.push(mapa);
+        // El backend devuelve `ts DESC`: se ordena ASCENDENTE para uPlot.
+        puntosSerie.sort((a, b) => a[0] - b[0]);
+        if (puntosSerie.length === 0) vacias.push(partirId(ids[i]).tag || ids[i]);
+        series.push(puntosSerie);
       });
 
-      // El backend devuelve `ts DESC`. Aquí se ordena ASCENDENTE porque es lo
-      // que uPlot necesita para dibujar de izquierda a derecha.
-      const tiempos = Array.from(todos).sort((a, b) => a - b);
-
-      const columnas = porSerie.map((mapa) =>
-        tiempos.map((t) => (mapa.has(t) ? (mapa.get(t) as number) : null))
-      );
+      const nuevo: Crudo = { series, desdeSeg };
+      setCrudo(nuevo);
+      const tiempos = Array.from(reales).sort((a, b) => a - b);
+      const hayAlgo = series.some((s) => s.length > 0);
 
       setEstado({
-        datos: [tiempos, ...columnas],
+        // Los datos de verdad los arma `armar()` abajo (depende de `finSeg`).
+        datos: VACIO,
         rango: tiempos.length ? [tiempos[0], tiempos[tiempos.length - 1]] : null,
-        puntos: tiempos.length,
+        puntos: hayAlgo ? 1 : 0,
         cargando: false,
         error: '',
         truncado,
@@ -247,7 +325,7 @@ export function useHistorico(
       // NADA EN TODO EL RANGO -> se pregunta dónde sí hay. Va DESPUÉS de pintar
       // el vacío, no antes: así el mensaje sale ya y la pista aparece medio
       // segundo más tarde, en vez de retrasar los dos.
-      if (tiempos.length === 0) {
+      if (!hayAlgo) {
         Promise.all(
           ids.map((id) =>
             leerHistorico(grupoId, { tag: partirId(id).tag, limite: 1 })
@@ -269,7 +347,14 @@ export function useHistorico(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activo, clave, revision]);
 
-  return { ...estado, recargar };
+  // Las series con el último valor mantenido. Aparte de la petición: si solo
+  // cambia `finSeg` (llegó el estado del grupo) no hace falta volver a pedir.
+  const armado = useMemo(
+    () => (crudo && activo ? armar(crudo, finSeg) : { datos: VACIO, puntos: 0 }),
+    [crudo, finSeg, activo]
+  );
+
+  return { ...estado, datos: armado.datos, puntos: armado.puntos, recargar };
 }
 
 // ─── Rangos de tiempo ────────────────────────────────────────────

@@ -28,7 +28,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import (ai_routes, alarm_routes, auth_routes, categoria_routes,
-                     crud_routes, db_routes, escritura_routes, export_routes,
+                     crud_routes, db_routes, escritura_routes,
+                     etiquetas_trend_routes, export_routes,
                      funciones_routes, grupo_routes, historian_routes,
                      internas_routes, lock_routes, migracion_routes, project_routes,
                      proyecto_routes, rest_routes, runtime_routes,
@@ -566,6 +567,8 @@ app.include_router(variables_routes.router)
 # (ver app/core/funciones_py.py).
 app.include_router(funciones_routes.router)
 app.include_router(historian_routes.router)
+# Etiquetas del widget Tendencia (datos/etiquetas_trend.json, sin SQL).
+app.include_router(etiquetas_trend_routes.router)
 app.include_router(alarm_routes.router)
 app.include_router(export_routes.router)
 app.include_router(ai_routes.router)

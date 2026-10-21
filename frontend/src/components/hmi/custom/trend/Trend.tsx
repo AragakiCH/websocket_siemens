@@ -58,6 +58,9 @@ import {
   Loader2Icon,
   DownloadIcon,
   SquareIcon,
+  HistoryIcon,
+  PencilIcon,
+  RadioIcon,
 } from 'lucide-react';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
@@ -85,9 +88,16 @@ import {
   ModalEtiquetas,
   PuntoEtiqueta,
   siguienteNombre,
-  useEtiquetasGuardadas,
+  useEtiquetasServidor,
   type EtiquetaTrend,
 } from './Etiquetas';
+import {
+  ModalFiltroHistorico,
+  cubiertas,
+  guardarFiltro,
+  leerFiltro,
+  type FiltroTrend,
+} from './FiltroHistorico';
 import {
   ajustar,
   encajar,
@@ -706,6 +716,23 @@ function construirOpciones(p: ParamsOpciones): uPlot.Options {
         // decide solo cuándo pintarlos según lo separados que estén, que es
         // justo el criterio que hace falta.
         if (!p.historico) serie.points = { show: false };
+        else {
+          // HISTÓRICO: el historizador guarda POR CAMBIO, así que cada serie
+          // mantiene su valor hasta el siguiente (ver historico.ts) y se
+          // dibuja en ESCALÓN — una rampa entre dos cambios separados
+          // inventaría valores intermedios que nunca existieron.
+          serie.paths = uPlot.paths.stepped!({ align: 1 });
+          // Los marcadores, solo si la serie tiene UN único valor (una línea
+          // de un punto no dibuja nada); con más, saldrían en cada instante.
+          serie.points = {
+            show: (u: uPlot, si: number) => {
+              const col = u.data[si] as unknown as (number | null)[];
+              let n = 0;
+              for (const v of col) if (v != null && ++n > 1) return false;
+              return n === 1;
+            },
+          };
+        }
         return serie;
       }),
     ],
@@ -727,7 +754,7 @@ function construirOpciones(p: ParamsOpciones): uPlot.Options {
 
 function Trend({ widget, interactivo = false }: RenderCtx) {
   const cfg = leerConfigTrend(widget.config);
-  const { variables, isDark } = useAppStore();
+  const { variables, isDark, sesion } = useAppStore();
   const tema = temaGrafico(isDark);
 
   const pCaja = estiloDeParte(widget, 'box');
@@ -799,7 +826,52 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
   const [resaltada, setResaltada] = useState<string | null>(null);
 
   // ── ETIQUETAS ──
-  const [etiquetas, setEtiquetas] = useEtiquetasGuardadas(widget.id);
+  //
+  // FILTRO DEL HISTORIZADOR (solo Vista Previa, solo si el trend está
+  // configurado en vivo): lleva el gráfico a un rango guardado sin tocar el
+  // diseño. Vive en la sesión de la ventana: sobrevive a F5 y se olvida al
+  // cerrarla. Ver FiltroHistorico.tsx.
+  const puedeFiltrar = !!interactivo && cfg.origen !== 'historico';
+  const [filtro, setFiltro] = useState<FiltroTrend | null>(() => leerFiltro(widget.id));
+  const filtroActivo = puedeFiltrar ? filtro : null;
+  const [modalFiltro, setModalFiltro] = useState<Partial<FiltroTrend> | null>(null);
+  // Aviso en la barra (ámbar, se quita al pulsarlo).
+  const [avisoBarra, setAvisoBarra] = useState('');
+
+  // El día de hoy (local): en vivo se ven las etiquetas de HOY. Se vuelve a
+  // mirar cada minuto para que a medianoche se vayan las de ayer.
+  const [hoy, setHoy] = useState(() => new Date().toDateString());
+  useEffect(() => {
+    if (!interactivo) return;
+    const reloj = window.setInterval(() => setHoy(new Date().toDateString()), 60_000);
+    return () => window.clearInterval(reloj);
+  }, [interactivo]);
+
+  // Qué etiquetas se piden al servidor: las del filtro; las del rango del
+  // Inspector si el trend es histórico; y en vivo, las de hoy.
+  const ventanaEtiquetas = useMemo(() => {
+    if (filtroActivo) return { desde: filtroActivo.desde, hasta: filtroActivo.hasta };
+    if (cfg.origen === 'historico') return resolverRango(cfg.rango, cfg.desde, cfg.hasta);
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return { desde: d.toISOString(), hasta: '' };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtroActivo?.desde, filtroActivo?.hasta, cfg.origen, cfg.rango, cfg.desde, cfg.hasta, hoy]);
+  const etq = useEtiquetasServidor(widget.id, ventanaEtiquetas, !!interactivo);
+  // Solo las de las variables que tiene ahora el trend.
+  const etiquetas = useMemo(
+    () => etq.etiquetas.filter((e) => !e.variable || ids.includes(e.variable)),
+    [etq.etiquetas, ids]
+  );
+  // Crear y borrar etiquetas: solo Supervisor (el servidor también lo exige).
+  // Sin sesión (instalación sin cuentas) decide el servidor.
+  const esSupervisor = !sesion || sesion.categoria === 'Supervisor';
+  const bloqueoEtiquetas = esSupervisor
+    ? undefined
+    : 'Solo un Supervisor puede poner o borrar etiquetas';
+  // Los grupos del historizador, para avisar si la variable de una etiqueta
+  // no se está grabando. Se piden al empezar a colocar una.
+  const [gruposHist, setGruposHist] = useState<GrupoHistorico[] | null>(null);
   const [etiquetando, setEtiquetando] = useState(false);
   const etiquetandoRef = useRef(false);
   etiquetandoRef.current = etiquetando;
@@ -809,6 +881,10 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
   // Altura del puntero dentro del área de dibujo: solo hace falta (y solo se
   // actualiza) mientras se coloca una etiqueta.
   const [cursorY, setCursorY] = useState<number | null>(null);
+  // El ratón está sobre la caja de una etiqueta: la regla se esconde.
+  const [sobreEtiqueta, setSobreEtiqueta] = useState(false);
+  // Lado del cuadro del nombre mientras se coloca una etiqueta.
+  const [ladoCuadro, setLadoCuadro] = useState<'derecha' | 'izquierda'>('derecha');
 
   // Las etiquetas se recolocan cuando cambia la vista. Sin limitarlo, en vivo
   // serían diez renders por segundo; con esto, como mucho ~7.
@@ -859,6 +935,9 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
   const [areaDibujo, setAreaDibujo] = useState<HTMLDivElement | null>(null);
 
   const alMoverCursor = useCallback((u: uPlot) => {
+    // Si uPlot recibe movimiento, el ratón NO está sobre una caja de
+    // etiqueta (ahí se corta): la regla puede volver a verse.
+    setSobreEtiqueta((prev) => (prev ? false : prev));
     const i = u.cursor.idx;
     const nuevo = i === null || i === undefined ? null : i;
     setIdxCursor((prev) => (prev === nuevo ? prev : nuevo));
@@ -992,20 +1071,52 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
   //
   // El hook se llama SIEMPRE (un hook no puede ir dentro de un `if`) pero se
   // apaga con `activo`: en modo vivo no pide nada y devuelve vacío.
-  const esHistorico = cfg.origen === 'historico';
+  // Con el FILTRO de la Vista Previa también es histórico: su grupo, su
+  // rango y sus puntos mandan sobre los del Inspector.
+  const esHistorico = cfg.origen === 'historico' || !!filtroActivo;
   const ventanaHist = useMemo(
-    () => resolverRango(cfg.rango, cfg.desde, cfg.hasta),
+    () =>
+      filtroActivo
+        ? { desde: filtroActivo.desde, hasta: filtroActivo.hasta }
+        : resolverRango(cfg.rango, cfg.desde, cfg.hasta),
     // Los presets se recalculan contra el reloj en cada recarga, no aquí: esto
-    // solo cambia cuando cambia la CONFIGURACIÓN.
-    [cfg.rango, cfg.desde, cfg.hasta]
+    // solo cambia cuando cambia la CONFIGURACIÓN (o el filtro).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cfg.rango, cfg.desde, cfg.hasta, filtroActivo?.desde, filtroActivo?.hasta]
   );
+  const grupoHist = filtroActivo ? filtroActivo.grupoId : cfg.grupoId;
+  const limiteHist = filtroActivo ? filtroActivo.limite : cfg.limiteSerie;
+  // Los grupos del historizador: para saber si el del gráfico está GRABANDO
+  // (entonces el último valor se mantiene hasta el final del rango) y para
+  // los avisos. Se piden al entrar en histórico.
+  const [gruposEstado, setGruposEstado] = useState<GrupoHistorico[] | null>(null);
+  useEffect(() => {
+    if (!esHistorico) return;
+    let vivo = true;
+    listarGrupos()
+      .then((l) => vivo && setGruposEstado(l))
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [esHistorico, grupoHist]);
+  const grupoGrabando = !!gruposEstado?.find((g) => g.grupo_id === grupoHist)?.activo;
+  // Hasta dónde se alarga el último valor: el fin del rango (o ahora, si el
+  // rango llega al futuro) con el grupo grabando; con el grupo pausado, nada.
+  const finSegHist = useMemo(() => {
+    if (!grupoGrabando) return null;
+    const h = Date.parse(ventanaHist.hasta);
+    if (!Number.isFinite(h)) return null;
+    return Math.min(h, Date.now()) / 1000;
+  }, [grupoGrabando, ventanaHist.hasta]);
   const hist = useHistorico(
     esHistorico,
-    cfg.grupoId,
+    grupoHist,
     ids,
     ventanaHist.desde,
     ventanaHist.hasta,
-    cfg.limiteSerie
+    limiteHist,
+    finSegHist
   );
 
   // ── EXPORTAR A EXCEL ──────────────────────────────────────────
@@ -1039,7 +1150,7 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
   const puedeBajarHist = interactivo && esHistorico && cfg.exportar;
   const descHist = useDescargaHistorico({
     activo: puedeBajarHist,
-    grupoId: cfg.grupoId,
+    grupoId: grupoHist,
     // El endpoint quiere el tag SIN el prefijo del PLC; `ids` los lleva en el
     // formato de la vista (`"<plc>|<tag>"`). Se parte con `partirId`, que es
     // la única función que sabe hacerlo en todo el proyecto.
@@ -1050,7 +1161,7 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     // motivo por el que el gráfico pide una llamada por serie). Se multiplica
     // por el número de series para que el Excel dé de sí lo mismo que la
     // pantalla, sin pasar del techo que acepta el backend.
-    limite: Math.min(100_000, cfg.limiteSerie * Math.max(1, ids.length)),
+    limite: Math.min(100_000, limiteHist * Math.max(1, ids.length)),
   });
 
   // El mensaje de la grabación se enseña EN LA BARRA, en el hueco del rótulo
@@ -1059,13 +1170,21 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
   // el proceso, y taparlo entero para decir «no se pudo descargar el Excel»
   // es justo lo que un HMI no puede hacer. Se usa el ámbar del tema, el mismo
   // que ya usa este widget para avisar.
-  const mensajeGrab = grab.error || grab.aviso || descHist.error;
+  const mensajeGrab = grab.error || grab.aviso || descHist.error || avisoBarra;
 
   /** Quita el mensaje, venga del camino que venga. */
   const limpiarMensaje = useCallback(() => {
     grab.limpiarMensajes();
     descHist.limpiarError();
+    setAvisoBarra('');
   }, [grab, descHist]);
+
+  // Los avisos propios (etiquetas, permisos) se van solos a los 10 s.
+  useEffect(() => {
+    if (!avisoBarra) return;
+    const reloj = window.setTimeout(() => setAvisoBarra(''), 10_000);
+    return () => window.clearTimeout(reloj);
+  }, [avisoBarra]);
 
   // ---- Muestreo en vivo. Alimenta el búfer y empuja los datos al canvas -- //
   //
@@ -1553,8 +1672,32 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
       valores,
       color: colorEfectivo(s.color, i, isDark),
       nombre: nombreSerie(s.variableId, s.etiqueta, i),
+      variable: ids[m.k] ?? s.variableId,
     };
   })();
+
+  /** ¿Algún grupo ACTIVO del historizador graba esta variable? (null = no se sabe aún) */
+  const seHistoriza = (variable: string): boolean | null => {
+    if (!gruposHist) return null;
+    return gruposHist.some((g) => g.activo && cubiertas(g, [variable]).length > 0);
+  };
+  const avisoNoHistorizada = (nombre: string) =>
+    `Ojo: ${nombre} no se está grabando en el historizador. La etiqueta se guarda, ` +
+    'pero al filtrar el histórico no tendrá línea.';
+
+  // El cuadro del nombre se aparta del ratón: a la izquierda cuando el
+  // puntero entra en el 60 % derecho del gráfico, y vuelve a la derecha
+  // cuando baja del 40 % (con margen, para que no salte de un lado a otro).
+  useEffect(() => {
+    if (!etiquetando) {
+      setLadoCuadro('derecha');
+      return;
+    }
+    const ancho = areaDibujo?.clientWidth ?? 0;
+    if (!posRegla || !ancho) return;
+    if (posRegla.x > ancho * 0.6) setLadoCuadro('izquierda');
+    else if (posRegla.x < ancho * 0.4) setLadoCuadro('derecha');
+  }, [etiquetando, posRegla, areaDibujo]);
 
   const terminarEtiquetado = () => {
     setEtiquetando(false);
@@ -1566,13 +1709,23 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
       terminarEtiquetado();
       return;
     }
+    if (bloqueoEtiquetas) {
+      setAvisoBarra(bloqueoEtiquetas);
+      return;
+    }
     // Pausa la VISTA (como el zoom): los datos se siguen guardando.
     interaccion.alTomarControl();
-    setNombreEtiqueta(siguienteNombre(etiquetas));
+    // Para el aviso «esta variable no se historiza».
+    listarGrupos()
+      .then(setGruposHist)
+      .catch(() => setGruposHist(null));
+    setNombreEtiqueta(siguienteNombre(etq.etiquetas));
     setAvisoEtiqueta('');
     setEtiquetando(true);
   };
-  const guardarEtiqueta = () => {
+  const [guardandoEtiqueta, setGuardandoEtiqueta] = useState(false);
+  const guardarEtiqueta = async () => {
+    if (guardandoEtiqueta) return;
     const nombre = nombreEtiqueta.trim();
     if (!nombre) {
       setAvisoEtiqueta('Escribe un nombre antes de hacer clic en el gráfico.');
@@ -1589,24 +1742,32 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     const lecturas = dibujables.map(({ s, i }, k) => {
       const v = p.valores[k];
       return {
+        variable: ids[k] ?? s.variableId,
         nombre: nombreSerie(s.variableId, s.etiqueta, i),
         color: colorEfectivo(s.color, i, isDark),
         valor: v == null || !Number.isFinite(v) ? null : v,
         unidad: variables.find((x) => x.id === s.variableId)?.unit,
       };
     });
-    const nueva: EtiquetaTrend = {
-      id: `e${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`,
-      nombre,
-      t: p.t,
-      y: p.v,
-      color: p.color,
+    // Se guarda en el SERVIDOR (datos/etiquetas_trend.json), con su instante
+    // en UTC. Si falla, el cuadro se queda abierto diciendo por qué.
+    setGuardandoEtiqueta(true);
+    const fallo = await etq.crear({
+      widget: widget.id,
+      variable: p.variable,
       curva: p.nombre,
+      color: p.color,
+      nombre,
+      ts: new Date(p.t * 1000).toISOString(),
+      valor: p.v,
       lecturas,
-      visible: true,
-      expandida: false,
-    };
-    setEtiquetas((l) => [...l, nueva]);
+    });
+    setGuardandoEtiqueta(false);
+    if (fallo) {
+      setAvisoEtiqueta(`No se guardó: ${fallo}`);
+      return;
+    }
+    if (seHistoriza(p.variable) === false) setAvisoBarra(avisoNoHistorizada(p.nombre));
     terminarEtiquetado();
   };
   const guardarEtiquetaRef = useRef(guardarEtiqueta);
@@ -1638,19 +1799,68 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etiquetando]);
 
-  const alternarEtiqueta = (id: string) =>
-    setEtiquetas((l) => l.map((e) => (e.id === id ? { ...e, expandida: !e.expandida } : e)));
+  const alternarEtiqueta = (id: string) => etq.alternar(id);
+
+  /** Lo grabado en esta sesión (en vivo), en segundos. */
+  const rangoSesion = (): [number, number] | null => bufferRef.current?.rango() ?? null;
+  const fueraDeSesion = (e: EtiquetaTrend): boolean => {
+    if (esHistorico) return false;
+    const r = rangoSesion();
+    return !r || e.t < r[0] || e.t > r[1];
+  };
+
+  // ---- Filtro: aplicar y volver a en vivo ---- //
+  const aplicarFiltro = (f: FiltroTrend) => {
+    if (etiquetando) terminarEtiquetado();
+    // El zoom Y del modo anterior no vale para el otro.
+    yManualRef.current = null;
+    yDeEtiquetasRef.current = false;
+    yPorSinDatosRef.current = false;
+    guardarFiltro(widget.id, f);
+    setFiltro(f);
+    setModalFiltro(null);
+  };
+  const volverDelFiltro = () => {
+    if (etiquetando) terminarEtiquetado();
+    yManualRef.current = null;
+    yDeEtiquetasRef.current = false;
+    yPorSinDatosRef.current = false;
+    guardarFiltro(widget.id, null);
+    setFiltro(null);
+    // Al rehacerse el gráfico en vivo, que SIGA el presente.
+    siguiendoRef.current = true;
+    setSiguiendo(true);
+  };
+  const abrirFiltro = () =>
+    setModalFiltro(
+      filtroActivo ?? { grupoId: cfg.grupoId || '', limite: cfg.limiteSerie }
+    );
 
   /**
    * «Aplicar» de Mostrar/Ocultar: quedan visibles las marcadas y el gráfico
    * se lleva a ellas (a las 3 más recientes si son más), como el ejemplo.
    */
   const aplicarMostrar = (ids: Set<string>) => {
-    setEtiquetas((l) => l.map((e) => ({ ...e, visible: ids.has(e.id) })));
+    etq.mostrarSolo(ids);
     setModalEtiquetas(null);
     const elegidas = etiquetas.filter((e) => ids.has(e.id));
     const u = plot.current;
     if (!elegidas.length || !u) return;
+    // En vivo, si TODAS caen donde esta sesión no grabó (de hoy, pero de
+    // antes de abrir el preview), no hay datos a los que llevar el gráfico:
+    // se abre «Filtrar histórico» en esa hora.
+    if (puedeFiltrar && !esHistorico && elegidas.every(fueraDeSesion)) {
+      const t0 = Math.min(...elegidas.map((e) => e.t));
+      const t1 = Math.max(...elegidas.map((e) => e.t));
+      setModalFiltro({
+        grupoId: cfg.grupoId || '',
+        limite: cfg.limiteSerie,
+        rango: 'personalizado',
+        desdeLocal: aValorLocal((t0 - 300) * 1000),
+        hastaLocal: aValorLocal((t1 + 300) * 1000),
+      });
+      return;
+    }
     const recientes = [...elegidas].sort((a, b) => b.t - a.t).slice(0, 3);
     const primero = Math.min(...recientes.map((e) => e.t));
     const ultimo = Math.max(...recientes.map((e) => e.t));
@@ -1695,10 +1905,66 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     u.setScale('y', { min: lo - margen, max: hi + margen });
     u.setScale('x', encajar(centro - ancho / 2, centro + ancho / 2, interaccion.limites()));
   };
-  const aplicarEliminar = (ids: Set<string>) => {
-    setEtiquetas((l) => l.filter((e) => !ids.has(e.id)));
+  const aplicarEliminar = async (ids: Set<string>) => {
     setModalEtiquetas(null);
+    const fallo = await etq.borrar(ids);
+    if (fallo) setAvisoBarra(`No se pudo borrar: ${fallo}`);
   };
+
+  // ---- Sin datos del historizador pero con etiquetas: el eje Y a ellas ----
+  // Sin líneas, la escala Y no tiene de dónde salir y los puntos caerían
+  // fuera. Se encuadra en las etiquetas visibles (como «Mostrar/Ocultar»).
+  const sinDatosHist = esHistorico && !hist.cargando && hist.puntos === 0;
+
+  const firmaEtqVisibles = etiquetas
+    .filter((e) => e.visible)
+    .map((e) => `${e.id}:${e.y}`)
+    .join(',');
+  // Marca de que el Y lo puso ESTE caso (y no el operador con sus botones):
+  // si luego llegan datos, se suelta y vuelve la escala de los datos.
+  const yPorSinDatosRef = useRef(false);
+  const sinDatosRef = useRef(false);
+  sinDatosRef.current = sinDatosHist;
+  useEffect(() => {
+    const u = plot.current;
+    if (!sinDatosHist) {
+      // Llegaron datos: fuera el Y de las etiquetas, vuelve el de los datos.
+      if (yPorSinDatosRef.current && u && hist.puntos > 0) {
+        yPorSinDatosRef.current = false;
+        yManualRef.current = null;
+        yDeEtiquetasRef.current = false;
+        let mn = Infinity;
+        let mx = -Infinity;
+        for (let k = 1; k < u.data.length; k++) {
+          for (const v of u.data[k] as unknown as (number | null)[]) {
+            if (v == null || !Number.isFinite(v)) continue;
+            if (v < mn) mn = v;
+            if (v > mx) mx = v;
+          }
+        }
+        if (mn <= mx) u.setScale('y', { min: mn, max: mx });
+      }
+      return;
+    }
+    if (yManualRef.current) return;
+    // Un momento de margen: justo al aplicar el filtro, antes de que salga
+    // la petición, también hay «0 puntos» sin estar cargando.
+    const reloj = window.setTimeout(() => {
+      const vis = etiquetas.filter((e) => e.visible);
+      const uu = plot.current;
+      if (!sinDatosRef.current || yManualRef.current || !vis.length || !uu) return;
+      const lo = Math.min(...vis.map((e) => e.y));
+      const hi = Math.max(...vis.map((e) => e.y));
+      const margen = Math.max((hi - lo) * 0.25, Math.abs(hi) * 0.1, 1);
+      yManualRef.current = [lo - margen, hi + margen];
+      yDeEtiquetasRef.current = true;
+      yPorSinDatosRef.current = true;
+      uu.setScale('y', { min: lo - margen, max: hi + margen });
+      pedirRevVista();
+    }, 600);
+    return () => window.clearTimeout(reloj);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sinDatosHist, firmaEtqVisibles, hist.puntos]);
 
   // ---- Columna derecha: logo y herramientas ---------------------------- //
   //
@@ -1770,8 +2036,10 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
           etiquetas={{
             agregar: empezarEtiquetado,
             mostrar: () => setModalEtiquetas('mostrar'),
-            eliminar: () => setModalEtiquetas('eliminar'),
+            eliminar: () =>
+              bloqueoEtiquetas ? setAvisoBarra(bloqueoEtiquetas) : setModalEtiquetas('eliminar'),
             agregando: etiquetando,
+            bloqueo: interactivo ? bloqueoEtiquetas : undefined,
           }}
         />
       </div>
@@ -1927,6 +2195,68 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
         >
           {mensajeGrab || etiquetaVista}
         </span>
+
+        {/* ── FILTRAR EL HISTORIZADOR ── solo en la Vista Previa y si el
+            trend está configurado en vivo. Con el filtro puesto, el botón
+            pasa a «Volver a en vivo» y al lado queda el lápiz para cambiarlo. */}
+        {puedeFiltrar && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={filtroActivo ? volverDelFiltro : abrirFiltro}
+              title={
+                filtroActivo
+                  ? 'Quitar el filtro y volver a lo que está pasando ahora (se siguió grabando)'
+                  : 'Ver lo que guardó el historizador en un rango de fechas'
+              }
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                height: 24,
+                padding: '0 9px',
+                borderRadius: 999,
+                border: `1px solid ${filtroActivo ? tema.vivo : tema.borde}`,
+                background: filtroActivo ? `${tema.vivo}1f` : tema.chapa,
+                color: filtroActivo ? tema.vivo : fuerte,
+                fontSize: 10.5,
+                fontWeight: 700,
+                letterSpacing: 0.2,
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+              }}
+            >
+              {filtroActivo ? (
+                <RadioIcon style={{ width: 12, height: 12 }} />
+              ) : (
+                <HistoryIcon style={{ width: 12, height: 12 }} />
+              )}
+              {filtroActivo ? 'Volver a en vivo' : 'Filtrar histórico'}
+            </button>
+            {filtroActivo && (
+              <button
+                type="button"
+                onClick={abrirFiltro}
+                title="Cambiar el filtro (grupo, fechas, puntos)"
+                aria-label="Cambiar el filtro"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 24,
+                  height: 24,
+                  borderRadius: 999,
+                  border: `1px solid ${tema.borde}`,
+                  background: tema.chapa,
+                  color: fuerte,
+                  cursor: 'pointer',
+                }}
+              >
+                <PencilIcon style={{ width: 11, height: 11 }} />
+              </button>
+            )}
+          </div>
+        )}
 
         {duracionVista && !señalando && (
           <span
@@ -2191,7 +2521,37 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
         {/* En histórico, «no hay datos» no es lo mismo que «estoy esperando», y
             la salida es distinta: ahí no se espera, se cambia el rango o el
             grupo. Por eso tiene su propio mensaje y no el de arriba. */}
-        {esHistorico && !esperando && !hist.error && puntos === 0 && !sinSeries && (
+        {esHistorico && !esperando && !hist.error && puntos === 0 && !sinSeries &&
+          etiquetas.some((e) => e.visible) && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 6,
+              left: 10,
+              right: 10,
+              zIndex: 7,
+              padding: '6px 10px',
+              borderRadius: 6,
+              border: `1px solid ${tema.pausa}55`,
+              background: `${tema.pausa}14`,
+              color: tema.pausa,
+              fontSize: 11,
+              lineHeight: 1.45,
+              textAlign: 'center',
+              pointerEvents: 'none',
+            }}
+          >
+            {(() => {
+              const g = gruposEstado?.find((x) => x.grupo_id === grupoHist);
+              const nombre = g ? g.nombre || g.grupo_id : grupoHist;
+              return `El grupo ${nombre ? `«${nombre}»` : ''} no tiene datos en este rango` +
+                (g && !g.activo ? ' (está pausado)' : '') +
+                '. Las etiquetas se muestran con el valor que se guardó al ponerlas.';
+            })()}
+          </div>
+        )}
+        {esHistorico && !esperando && !hist.error && puntos === 0 && !sinSeries &&
+          !etiquetas.some((e) => e.visible) && (
           <div
             style={{
               position: 'absolute',
@@ -2209,14 +2569,14 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
             }}
           >
             <DatabaseIcon style={{ width: 16, height: 16, opacity: 0.6 }} />
-            {cfg.grupoId
+            {grupoHist
               ? 'No hay nada guardado en este rango.'
               : 'Elige un grupo del historizador en Propiedades.'}
             {/* La ventana REAL que se consultó, en UTC, que es como está la
                 tabla. Sin este renglón, «no hay nada» es indistinguible de
                 «pedí otra hora sin darme cuenta» — y con cinco horas de
                 diferencia horaria, lo segundo pasa constantemente. */}
-            {cfg.grupoId && ventanaHist.desde && ventanaHist.hasta && (
+            {grupoHist && ventanaHist.desde && ventanaHist.hasta && (
               <span style={{ fontSize: 10, opacity: 0.7, fontFamily: 'monospace' }}>
                 {ventanaHist.desde.slice(0, 19).replace('T', ' ')} →{' '}
                 {ventanaHist.hasta.slice(0, 19).replace('T', ' ')} UTC
@@ -2290,6 +2650,7 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
             caja de valores ya no puede asomar fuera de la zona del gráfico. */}
         {cfg.mostrarRegla &&
           interactivo &&
+          !sobreEtiqueta &&
           posRegla &&
           areaDibujo &&
           señalando &&
@@ -2316,6 +2677,8 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
             tema={tema}
             fuerte={fuerte}
             onAlternar={alternarEtiqueta}
+            atravesable={etiquetando}
+            onSobre={setSobreEtiqueta}
           />
         )}
         {etiquetando && areaDibujo && puntoEtiqueta && (
@@ -2332,10 +2695,16 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
             fuerte={fuerte}
             valor={nombreEtiqueta}
             onCambiar={setNombreEtiqueta}
+            lado={ladoCuadro}
             ayuda={
               avisoEtiqueta ||
-              (puntoEtiqueta
-                ? `Haz clic para guardar la etiqueta sobre ${puntoEtiqueta.nombre}.`
+              (guardandoEtiqueta
+                ? 'Guardando…'
+                : puntoEtiqueta
+                ? `Haz clic para guardar la etiqueta sobre ${puntoEtiqueta.nombre}.` +
+                  (seHistoriza(puntoEtiqueta.variable) === false
+                    ? ` ${avisoNoHistorizada(puntoEtiqueta.nombre)}`
+                    : '')
                 : 'Acércate a una de las líneas para guardar la etiqueta.')
             }
             onCancelar={terminarEtiquetado}
@@ -2349,6 +2718,34 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
             fuerte={fuerte}
             onAceptar={modalEtiquetas === 'mostrar' ? aplicarMostrar : aplicarEliminar}
             onCerrar={() => setModalEtiquetas(null)}
+            notaDe={(e) =>
+              fueraDeSesion(e)
+                ? 'Fuera de lo grabado en esta sesión: al mostrarla se abre «Filtrar histórico» en esa hora.'
+                : ''
+            }
+            vacio={
+              esHistorico
+                ? 'No hay etiquetas en este rango.'
+                : 'No hay etiquetas de hoy en este trend. Las de otros días se ven con «Filtrar histórico».'
+            }
+          />
+        )}
+        {modalFiltro && (
+          <ModalFiltroHistorico
+            tema={tema}
+            fuerte={fuerte}
+            ids={ids}
+            nombreDe={(id) => {
+              const k = dibujables.findIndex(({ s }) => s.variableId === id);
+              return k >= 0
+                ? nombreSerie(id, dibujables[k].s.etiqueta, dibujables[k].i)
+                : variables.find((v) => v.id === id)?.name || id;
+            }}
+            inicial={modalFiltro}
+            grupoPorDefecto={cfg.grupoId}
+            limitePorDefecto={cfg.limiteSerie}
+            onAplicar={aplicarFiltro}
+            onCerrar={() => setModalFiltro(null)}
           />
         )}
       </div>

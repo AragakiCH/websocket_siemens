@@ -109,10 +109,13 @@ function Boton({
   titulo,
   activo,
   aviso,
+  bloqueado,
 }: {
   tema: TemaGrafico;
   /** Resaltado en ámbar (p. ej. «Reanudar» mientras está pausado). */
   aviso?: boolean;
+  /** Apagado por un motivo (p. ej. «Solo Supervisor»): se ve y lo explica. */
+  bloqueado?: string;
   /** Pulsado (p. ej. «Agregar etiqueta» mientras se coloca). */
   activo?: boolean;
   /** Sin él, el botón es solo diseño («Próximamente»). */
@@ -129,8 +132,9 @@ function Boton({
   return (
     <button
       type="button"
-      title={onClick ? titulo : PROXIMAMENTE}
-      onClick={onClick}
+      title={bloqueado || (onClick ? titulo : PROXIMAMENTE)}
+      onClick={bloqueado ? undefined : onClick}
+      aria-disabled={bloqueado ? true : undefined}
       aria-pressed={activo || undefined}
       onPointerEnter={() => setEncima(true)}
       onPointerLeave={() => setEncima(false)}
@@ -158,8 +162,8 @@ function Boton({
         lineHeight: 1.15,
         whiteSpace: 'nowrap',
         overflow: 'hidden',
-        cursor: onClick ? 'pointer' : 'default',
-        opacity: onClick ? 1 : 0.6,
+        cursor: bloqueado ? 'not-allowed' : onClick ? 'pointer' : 'default',
+        opacity: bloqueado ? 0.45 : onClick ? 1 : 0.6,
         transition: 'background .12s',
       }}
     >
@@ -203,6 +207,8 @@ export interface AccionesEtiquetas {
   eliminar: () => void;
   /** Se está colocando una: el botón se ve pulsado. */
   agregando: boolean;
+  /** Si no puede crear ni borrar (no es Supervisor), el motivo. */
+  bloqueo?: string;
 }
 
 export interface AccionesDetener {
@@ -255,6 +261,7 @@ function PanelHerramientas({
       ) : (
         <Boton tema={tema} ancho icono={<IcoPausa />} texto="Detener"
           onClick={detener?.alternar}
+          bloqueado={detener ? undefined : 'No disponible mientras se ve el histórico'}
           titulo="Congelar la vista (los datos se siguen grabando)" />
       )}
 
@@ -288,12 +295,12 @@ function PanelHerramientas({
 
       <Rotulo tema={tema}>Etiquetas</Rotulo>
       <Boton tema={tema} ancho icono={<IcoMasCirculo />} texto="Agregar etiqueta"
-        onClick={etiquetas?.agregar} activo={etiquetas?.agregando}
+        onClick={etiquetas?.agregar} activo={etiquetas?.agregando} bloqueado={etiquetas?.bloqueo}
         titulo={etiquetas?.agregando ? 'Cancelar la etiqueta' : 'Poner una etiqueta en el gráfico'} />
       <Boton tema={tema} ancho icono={<EyeIcon size={15} />} texto="Mostrar/Ocultar"
         onClick={etiquetas?.mostrar} titulo="Elegir qué etiquetas se ven" />
       <Boton tema={tema} ancho icono={<Trash2Icon size={14} />} texto="Eliminar etiqueta"
-        onClick={etiquetas?.eliminar} titulo="Borrar etiquetas" />
+        onClick={etiquetas?.eliminar} titulo="Borrar etiquetas" bloqueado={etiquetas?.bloqueo} />
     </div>
   );
 }
