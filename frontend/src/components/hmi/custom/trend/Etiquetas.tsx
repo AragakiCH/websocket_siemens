@@ -16,7 +16,8 @@
 //   app/api/etiquetas_trend_routes.py), que es la fuente de verdad: en vivo
 //   se ven las de HOY de ese trend; filtrando el historizador, las del rango.
 //   Crear y borrar es solo para Supervisor. En el navegador solo queda qué se
-//   ve y qué está desplegado (`sessionStorage`), que es de cada pantalla.
+//   ve y qué está desplegado (`localStorage`): sobrevive a cerrar el preview,
+//   igual que los datos del trend, así que lo que se ocultó sigue oculto.
 //   Las que antes vivían solo en `sessionStorage` (useEtiquetasGuardadas) ya
 //   no se usan.
 //
@@ -71,11 +72,15 @@ export interface EtiquetaTrend {
 // ─── En el servidor ───────────────────────────────────────────────
 
 type EstadoUI = Record<string, { v?: boolean; x?: boolean }>;
-const claveUI = (widgetId: string) => `hmi.trend.etiquetasUI.${widgetId}`;
+// En `localStorage` y no en `sessionStorage`: los datos del trend ya
+// sobreviven a cerrar el preview, y una etiqueta que se ocultó no debe volver
+// a salir sola al abrirlo otra vez. (Prefijo distinto de `hmi.trend.etiquetas.`,
+// que es lo que `sesionTrend()` borra de la versión vieja.)
+const claveUI = (widgetId: string) => `hmi.trend.vistaEtiquetas.${widgetId}`;
 
 function leerUI(widgetId: string): EstadoUI {
   try {
-    const d = JSON.parse(sessionStorage.getItem(claveUI(widgetId)) ?? '{}');
+    const d = JSON.parse(localStorage.getItem(claveUI(widgetId)) ?? '{}');
     return d && typeof d === 'object' && !Array.isArray(d) ? d : {};
   } catch {
     return {};
@@ -83,7 +88,7 @@ function leerUI(widgetId: string): EstadoUI {
 }
 function guardarUI(widgetId: string, ui: EstadoUI): void {
   try {
-    sessionStorage.setItem(claveUI(widgetId), JSON.stringify(ui));
+    localStorage.setItem(claveUI(widgetId), JSON.stringify(ui));
   } catch {
     /* sin almacenamiento: queda en memoria */
   }
@@ -579,44 +584,91 @@ export function PuntoEtiqueta({
 }
 
 // ─── El cuadro del nombre (arriba a la derecha del gráfico) ───────
+//
+// POR QUÉ VA DENTRO DEL ÁREA DE DIBUJO Y REENVÍA EL RATÓN
+// Antes iba encima del gráfico pero FUERA de `.u-over`. uPlot solo atiende
+// el movimiento cuyo destino es `.u-over` mismo (`filtTarg`: `e.target ==
+// over`), así que al pasar el puntero sobre el cuadro la regla y el punto se
+// quedaban clavados en su borde. Para esquivarlo, el cuadro saltaba a la
+// izquierda al pasar la regla del 60 %… pero la regla se trababa ANTES de
+// llegar ahí (con un gráfico de menos de ~650 px, siempre), y no había forma
+// de poner una etiqueta a la derecha.
+//
+// Ahora el cuadro está siempre a la derecha, dentro de `.u-over` (portal), y
+// su `mousemove` se le pasa a uPlot a mano (`onMoverRaton`): la regla y el
+// punto siguen corriendo por DEBAJO. Mientras el ratón está sobre el fondo
+// del cuadro, este se vuelve casi transparente para ver dónde se apunta, y
+// un clic en el fondo guarda la etiqueta ahí debajo (`onClicFondo`). En el
+// campo y en el botón se comporta como siempre.
 
 export function CuadroNombre({
+  area,
   tema,
   fuerte,
   valor,
   onCambiar,
   ayuda,
   onCancelar,
-  lado = 'derecha',
+  onMoverRaton,
+  onClicFondo,
 }: {
+  /** `.u-over` de uPlot: el cuadro se monta dentro (ver arriba). */
+  area: HTMLDivElement;
   tema: TemaGrafico;
   fuerte: string;
   valor: string;
   onCambiar: (v: string) => void;
   ayuda: string;
   onCancelar: () => void;
-  /** Se pasa al otro lado cuando el ratón se acerca, para no tapar la zona donde se quiere poner la etiqueta. */
-  lado?: 'derecha' | 'izquierda';
+  /** El ratón se movió sobre el cuadro: hay que mover el cursor de uPlot. */
+  onMoverRaton: (e: React.MouseEvent) => void;
+  /** Clic en el fondo del cuadro: guardar la etiqueta en lo que hay debajo. */
+  onClicFondo: () => void;
 }) {
-  return (
+  const [encima, setEncima] = useState(false);
+  const [enControl, setEnControl] = useState(false);
+  const transparente = encima && !enControl;
+  const control = {
+    onMouseEnter: () => setEnControl(true),
+    onMouseLeave: () => setEnControl(false),
+  };
+  return createPortal(
     <div
       data-trend-ui
+      onMouseMove={onMoverRaton}
+      onMouseEnter={() => setEncima(true)}
+      onMouseLeave={() => {
+        setEncima(false);
+        setEnControl(false);
+      }}
+      onClick={(e) => {
+        const el = e.target as HTMLElement;
+        if (el.closest('input, button, label')) return;
+        onClicFondo();
+      }}
       style={{
         position: 'absolute',
         top: 8,
-        right: lado === 'derecha' ? 10 : undefined,
-        left: lado === 'izquierda' ? 64 : undefined,
+        right: 8,
         zIndex: 20,
-        width: 250,
+        width: Math.min(250, Math.max(160, area.clientWidth - 16)),
+        boxSizing: 'border-box',
         padding: '10px 12px',
         borderRadius: 8,
         border: `1px solid ${tema.borde}`,
         background: tema.superficie,
         boxShadow: '0 8px 24px rgba(15,23,42,0.2)',
         fontFamily: 'Inter, system-ui, Arial, sans-serif',
+        // Con el ratón en el fondo se ve lo de debajo (la regla y el punto).
+        opacity: transparente ? 0.28 : 1,
+        transition: 'opacity .12s',
+        cursor: transparente ? 'copy' : 'default',
       }}
     >
-      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: fuerte, marginBottom: 5 }}>
+      <label
+        {...control}
+        style={{ display: 'block', fontSize: 11, fontWeight: 700, color: fuerte, marginBottom: 5 }}
+      >
         Nombre de la etiqueta
         <input
           autoFocus
@@ -642,6 +694,7 @@ export function CuadroNombre({
       <p style={{ margin: '6px 0 7px', fontSize: 10.5, lineHeight: 1.4, color: tema.tintaSuave }}>{ayuda}</p>
       <button
         type="button"
+        {...control}
         onClick={onCancelar}
         style={{
           padding: '3px 9px',
@@ -655,7 +708,8 @@ export function CuadroNombre({
       >
         Cancelar (Esc)
       </button>
-    </div>
+    </div>,
+    area
   );
 }
 

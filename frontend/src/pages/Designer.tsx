@@ -402,6 +402,8 @@ export function Designer() {
   // hidratación leería justo eso.
   const [errorGuardado, setErrorGuardado] = useState<string>('');
   const cargada = pantallaCargada === projectId;
+  // La lista de parámetros del tipo de faceplate (para bajar al añadir uno).
+  const listaParamsRef = useRef<HTMLDivElement | null>(null);
   // ── Tipo de faceplate ─────────────────────────────────────────
   //
   // La declaración sale de la LISTA de pantallas, que ya la trae. Un estado
@@ -1691,6 +1693,12 @@ export function Designer() {
                         vez de a una variable.
                       </p>
 
+                      {/* Con SCROLL a partir de ~15 parámetros: este panel no
+                          tiene scroll propio, y con 30 la lista se salía por
+                          abajo sin forma de llegar al final. */}
+                      <div
+                    ref={listaParamsRef}
+                    className="mp-scroll mp-scroll-dark max-h-[480px] space-y-1.5 overflow-y-auto pr-1">
                       {fp.parametros.map((p, i) =>
                     <div key={i} className="flex items-center gap-1">
                           <input
@@ -1722,6 +1730,7 @@ export function Designer() {
                           </button>
                         </div>
                     )}
+                      </div>
 
                       {/* El id se deriva del nombre y NO se puede editar: es
                           lo que los widgets guardan dentro (`param:marcha`),
@@ -1738,6 +1747,12 @@ export function Designer() {
                           ...fp.parametros,
                           { id: `p${n}`, nombre: `Parámetro ${n}`, tipo: 'double' }]
 
+                        });
+                        // El nuevo cae al final de la lista, que con scroll
+                        // puede quedar fuera de la vista: se baja hasta él.
+                        requestAnimationFrame(() => {
+                          const el = listaParamsRef.current;
+                          if (el) el.scrollTop = el.scrollHeight;
                         });
                       }}
                       className="w-full rounded-lg border border-dashed border-slate-300 px-2 py-1 text-[11px] text-slate-500 transition hover:border-siemens hover:text-siemens disabled:cursor-not-allowed disabled:opacity-40 dark:border-navy-slate dark:text-slate-400">

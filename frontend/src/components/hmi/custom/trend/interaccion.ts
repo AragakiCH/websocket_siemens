@@ -76,6 +76,14 @@ export interface OpcionesInteraccion {
   alTomarControl: () => void;
   /** Volvió al extremo derecho: se puede seguir en vivo otra vez. */
   alVolverAlBorde: () => void;
+  /**
+   * Doble clic. Opcional: sin él, hace lo de siempre (`alVolverAlBorde`).
+   * Existe porque en histórico `alVolverAlBorde` no hace nada —no hay
+   * presente al que volver— y el doble clic debe devolver la vista inicial.
+   * No se cambia `alVolverAlBorde` para eso porque también lo llama el
+   * desplazamiento al tocar el borde derecho, y ahí no hay que reencuadrar.
+   */
+  alDobleClic?: () => void;
 }
 
 function acotarSpan(span: number): number {
@@ -336,7 +344,7 @@ export function pluginInteraccion(o: OpcionesInteraccion): uPlot.Plugin {
           }
         };
 
-        const doble = () => o.alVolverAlBorde();
+        const doble = () => (o.alDobleClic ? o.alDobleClic() : o.alVolverAlBorde());
 
         over.addEventListener('pointerdown', abajo);
         over.addEventListener('pointermove', mover);

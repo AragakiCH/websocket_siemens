@@ -51,7 +51,16 @@
 import { useEffect, useRef } from 'react';
 import type { PlcVariable } from '../../../../models/plc';
 import { RealPLCService } from '../../../../services/RealPLCService';
-import { guardarBuffer, leerBuffer } from './sesionTrend';
+import {
+  RETENCION_MAX_S,
+  SEG_BLOQUE,
+  borrarBloquesAntes,
+  guardarBloque,
+  horaDe,
+  leerBloques,
+  pedirEscritura,
+  type RegistroBuffer,
+} from './sesionTrend';
 
 /** Tope duro de muestras. Protege la memoria del navegador. */
 export const MAX_PUNTOS = 120_000;
@@ -107,9 +116,9 @@ export class BufferTrend {
    * y se corta de una vez. El margen NUNCA hace que se pierda dato que la
    * pantalla todavía puede pedir: solo retrasa la limpieza de lo ya caducado.
    */
-  podar(retencionSeg: number, maxPuntos: number = MAX_PUNTOS): void {
+  podar(retencionSeg: number, maxPuntos: number = MAX_PUNTOS): number {
     const n = this.t.length;
-    if (n === 0) return;
+    if (n === 0) return 0;
 
     const corte = this.t[n - 1] - retencionSeg;
     let caducadas = 0;
@@ -120,10 +129,11 @@ export class BufferTrend {
     // del tope duro (eso sí es inmediato: es la memoria del navegador).
     const porRetencion = caducadas >= 500 || caducadas > n * 0.1 ? caducadas : 0;
     const cuantas = Math.max(porRetencion, exceso);
-    if (cuantas <= 0) return;
+    if (cuantas <= 0) return 0;
 
     this.t.splice(0, cuantas);
     for (const col of this.cols.values()) col.splice(0, cuantas);
+    return cuantas;
   }
 
   /**
@@ -284,63 +294,227 @@ function useBufferLocal(
 
 
 // =========================================================================
-// GRABADORES DE SESIÓN (Vista Previa)
+// GRABADORES DE LA VISTA PREVIA
 //
-// El búfer de un Trend ya no vive DENTRO del widget en la Vista Previa: vive
+// El búfer de un Trend no vive DENTRO del widget en la Vista Previa: vive
 // aquí, uno por Trend, mientras la ventana siga abierta. Por eso:
 //
 //   * Cambiar de sección o de pantalla (el widget se desmonta) NO borra lo
-//     graficado, y el grabador SIGUE muestreando aunque no se esté viendo:
-//     al volver no hay hueco.
-//   * Cada 2 s se copia a IndexedDB con la llave de la sesión, así que al
-//     RECARGAR (F5) se recupera. Cerrar la ventana empieza una sesión nueva
-//     y lo viejo se borra (ver sesionTrend.ts).
+//     graficado, y el grabador SIGUE muestreando aunque no se esté viendo.
+//   * Se guarda en IndexedDB por bloques de una hora (ver sesionTrend.ts), y
+//     ya NO es de la sesión: cerrar el preview y volver a abrirlo recupera lo
+//     de antes, con un hueco donde estuvo cerrado. Dura lo que diga «Memoria
+//     para retroceder», hasta 7 días.
 //
 // Los valores llegan directamente de `RealPLCService.subscribe`, que es lo
 // mismo que alimenta `useAppStore().variables`: no hace falta React para
 // seguir grabando.
+//
+// ── LO VIEJO SE COMPACTA ────────────────────────────────────────────────
+// Con señales que publican cada 100 ms, un día son ~860 000 filas por Trend:
+// demasiado para la memoria del navegador y para redibujar. Así que:
+//
+//   * Los últimos `COMPLETO_S` (15 min) se guardan COMPLETOS.
+//   * Lo anterior se resume, cada `CUBETA_S` (5 s), en DOS filas: el mínimo y
+//     el máximo de cada variable. Los picos NO se pierden —un pico es justo
+//     el máximo de su cubeta—; lo que se pierde es el detalle de dentro de
+//     esos 5 s. Siete días caben así en ~250 000 filas.
+//   * Un HUECO (una fila toda `null`: preview cerrado, WebSocket caído) se
+//     conserva tal cual: el resumen se hace por TRAMOS entre huecos, nunca a
+//     través de uno. Si no, el corte desaparecería y la línea uniría el antes
+//     y el después como si no hubiera pasado nada.
 // =========================================================================
+
+/** Lo que se guarda a resolución completa, en segundos. */
+export const COMPLETO_S = 900;
+/** Ancho de cada cubeta del resumen, en segundos. */
+export const CUBETA_S = 5;
+/** Cada cuánto se compacta, en ms. */
+const COMPACTAR_CADA_MS = 30_000;
+/**
+ * Tope de filas de un grabador. Más alto que `MAX_PUNTOS` porque aquí lo viejo
+ * va compactado: 7 días a 2 filas cada 5 s son ~242 000, más 15 min completos.
+ */
+export const MAX_PUNTOS_GRABADOR = 300_000;
 
 const GUARDAR_CADA_MS = 2000;
 
+/** ¿Es una fila de hueco (todas las variables sin valor)? */
+function esHueco(b: BufferTrend, i: number): boolean {
+  for (const col of b.cols.values()) if (col[i] != null) return false;
+  return true;
+}
+
+/**
+ * Resume en min/máx por cubeta las filas con `desde <= t < hasta`.
+ * Devuelve el primer y último instante tocados (para saber qué bloques
+ * reescribir), o `null` si no había nada que resumir.
+ *
+ * ES IDEMPOTENTE: resumir algo ya resumido deja lo mismo (un tramo de dos
+ * filas min/máx vuelve a dar ese mínimo y ese máximo en los mismos
+ * instantes). Por eso tras cargar lo guardado se puede volver a pasar por
+ * todo sin miedo.
+ */
+export function compactar(
+  b: BufferTrend,
+  desde: number,
+  hasta: number
+): [number, number] | null {
+  const t = b.t;
+  const n = t.length;
+  let i0 = 0;
+  while (i0 < n && t[i0] < desde) i0++;
+  let i1 = i0;
+  while (i1 < n && t[i1] < hasta) i1++;
+  if (i1 - i0 < 3) return null;
+
+  const ids = Array.from(b.cols.keys());
+  const cols = ids.map((id) => b.cols.get(id)!);
+  const nT: number[] = [];
+  const nC: (number | null)[][] = ids.map(() => []);
+
+  /** Emite el tramo [a, z] (índices) de una misma cubeta, sin huecos. */
+  const emitir = (a: number, z: number) => {
+    if (z - a < 2) {
+      // 1 o 2 filas: ya son lo mínimo, se copian tal cual.
+      for (let i = a; i <= z; i++) {
+        nT.push(t[i]);
+        cols.forEach((c, k) => nC[k].push(c[i]));
+      }
+      return;
+    }
+    nT.push(t[a], t[z]);
+    cols.forEach((c, k) => {
+      let mn = Infinity;
+      let mx = -Infinity;
+      for (let i = a; i <= z; i++) {
+        const v = c[i];
+        if (v == null) continue;
+        if (v < mn) mn = v;
+        if (v > mx) mx = v;
+      }
+      if (mn === Infinity) nC[k].push(null, null);
+      else nC[k].push(mn, mx);
+    });
+  };
+
+  let i = i0;
+  while (i < i1) {
+    if (esHueco(b, i)) {
+      nT.push(t[i]);
+      nC.forEach((c) => c.push(null));
+      i++;
+      continue;
+    }
+    // Un tramo: misma cubeta y sin hueco por medio.
+    const cubeta = Math.floor(t[i] / CUBETA_S);
+    let z = i;
+    while (z + 1 < i1 && Math.floor(t[z + 1] / CUBETA_S) === cubeta && !esHueco(b, z + 1)) z++;
+    emitir(i, z);
+    i = z + 1;
+  }
+
+  if (nT.length === i1 - i0) return null; // no se ganó nada
+  b.t = t.slice(0, i0).concat(nT, t.slice(i1));
+  ids.forEach((id, k) => {
+    const c = cols[k];
+    b.cols.set(id, c.slice(0, i0).concat(nC[k], c.slice(i1)));
+  });
+  return [t[i0], t[i1 - 1]];
+}
+
 interface Grabador {
+  clave: string;
   buffer: BufferTrend;
   ids: string[];
   retencion: number;
   vigentes: Map<string, number | null>;
   ultimoPush: number;
   oyentes: Set<(b: BufferTrend) => void>;
-  sucio: boolean;
+  /** Horas (bloques) con cambios sin guardar. */
+  sucios: Set<number>;
+  /** Hasta dónde (s) ya está compactado. */
+  compactoHasta: number;
+  ultimaCompactacion: number;
+  /** Primera hora que sigue existiendo tras podar: lo anterior se borra. */
+  borrarAntesDe: number | null;
+  /** ¿Es esta ventana la que escribe en IndexedDB? Ver `pedirEscritura`. */
+  escritor: boolean;
 }
 
 const grabadores = new Map<string, Grabador>();
 
+/** Marca como sucias las horas de [t0, t1]. */
+function ensuciar(g: Grabador, t0: number, t1: number): void {
+  for (let h = horaDe(t0); h <= horaDe(t1); h++) g.sucios.add(h);
+}
+
+function podarGrabador(g: Grabador): void {
+  const antes = g.buffer.t[0];
+  if (g.buffer.podar(g.retencion, MAX_PUNTOS_GRABADOR) > 0) {
+    const primero = g.buffer.t[0];
+    if (primero !== undefined) {
+      // El bloque donde ahora empieza quedó a medias: se reescribe. Los de
+      // antes, enteros fuera de la memoria, se borran.
+      g.sucios.add(horaDe(primero));
+      if (antes === undefined || horaDe(antes) < horaDe(primero)) {
+        g.borrarAntesDe = horaDe(primero);
+      }
+    }
+  }
+}
+
+function compactarGrabador(g: Grabador, ahora: number): void {
+  g.ultimaCompactacion = ahora;
+  const b = g.buffer;
+  if (!b.t.length) return;
+  const hasta = Math.floor((b.t[b.t.length - 1] - COMPLETO_S) / CUBETA_S) * CUBETA_S;
+  if (hasta <= g.compactoHasta) return;
+  const tocado = compactar(b, g.compactoHasta, hasta);
+  g.compactoHasta = hasta;
+  if (tocado) ensuciar(g, tocado[0], tocado[1]);
+}
+
 function muestrearGrabador(g: Grabador, valores: Map<string, number | null>): void {
   const ahora = Date.now();
   g.buffer.push(ahora / 1000, valores);
-  g.buffer.podar(g.retencion);
+  g.sucios.add(horaDe(ahora / 1000));
+  podarGrabador(g);
+  if (ahora - g.ultimaCompactacion > COMPACTAR_CADA_MS) compactarGrabador(g, ahora);
   g.ultimoPush = ahora;
-  g.sucio = true;
   g.oyentes.forEach((f) => f(g.buffer));
 }
 
-/** Mete lo recuperado de IndexedDB DELANTE de lo que ya se haya grabado. */
-function fundir(g: Grabador, r: { t: number[]; cols: Record<string, (number | null)[]> }): void {
+/**
+ * Mete lo recuperado de IndexedDB DELANTE de lo que ya se haya grabado, con
+ * una fila de HUECO entre medias: entre lo de antes y lo de ahora el preview
+ * estuvo cerrado y no se grabó nada, y sin esa fila uPlot uniría el último
+ * punto de antes con el primero de ahora con una recta que nunca existió.
+ */
+function fundir(g: Grabador, r: RegistroBuffer): void {
   const b = g.buffer;
   const primero = b.t.length ? b.t[0] : Infinity;
   let n = 0;
   while (n < r.t.length && r.t[n] < primero) n++;
   if (n === 0) return;
   const tViejo = r.t.slice(0, n);
+  const hueco = tViejo[n - 1] + 0.001;
+  const conHueco = hueco < primero;
+  if (conHueco) tViejo.push(hueco);
   const ids = new Set([...b.cols.keys(), ...Object.keys(r.cols)]);
   for (const id of ids) {
     const viejo = (r.cols[id] ?? []).slice(0, n);
     while (viejo.length < n) viejo.push(null);
+    if (conHueco) viejo.push(null);
     const actual = b.cols.get(id) ?? new Array(b.t.length).fill(null);
     b.cols.set(id, viejo.concat(actual));
   }
   b.t = tViejo.concat(b.t);
-  b.podar(g.retencion);
+  // Se quita lo que ya caducó y se vuelve a compactar TODO (es idempotente):
+  // los últimos 15 min de la vez anterior llegan completos y ya son viejos.
+  podarGrabador(g);
+  g.compactoHasta = 0;
+  compactarGrabador(g, Date.now());
 }
 
 /**
@@ -368,23 +542,54 @@ function tomarValores(g: Grabador, vars: PlcVariable[]): void {
   muestrearGrabador(g, valores);
 }
 
+/** Las filas de una hora, copiadas, tal como se guardan en un bloque. */
+function bloqueDe(b: BufferTrend, hora: number): RegistroBuffer {
+  const ini = hora * SEG_BLOQUE;
+  const fin = ini + SEG_BLOQUE;
+  const t = b.t;
+  let lo = 0;
+  let hi = t.length;
+  while (lo < hi) {
+    const m = (lo + hi) >> 1;
+    if (t[m] < ini) lo = m + 1;
+    else hi = m;
+  }
+  let z = lo;
+  while (z < t.length && t[z] < fin) z++;
+  const cols: Record<string, (number | null)[]> = {};
+  for (const [id, col] of b.cols) cols[id] = col.slice(lo, z);
+  return { t: t.slice(lo, z), cols };
+}
+
 function crearGrabador(clave: string): Grabador {
   const g: Grabador = {
+    clave,
     buffer: new BufferTrend(),
     ids: [],
     retencion: 1800,
     vigentes: new Map(),
     ultimoPush: 0,
     oyentes: new Set(),
-    sucio: false,
+    sucios: new Set(),
+    compactoHasta: 0,
+    ultimaCompactacion: Date.now(),
+    borrarAntesDe: null,
+    escritor: false,
   };
 
-  // Lo que se grabó antes de recargar.
-  void leerBuffer(clave).then((r) => {
-    if (!r) return;
+  // Lo que se grabó antes de cerrar (o de recargar).
+  void leerBloques(clave).then((r) => {
+    if (!r || !r.t.length) return;
     fundir(g, r);
     if (g.ids.length) g.buffer.sincronizar(g.ids);
     g.oyentes.forEach((f) => f(g.buffer));
+  });
+
+  // Solo UNA ventana escribe este Trend. La que llega segunda graba en
+  // memoria y toma el relevo si la otra se cierra.
+  pedirEscritura(clave, () => {
+    g.escritor = true;
+    g.sucios.add(horaDe(Date.now() / 1000));
   });
 
   // Valores nuevos: lo mismo que hacía el efecto de `useBufferLocal`.
@@ -402,13 +607,20 @@ function crearGrabador(clave: string): Grabador {
     muestrearGrabador(g, fila);
   }, LATIDO_MS);
 
-  // Copia para sobrevivir a F5.
+  // Copia a IndexedDB: solo los bloques que cambiaron.
   const guardar = () => {
-    if (!g.sucio || !g.buffer.t.length) return;
-    g.sucio = false;
-    const cols: Record<string, (number | null)[]> = {};
-    for (const [id, col] of g.buffer.cols) cols[id] = col;
-    void guardarBuffer(clave, { t: g.buffer.t, cols });
+    if (!g.escritor) {
+      g.sucios.clear();
+      return;
+    }
+    if (g.borrarAntesDe != null) {
+      void borrarBloquesAntes(clave, g.borrarAntesDe);
+      g.borrarAntesDe = null;
+    }
+    if (!g.sucios.size) return;
+    const horas = Array.from(g.sucios);
+    g.sucios.clear();
+    for (const h of horas) void guardarBloque(clave, h, bloqueDe(g.buffer, h));
   };
   setInterval(guardar, GUARDAR_CADA_MS);
   try {
@@ -434,7 +646,7 @@ function useBufferDeSesion(
       g = crearGrabador(clave);
       grabadores.set(clave, g);
     }
-    g.retencion = retencionSeg;
+    g.retencion = Math.min(RETENCION_MAX_S, retencionSeg);
   }
   const idsClave = ids.join('|');
 

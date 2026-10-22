@@ -38,7 +38,9 @@
 // DE DÓNDE SALEN LOS DATOS
 // De las variables que llegan por WebSocket. El widget guarda `retencionSeg`
 // en memoria y enseña `ventanaSeg`: la diferencia es lo que se puede recorrer
-// hacia atrás. Nada va a disco — para mirar días atrás está el historizador.
+// hacia atrás. En la Vista Previa eso además se guarda en el navegador (hasta
+// 7 días, ver buffer.ts) y sobrevive a cerrarla; para datos compartidos entre
+// equipos o de semanas está el historizador.
 //
 // LOS GESTOS SOLO VAN EN LA VISTA PREVIA
 // En el lienzo del Diseñador el arrastre sirve para COLOCAR el widget. Si el
@@ -82,6 +84,8 @@ import { listarGrupos, type GrupoHistorico } from '../../../../services/historic
 import { useDescargaHistorico, useGrabacionTrend } from './grabacion';
 import { partirId } from '../../../../services/escrituraApi';
 import { ColumnaTrend } from './ColumnaTrend';
+import { RETENCION_MAX_S } from './sesionTrend';
+import { SelectorVariableTrend } from './SelectorVariableTrend';
 import {
   CapaEtiquetas,
   CuadroNombre,
@@ -320,6 +324,31 @@ export const UNIDADES_DURACION = [
 ] as const;
 
 /**
+ * Unidades de la memoria personalizada. Llega a días porque la memoria puede
+ * ser de hasta 7: «3 días» se lee, «259200 segundos» no.
+ */
+export const UNIDADES_MEMORIA = [
+  { v: 60, t: 'minutos' },
+  { v: 3600, t: 'horas' },
+  { v: 86_400, t: 'días' },
+] as const;
+
+/** La unidad más grande que da un número redondo (mínimo, minutos). */
+export function unidadMemoriaDe(segundos: number): number {
+  if (segundos > 0 && segundos % 86_400 === 0) return 86_400;
+  if (segundos > 0 && segundos % 3600 === 0) return 3600;
+  return 60;
+}
+
+/** «3 días», «12 h», «90 min». */
+function fmtMemoria(seg: number): string {
+  if (seg >= 86_400 && seg % 86_400 === 0) return `${seg / 86_400} día${seg === 86_400 ? '' : 's'}`;
+  if (seg >= 86_400) return `${(seg / 86_400).toFixed(1)} días`;
+  if (seg >= 3600) return `${+(seg / 3600).toFixed(1)} h`;
+  return `${Math.round(seg / 60)} min`;
+}
+
+/**
  * En qué unidad conviene ENSEÑAR una duración dada en segundos.
  *
  * Se elige la mayor que dé un número redondo: 7200 se lee «2 horas», pero
@@ -349,7 +378,12 @@ export function leerConfigTrend(config: any): ConfigTrend {
   // que la pantalla todavía tiene que enseñar. Los proyectos guardados antes
   // de que existiera este campo entran por aquí y salen con 30 min.
   const cruda = Number(c.retencionSeg);
-  const retencionSeg = Math.max(ventanaSeg, cruda > 0 ? cruda : 1800);
+  // Y nunca más de 7 días: es lo que cabe en el navegador (ver buffer.ts,
+  // «LO VIEJO SE COMPACTA»). Un valor mayor escrito a mano se queda en 7.
+  const retencionSeg = Math.min(
+    RETENCION_MAX_S,
+    Math.max(ventanaSeg, cruda > 0 ? Math.round(cruda) : 1800)
+  );
   return {
     series: Array.isArray(c.series)
       ? c.series.map((s: any) => ({
@@ -508,6 +542,57 @@ export function prefijoComun(nombres: string[]): string {
  */
 const ROJO_GRABANDO = '#ef4444';
 
+/**
+ * Ancho máximo de la vista INICIAL en histórico, en segundos.
+ *
+ * Al filtrar 8 horas el gráfico encuadraba las 8 horas: si lo grabado eran los
+ * últimos 20 minutos, las líneas ocupaban un 4 % del ancho y se veían como un
+ * bloque de color pegado al borde. Ahora se abre en 5 minutos como mucho; el
+ * rango entero sigue cargado y se recorre con ±1 h, las flechas o arrastrando,
+ * y «Ver todo» lo enseña completo.
+ *
+ * Por qué 5 y no 30: se probó con 30 y, con señales que graban varias veces
+ * por segundo, seguían viéndose apiñadas. 5 min deja las líneas legibles y
+ * aún da contexto. Para señales MUY lentas (horas) quedará casi plano: si
+ * hace falta, esto pasa a ser una opción del Inspector.
+ */
+const VISTA_INICIAL_MAX_S = 300;
+
+/**
+ * La vista con la que abre un rango histórico.
+ *
+ * Arranca en el PRIMER DATO REAL, no en «desde»: un turno de 8 h con datos
+ * solo al final abriría en minutos vacíos. Termina 5 min después o donde
+ * acabe el rango, lo que llegue antes. Un rango corto se ve entero.
+ *
+ * NO SE RELLENA HACIA ATRÁS. La primera versión, si desde el primer dato
+ * hasta el final quedaban menos de 30 min, corría la ventana hacia atrás
+ * para que siguiera midiendo el máximo: con 11 min de datos al final de un turno,
+ * dos tercios del gráfico salían vacíos y los datos apretados en el tercio
+ * derecho — justo lo que se quería evitar. Ahora la ventana es lo que hay
+ * con datos, a todo lo ancho. Solo se garantiza un mínimo (`MIN_VISTA_S`)
+ * para que un dato suelto al final no deje una ventana de dos segundos.
+ *
+ * SIN NINGÚN DATO se enseña el rango ENTERO, como antes: no hay nada que
+ * ampliar, y las etiquetas de ese rango (que sí se dibujan sin líneas) pueden
+ * estar en cualquier punto de él.
+ */
+function vistaInicialHist(
+  rango: [number, number],
+  primerDato: number | null
+): { min: number; max: number } {
+  const [d, h] = rango;
+  if (primerDato == null || h - d <= VISTA_INICIAL_MAX_S) return { min: d, max: h };
+  const ini = primerDato > d && primerDato < h ? primerDato : d;
+  const fin = Math.min(h, ini + VISTA_INICIAL_MAX_S);
+  const MIN_VISTA_S = 60;
+  return { min: fin - ini >= MIN_VISTA_S ? ini : Math.max(d, fin - MIN_VISTA_S), max: fin };
+}
+
+/** Lo que dice «Filtrar histórico» cuando el trend no tiene grupo. */
+const MSG_SIN_GRUPO =
+  'Este trend no tiene grupo del historizador: elígelo en el Inspector, en el Diseñador.';
+
 const CLASE_TREND = 'psi-trend';
 
 let estilosPuestos = false;
@@ -642,12 +727,31 @@ function construirOpciones(p: ParamsOpciones): uPlot.Options {
       // busca también sale mal, así que la caja estaba leyendo el valor de OTRA
       // muestra. El síntoma visible era la regla; el fallo de verdad, el dato.
       //
-      // `move` es el gancho que uPlot ofrece justo para esto: recibe la
-      // posición cruda y devuelve la corregida. Se divide por el factor real
-      // —ancho de maquetación entre ancho en pantalla— y todo vuelve a la misma
-      // unidad. Sin escalado el factor es 1 y esto no hace nada.
+      // `move` es el gancho que uPlot ofrece justo para esto. Se divide por el
+      // factor real —ancho de maquetación entre ancho en pantalla— y todo
+      // vuelve a la misma unidad. Sin escalado el factor es 1.
+      //
+      // ── Y TIENE QUE SER IDEMPOTENTE (el fallo de las etiquetas) ─────────
+      // uPlot NO llama a `move` solo con el ratón: también en CADA redibujado
+      // (`updateCursor` tras `setData`/`setScale`), y ahí le pasa la posición
+      // YA corregida la vez anterior. La primera versión multiplicaba por el
+      // factor lo que le llegara, así que con el lienzo escalado la regla se
+      // corregía una vez más con cada dato nuevo —diez veces por segundo en
+      // vivo, aunque esté PAUSADO, porque los datos siguen entrando—: se iba
+      // arrastrando hacia la izquierda, tanto más cuanto más a la derecha
+      // estuviera. Por eso no había forma de poner una etiqueta a la derecha
+      // (había que arrastrar el gráfico), y por eso el punto «desaparecía»:
+      // la regla se separaba del ratón y la línea quedaba lejos de él.
+      //
+      // Ahora no se corrige lo que llega: se recalcula SIEMPRE desde la última
+      // posición REAL del puntero (`__raton`, la apunta un oyente en `.u-over`,
+      // ver la creación del gráfico). Llamarlo una o cien veces da lo mismo.
       move: (u: uPlot, izq: number, arr: number): [number, number] => {
+        // uPlot esconde el cursor con valores negativos (al salir el ratón).
+        if (izq < 0) return [izq, arr];
         const over = u.over as HTMLDivElement;
+        const raton = (over as any).__raton as { x: number; y: number } | undefined;
+        if (!raton) return [izq, arr];
         const r = over.getBoundingClientRect();
         const anchoLayout = over.clientWidth;
         const altoLayout = over.clientHeight;
@@ -657,7 +761,7 @@ function construirOpciones(p: ParamsOpciones): uPlot.Options {
         // Un factor absurdo (elemento a medio montar, oculto) se ignora: mejor
         // sin corregir que mandando el cursor al limbo.
         if (!(kx > 0.05 && kx < 20)) return [izq, arr];
-        return [izq * kx, arr * ky];
+        return [(raton.x - r.left) * kx, (raton.y - r.top) * ky];
       },
     },
     scales: {
@@ -838,8 +942,8 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
   // Aviso en la barra (ámbar, se quita al pulsarlo).
   const [avisoBarra, setAvisoBarra] = useState('');
 
-  // El día de hoy (local): en vivo se ven las etiquetas de HOY. Se vuelve a
-  // mirar cada minuto para que a medianoche se vayan las de ayer.
+  // El día de hoy (local): marca desde cuándo se piden las etiquetas en vivo
+  // (ver `ventanaEtiquetas`). Se mira cada minuto para cambiar a medianoche.
   const [hoy, setHoy] = useState(() => new Date().toDateString());
   useEffect(() => {
     if (!interactivo) return;
@@ -848,15 +952,19 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
   }, [interactivo]);
 
   // Qué etiquetas se piden al servidor: las del filtro; las del rango del
-  // Inspector si el trend es histórico; y en vivo, las de hoy.
+  // Inspector si el trend es histórico; y en vivo, las de TODA la memoria
+  // («Memoria para retroceder»). Antes eran solo las de hoy, porque el búfer
+  // moría al cerrar el preview; ahora se guarda hasta 7 días, y al retroceder
+  // hasta el lunes sus etiquetas tienen que estar ahí. (Desde medianoche menos
+  // la memoria: así la petición solo cambia una vez al día, con `hoy`.)
   const ventanaEtiquetas = useMemo(() => {
     if (filtroActivo) return { desde: filtroActivo.desde, hasta: filtroActivo.hasta };
     if (cfg.origen === 'historico') return resolverRango(cfg.rango, cfg.desde, cfg.hasta);
     const d = new Date();
     d.setHours(0, 0, 0, 0);
-    return { desde: d.toISOString(), hasta: '' };
+    return { desde: new Date(d.getTime() - cfg.retencionSeg * 1000).toISOString(), hasta: '' };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroActivo?.desde, filtroActivo?.hasta, cfg.origen, cfg.rango, cfg.desde, cfg.hasta, hoy]);
+  }, [filtroActivo?.desde, filtroActivo?.hasta, cfg.origen, cfg.rango, cfg.desde, cfg.hasta, cfg.retencionSeg, hoy]);
   const etq = useEtiquetasServidor(widget.id, ventanaEtiquetas, !!interactivo);
   // Solo las de las variables que tiene ahora el trend.
   const etiquetas = useMemo(
@@ -883,8 +991,9 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
   const [cursorY, setCursorY] = useState<number | null>(null);
   // El ratón está sobre la caja de una etiqueta: la regla se esconde.
   const [sobreEtiqueta, setSobreEtiqueta] = useState(false);
-  // Lado del cuadro del nombre mientras se coloca una etiqueta.
-  const [ladoCuadro, setLadoCuadro] = useState<'derecha' | 'izquierda'>('derecha');
+  // La curva a la que está pegado el punto mientras se coloca una etiqueta
+  // (índice en `dibujables`). Ver «CON RESISTENCIA» en `puntoEtiqueta`.
+  const curvaEtiquetaRef = useRef<number | null>(null);
 
   // Las etiquetas se recolocan cuando cambia la vista. Sin limitarlo, en vivo
   // serían diez renders por segundo; con esto, como mucho ~7.
@@ -1000,6 +1109,12 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
   // El gesto se hacía, y el gráfico volvía solo a su sitio.
   const esHistoricoRef = useRef(false);
   const rangoHistRef = useRef<[number, number] | null>(null);
+  // Primer instante con un dato REAL en el rango (para la vista inicial).
+  const primerDatoHistRef = useRef<number | null>(null);
+  // `volverAVivo` se declara después de `interaccion`; el doble clic lo lee
+  // por aquí para no depender del orden.
+  const volverAVivoRef = useRef<() => void>(() => {});
+  const encuadreRef = useRef<{ u: uPlot | null; clave: string }>({ u: null, clave: '' });
 
   const interaccion = useMemo<OpcionesInteraccion>(
     () => ({
@@ -1023,6 +1138,16 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
         siguiendoRef.current = true;
         setSiguiendo(true);
       },
+      // En vivo, igual que siempre; en histórico, a la vista inicial.
+      alDobleClic: () => {
+        if (esHistoricoRef.current) {
+          volverAVivoRef.current();
+          return;
+        }
+        if (siguiendoRef.current) return;
+        siguiendoRef.current = true;
+        setSiguiendo(true);
+      },
     }),
     []
   );
@@ -1036,12 +1161,12 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
    */
   const volverAVivo = useCallback(() => {
     const u = plot.current;
-    // En histórico el doble clic no puede «volver al presente» —no hay
-    // presente que enseñar— así que hace lo equivalente: devolver la vista al
-    // rango entero que se pidió, deshaciendo el zoom.
+    // En histórico no hay «presente» al que volver, así que hace lo
+    // equivalente: devolver la VISTA INICIAL (5 min desde el primer dato),
+    // que es donde se empezó. Las 8 h enteras están en «Ver todo».
     if (esHistoricoRef.current) {
       const r = rangoHistRef.current;
-      if (u && r) u.setScale('x', { min: r[0], max: r[1] });
+      if (u && r) u.setScale('x', vistaInicialHist(r, primerDatoHistRef.current));
       return;
     }
     siguiendoRef.current = true;
@@ -1049,6 +1174,7 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     const r = bufferRef.current?.rango();
     if (u && r) u.setScale('x', { min: r[1] - cfg.ventanaSeg, max: r[1] });
   }, [cfg.ventanaSeg]);
+  volverAVivoRef.current = volverAVivo;
 
   /**
    * «Reanudar»: vuelve al último dato y sigue en vivo, PERO con el zoom que
@@ -1084,7 +1210,11 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [cfg.rango, cfg.desde, cfg.hasta, filtroActivo?.desde, filtroActivo?.hasta]
   );
-  const grupoHist = filtroActivo ? filtroActivo.grupoId : cfg.grupoId;
+  // El grupo es SIEMPRE el del Inspector, también con el filtro puesto: el
+  // modal ya no lo elige (ver FiltroHistorico.tsx). Un filtro guardado en la
+  // sesión con otro grupo —de antes de este cambio— se queda en su rango y
+  // sus puntos, pero consulta el grupo del diseño.
+  const grupoHist = cfg.grupoId;
   const limiteHist = filtroActivo ? filtroActivo.limite : cfg.limiteSerie;
   // Los grupos del historizador: para saber si el del gráfico está GRABANDO
   // (entonces el último valor se mantiene hasta el final del rango) y para
@@ -1296,18 +1426,38 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
         rangoY: () => yManualRef.current,
         alCambiarVista: pedirRevVista,
       }),
-      (bufferRef.current ?? new BufferTrend()).datos(ids),
+      // En histórico, LOS DATOS DEL HISTÓRICO. Antes nacía siempre con el
+      // búfer en vivo, y como el efecto de datos solo vuelve a correr cuando
+      // cambian, rehacer el gráfico (p. ej. al cambiar de tema) dejaba un
+      // histórico dibujando lo del en vivo hasta la siguiente recarga.
+      esHistorico && hist.datos.length === ids.length + 1
+        ? hist.datos
+        : (bufferRef.current ?? new BufferTrend()).datos(ids),
       destino
     );
     plot.current = u;
     setAreaDibujo(u.over as HTMLDivElement);
+
+    // La última posición REAL del puntero sobre el área de dibujo, para el
+    // gancho `move` (ver «Y TIENE QUE SER IDEMPOTENTE»). En CAPTURA: así se
+    // apunta también cuando el ratón pasa por encima de un hijo del área —el
+    // cuadro del nombre de la etiqueta—, y antes de que uPlot lo procese.
+    const overDiv = u.over as HTMLDivElement;
+    const apuntarRaton = (e: MouseEvent) => {
+      (overDiv as any).__raton = { x: e.clientX, y: e.clientY };
+    };
+    overDiv.addEventListener('mousemove', apuntarRaton, true);
+    overDiv.addEventListener('mousedown', apuntarRaton, true);
 
     // Encuadre inicial. En histórico es el rango PEDIDO —ya está calculado en
     // el cuerpo del render, antes de este efecto—; pegarlo al presente aunque
     // fuera un instante producía un salto feo al llegar los datos.
     const rh = rangoHistRef.current;
     if (esHistorico && rh) {
-      u.setScale('x', { min: rh[0], max: rh[1] });
+      u.setScale('x', vistaInicialHist(rh, primerDatoHistRef.current));
+      // Con datos ya cargados, este encuadre cuenta como el inicial: el
+      // efecto de datos no debe volver a moverlo al recargar.
+      if (hist.rango) encuadreRef.current = { u, clave: claveEncuadre };
     } else {
       const r = bufferRef.current?.rango();
       const fin = r ? r[1] : Date.now() / 1000;
@@ -1370,6 +1520,13 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     if (Number.isFinite(d) && Number.isFinite(h) && h > d) return [d / 1000, h / 1000];
     return hist.rango;
   })();
+  primerDatoHistRef.current = hist.rango ? hist.rango[0] : null;
+
+  // QUÉ RANGO SE ENCUADRÓ YA, Y EN QUÉ GRÁFICO. Recargar con la píldora
+  // HISTÓRICO trae datos nuevos del MISMO rango, y eso no debe devolverte a la
+  // vista inicial si estabas mirando las 15:00. Solo se reencuadra si cambió
+  // el rango (otro filtro, otro grupo, otras variables) o se rehízo el gráfico.
+  const claveEncuadre = `${grupoHist}|${ventanaHist.desde}|${ventanaHist.hasta}|${ids.join(',')}`;
 
   // ---- Datos históricos al canvas --------------------------------------- //
   //
@@ -1382,17 +1539,26 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     if (!u) return;
     if (u.series.length !== ids.length + 1) return;
     u.setData(hist.datos, false);
-    // El encuadre es el RANGO PEDIDO, no el de los datos que llegaron. Si se
-    // ajustara a los datos, un tramo sin registros haría que el gráfico
-    // enseñara otra ventana distinta de la que pone el desplegable, y el hueco
-    // —que es información: ahí no se guardó nada— desaparecería de la vista.
-    const d = Date.parse(ventanaHist.desde);
-    const h = Date.parse(ventanaHist.hasta);
-    if (Number.isFinite(d) && Number.isFinite(h) && h > d) {
-      u.setScale('x', { min: d / 1000, max: h / 1000 });
-    } else if (hist.rango) {
-      u.setScale('x', { min: hist.rango[0], max: hist.rango[1] });
+
+    // Mismo rango y mismo gráfico: es una recarga. La vista se queda donde
+    // está; solo se vuelve a poner la X para que uPlot recalcule la Y con
+    // los datos nuevos (`setData(…, false)` no toca las escalas).
+    const ya = encuadreRef.current;
+    if (ya.u === u && ya.clave === claveEncuadre) {
+      const { min, max } = u.scales.x;
+      if (min != null && max != null) u.setScale('x', { min, max });
+      return;
     }
+
+    // Los LÍMITES siguen siendo el rango pedido (hasta dónde se puede ir con
+    // los gestos, ver `rangoHistRef`); lo que cambia es la vista de partida:
+    // 5 min como mucho, desde el primer dato. Ver `vistaInicialHist`.
+    const r = rangoHistRef.current;
+    if (!r) return;
+    u.setScale('x', vistaInicialHist(r, primerDatoHistRef.current));
+    // Solo se da por encuadrado cuando hay datos: si aún no llegó nada, el
+    // primer dato todavía no se conoce y hay que encuadrar al llegar.
+    if (hist.rango) encuadreRef.current = { u, clave: claveEncuadre };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [esHistorico, hist.datos, ids.length]);
 
@@ -1637,6 +1803,7 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     const iDer = indiceHasta(tDer);
 
     let mejor: { k: number; y: number; d: number } | null = null;
+    const candidatos: { k: number; y: number; d: number }[] = [];
     dibujables.forEach((_d, k) => {
       const col = u.data[k + 1] as unknown as (number | null)[] | undefined;
       if (!col) return;
@@ -1655,10 +1822,32 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
       const abajo = u.valToPos(mn, 'y');
       const y = Math.min(abajo, Math.max(arriba, cursorY));
       const d = Math.abs(cursorY - y);
+      candidatos.push({ k, y, d });
       if (!mejor || d < mejor.d) mejor = { k, y, d };
     });
-    const m = mejor as { k: number; y: number; d: number } | null;
-    if (!m) return null;
+    // ── CON RESISTENCIA ──
+    // Antes ganaba SIEMPRE la curva más cercana, recalculado en cada píxel.
+    // Con varias líneas cruzándose, la «más cercana» cambiaba a cada
+    // movimiento y el punto brincaba de una a otra. Ahora:
+    //   * se queda en la curva que ya tenía mientras otra no esté claramente
+    //     más cerca (`CAMBIO_PX` más);
+    //   * y solo se pega si el ratón está a menos de `CAPTURA_PX`: lejos de
+    //     todas, no hay punto (y el cuadro dice «Acércate a una línea»).
+    // 45 y no 30: con la regla ya pegada al ratón, 30 se quedaba corto en
+    // las líneas suaves y el punto desaparecía estando cerca de una.
+    const CAPTURA_PX = 45;
+    const CAMBIO_PX = 10;
+    let m = mejor as { k: number; y: number; d: number } | null;
+    const prev = curvaEtiquetaRef.current;
+    if (m && prev != null && prev !== m.k) {
+      const actual = candidatos.find((c) => c.k === prev);
+      if (actual && actual.d <= CAPTURA_PX && actual.d - m.d < CAMBIO_PX) m = actual;
+    }
+    if (!m || m.d > CAPTURA_PX) {
+      curvaEtiquetaRef.current = null;
+      return null;
+    }
+    curvaEtiquetaRef.current = m.k;
     const v = u.posToVal(m.y, 'y');
     const { s, i } = dibujables[m.k];
     // Lo que valía cada variable en ese instante; la elegida, el valor
@@ -1685,24 +1874,26 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     `Ojo: ${nombre} no se está grabando en el historizador. La etiqueta se guarda, ` +
     'pero al filtrar el histórico no tendrá línea.';
 
-  // El cuadro del nombre se aparta del ratón: a la izquierda cuando el
-  // puntero entra en el 60 % derecho del gráfico, y vuelve a la derecha
-  // cuando baja del 40 % (con margen, para que no salte de un lado a otro).
-  useEffect(() => {
-    if (!etiquetando) {
-      setLadoCuadro('derecha');
-      return;
-    }
-    const ancho = areaDibujo?.clientWidth ?? 0;
-    if (!posRegla || !ancho) return;
-    if (posRegla.x > ancho * 0.6) setLadoCuadro('izquierda');
-    else if (posRegla.x < ancho * 0.4) setLadoCuadro('derecha');
-  }, [etiquetando, posRegla, areaDibujo]);
+  /**
+   * El ratón se movió sobre el cuadro del nombre: se le avisa a uPlot, que
+   * solo atiende el movimiento cuyo destino es `.u-over` mismo (ver
+   * `CuadroNombre`). La posición no se calcula aquí: el oyente en captura de
+   * `.u-over` ya apuntó el puntero, y el gancho `move` la convierte. Solo hay
+   * que pasar un valor no negativo para que no la tome por «cursor fuera».
+   */
+  const moverCursorDesde = (e: React.MouseEvent) => {
+    const u = plot.current;
+    const over = u?.over as HTMLDivElement | undefined;
+    if (!u || !over) return;
+    (over as any).__raton = { x: e.clientX, y: e.clientY };
+    u.setCursor({ left: 0, top: 0 });
+  };
 
   const terminarEtiquetado = () => {
     setEtiquetando(false);
     setAvisoEtiqueta('');
     setCursorY(null);
+    curvaEtiquetaRef.current = null;
   };
   const empezarEtiquetado = () => {
     if (etiquetando) {
@@ -1831,6 +2022,7 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
     siguiendoRef.current = true;
     setSiguiendo(true);
   };
+  const sinGrupoFiltro = !cfg.grupoId;
   const abrirFiltro = () =>
     setModalFiltro(
       filtroActivo ?? { grupoId: cfg.grupoId || '', limite: cfg.limiteSerie }
@@ -2203,10 +2395,22 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
             <button
               type="button"
-              onClick={filtroActivo ? volverDelFiltro : abrirFiltro}
+              // Sin grupo en el Inspector no hay nada que filtrar. El botón NO
+              // se esconde —quien lo busca pensaría que la función no existe—:
+              // se apaga y, al pulsarlo, dice qué falta. En una pantalla
+              // táctil el `title` no se ve, por eso además va a la barra.
+              onClick={
+                filtroActivo
+                  ? volverDelFiltro
+                  : sinGrupoFiltro
+                  ? () => setAvisoBarra(MSG_SIN_GRUPO)
+                  : abrirFiltro
+              }
               title={
                 filtroActivo
                   ? 'Quitar el filtro y volver a lo que está pasando ahora (se siguió grabando)'
+                  : sinGrupoFiltro
+                  ? MSG_SIN_GRUPO
                   : 'Ver lo que guardó el historizador en un rango de fechas'
               }
               style={{
@@ -2223,7 +2427,8 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
                 fontWeight: 700,
                 letterSpacing: 0.2,
                 whiteSpace: 'nowrap',
-                cursor: 'pointer',
+                cursor: !filtroActivo && sinGrupoFiltro ? 'not-allowed' : 'pointer',
+                opacity: !filtroActivo && sinGrupoFiltro ? 0.5 : 1,
               }}
             >
               {filtroActivo ? (
@@ -2689,13 +2894,15 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
             color={puntoEtiqueta.color}
           />
         )}
-        {etiquetando && (
+        {etiquetando && areaDibujo && (
           <CuadroNombre
+            area={areaDibujo}
             tema={tema}
             fuerte={fuerte}
             valor={nombreEtiqueta}
             onCambiar={setNombreEtiqueta}
-            lado={ladoCuadro}
+            onMoverRaton={moverCursorDesde}
+            onClicFondo={() => guardarEtiquetaRef.current()}
             ayuda={
               avisoEtiqueta ||
               (guardandoEtiqueta
@@ -2720,13 +2927,13 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
             onCerrar={() => setModalEtiquetas(null)}
             notaDe={(e) =>
               fueraDeSesion(e)
-                ? 'Fuera de lo grabado en esta sesión: al mostrarla se abre «Filtrar histórico» en esa hora.'
+                ? 'Fuera de lo que guarda este trend: al mostrarla se abre «Filtrar histórico» en esa hora.'
                 : ''
             }
             vacio={
               esHistorico
                 ? 'No hay etiquetas en este rango.'
-                : 'No hay etiquetas de hoy en este trend. Las de otros días se ven con «Filtrar histórico».'
+                : 'No hay etiquetas en lo que guarda este trend. Las más antiguas se ven con «Filtrar histórico».'
             }
           />
         )}
@@ -2742,7 +2949,7 @@ function Trend({ widget, interactivo = false }: RenderCtx) {
                 : variables.find((v) => v.id === id)?.name || id;
             }}
             inicial={modalFiltro}
-            grupoPorDefecto={cfg.grupoId}
+            grupoId={cfg.grupoId}
             limitePorDefecto={cfg.limiteSerie}
             onAplicar={aplicarFiltro}
             onCerrar={() => setModalFiltro(null)}
@@ -3209,7 +3416,9 @@ function InspectorTrend({ config, setConfig }: InspectorCtx) {
   const cfg = leerConfigTrend(config);
   const { selectedVariables, isDark } = useAppStore();
   const esHistorico = cfg.origen === 'historico';
-  const { grupos, cargando: cargandoGrupos, error: errorGrupos } = useGrupos(esHistorico);
+  // Los grupos se cargan SIEMPRE, no solo en histórico: el grupo también es
+  // el que usa «Filtrar histórico» en la Vista Previa de un trend en vivo.
+  const { grupos, cargando: cargandoGrupos, error: errorGrupos } = useGrupos(true);
   const grupoElegido = grupos.find((g) => g.grupo_id === cfg.grupoId);
   const [abiertoVarias, setAbiertoVarias] = useState(false);
 
@@ -3227,6 +3436,25 @@ function InspectorTrend({ config, setConfig }: InspectorCtx) {
   const [unidadDuracion, setUnidadDuracion] = useState(
     () => unidadDe(leerConfigTrend(config).grabDuracionS)
   );
+
+  // ── MEMORIA PERSONALIZADA ── el mismo patrón que la duración: el modo va
+  // en estado (abre «Personalizado» si lo guardado no es un atajo) y la
+  // unidad es solo de presentación — se guardan segundos.
+  const [memoriaLibre, setMemoriaLibre] = useState(
+    () => !RETENCIONES.some((r) => r.v === leerConfigTrend(config).retencionSeg)
+  );
+  const [unidadMemoria, setUnidadMemoria] = useState(
+    () => unidadMemoriaDe(leerConfigTrend(config).retencionSeg)
+  );
+  // El número del campo, como TEXTO. Si fuera el valor guardado, borrar el
+  // campo para escribir otro número lo pondría al mínimo al instante y el
+  // cursor pelearía con quien escribe. Se guarda en cuanto el número vale, y
+  // al salir del campo se vuelve a enseñar lo que de verdad quedó.
+  const textoMemoriaDe = (seg: number, unidad: number) => String(+(seg / unidad).toFixed(2));
+  const [textoMemoria, setTextoMemoria] = useState(() => {
+    const c = leerConfigTrend(config);
+    return textoMemoriaDe(c.retencionSeg, unidadMemoriaDe(c.retencionSeg));
+  });
 
   // Solo numéricas: una tendencia de un bool sería una escalera entre 0 y 1 y
   // de un texto no se puede dibujar nada.
@@ -3265,7 +3493,7 @@ function InspectorTrend({ config, setConfig }: InspectorCtx) {
   // todas: una lista vacía parecería una avería, y aquí el que decide es quien
   // monta la pantalla.
   const delGrupo = (() => {
-    if (!esHistorico || !grupoElegido || grupoElegido.todos_los_tags) return null;
+    if (!grupoElegido || grupoElegido.todos_los_tags) return null;
     const tags = new Set(
       (grupoElegido.tags ?? []).map((t) => (t.includes('|') ? partirId(t).tag : t))
     );
@@ -3393,18 +3621,18 @@ function InspectorTrend({ config, setConfig }: InspectorCtx) {
                 </div>
 
                 <div className="min-w-0 flex-1 space-y-1">
-                  <select
-                    value={s.variableId}
-                    onChange={(e) => editar(s.id, { variableId: e.target.value })}
-                    className={INPUT}
-                  >
-                    <option value="">— Elegir variable —</option>
-                    {numericas.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.name} ({v.type})
-                      </option>
-                    ))}
-                  </select>
+                  {/* Con buscador: ver SelectorVariableTrend.tsx. */}
+                  <SelectorVariableTrend
+                    valor={s.variableId}
+                    opciones={numericas}
+                    delGrupo={delGrupo}
+                    enUso={
+                      new Set(
+                        cfg.series.filter((o) => o.id !== s.id).map((o) => o.variableId)
+                      )
+                    }
+                    onElegir={(variableId) => editar(s.id, { variableId })}
+                  />
                   {/* El nombre en su PROPIA fila, a todo el ancho. Compartía
                       fila con el grosor y quedaba aplastado en un cuadrito
                       donde no se veía lo escrito. */}
@@ -3509,56 +3737,66 @@ function InspectorTrend({ config, setConfig }: InspectorCtx) {
         <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
           {esHistorico
             ? 'Consulta lo que el historizador guardó. No se actualiza solo: se recarga con la píldora «HISTÓRICO» del gráfico.'
-            : 'Lo que llega por WebSocket. Nada va a disco, y al recargar la página se empieza de cero.'}
+            : 'Lo que llega por WebSocket. Se guarda en el navegador de este equipo durante la «Memoria para retroceder».'}
         </span>
+      </label>
+
+      {/* ── GRUPO DEL HISTORIZADOR ── fuera del bloque de histórico: en
+          vivo también hace falta, porque es el que usa «Filtrar histórico».
+          Antes lo elegía el operario en el modal; ahora es parte del diseño
+          del widget, como sus variables. */}
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+          Grupo del historizador
+        </span>
+        <select
+          value={cfg.grupoId}
+          onChange={(e) => set({ grupoId: e.target.value })}
+          className={INPUT}
+        >
+          <option value="">
+            {cargandoGrupos ? 'Cargando…' : '— Elige un grupo —'}
+          </option>
+          {grupos.map((g) => (
+            <option key={g.grupo_id} value={g.grupo_id}>
+              {g.nombre || g.grupo_id}
+              {g.activo ? '' : ' · pausado'}
+            </option>
+          ))}
+          {/* Un grupo que se configuró y luego se borró del historizador.
+              No se cambia en silencio: se enseña marcado, porque el widget
+              va a salir vacío y hay que poder verlo aquí. */}
+          {cfg.grupoId && !cargandoGrupos && !grupoElegido && (
+            <option value={cfg.grupoId}>{cfg.grupoId} · ya no existe</option>
+          )}
+        </select>
+        {errorGrupos && (
+          <span className="mt-1 block text-[10px] font-semibold text-red-500">
+            {errorGrupos}
+          </span>
+        )}
+        {grupoElegido && (
+          <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
+            {grupoElegido.todos_los_tags
+              ? 'Guarda TODOS los tags'
+              : `${grupoElegido.num_tags} tag(s)`}{' '}
+            en <b>{grupoElegido.tabla}</b>.{' '}
+            {grupoElegido.filas_escritas > 0
+              ? `${grupoElegido.filas_escritas.toLocaleString()} filas escritas.`
+              : 'Todavía no ha escrito nada.'}
+            {!grupoElegido.activo && ' La captura está pausada.'}
+          </span>
+        )}
+        {!esHistorico && (
+          <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
+            En vivo, es el grupo que consulta <b>Filtrar histórico</b> en la Vista
+            Previa. El operario ya no lo elige: solo el rango.
+          </span>
+        )}
       </label>
 
       {esHistorico && (
         <>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
-              Grupo del historizador
-            </span>
-            <select
-              value={cfg.grupoId}
-              onChange={(e) => set({ grupoId: e.target.value })}
-              className={INPUT}
-            >
-              <option value="">
-                {cargandoGrupos ? 'Cargando…' : '— Elige un grupo —'}
-              </option>
-              {grupos.map((g) => (
-                <option key={g.grupo_id} value={g.grupo_id}>
-                  {g.nombre || g.grupo_id}
-                  {g.activo ? '' : ' · pausado'}
-                </option>
-              ))}
-              {/* Un grupo que se configuró y luego se borró del historizador.
-                  No se cambia en silencio: se enseña marcado, porque el widget
-                  va a salir vacío y hay que poder verlo aquí. */}
-              {cfg.grupoId && !cargandoGrupos && !grupoElegido && (
-                <option value={cfg.grupoId}>{cfg.grupoId} · ya no existe</option>
-              )}
-            </select>
-            {errorGrupos && (
-              <span className="mt-1 block text-[10px] font-semibold text-red-500">
-                {errorGrupos}
-              </span>
-            )}
-            {grupoElegido && (
-              <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
-                {grupoElegido.todos_los_tags
-                  ? 'Guarda TODOS los tags'
-                  : `${grupoElegido.num_tags} tag(s)`}{' '}
-                en <b>{grupoElegido.tabla}</b>.{' '}
-                {grupoElegido.filas_escritas > 0
-                  ? `${grupoElegido.filas_escritas.toLocaleString()} filas escritas.`
-                  : 'Todavía no ha escrito nada.'}
-                {!grupoElegido.activo && ' La captura está pausada.'}
-              </span>
-            )}
-          </label>
-
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
               Rango
@@ -3667,7 +3905,7 @@ function InspectorTrend({ config, setConfig }: InspectorCtx) {
       {!esHistorico && (
       <label className="block">
         <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
-          Ventana de tiempo
+          Ventana de tiempo inicial
         </span>
         <select
           value={String(cfg.ventanaSeg)}
@@ -3689,8 +3927,19 @@ function InspectorTrend({ config, setConfig }: InspectorCtx) {
           Memoria para retroceder
         </span>
         <select
-          value={String(cfg.retencionSeg)}
-          onChange={(e) => set({ retencionSeg: Number(e.target.value) })}
+          value={memoriaLibre ? 'otro' : String(cfg.retencionSeg)}
+          onChange={(e) => {
+            if (e.target.value === 'otro') {
+              // Se abre con lo que ya había, en su unidad más legible.
+              const u = unidadMemoriaDe(cfg.retencionSeg);
+              setUnidadMemoria(u);
+              setTextoMemoria(textoMemoriaDe(cfg.retencionSeg, u));
+              setMemoriaLibre(true);
+              return;
+            }
+            setMemoriaLibre(false);
+            set({ retencionSeg: Number(e.target.value) });
+          }}
           className={INPUT}
         >
           {RETENCIONES.map((r) => (
@@ -3698,10 +3947,68 @@ function InspectorTrend({ config, setConfig }: InspectorCtx) {
               {r.t}
             </option>
           ))}
+          <option value="otro">Personalizado…</option>
         </select>
+
+        {memoriaLibre && (
+          <div className="mt-1.5 grid grid-cols-[1fr_auto] gap-2">
+            <input
+              type="number"
+              min={1}
+              // El tope del campo va en la unidad elegida: el navegador avisa
+              // antes de escribir «10» en días.
+              max={Math.floor(RETENCION_MAX_S / unidadMemoria)}
+              step="any"
+              value={textoMemoria}
+              onChange={(e) => {
+                setTextoMemoria(e.target.value);
+                const n = Number(e.target.value);
+                if (!Number.isFinite(n) || n <= 0) return;
+                set({ retencionSeg: Math.min(RETENCION_MAX_S, Math.round(n * unidadMemoria)) });
+              }}
+              onBlur={() => setTextoMemoria(textoMemoriaDe(cfg.retencionSeg, unidadMemoria))}
+              className={INPUT}
+            />
+            <select
+              value={String(unidadMemoria)}
+              onChange={(e) => {
+                // Cambiar la unidad CAMBIA lo guardado: «3» en horas pasa a
+                // ser «3» en días. Es lo que espera quien tiene escrito un
+                // número y elige otra unidad al lado.
+                const u = Number(e.target.value);
+                setUnidadMemoria(u);
+                const n = Number(textoMemoria);
+                if (Number.isFinite(n) && n > 0) {
+                  set({ retencionSeg: Math.min(RETENCION_MAX_S, Math.round(n * u)) });
+                }
+              }}
+              className={`${INPUT} w-auto`}
+            >
+              {UNIDADES_MEMORIA.map((u) => (
+                <option key={u.v} value={u.v}>
+                  {u.t}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <span className="mt-1 block text-[10px] leading-relaxed text-slate-400">
-          Cuánto se guarda en el navegador. Es hasta dónde se puede desplazar
-          hacia atrás; la ventana de arriba es solo lo que se ve de un vistazo.
+          Cuánto se guarda en el navegador de ESTE equipo, aunque se cierre el
+          preview: al volver a abrirlo se puede retroceder hasta ahí (lo que
+          estuvo cerrado sale como hueco). Lo de hace más de 15 min se guarda
+          resumido cada 5 s, sin perder los picos.
+          {memoriaLibre && (
+            <>
+              {' '}
+              Guarda <b>{fmtMemoria(cfg.retencionSeg)}</b>. Máximo 7 días
+              {Number(textoMemoria) * unidadMemoria > RETENCION_MAX_S && (
+                <span className="font-semibold text-amber-600 dark:text-amber-400">
+                  {' '}— se quedó en 7 días
+                </span>
+              )}
+              .
+            </>
+          )}
         </span>
       </label>
       )}

@@ -3,10 +3,16 @@
 // «Filtrar histórico»: el modal que lleva el trend de la VISTA PREVIA a lo
 // que el historizador guardó en un rango de fechas, sin tocar el diseño.
 //
-// Los mismos campos que el Inspector (grupo, rango, puntos por serie), pero
-// en tiempo de ejecución: lo que se elige aquí vive en la sesión de esa
-// ventana, no en el proyecto. Mientras se filtra, el trend sigue grabando
-// el en vivo por detrás; «Volver a en vivo» lo vuelve a dibujar.
+// Rango y puntos por serie, en tiempo de ejecución: lo que se elige aquí vive
+// en la sesión de esa ventana, no en el proyecto. Mientras se filtra, el trend
+// sigue grabando el en vivo por detrás; «Volver a en vivo» lo vuelve a dibujar.
+//
+// EL GRUPO NO SE ELIGE AQUÍ
+//   Lo fija quien diseña la pantalla, en el Inspector del Trend. Antes se
+//   elegía en este modal, y eso dejaba al operario delante de una lista de
+//   grupos que no tiene por qué conocer —y que puede llevarle a uno que no
+//   graba sus variables—. El grupo es parte del DISEÑO del widget, como sus
+//   variables: aquí solo se enseña, con cuántas de ellas cubre.
 //
 // LAS FECHAS SE FIJAN AL APLICAR
 //   «Última hora» se convierte en dos instantes absolutos al pulsar Aplicar
@@ -74,7 +80,7 @@ export function ModalFiltroHistorico({
   ids,
   nombreDe,
   inicial,
-  grupoPorDefecto,
+  grupoId,
   limitePorDefecto,
   onAplicar,
   onCerrar,
@@ -86,7 +92,8 @@ export function ModalFiltroHistorico({
   nombreDe: (id: string) => string;
   /** Lo que se reabre (el filtro aplicado, o uno propuesto). */
   inicial: Partial<FiltroTrend> | null;
-  grupoPorDefecto: string;
+  /** El grupo del historizador del Trend: el del Inspector. No se cambia aquí. */
+  grupoId: string;
   limitePorDefecto: number;
   onAplicar: (f: FiltroTrend) => void;
   onCerrar: () => void;
@@ -94,7 +101,6 @@ export function ModalFiltroHistorico({
   const ahora = Date.now();
   const [grupos, setGrupos] = useState<GrupoHistorico[] | null>(null);
   const [errorGrupos, setErrorGrupos] = useState('');
-  const [grupoId, setGrupoId] = useState(inicial?.grupoId || grupoPorDefecto || '');
   const [rango, setRango] = useState(inicial?.rango || '1h');
   const [desdeLocal, setDesdeLocal] = useState(inicial?.desdeLocal || aValorLocal(ahora - 3600_000));
   const [hastaLocal, setHastaLocal] = useState(inicial?.hastaLocal || aValorLocal(ahora));
@@ -103,16 +109,8 @@ export function ModalFiltroHistorico({
   useEffect(() => {
     let vivo = true;
     listarGrupos()
-      .then((l) => {
-        if (!vivo) return;
-        setGrupos(l);
-        // Sin grupo elegido: el que más variables del trend cubre.
-        setGrupoId((g) => {
-          if (g && l.some((x) => x.grupo_id === g)) return g;
-          const mejor = [...l].sort((a, b) => cubiertas(b, ids).length - cubiertas(a, ids).length)[0];
-          return mejor?.grupo_id ?? '';
-        });
-      })
+      // Solo para ENSEÑAR el grupo (nombre, si está pausado, qué cubre).
+      .then((l) => vivo && setGrupos(l))
       .catch((e: any) => vivo && setErrorGrupos(e?.message ?? 'No se pudieron leer los grupos.'));
     return () => {
       vivo = false;
@@ -147,13 +145,15 @@ export function ModalFiltroHistorico({
   }, [rango, desdeLocal, hastaLocal]);
 
   const problema = !grupoId
-    ? 'Elige un grupo del historizador.'
+    ? 'Este trend no tiene grupo del historizador. Elígelo en el Inspector del Diseñador.'
+    : grupos !== null && !grupo
+    ? `El grupo «${grupoId}» ya no existe en el historizador. Elige otro en el Inspector.`
     : !ventana.desde || !ventana.hasta
     ? 'Pon la fecha y hora de inicio y de fin.'
     : Date.parse(ventana.desde) >= Date.parse(ventana.hasta)
     ? '«Desde» tiene que ser antes que «Hasta».'
     : grupo && cubre.length === 0
-    ? 'Ese grupo no graba ninguna de las variables de este trend.'
+    ? 'El historizador no graba ninguna de las variables de este trend.'
     : '';
 
   const aplicar = () => {
@@ -236,30 +236,14 @@ export function ModalFiltroHistorico({
           detrás; «Volver a en vivo» lo vuelve a enseñar.
         </p>
 
-        <label style={rotulo}>
-          Grupo del historizador
-          <select value={grupoId} onChange={(e) => setGrupoId(e.target.value)} style={{ ...campo, cursor: 'pointer' }}>
-            <option value="">— Elige un grupo —</option>
-            {(grupos ?? []).map((g) => (
-              <option key={g.grupo_id} value={g.grupo_id}>
-                {g.nombre || g.grupo_id}
-                {g.activo ? '' : ' · pausado'} · cubre {cubiertas(g, ids).length} de {ids.length}
-              </option>
-            ))}
-          </select>
-        </label>
-        {grupos === null && !errorGrupos && (
-          <p style={{ margin: '5px 0 0', fontSize: 11, color: tema.tintaSuave }}>Cargando grupos…</p>
-        )}
-        {errorGrupos && <p style={{ margin: '5px 0 0', fontSize: 11, color: tema.pausa }}>{errorGrupos}</p>}
-        {grupo && !grupo.activo && (
-          <p style={{ margin: '5px 0 0', fontSize: 11, lineHeight: 1.45, color: tema.pausa }}>
-            Este grupo está pausado: solo tiene lo que grabó mientras estuvo activo.
-          </p>
-        )}
+        {/* EL GRUPO NO SE ENSEÑA. Es del diseño (Inspector del Trend), y al
+            operario no le dice nada. Solo queda lo que le sirve: si alguna de
+            sus líneas va a salir vacía. Los fallos que impiden filtrar (sin
+            grupo, grupo borrado, no graba ninguna) salen abajo, en `problema`. */}
+        {errorGrupos && <p style={{ margin: '12px 0 0', fontSize: 11, color: tema.pausa }}>{errorGrupos}</p>}
         {grupo && faltan.length > 0 && cubre.length > 0 && (
-          <p style={{ margin: '5px 0 0', fontSize: 11, lineHeight: 1.45, color: tema.pausa }}>
-            Este grupo no graba: {faltan.map(nombreDe).join(', ')}. Esas líneas saldrán vacías.
+          <p style={{ margin: '12px 0 0', fontSize: 11, lineHeight: 1.45, color: tema.pausa }}>
+            No se graban en el historizador: {faltan.map(nombreDe).join(', ')}. Esas líneas saldrán vacías.
           </p>
         )}
 

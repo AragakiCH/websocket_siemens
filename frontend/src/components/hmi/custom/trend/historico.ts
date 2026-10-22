@@ -140,7 +140,13 @@ function armar(c: Crudo, finSeg: number | null): { datos: any; puntos: number } 
   const todos = new Set<number>();
   for (const s of c.series) for (const [t] of s) todos.add(t);
   if (todos.size === 0) return { datos: VACIO, puntos: 0 };
-  const ultimoReal = Math.max(...todos);
+  // Con un BUCLE, no con `Math.max(...todos)`: el spread pasa cada instante
+  // como un argumento, y a partir de ~125 000 el motor revienta con
+  // «Maximum call stack size exceeded». Como cada tag trae su propia hora
+  // (con microsegundos de diferencia), 13 series a 10 000 puntos ya pasan
+  // ese límite — y esto corre en el render: se caía la pantalla entera.
+  let ultimoReal = -Infinity;
+  for (const t of todos) if (t > ultimoReal) ultimoReal = t;
   if (finSeg != null && finSeg > ultimoReal) todos.add(finSeg);
   const tiempos = Array.from(todos).sort((a, b) => a - b);
   const columnas = c.series.map((s) => {
