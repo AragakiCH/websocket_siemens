@@ -529,6 +529,37 @@ class ProjectStore:
                 })
         return tocadas
 
+    async def buscar_referencia(self, clave: str) -> List[dict]:
+        """
+        En qué pantallas aparece una clave de variable, y en cuántos widgets.
+
+        Solo lee. La usan las constantes de faceplate para avisar ANTES de
+        borrar una que está asignada. Mismo criterio que
+        `reemplazar_referencia`: búsqueda en profundidad y por IGUALDAD del
+        texto completo, nunca por «contiene».
+        """
+        if not clave:
+            return []
+
+        def aparece(nodo: Any) -> bool:
+            if isinstance(nodo, str):
+                return nodo == clave
+            if isinstance(nodo, list):
+                return any(aparece(x) for x in nodo)
+            if isinstance(nodo, dict):
+                return any(aparece(x) for x in nodo.values())
+            return False
+
+        salida: List[dict] = []
+        async with self._lock_async:
+            for pid, doc in self._cache.items():
+                n = sum(1 for w in (doc.get("widgets") or []) if aparece(w))
+                if n:
+                    salida.append({"project_id": pid,
+                                   "nombre": doc.get("nombre") or pid,
+                                   "widgets": n})
+        return salida
+
     async def guardar_widget(self, project_id: str, widget: dict,
                              version: Optional[int] = None,
                              usuario: str = "") -> dict:

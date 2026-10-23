@@ -884,6 +884,9 @@ export function Configuracion() {
   const varGroups = React.useMemo(() => {
     const map = new Map<string, typeof variables>();
     for (const v of variables) {
+      // Las constantes de faceplate no son de ningún PLC: se gestionan en el
+      // desplegable de parámetros del faceplate, no aquí.
+      if (v.id.startsWith('constante|')) continue;
       const sep = v.id.indexOf('|');
       const plcId = sep > 0 ? v.id.slice(0, sep) : '_unknown';
       const arr = map.get(plcId);

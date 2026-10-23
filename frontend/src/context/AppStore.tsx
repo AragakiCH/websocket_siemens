@@ -720,8 +720,12 @@ export function AppStoreProvider({ children }: {children: React.ReactNode;}) {
     },
     [config.language]
   );
+  // Las CONSTANTES de faceplate (`constante|<id>`) no entran: solo se
+  // ofrecen en los desplegables de parámetros de un faceplate, que las piden
+  // aparte (ver components/hmi/custom/faceplate/Constantes.tsx). Siguen en
+  // `variables`, que es de donde los widgets leen el valor.
   const selectedVariables = useMemo(
-    () => variables.filter((v) => v.selected),
+    () => variables.filter((v) => v.selected && !v.id.startsWith('constante|')),
     [variables]
   );
   const proyectoActivo = useMemo(

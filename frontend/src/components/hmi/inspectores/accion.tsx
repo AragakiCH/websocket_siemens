@@ -41,6 +41,12 @@ import {
   type TagPermitido } from
 '../../../services/escrituraApi';
 import { useTipos } from '../custom/faceplate/Faceplate';
+import {
+  NUEVA_CONSTANTE,
+  PanelConstante,
+  grupoConstantes,
+  useConstantes,
+} from '../custom/faceplate/Constantes';
 import { useAppStore } from '../../../context/AppStore';
 import { PREFIJO_PARAM } from '../../../utils/designStorage';
 import { BuscadorOpciones, filtrarGrupos } from '../../ui/Field';
@@ -307,6 +313,12 @@ export function InspectorAccion({
   );
   const tipoElegido = tipos.find((x) => x.project_id === accion.faceplate);
   const parametros = tipoElegido?.parametros ?? [];
+  // Las constantes de ESTE tipo de faceplate (ver faceplate/Constantes.tsx),
+  // y en qué parámetro se está creando una ahora mismo.
+  const constantes = useConstantes(
+    accion.tipo === 'abrir-faceplate' ? accion.faceplate ?? '' : ''
+  );
+  const [creandoConstante, setCreandoConstante] = useState<string | null>(null);
 
   // Los temas sólo hacen falta para una de las acciones, así que se piden
   // sólo cuando se elige: en un Inspector que se abre a cada clic, una
@@ -623,6 +635,12 @@ export function InspectorAccion({
                   ...(variablesWidget.length
                     ? [{ label: 'Variables del widget', options: variablesWidget }]
                     : []),
+                  // Las constantes de este faceplate del tipo del parámetro,
+                  // y «+ Nueva constante…».
+                  ...(() => {
+                    const g = accion.faceplate ? grupoConstantes(constantes.lista, p.tipo) : null;
+                    return g ? [g] : [];
+                  })(),
                   ...tags,
                 ];
                 // Lo puesto que ya no está en ninguna lista: se enseña igual,
@@ -645,11 +663,29 @@ export function InspectorAccion({
                     <SelectorParametro
                       valor={valor}
                       grupos={grupos}
-                      onCambiar={(v) =>
+                      onCambiar={(v) => {
+                        // «+ Nueva constante…» no se asigna: abre el formulario.
+                        if (v === NUEVA_CONSTANTE) {
+                          setCreandoConstante(p.id);
+                          return;
+                        }
+                        setCreandoConstante(null);
                         set({
                           params: { ...accion.params, [p.id]: v },
-                        })
+                        });
+                      }}
+                    />
+                    <PanelConstante
+                      faceplate={accion.faceplate ?? ''}
+                      tipo={p.tipo}
+                      valor={valor}
+                      lista={constantes.lista}
+                      creando={creandoConstante === p.id}
+                      onCerrarCreacion={() => setCreandoConstante(null)}
+                      onAsignar={(clave) =>
+                        set({ params: { ...accion.params, [p.id]: clave } })
                       }
+                      recargar={constantes.recargar}
                     />
                   </div>
                 );

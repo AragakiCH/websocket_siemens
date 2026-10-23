@@ -303,6 +303,10 @@ async def tags(request: Request, plc: Optional[str] = None) -> dict:
     internas = getattr(request.app.state, "internas_store", None)
     if internas is not None and plc in (None, PLC_INTERNO):
         lista = lista + internas.tags()
+    # Y las constantes de faceplate (`constante|<id>`), por lo mismo.
+    constantes = getattr(request.app.state, "constantes_store", None)
+    if constantes is not None and plc in (None, "constante"):
+        lista = lista + constantes.tags()
 
     return {"plc": plc, "tags": lista}
 

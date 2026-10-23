@@ -155,6 +155,7 @@ class PlcManager:
         # dejar que viajen en el mismo snapshot. Si no se inyecta, todo sigue
         # funcionando exactamente igual sin internas.
         self._internas = None
+        self._constantes = None
 
         # MULTIUSUARIO: la lista de PLCs se persiste para que un reinicio del
         # servicio no borre el trabajo de todos los usuarios a la vez.
@@ -571,6 +572,14 @@ class PlcManager:
         """Le dice al gestor dónde están las variables internas."""
         self._internas = store
 
+    def usar_constantes(self, store) -> None:
+        """
+        Le dice al gestor dónde están las constantes de faceplate. Viajan en
+        el snapshot como las internas (ver `build_snapshot_message`) y NO se
+        pueden escribir (ver `escribir_tags`).
+        """
+        self._constantes = store
+
     def list_plc_ids(self) -> List[str]:
         """Ids de los PLCs gestionados (para el selector del cliente)."""
         return list(self._handlers.keys())
@@ -597,6 +606,15 @@ class PlcManager:
                 tags.update(self._internas.snapshot_entries())
             except Exception as exc:  # noqa: BLE001
                 logger.warning("No se pudieron añadir las internas al "
+                               "snapshot: %s", exc)
+        # Las CONSTANTES de faceplate, por lo mismo: el cliente reemplaza su
+        # lista entera con cada snapshot, y una constante que no viniera aquí
+        # dejaría sin valor al faceplate que la usa en cada reconexión.
+        if getattr(self, "_constantes", None) is not None and plc in (None, "constante"):
+            try:
+                tags.update(self._constantes.snapshot_entries())
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("No se pudieron añadir las constantes al "
                                "snapshot: %s", exc)
 
         for plc_id, h in self._handlers.items():
@@ -708,6 +726,16 @@ class PlcManager:
 
             if not plc_id or not tag:
                 raise ValueError(f"Entrada {i}: hacen falta 'plc_id' y 'tag'.")
+
+            # Una CONSTANTE de faceplate no se escribe nunca: la fija quien
+            # diseña, y si un botón pudiera cambiarla dejaría de ser constante.
+            # Se dice claro, en vez del «no hay ningún PLC con id» que saldría
+            # por no tener handler.
+            if plc_id == "constante":
+                raise ValueError(
+                    f"«{tag}» es una constante del faceplate: no se puede "
+                    f"escribir desde la pantalla. Su valor se cambia en el "
+                    f"Diseñador.")
 
             handler = self._handlers.get(plc_id)
             # Las variables internas no tienen handler: se atienden con un

@@ -110,7 +110,8 @@ class RealPLCServiceImpl {
     return toPlcVariables(
       this.tags,
       this.selection,
-      (plc) => plc !== 'interno' && this.plcConectado.get(plc) === false
+      // Las constantes de faceplate tampoco: viven en el servidor.
+      (plc) => plc !== 'interno' && plc !== 'constante' && this.plcConectado.get(plc) === false
     );
   }
 
@@ -195,7 +196,7 @@ class RealPLCServiceImpl {
    */
   plcDisponible(plcId: string): boolean {
     if (!this.vivo) return false;
-    if (plcId === 'interno') return true;
+    if (plcId === 'interno' || plcId === 'constante') return true;
     return this.plcConectado.get(plcId) ?? true;
   }
 
@@ -327,7 +328,7 @@ class RealPLCServiceImpl {
         // los lleva arriba del todo (las alarmas van dentro de `alarma`).
         const clave = `${msg.plc}|${msg.tag}`;
         this.tags[clave] = { ...(this.tags[clave] ?? {}), ...msg };
-        if (msg.plc === 'interno') {
+        if (msg.plc === 'interno' || msg.plc === 'constante') {
           // Una interna la acaba de mover una persona, y espera verla
           // moverse YA: en la tabla de Variables y en el widget que la
           // enseña. Son pocas y no llegan a ráfagas, así que se emite al

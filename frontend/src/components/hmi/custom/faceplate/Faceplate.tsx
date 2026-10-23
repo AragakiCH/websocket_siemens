@@ -35,6 +35,7 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { BoxIcon, Loader2Icon, AlertTriangleIcon } from 'lucide-react';
 import type { CustomWidgetDef, RenderCtx, InspectorCtx } from '../types';
 import { useAppStore } from '../../../../context/AppStore';
+import { NUEVA_CONSTANTE, PanelConstante, grupoConstantes, useConstantes } from './Constantes';
 import {
   listarPantallas,
   type ParametroFaceplate,
@@ -240,6 +241,11 @@ function InspectorFaceplate({ config, setConfig }: InspectorCtx) {
   const ponerTag = (idParam: string, variableId: string) =>
     setConfig({ ...cfg, params: { ...cfg.params, [idParam]: variableId } });
 
+  // Las constantes de ESTE tipo de faceplate (ver Constantes.tsx), y en qué
+  // parámetro se está creando una.
+  const constantes = useConstantes(cfg.tipo);
+  const [creandoConstante, setCreandoConstante] = useState<string | null>(null);
+
   return (
     <>
       <label className="block">
@@ -302,11 +308,17 @@ function InspectorFaceplate({ config, setConfig }: InspectorCtx) {
             // Solo las variables del tipo que el parámetro pide. Ofrecer una
             // booleana para una corriente es ofrecer un enlace que no va a
             // funcionar y que sólo se descubre mirando el panel en planta.
-            const compatibles = variables.filter((v) => v.type === p.tipo);
+            // (Sin las constantes: van en su propio grupo, más abajo.)
+            const compatibles = variables.filter(
+              (v) => v.type === p.tipo && !v.id.startsWith('constante|')
+            );
+            const grupoK = grupoConstantes(constantes.lista, p.tipo);
             const elegida = cfg.params[p.id] ?? '';
             const huerfana = !!elegida && !variables.some((v) => v.id === elegida);
             return (
-              <label key={p.id} className="block">
+              // <div> y no <label>: debajo va el panel de la constante, con sus
+              // propios campos, y un <label> llevaría cada clic al <select>.
+              <div key={p.id} className="block">
                 <span className="mb-1 flex items-baseline justify-between gap-2">
                   <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                     {p.nombre}
@@ -315,23 +327,54 @@ function InspectorFaceplate({ config, setConfig }: InspectorCtx) {
                 </span>
                 <select
                   value={elegida}
-                  onChange={(e) => ponerTag(p.id, e.target.value)}
+                  onChange={(e) => {
+                    // «+ Nueva constante…» no se asigna: abre el formulario.
+                    if (e.target.value === NUEVA_CONSTANTE) {
+                      setCreandoConstante(p.id);
+                      return;
+                    }
+                    setCreandoConstante(null);
+                    ponerTag(p.id, e.target.value);
+                  }}
                   className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-navy outline-none transition focus:border-siemens focus:ring-2 focus:ring-siemens/20 dark:border-navy-slate dark:bg-navy dark:text-slate-100"
                 >
                   <option value="">— Sin asignar —</option>
-                  {compatibles.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}
-                    </option>
-                  ))}
+                  {grupoK && (
+                    <optgroup label={grupoK.label}>
+                      {grupoK.options.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <optgroup label="Tags">
+                    {compatibles.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name}
+                      </option>
+                    ))}
+                  </optgroup>
                   {/* La que estaba puesta y ya no existe se conserva en la
                       lista: quitarla en silencio borraría el enlace sin que
                       nadie se entere de que el tag desapareció. */}
                   {huerfana && (
-                    <option value={elegida}>{elegida} (ya no existe)</option>
+                    <option value={elegida}>
+                      {elegida.startsWith('constante|') ? 'Constante borrada' : elegida} (ya no existe)
+                    </option>
                   )}
                 </select>
-              </label>
+                <PanelConstante
+                  faceplate={cfg.tipo}
+                  tipo={p.tipo}
+                  valor={elegida}
+                  lista={constantes.lista}
+                  creando={creandoConstante === p.id}
+                  onCerrarCreacion={() => setCreandoConstante(null)}
+                  onAsignar={(clave) => ponerTag(p.id, clave)}
+                  recargar={constantes.recargar}
+                />
+              </div>
             );
           })}
         </div>

@@ -90,6 +90,8 @@ export default defineConfig({
       // de Vite. Si anades un router en app/api/, anade aqui su prefijo
       // (o deja que lo avise `tools/dev.py`, que ahora lo comprueba solo).
       '/internas': BACKEND,
+      // Constantes de los parámetros de faceplate.
+      '/constantes': BACKEND,
       // Escritura en el PLC y variables sobre huecos de reserva.
       '/escritura': BACKEND,
       '/variables': BACKEND,

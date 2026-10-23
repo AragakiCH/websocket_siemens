@@ -31,7 +31,7 @@ from app.api import (ai_routes, alarm_routes, auth_routes, categoria_routes,
                      crud_routes, db_routes, escritura_routes,
                      etiquetas_trend_routes, export_routes,
                      funciones_routes, grupo_routes, historian_routes,
-                     internas_routes, lock_routes, migracion_routes, project_routes,
+                     internas_routes, constantes_routes, lock_routes, migracion_routes, project_routes,
                      proyecto_routes, rest_routes, runtime_routes,
                      sistema_routes, tema_routes, variables_routes,
                      websocket_routes, widget_routes)
@@ -42,6 +42,7 @@ from app.core.crud_manager import CrudManager
 from app.core.db_manager import DbManager
 from app.core.escritura_store import EscrituraStore
 from app.core.internas_store import InternasStore
+from app.core.constantes_store import ConstantesStore
 from app.core.variables_store import VariablesStore
 from app.db.historian import Historizador
 from app.db.widget_store import WidgetStore
@@ -125,6 +126,10 @@ async def lifespan(app: FastAPI):
     internas_store = InternasStore()
     # Para que viajen en el snapshot del WebSocket junto a los tags de campo.
     plc_manager.usar_internas(internas_store)
+    # Constantes de faceplate (datos/variables_constantes.json): valores
+    # fijos con nombre, publicados como `constante|<id>` y de solo lectura.
+    constantes_store = ConstantesStore()
+    plc_manager.usar_constantes(constantes_store)
     # El historizador escucha el MISMO flujo de tags que el WebSocket:
     # no abre una segunda sesión OPC UA ni añade carga al PLC.
     historizador = Historizador(db_manager, db_manager.store)
@@ -179,6 +184,7 @@ async def lifespan(app: FastAPI):
     app.state.escritura_store = escritura_store
     app.state.variables_store = variables_store
     app.state.internas_store = internas_store
+    app.state.constantes_store = constantes_store
     app.state.historizador = historizador
     app.state.grabador = grabador
     app.state.project_store = project_store
@@ -556,6 +562,8 @@ app.include_router(db_routes.router)
 app.include_router(migracion_routes.router)
 app.include_router(crud_routes.router)
 app.include_router(internas_routes.router)
+# Constantes de los parámetros de faceplate (datos/variables_constantes.json).
+app.include_router(constantes_routes.router)
 app.include_router(widget_routes.router)
 # Las secciones de la paleta de widgets, por proyecto.
 app.include_router(categoria_routes.router)
