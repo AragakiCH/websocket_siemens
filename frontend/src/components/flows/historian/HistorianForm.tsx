@@ -37,6 +37,23 @@ interface OpcionConexion {
   error?: string;
 }
 
+/**
+ * Cuántas filas al día va a generar el grupo en modo muestreo, para que el
+ * volumen se vea ANTES de guardar: 45 tags cada segundo son casi cuatro
+ * millones de filas diarias, y eso hay que saberlo al elegir el periodo.
+ */
+function ritmo(config: Record<string, any>): string {
+  const periodo = Math.max(100, parseInt(config.periodo_ms) || 1000);
+  const tags = config.modo_tags === 'seleccion' ? (config.tags || []).length : 0;
+  const porDia = Math.round((86_400_000 / periodo) * Math.max(tags, 1));
+  const texto = porDia >= 1_000_000
+    ? `${(porDia / 1_000_000).toFixed(1)} M`
+    : porDia.toLocaleString('es');
+  return tags > 0
+    ? `~${texto} filas/día con ${tags} tag(s).`
+    : `~${texto} filas/día POR TAG (modo «todos»: multiplica por los que haya).`;
+}
+
 export function HistorianForm({ config, connectionNodes, onChange }: Props) {
   // Modo de selección de tags. Los nodos creados antes de esta pantalla no
   // tienen `modo_tags`, así que se deduce: si traían tags, era una selección.
@@ -573,6 +590,41 @@ export function HistorianForm({ config, connectionNodes, onChange }: Props) {
         />
       </Field>
 
+      {/* Modo de captura */}
+      <Field label="Cómo se guarda">
+        <select
+          value={config.modo === 'cambios' ? 'cambios' : 'muestreo'}
+          onChange={(e) => onChange({ modo: e.target.value })}
+          className="input-field"
+        >
+          <option value="muestreo">Cada N ms, cambie o no (continuo)</option>
+          <option value="cambios">Solo cuando el valor cambia</option>
+        </select>
+        <p className="mt-0.5 text-[10px] text-slate-400">
+          {config.modo === 'cambios'
+            ? 'Ahorra filas, pero un tag que no cambia se guarda UNA vez (su valor inicial) y no vuelve a aparecer.'
+            : 'Todos los tags del grupo se guardan en cada periodo con la misma hora, estén quietos o no. Es el histórico sin huecos.'}
+        </p>
+      </Field>
+
+      {config.modo !== 'cambios' && (
+        <Field label="Periodo de muestreo (ms)">
+          <input
+            type="number"
+            value={config.periodo_ms ?? 1000}
+            onChange={(e) => onChange({ periodo_ms: parseInt(e.target.value) || 1000 })}
+            min={100}
+            step={100}
+            className="input-field"
+          />
+          <p className="mt-0.5 text-[10px] text-slate-400">
+            Mínimo 100. Volumen: {ritmo(config)}
+          </p>
+        </Field>
+      )}
+
+      {config.modo === 'cambios' && (
+      <>
       {/* Banda muerta */}
       <Field label="Banda muerta">
         <input
@@ -602,6 +654,8 @@ export function HistorianForm({ config, connectionNodes, onChange }: Props) {
           0 = sin límite. Con 1000, máx 1 fila/seg por tag.
         </p>
       </Field>
+      </>
+      )}
 
       {/* Activo */}
       <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">

@@ -124,6 +124,10 @@ export function FlowConfigPanel({ node, nodes, onUpdateConfig, onUpdateStatus, o
             tabla: (h.tabla || '').trim() || TABLA_HISTORICO_POR_DEFECTO,
             nombre: h.nombre || '',
             activo: h.activo ?? true,
+            // Muestreo a periodo fijo por defecto: un tag que no cambia
+            // también tiene que aparecer en el histórico.
+            modo: h.modo === 'cambios' ? 'cambios' : 'muestreo',
+            periodo_ms: Math.max(100, parseInt(h.periodo_ms) || 1000),
             banda_muerta: h.banda_muerta ?? 0,
             intervalo_min_ms: h.intervalo_min_ms ?? 0,
           };

@@ -85,7 +85,24 @@ class NuevoGrupo(BaseModel):
         default=0, ge=0,
         description="**Válvula de seguridad (0 = desactivada).** Tiempo mínimo "
                     "entre muestras guardadas del MISMO tag. Con 1000, un tag "
-                    "que cambia cada 100 ms solo genera 1 fila por segundo.",
+                    "que cambia cada 100 ms solo genera 1 fila por segundo. "
+                    "Solo aplica en modo `cambios`.",
+    )
+    modo: str = Field(
+        default="muestreo",
+        pattern="^(muestreo|cambios)$",
+        description="**Cómo se captura.** `muestreo` (por defecto): cada "
+                    "`periodo_ms` se guarda el valor actual de TODOS los tags "
+                    "del grupo, cambien o no — un histórico continuo, sin "
+                    "huecos para los tags que se quedan quietos. `cambios`: "
+                    "solo cuando el PLC publica un cambio; ahorra filas, pero "
+                    "un tag estático se guarda una vez y no vuelve a aparecer.",
+    )
+    periodo_ms: int = Field(
+        default=1000, ge=100,
+        description="Cada cuánto se toma la muestra en modo `muestreo`. "
+                    "Mínimo 100 ms. Cuenta el volumen: 45 tags cada 1000 ms "
+                    "son ~3,9 millones de filas al día.",
     )
 
 
@@ -214,6 +231,7 @@ async def crear_grupo(
         tabla=cuerpo.tabla, nombre=cuerpo.nombre, activo=cuerpo.activo,
         banda_muerta=cuerpo.banda_muerta,
         intervalo_min_ms=cuerpo.intervalo_min_ms,
+        modo=cuerpo.modo, periodo_ms=cuerpo.periodo_ms,
     )
     if resultado.get("ok"):
         await _avisar(request, sesion, "alta")
@@ -257,7 +275,7 @@ async def arrancar_grupo(
     request: Request, grupo_id: str,
     sesion: Sesion = Depends(exigir_rol("Administradores")),
 ) -> dict:
-    resultado = _hist(request).activar(grupo_id, True)
+    resultado = await _hist(request).activar(grupo_id, True)
     if resultado.get("ok"):
         await _avisar(request, sesion, "activado")
     return resultado
@@ -267,8 +285,11 @@ async def arrancar_grupo(
     "/historian/{grupo_id}/stop",
     tags=TAG,
     summary="Pausar la captura de un grupo",
-    description="Deja de guardar, sin borrar la configuración ni los datos. "
-                "Lo pendiente en el buffer se escribirá en el siguiente ciclo.",
+    description="Deja de guardar **en el acto**, sin borrar la configuración "
+                "ni los datos: se para el muestreador y lo pendiente en el "
+                "buffer se vuelca de una vez en esta misma llamada (la "
+                "respuesta dice cuántas filas eran). Después de esto no entra "
+                "ni una fila más hasta un `start`.",
     responses={200: {"content": {"application/json": {"example": {
         "ok": True, "grupo_id": "proceso", "activo": False,
         "mensaje": "Grupo 'proceso' detenido.",
@@ -278,7 +299,7 @@ async def parar_grupo(
     request: Request, grupo_id: str,
     sesion: Sesion = Depends(exigir_rol("Administradores")),
 ) -> dict:
-    resultado = _hist(request).activar(grupo_id, False)
+    resultado = await _hist(request).activar(grupo_id, False)
     if resultado.get("ok"):
         await _avisar(request, sesion, "pausado")
     return resultado

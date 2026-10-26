@@ -391,7 +391,11 @@ export function FlowEditor() {
 
   const updateStatus = useCallback((id: string, status: FlowNodeData['status'], msg?: string) => {
     setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, status, statusMsg: msg } : n)));
-  }, []);
+    // Un Start/Stop/Historian guardado cambia el estado del grupo EN EL
+    // SERVIDOR; el sondeo lo trae cada 8 s, pero quien acaba de pulsar Stop
+    // quiere ver «detenido» ya, no dentro de ocho segundos.
+    if (status === 'ok') refrescarGrupos();
+  }, [refrescarGrupos]);
 
   // ── Linking ───────────────────────────────────────────────────
   const startLink = useCallback((fromId: string) => {

@@ -132,7 +132,10 @@ async def lifespan(app: FastAPI):
     plc_manager.usar_constantes(constantes_store)
     # El historizador escucha el MISMO flujo de tags que el WebSocket:
     # no abre una segunda sesión OPC UA ni añade carga al PLC.
-    historizador = Historizador(db_manager, db_manager.store)
+    # Y para el modo `muestreo` necesita el PlcManager: de ahí saca el valor
+    # ACTUAL de cada tag en cada periodo, cambie o no.
+    historizador = Historizador(db_manager, db_manager.store,
+                                plc_manager=plc_manager)
     # El grabador comparte el mismo flujo de tags: mantiene en memoria el
     # último valor de cada uno y lo muestrea a intervalo fijo.
     grabador = Grabador(plc_manager)

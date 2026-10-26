@@ -361,6 +361,11 @@ export interface GrupoRemoto {
   todos_los_tags: boolean;
   banda_muerta: number;
   intervalo_min_ms: number;
+  /** 'muestreo' (cada `periodo_ms`, cambien o no) o 'cambios'. */
+  modo?: 'muestreo' | 'cambios';
+  periodo_ms?: number;
+  /** ISO de la última parada, '' si está activo. */
+  detenido_en?: string;
   filas_escritas: number;
   filas_descartadas: number;
   ultima_escritura: string;

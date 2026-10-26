@@ -89,6 +89,11 @@ export const NODE_CATALOG: NodeCatalogEntry[] = [
       tabla: TABLA_HISTORICO_POR_DEFECTO,
       nombre: '',
       activo: true,
+      // 'muestreo': cada `periodo_ms` se guarda el valor actual de todos los
+      // tags, cambien o no (histórico continuo). 'cambios': solo cuando el
+      // PLC publica un cambio (un tag quieto se guarda una vez y ya).
+      modo: 'muestreo',
+      periodo_ms: 1000,
       banda_muerta: 0,
       intervalo_min_ms: 0,
     },
