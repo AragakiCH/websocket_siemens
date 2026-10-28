@@ -520,6 +520,30 @@ async def provisionar(
         except Exception as exc:  # noqa: BLE001
             diag = diagnosticar(exc, motor=motor, host=host, puerto=puerto,
                                 base_datos=base, opciones=opciones)
+            # Msg 15118: SQL Server aplica la política de contraseñas de
+            # Windows (mayúscula, minúscula, número, símbolo, y que no
+            # contenga el nombre del usuario). El texto del driver viene en
+            # inglés y habla de «operating system policy», que no orienta a
+            # nadie: se dice en claro qué contraseña hace falta.
+            if "15118" in str(exc) or "not complex enough" in str(exc):
+                diag = {
+                    **diag,
+                    "codigo": "password_debil",
+                    "titulo": "SQL Server rechazó la contraseña del usuario",
+                    "mensaje": (
+                        f"La contraseña de '{usuario_hmi}' no cumple la "
+                        f"política de contraseñas de Windows que aplica este "
+                        f"SQL Server. La base y las tablas ya están: solo "
+                        f"falta el usuario."
+                    ),
+                    "sugerencia": (
+                        "Escribe arriba una contraseña con mayúscula, "
+                        "minúscula, número y símbolo, de 8 o más caracteres, "
+                        "y que NO contenga el nombre del usuario "
+                        f"('{usuario_hmi}'). Ejemplo: Scada2026!Hmi. Luego "
+                        "pulsa «Crear el usuario» otra vez."
+                    ),
+                }
             return {"ok": False, "pasos": pasos.items, "diagnostico": diag,
                     "mensaje": f"{hecho_base} y las tablas están, pero no se "
                                f"pudo crear el usuario: {diag['titulo']}."}
@@ -534,11 +558,20 @@ async def provisionar(
     usuario_prueba = usuario_verificar or usuario_hmi
     password_prueba = password_verificar or password_hmi
     if usuario_prueba and password_prueba:
+        # SIN `Trusted_Connection`. Con «autenticación de Windows» marcada,
+        # `opciones` lleva `Trusted_Connection=yes`, y ODBC entonces IGNORA
+        # usuario y contraseña y entra con la cuenta de Windows: la prueba
+        # decía «'administrador' entra y ve 8 tablas» en un servidor en modo
+        # «solo Windows» donde ese login no podía entrar, y un segundo
+        # después la conexión real fallaba con 18456. La verificación tiene
+        # que hacerse EXACTAMENTE como va a conectar el HMI.
+        opciones_prueba = {k: v for k, v in opciones.items()
+                           if k.lower() not in ("trusted_connection", "trustedconnection")}
         try:
             comprobante = SqlDriver(
                 motor=motor, host=host, puerto=puerto, base_datos=base,
                 usuario=usuario_prueba, password=password_prueba,
-                opciones=opciones,
+                opciones=opciones_prueba,
             )
             await comprobante.connect()
             try:
