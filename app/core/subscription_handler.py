@@ -270,6 +270,9 @@ class SubscriptionHandler:
             "modelo": getattr(self._driver, "modelo", "") or "",
             # Último fallo de conexión, para que "Desconectado" diga POR QUÉ.
             "ultimo_error": self.ultimo_error,
+            # Tags cuyo MonitoredItem rechazó el servidor (tope de la CPU):
+            # solo se actualizan con la lectura de contraste del watchdog.
+            "sin_monitorizar": len(getattr(self._driver, "sin_monitorizar", {}) or {}),
             # Intervalos configurados: cada cuánto se muestrea y se publica.
             "sampling_interval_ms": self._settings.sampling_interval_ms,
             "publishing_interval_ms": self._settings.publishing_interval_ms,
@@ -330,7 +333,17 @@ class SubscriptionHandler:
 
         tv = await self._driver.write_tag(node_id, valor)
         if tv is not None:
-            self._snapshot[tv.tag] = tv
+            # SNAPSHOT **Y** BROADCAST. Antes solo se actualizaba el snapshot
+            # en memoria, y las vistas no se enteraban: Configuración seguía
+            # enseñando el valor viejo y el widget, al terminar de editar,
+            # volvía a pintar el de su lista, que era el viejo. Y la red de
+            # seguridad tampoco lo arreglaba: la reconciliación compara el
+            # PLC con ESTE snapshot, que ya tenía el valor nuevo, así que
+            # «no había nada que difundir». Si además el tag no tenía
+            # MonitoredItem (tope de la CPU), el valor escrito no llegaba a
+            # la pantalla NUNCA. Difundirlo aquí cierra el círculo por la
+            # misma ruta que un cambio del PLC.
+            await self._difundir_valor(tv)
         return tv
 
     def num_tags(self) -> int:

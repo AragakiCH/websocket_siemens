@@ -16,7 +16,9 @@ Implementación concreta del driver de PLC sobre OPC UA usando la librería
 """
 from __future__ import annotations
 
+import asyncio
 import logging
+import math
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
@@ -36,6 +38,34 @@ logger = logging.getLogger("opcua_driver")
 # Nodos por petición `Read` en `read_tags`. Muy por debajo del límite
 # habitual del S7-1500 (MaxNodesPerRead ≈ 1000) para no rozarlo nunca.
 LOTE_LECTURA = 250
+
+# MonitoredItems por petición CreateMonitoredItems. Un S7-1500 acepta
+# cientos por petición; trocear evita un único request enorme que el servidor
+# rechace entero, y deja ver POR TROZO cuáles aceptó y cuáles no.
+LOTE_SUSCRIPCION = 500
+
+# Confirmación de una escritura: el servidor OPC UA del S7-1500 contesta a un
+# Read con el valor de su CACHÉ, que refresca cada «minimum sampling
+# interval» (100 ms de fábrica). Releer en el mismo milisegundo que se
+# escribió devuelve el valor VIEJO, y entonces la aplicación guardaba en su
+# snapshot el 0 que había, no el 777 que acababa de escribir, y encima decía
+# «el PLC no guardó ese valor». Se relee hasta que coincida o se agote el
+# plazo (8 x 75 ms = 600 ms): si tras eso sigue distinto, es que el programa
+# del PLC lo pisó de verdad, y ESO sí hay que decirlo.
+CONFIRMACION_INTENTOS = 8
+CONFIRMACION_ESPERA_S = 0.075
+
+
+def _coincide(leido: object, escrito: object) -> bool:
+    """Igualdad con tolerancia para decimales (un REAL de 32 bits recorta)."""
+    if isinstance(leido, bool) or isinstance(escrito, bool):
+        return leido == escrito
+    if isinstance(leido, float) or isinstance(escrito, float):
+        try:
+            return math.isclose(float(leido), float(escrito), rel_tol=1e-6, abs_tol=1e-9)
+        except (TypeError, ValueError):
+            return False
+    return leido == escrito
 
 # Nombres de nodos internos / metadata que NO son variables de datos reales.
 NODOS_IGNORADOS = {"Icon", "InputArguments", "OutputArguments"}
@@ -185,6 +215,13 @@ class OpcUaDriver(PlcDriver):
         # La subscription dejó de valer (StatusChangeNotification del
         # servidor). La lee `subscription_viva()`; la limpia `subscribe()`.
         self.subscription_caida: bool = False
+        # Tags cuyo MonitoredItem el servidor RECHAZÓ al suscribir (p. ej.
+        # BadTooManyMonitoredItems: cada CPU tiene un tope, y 3.000 tags lo
+        # pasan en muchas). Esos no reciben notificaciones: solo los pone al
+        # día la lectura de contraste del SubscriptionHandler. Se guarda para
+        # decirlo en el estado y en el log, en vez de fingir que todo va.
+        self.sin_monitorizar: Dict[str, str] = {}
+        self._aviso_lectura: bool = False
 
         # Estado compartido con el handler.
         self.tag_por_nodeid: Dict[str, TagInfo] = {}
@@ -516,28 +553,67 @@ class OpcUaDriver(PlcDriver):
 
         # sampling_interval = cada cuánto el server MUESTREA cada tag (ms).
         muestreo = float(self._settings.sampling_interval_ms)
-        try:
-            handles = await self._subscription.subscribe_data_change(
-                nodos,
-                queuesize=self._settings.subscription_queue_size,
-                sampling_interval=muestreo,
-            )
-            self._handles = handles if isinstance(handles, list) else [handles]
+        self._handles = []
+        self.sin_monitorizar = {}
+
+        # POR TROZOS, Y MIRANDO LA RESPUESTA DE CADA UNO.
+        #
+        # `subscribe_data_change` con una lista NO lanza si el servidor
+        # rechaza parte de los items: devuelve un `ua.StatusCode` en la
+        # posición de cada rechazado y un handle en las demás. Antes se
+        # guardaba esa lista tal cual y se anunciaba «3226 MonitoredItems»
+        # aunque la CPU hubiera aceptado 1000: los tags del final del browse
+        # se quedaban sin notificaciones y nadie lo sabía — «escribo en TIA y
+        # aquí nunca cambia». Ahora cada rechazo se cuenta, se nombra y se
+        # recuerda (`sin_monitorizar`), y el SubscriptionHandler los cubre con
+        # su lectura de contraste.
+        for i in range(0, len(nodos), LOTE_SUSCRIPCION):
+            trozo_nodos = nodos[i:i + LOTE_SUSCRIPCION]
+            trozo_tags = tags[i:i + LOTE_SUSCRIPCION]
+            try:
+                handles = await self._subscription.subscribe_data_change(
+                    trozo_nodos,
+                    queuesize=self._settings.subscription_queue_size,
+                    sampling_interval=muestreo,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Suscripción del trozo %d-%d falló (%s). "
+                               "Suscribo uno a uno.", i, i + len(trozo_nodos), exc)
+                for nodo, info in zip(trozo_nodos, trozo_tags):
+                    try:
+                        h = await self._subscription.subscribe_data_change(
+                            nodo, queuesize=self._settings.subscription_queue_size,
+                            sampling_interval=muestreo,
+                        )
+                        self._handles.append(h if not isinstance(h, list) else h[0])
+                    except Exception as e2:  # noqa: BLE001
+                        self.sin_monitorizar[info.full_name] = str(e2)
+                continue
+            if not isinstance(handles, list):
+                handles = [handles]
+            for h, info in zip(handles, trozo_tags):
+                if isinstance(h, ua.StatusCode):
+                    self.sin_monitorizar[info.full_name] = h.name
+                else:
+                    self._handles.append(h)
+
+        aceptados = len(self._handles)
+        if self.sin_monitorizar:
+            motivos: Dict[str, int] = {}
+            for m in self.sin_monitorizar.values():
+                motivos[m] = motivos.get(m, 0) + 1
+            ejemplos = ", ".join(list(self.sin_monitorizar)[:5])
+            logger.warning(
+                "Subscription: el servidor aceptó %d de %d MonitoredItems y "
+                "RECHAZÓ %d (%s). Esos tags no reciben cambios en tiempo real "
+                "—la CPU tiene un tope de items monitorizados—; se actualizan "
+                "con la lectura de contraste del watchdog. Primeros: %s",
+                aceptados, len(nodos), len(self.sin_monitorizar),
+                ", ".join(f"{k}: {v}" for k, v in motivos.items()), ejemplos)
+        else:
             logger.info("Subscription: %d MonitoredItems (publish=%dms, sampling=%dms).",
-                        len(nodos), self._settings.publishing_interval_ms,
+                        aceptados, self._settings.publishing_interval_ms,
                         self._settings.sampling_interval_ms)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Suscripción en lote falló (%s). Suscribo uno a uno.", exc)
-            self._handles = []
-            for nodo, info in zip(nodos, tags):
-                try:
-                    h = await self._subscription.subscribe_data_change(
-                        nodo, queuesize=self._settings.subscription_queue_size,
-                        sampling_interval=muestreo,
-                    )
-                    self._handles.append(h if not isinstance(h, list) else h[0])
-                except Exception as e2:  # noqa: BLE001
-                    logger.warning("No se pudo suscribir %s: %s", info.full_name, e2)
 
     def subscription_viva(self) -> bool:
         return not self.subscription_caida
@@ -560,15 +636,29 @@ class OpcUaDriver(PlcDriver):
         for i in range(0, len(node_ids), LOTE_LECTURA):
             lote = node_ids[i:i + LOTE_LECTURA]
             try:
-                valores = await self._client.read_values(
-                    [self._client.get_node(n) for n in lote]
+                # `read_attributes` y no `read_values`: trae el StatusCode de
+                # CADA item. Un tag que el servidor no puede leer (un STRUCT,
+                # un tipo raro) no debe convertirse en un `None` que luego
+                # parezca «el PLC lo puso a nada», ni tumbar el lote entero.
+                datos = await self._client.read_attributes(
+                    [self._client.get_node(n) for n in lote],
+                    attr=ua.AttributeIds.Value,
                 )
             except Exception as exc:  # noqa: BLE001
-                logger.debug("Lectura en bloque fallida (%d nodos): %s",
-                             len(lote), exc)
+                if not self._aviso_lectura:
+                    self._aviso_lectura = True
+                    logger.warning("Lectura en bloque fallida (%d nodos): %s. "
+                                   "La lectura de contraste no funciona para "
+                                   "ese tramo (se avisa una vez).",
+                                   len(lote), exc)
                 salida.extend([None] * len(lote))
                 continue
-            for node_id, valor in zip(lote, valores):
+            for node_id, dv in zip(lote, datos):
+                sc = getattr(dv, "StatusCode", None)
+                if dv is None or dv.Value is None or (sc is not None and not sc.is_good()):
+                    salida.append(None)
+                    continue
+                valor = dv.Value.Value
                 info = self.tag_por_nodeid.get(node_id)
                 salida.append(TagValue(
                     tag=info.full_name if info else node_id,
@@ -576,6 +666,8 @@ class OpcUaDriver(PlcDriver):
                     data_type=info.data_type if info else type(valor).__name__,
                     timestamp=ahora,
                     node_id=node_id,
+                    source_ts=_dt_iso(getattr(dv, "SourceTimestamp", None)),
+                    server_ts=_dt_iso(getattr(dv, "ServerTimestamp", None)),
                 ))
         return salida
 
@@ -645,7 +737,27 @@ class OpcUaDriver(PlcDriver):
         logger.info("Escrito %s = %r en %s",
                     info.full_name if info else node_id, valor_convertido,
                     self._settings.opcua_endpoint)
-        return await self.read_tag(node_id)
+
+        # Releer HASTA que el servidor refleje lo escrito (ver
+        # CONFIRMACION_INTENTOS). La primera lectura suele traer todavía el
+        # valor de la caché anterior.
+        tv = await self.read_tag(node_id)
+        intentos = 1
+        while not _coincide(tv.value, valor_convertido) and intentos < CONFIRMACION_INTENTOS:
+            await asyncio.sleep(CONFIRMACION_ESPERA_S)
+            tv = await self.read_tag(node_id)
+            intentos += 1
+        if not _coincide(tv.value, valor_convertido):
+            logger.warning("Tras escribir %s = %r, el PLC devuelve %r "
+                           "(%d relecturas en %.0f ms): el programa lo pisa "
+                           "o el servidor no lo refresca.",
+                           info.full_name if info else node_id, valor_convertido,
+                           tv.value, intentos,
+                           intentos * CONFIRMACION_ESPERA_S * 1000)
+        elif intentos > 1:
+            logger.debug("Escritura de %s confirmada a la relectura %d.",
+                         info.full_name if info else node_id, intentos)
+        return tv
 
     # ==================================================================== #
     # Watchdog
