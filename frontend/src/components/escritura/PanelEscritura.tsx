@@ -31,6 +31,8 @@
 // de temperatura cuyo máximo real son 90 °C. Los límites son la segunda red.
 // =========================================================================
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertTriangleIcon,
   CheckIcon,
@@ -46,6 +48,8 @@ import {
   candidatos as pedirCandidatos,
   habilitar as habilitarTag,
   deshabilitar as deshabilitarTag,
+  habilitarLote,
+  deshabilitarLote,
   type TagCandidato } from
 '../../services/escrituraApi';
 
@@ -303,6 +307,18 @@ export function PanelEscritura({ plcs, onEstado, buscaInicial = '' }: Props) {
   const [guardando, setGuardando] = useState('');
   const [errorFila, setErrorFila] = useState('');
 
+  // «Habilitar todas / Deshabilitar todas»: la confirmación abierta, si la
+  // hay, y el resultado del último lote.
+  const [confirmarLote, setConfirmarLote] = useState<null | 'habilitar' | 'deshabilitar'>(null);
+  const [aplicandoLote, setAplicandoLote] = useState(false);
+  const [resultadoLote, setResultadoLote] = useState('');
+  // El aviso del resultado se va solo a los 3 s (sigue pudiendo cerrarse a mano).
+  useEffect(() => {
+    if (!resultadoLote) return;
+    const reloj = window.setTimeout(() => setResultadoLote(''), 3000);
+    return () => window.clearTimeout(reloj);
+  }, [resultadoLote]);
+
   // El primer PLC en cuanto se sepa cuáles hay. Con uno solo —el caso normal—
   // la pantalla llega ya cargada y no hay que elegir nada.
   useEffect(() => {
@@ -357,6 +373,42 @@ export function PanelEscritura({ plcs, onEstado, buscaInicial = '' }: Props) {
   }, [lista, busca, soloActivos]);
 
   const visibles = filtrados.slice(0, TOPE_FILAS);
+
+  // Lo que cambiaría cada botón: TODO lo que coincide con el filtro (PLC,
+  // buscador, «Solo habilitados»), no solo las 300 filas que se dibujan.
+  const porHabilitar = useMemo(() => filtrados.filter((c) => !c.habilitado), [filtrados]);
+  const porQuitar = useMemo(() => filtrados.filter((c) => c.habilitado), [filtrados]);
+  const plcNombre = plcs.find((p) => p.id === plcId)?.nombre ?? plcId;
+
+  const aplicarLote = async (modo: 'habilitar' | 'deshabilitar') => {
+    setAplicandoLote(true);
+    setErrorFila('');
+    setResultadoLote('');
+    try {
+      if (modo === 'habilitar') {
+        const r = await habilitarLote(plcId, porHabilitar.map((c) => c.tag));
+        setResultadoLote(
+          `${r.habilitados} habilitada${r.habilitados === 1 ? '' : 's'}` +
+            (r.omitidos.length
+              ? ` · ${r.omitidos.length} saltada${r.omitidos.length === 1 ? '' : 's'} ` +
+                `(${r.omitidos.slice(0, 3).map((o) => `${o.tag}: ${o.motivo}`).join('; ')}` +
+                `${r.omitidos.length > 3 ? '…' : ''})`
+              : '')
+        );
+      } else {
+        const r = await deshabilitarLote(plcId, porQuitar.map((c) => c.tag));
+        setResultadoLote(`${r.quitados} deshabilitada${r.quitados === 1 ? '' : 's'}`);
+      }
+      setEditando(null);
+      setConfirmarLote(null);
+      await cargar(plcId);
+    } catch (e: any) {
+      setErrorFila(e?.message ?? 'El servidor rechazó el cambio.');
+      setConfirmarLote(null);
+    } finally {
+      setAplicandoLote(false);
+    }
+  };
 
   /**
    * Alta o cambio de límites.
@@ -509,8 +561,33 @@ export function PanelEscritura({ plcs, onEstado, buscaInicial = '' }: Props) {
         </p>
       }
 
-      {/* ── Resumen ────────────────────────────────────────────── */}
+      {/* Aviso FLOTANTE abajo al centro (no ocupa sitio en la página):
+          entra subiendo, se va solo a los 3 s y se puede cerrar con la X. */}
+      {createPortal(
+      <AnimatePresence>
+          {resultadoLote &&
+        <motion.div
+          key="aviso-lote"
+          role="status"
+          initial={{ opacity: 0, y: 16, x: '-50%' }}
+          animate={{ opacity: 1, y: 0, x: '-50%' }}
+          exit={{ opacity: 0, y: 16, x: '-50%' }}
+          transition={{ duration: 0.18 }}
+          className="fixed bottom-6 left-1/2 z-[9999] flex max-w-[min(92vw,560px)] items-start gap-2 rounded-xl border border-siemens/30 bg-white px-4 py-2.5 text-xs font-semibold text-siemens shadow-2xl dark:bg-navy-soft">
+              <CheckIcon className="mt-px h-4 w-4 shrink-0" />
+              <span className="min-w-0 text-navy dark:text-slate-100">{resultadoLote}</span>
+              <button type="button" onClick={() => setResultadoLote('')} aria-label="Cerrar" className="ml-1 shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <XIcon className="h-3.5 w-3.5" />
+              </button>
+            </motion.div>
+        }
+        </AnimatePresence>,
+      document.body
+    )}
+
+      {/* ── Resumen + «Habilitar / Deshabilitar todas» ─────────── */}
       {!sinPermiso && !error &&
+      <div className="flex flex-wrap items-center justify-between gap-2">
       <p className="text-[11.5px] text-slate-400">
           <span className="font-bold text-siemens tabular-nums">{habilitados}</span>
           {' '}habilitado{habilitados === 1 ? '' : 's'} de{' '}
@@ -521,6 +598,79 @@ export function PanelEscritura({ plcs, onEstado, buscaInicial = '' }: Props) {
         <> · <span className="tabular-nums">{filtrados.length}</span> en el filtro</> :
         null}
         </p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            disabled={cargando || aplicandoLote || porHabilitar.length === 0}
+            onClick={() => setConfirmarLote('habilitar')}
+            title={busca || soloActivos ? 'Habilitar todas las del filtro' : 'Habilitar todas las de este PLC'}
+            className="rounded-lg border border-siemens/40 bg-siemens/10 px-2.5 py-1.5 text-[11.5px] font-semibold text-siemens transition hover:bg-siemens/20 disabled:cursor-not-allowed disabled:opacity-40">
+            Habilitar todas ({porHabilitar.length})
+          </button>
+          <button
+            type="button"
+            disabled={cargando || aplicandoLote || porQuitar.length === 0}
+            onClick={() => setConfirmarLote('deshabilitar')}
+            title={busca || soloActivos ? 'Deshabilitar todas las del filtro' : 'Deshabilitar todas las de este PLC'}
+            className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-[11.5px] font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-navy-slate dark:text-slate-300 dark:hover:bg-navy-slate/40">
+            Deshabilitar todas ({porQuitar.length})
+          </button>
+        </div>
+      </div>
+      }
+
+      {/* ── Confirmación del lote ── siempre: habilitar miles de tags de
+          golpe es justo lo que el aviso de arriba pide pensar dos veces. */}
+      {confirmarLote &&
+      <div
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4"
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget && !aplicandoLote) setConfirmarLote(null);
+        }}>
+          <div
+          role="dialog"
+          aria-label={confirmarLote === 'habilitar' ? 'Habilitar todas' : 'Deshabilitar todas'}
+          className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-navy-slate dark:bg-navy-soft">
+            <h3 className="text-base font-bold text-navy dark:text-slate-100">
+              {confirmarLote === 'habilitar' ? 'Habilitar para escritura' : 'Deshabilitar escritura'}
+            </h3>
+            <p className="mt-2 text-[13px] leading-relaxed text-slate-600 dark:text-slate-300">
+              {confirmarLote === 'habilitar' ?
+            <>Se habilitarán <b>{porHabilitar.length}</b> tag{porHabilitar.length === 1 ? '' : 's'}</> :
+            <>Se deshabilitarán <b>{porQuitar.length}</b> tag{porQuitar.length === 1 ? '' : 's'}</>}{' '}
+              de <b>{plcNombre}</b>
+              {busca || soloActivos ? ' (los que coinciden con el filtro)' : ''}.
+            </p>
+            {confirmarLote === 'habilitar' ?
+          <p className="mt-2 rounded-lg border border-state-warn/30 bg-state-warn/[0.07] px-3 py-2 text-[12px] leading-relaxed text-slate-600 dark:text-slate-300">
+                <b className="text-state-warn">Habilita solo lo que el programa del PLC NO escriba.</b>{' '}
+                Las nuevas entran sin límites; las que ya estaban conservan los suyos.
+              </p> :
+          <p className="mt-2 text-[12px] leading-relaxed text-slate-500 dark:text-slate-400">
+                Desde ese momento el HMI no podrá escribir en ellos. No cambia nada en el PLC.
+              </p>
+          }
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+              type="button"
+              disabled={aplicandoLote}
+              onClick={() => setConfirmarLote(null)}
+              className="rounded-lg border border-slate-300 px-3.5 py-1.5 text-sm font-semibold text-navy transition hover:bg-slate-100 disabled:opacity-50 dark:border-navy-slate dark:text-slate-100 dark:hover:bg-navy-slate/40">
+                Cancelar
+              </button>
+              <button
+              type="button"
+              disabled={aplicandoLote}
+              onClick={() => void aplicarLote(confirmarLote)}
+              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold text-white transition disabled:opacity-60 ${
+              confirmarLote === 'habilitar' ? 'bg-siemens hover:brightness-110' : 'bg-state-error hover:brightness-110'}`
+              }>
+                {aplicandoLote && <Loader2Icon className="h-3.5 w-3.5 animate-spin" />}
+                {confirmarLote === 'habilitar' ? 'Habilitar' : 'Deshabilitar'}
+              </button>
+            </div>
+          </div>
+        </div>
       }
 
       {/* ── Contenido ──────────────────────────────────────────── */}

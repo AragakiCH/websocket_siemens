@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
@@ -104,6 +105,30 @@ logger = logging.getLogger("plc_manager")
 
 # Marcas soportadas.
 VENDORS = ("siemens", "rexroth", "allenbradley")
+
+
+def valor_coincide(confirmado, escrito) -> bool:
+    """
+    ¿El PLC se quedó con lo que se le escribió?
+
+    Los DECIMALES se comparan con tolerancia, no con `==`. Un REAL del PLC es
+    de 32 bits y guarda el decimal binario más cercano: se escribe 12.8585 y
+    al releerlo vuelve 12.858499526977539. Es el mismo valor (la diferencia va
+    en la 8.ª cifra), pero con `==` salía «el PLC no guardó ese valor». Una
+    millonésima relativa cubre de sobra esa precisión, y un valor de verdad
+    distinto (el programa lo pisó a 0 o a 13) sigue saliendo como distinto.
+
+    Enteros, booleanos y textos se siguen comparando exactos.
+    """
+    if isinstance(confirmado, bool) or isinstance(escrito, bool):
+        return confirmado == escrito
+    if isinstance(confirmado, float) or isinstance(escrito, float):
+        try:
+            a, b = float(confirmado), float(escrito)
+        except (TypeError, ValueError):
+            return False
+        return math.isclose(a, b, rel_tol=1e-6, abs_tol=1e-9)
+    return confirmado == escrito
 
 
 def _ahora_iso() -> str:
@@ -811,7 +836,7 @@ class PlcManager:
                     # El PLC pudo guardar algo distinto de lo pedido. Decirlo
                     # explícitamente evita que la interfaz dé por bueno algo
                     # que no lo es.
-                    "coincide": (tv is not None and tv.value == p["valor"]),
+                    "coincide": (tv is not None and valor_coincide(tv.value, p["valor"])),
                     "ok": True,
                 })
             except Exception as exc:  # noqa: BLE001

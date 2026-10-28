@@ -177,6 +177,51 @@ class EscrituraStore:
                     "(rango %s..%s).", tag, plc_id, usuario or "?", minimo, maximo)
         return entrada
 
+    def habilitar_lote(self, plc_id: str, entradas: List[dict], usuario: str = "") -> int:
+        """
+        Habilita varios tags de un PLC de una vez y guarda el fichero UNA vez.
+
+        `entradas`: `[{tag, node_id, data_type}]`, ya comprobadas contra el PLC
+        por quien llama. Un tag que YA estaba habilitado conserva sus límites,
+        su descripción y quién lo habilitó: «habilitar todas» no puede borrar
+        los topes que alguien puso a mano.
+        """
+        if not plc_id:
+            raise ValueError("Hace falta el plc_id.")
+        nuevos = 0
+        ahora = _ahora_iso()
+        for e in entradas:
+            tag = e.get("tag") or ""
+            if not tag:
+                continue
+            clave = f"{plc_id}|{tag}"
+            if clave in self.tags:
+                continue
+            self.tags[clave] = TagEscribible(
+                plc_id=plc_id, tag=tag, node_id=e.get("node_id") or "",
+                data_type=e.get("data_type") or "", minimo=None, maximo=None,
+                descripcion="", habilitado_por=usuario, habilitado_en=ahora,
+                actualizado_en=ahora,
+            )
+            nuevos += 1
+        if nuevos:
+            self._escribir()
+            logger.info("%d tag(s) del PLC '%s' habilitados para escritura por %s "
+                        "(en lote).", nuevos, plc_id, usuario or "?")
+        return nuevos
+
+    def deshabilitar_lote(self, plc_id: str, tags: List[str]) -> int:
+        """Quita varios tags de la lista blanca y guarda UNA vez. Devuelve cuántos."""
+        quitados = 0
+        for tag in tags:
+            if self.tags.pop(f"{plc_id}|{tag}", None) is not None:
+                quitados += 1
+        if quitados:
+            self._escribir()
+            logger.info("%d tag(s) del PLC '%s' YA NO son escribibles (en lote).",
+                        quitados, plc_id)
+        return quitados
+
     def deshabilitar(self, plc_id: str, tag: str) -> bool:
         clave = f"{plc_id}|{tag}"
         if clave not in self.tags:

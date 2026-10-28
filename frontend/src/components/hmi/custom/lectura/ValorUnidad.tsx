@@ -54,6 +54,19 @@ import {
 
 // ─── Config ──────────────────────────────────────────────────────
 
+
+/**
+ * El valor releído del PLC, para el aviso: un REAL vuelve como
+ * 12.858499526977539 y eso es ruido de la precisión de 32 bits; se enseña
+ * con 7 cifras significativas (12.8585). Enteros, textos y bools, tal cual.
+ */
+function fmtConfirmado(v: unknown): string {
+  if (typeof v === 'number' && Number.isFinite(v) && !Number.isInteger(v)) {
+    return String(Number(v.toPrecision(7)));
+  }
+  return String(v);
+}
+
 export type ModoValor = 'lectura' | 'escritura';
 
 export interface ConfigValorUnidad {
@@ -269,7 +282,7 @@ function ValorUnidad({ widget, variable, interactivo }: RenderCtx) {
       // al operario convencido de haber cambiado algo que sigue igual.
       const uno = r?.resultados?.[0];
       if (uno && uno.coincide === false) {
-        decir(`El PLC no guardó ese valor: quedó en ${uno.confirmado}.`);
+        decir(`El PLC no guardó ese valor: quedó en ${fmtConfirmado(uno.confirmado)}.`);
       }
     } catch (e: any) {
       decir(e?.message ?? 'No se pudo escribir.');

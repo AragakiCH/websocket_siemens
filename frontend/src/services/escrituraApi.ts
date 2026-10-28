@@ -197,17 +197,47 @@ export async function habilitar(entrada: {
 }
 
 /**
- * Saca un tag de la lista blanca. `DELETE`.
+ * Saca un tag de la lista blanca.
  *
- * Los dos trozos van codificados por separado: un tag es `PLC_PRG.rSetPoint` y
- * un `plc_id` puede ser una IP — los dos llevan puntos, y alguno podría traer
- * algo peor. Sin codificar, el tag se comería un segmento de la ruta.
+ * Va por `POST /escritura/permitidos/quitar` con el tag en el CUERPO, no en la
+ * ruta. Antes era `DELETE /escritura/permitidos/<plc>/<tag>`, y un tag con `/`
+ * en el nombre («…LINEA 3/4») fallaba con 405: aunque se codifique como
+ * `%2F`, el servidor lo decodifica antes de buscar la ruta, la dirección queda
+ * con un tramo de más y cae en la de la página del HMI, que solo admite GET.
  */
 export async function deshabilitar(plcId: string, tag: string): Promise<any> {
-  const r = await fetchAuth(
-    `/escritura/permitidos/${encodeURIComponent(plcId)}/${encodeURIComponent(tag)}`,
-    { method: 'DELETE' }
-  );
+  return deshabilitarLote(plcId, [tag]);
+}
+
+export interface ResultadoLoteAlta {
+  habilitados: number;
+  ya_estaban: number;
+  omitidos: { tag: string; motivo: string }[];
+}
+
+/** «Habilitar todas»: varios tags de un PLC en una sola petición. */
+export async function habilitarLote(plcId: string, tags: string[]): Promise<ResultadoLoteAlta> {
+  const r = await fetchAuth('/escritura/permitidos/lote', {
+    method: 'PUT',
+    body: JSON.stringify({ plc_id: plcId, tags }),
+  });
   olvidarPermitidos();
-  return r;
+  return {
+    habilitados: Number(r?.habilitados) || 0,
+    ya_estaban: Number(r?.ya_estaban) || 0,
+    omitidos: Array.isArray(r?.omitidos) ? r.omitidos : [],
+  };
+}
+
+/** «Deshabilitar todas» (y el interruptor de una fila): tags en el cuerpo. */
+export async function deshabilitarLote(
+  plcId: string,
+  tags: string[]
+): Promise<{ quitados: number; no_estaban: number }> {
+  const r = await fetchAuth('/escritura/permitidos/quitar', {
+    method: 'POST',
+    body: JSON.stringify({ plc_id: plcId, tags }),
+  });
+  olvidarPermitidos();
+  return { quitados: Number(r?.quitados) || 0, no_estaban: Number(r?.no_estaban) || 0 };
 }

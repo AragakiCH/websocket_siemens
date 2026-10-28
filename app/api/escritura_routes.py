@@ -7,7 +7,9 @@ Escribir valores en el PLC, y decidir en qué se puede escribir.
     POST   /escritura                    escribir uno o varios tags
     GET    /escritura/permitidos         lista blanca actual
     PUT    /escritura/permitidos         habilitar un tag (o cambiar límites)
-    DELETE /escritura/permitidos/{...}   deshabilitarlo
+    PUT    /escritura/permitidos/lote    habilitar varios de una vez
+    POST   /escritura/permitidos/quitar  deshabilitar uno o varios (tag en el CUERPO)
+    DELETE /escritura/permitidos/{...}   deshabilitar uno (tag en la ruta; ver abajo)
     GET    /escritura/candidatos         tags del PLC que se PODRÍAN habilitar
 
 POR QUÉ LA ESCRITURA VA EN SU PROPIO MÓDULO
@@ -274,6 +276,89 @@ async def habilitar(
               "maximo": cuerpo.maximo, "data_type": info.data_type})
     return {"ok": True, "tag": entrada.publico(),
             "mensaje": f"'{info.full_name}' habilitado para escritura."}
+
+
+class LoteTags(BaseModel):
+    plc_id: str = Field(..., min_length=1)
+    tags: List[str] = Field(..., max_length=20000,
+                            description="Nombres completos de los tags.")
+
+
+@router.put(
+    "/escritura/permitidos/lote",
+    tags=TAG,
+    summary="Habilitar varios tags de una vez",
+    description="Lo que hace «Habilitar todas» en Configuración → Escritura. "
+                "Cada tag se comprueba contra el PLC igual que uno suelto; los "
+                "que no existen o no son de un tipo escribible se SALTAN y se "
+                "devuelven en `omitidos`, sin tumbar el resto. Los que ya "
+                "estaban habilitados conservan sus límites.",
+)
+async def habilitar_lote(
+    request: Request,
+    cuerpo: LoteTags,
+    sesion: Sesion = Depends(exigir_rol(ROL_ESCRITURA)),
+) -> dict:
+    handler = _manager(request)._handlers.get(cuerpo.plc_id)
+    if handler is None:
+        raise HTTPException(404, f"No hay ningún PLC con id '{cuerpo.plc_id}'.")
+    if not handler.soporta_escritura():
+        raise HTTPException(
+            400, f"El PLC '{cuerpo.plc_id}' usa un driver que no sabe escribir.")
+
+    entradas: List[dict] = []
+    omitidos: List[dict] = []
+    for tag in dict.fromkeys(cuerpo.tags):  # sin repetidos, en orden
+        info = handler.buscar_tag(tag)
+        if info is None:
+            omitidos.append({"tag": tag, "motivo": "no existe en el PLC"})
+            continue
+        if not es_escribible(info.data_type):
+            omitidos.append({"tag": tag, "motivo": f"tipo {info.data_type} no escribible"})
+            continue
+        entradas.append({"tag": info.full_name, "node_id": info.node_id,
+                         "data_type": info.data_type})
+
+    try:
+        nuevos = _permitidos(request).habilitar_lote(
+            cuerpo.plc_id, entradas, usuario=usuario_de(sesion))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+    if nuevos:
+        _auditar(request, "plc.escritura.habilitada_lote", sesion, cuerpo.plc_id,
+                 {"plc_id": cuerpo.plc_id, "habilitados": nuevos,
+                  "ya_estaban": len(entradas) - nuevos, "omitidos": len(omitidos)})
+    return {"ok": True, "habilitados": nuevos,
+            "ya_estaban": len(entradas) - nuevos, "omitidos": omitidos}
+
+
+@router.post(
+    "/escritura/permitidos/quitar",
+    tags=TAG,
+    summary="Deshabilitar uno o varios tags",
+    description="Como el DELETE, pero con el tag en el CUERPO. Un tag cuyo "
+                "nombre lleva `/` («LINEA 3/4») no se puede poner en la ruta: "
+                "el servidor decodifica el `%2F` antes de buscar la ruta, la "
+                "dirección queda con un tramo de más y la petición acaba en la "
+                "de la página del HMI, que solo admite GET (405). Es lo que usa "
+                "el interruptor de cada fila y «Deshabilitar todas».",
+)
+async def deshabilitar_lote(
+    request: Request,
+    cuerpo: LoteTags,
+    sesion: Sesion = Depends(exigir_rol(ROL_ESCRITURA)),
+) -> dict:
+    tags = list(dict.fromkeys(cuerpo.tags))
+    quitados = _permitidos(request).deshabilitar_lote(cuerpo.plc_id, tags)
+    if quitados:
+        if len(tags) == 1:
+            _auditar(request, "plc.escritura.deshabilitada", sesion, tags[0],
+                     {"plc_id": cuerpo.plc_id})
+        else:
+            _auditar(request, "plc.escritura.deshabilitada_lote", sesion,
+                     cuerpo.plc_id, {"plc_id": cuerpo.plc_id, "quitados": quitados})
+    return {"ok": True, "quitados": quitados, "no_estaban": len(tags) - quitados}
 
 
 @router.delete(

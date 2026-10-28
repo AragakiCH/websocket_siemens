@@ -293,7 +293,7 @@ function CampoReceta({ widget, variable, interactivo, style }: RenderCtx) {
       const uno = r?.resultados?.[0];
       if (uno && uno.coincide === false) {
         setEnviado(null);
-        return `el PLC no guardó ese valor: quedó en ${uno.confirmado}`;
+        return `el PLC no guardó ese valor: quedó en ${fmtConfirmado(uno.confirmado)}`;
       }
       return '';
     } catch (e: any) {
@@ -510,6 +510,19 @@ function InspectorCampoReceta({ config, setConfig }: InspectorCtx) {
       </p>
     </>
   );
+}
+
+
+/**
+ * El valor releído del PLC, para el aviso: un REAL vuelve como
+ * 12.858499526977539 y eso es ruido de la precisión de 32 bits; se enseña
+ * con 7 cifras significativas (12.8585). Enteros, textos y bools, tal cual.
+ */
+function fmtConfirmado(v: unknown): string {
+  if (typeof v === 'number' && Number.isFinite(v) && !Number.isInteger(v)) {
+    return String(Number(v.toPrecision(7)));
+  }
+  return String(v);
 }
 
 export const recetaCampo: CustomWidgetDef = {
