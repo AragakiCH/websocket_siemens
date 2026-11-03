@@ -67,6 +67,13 @@ fi
 export PLC_DATOS_DIR="$DATOS"
 export PLC_API_HOST="${PLC_API_HOST:-0.0.0.0}"
 export PLC_API_PORT="${PLC_API_PORT:-8010}"
+# Las cuentas viven en la base SQLite local (db_id "local" en conexiones.json);
+# fijarlo evita el aviso «no hay PLC_AUTH_DB_ID» y que cambie al añadir otra base.
+export PLC_AUTH_DB_ID="${PLC_AUTH_DB_ID:-local}"
+# El ctrlX no tiene pantalla: nadie entra por 127.0.0.1. Con «auto», los PCs
+# de la misma LAN que el ctrlX cuentan como «equipo servidor» (primera cuenta,
+# configurar la base, restaurar datos). Para una lista fija: 192.168.17.0/24
+export PLC_REDES_SERVIDOR="${PLC_REDES_SERVIDOR:-auto}"
 # Todo lo que algún módulo quiera escribir «en el home» (certificados OPC UA
 # del driver Rexroth, cachés) cae también en la carpeta de datos.
 export HOME="$SNAP_COMMON"

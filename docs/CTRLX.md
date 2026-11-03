@@ -66,6 +66,16 @@ de datos → «Descargar copia»; en el ctrlX, la misma pantalla → «Restaurar
   sistema). Si hiciera falta, es un `stage-packages` con `msodbcsql18`
   arm64; no está hecho a propósito.
 
+## Primera cuenta y «equipo servidor»
+
+Psi Core solo deja crear la primera cuenta, configurar la base o restaurar
+datos desde el **equipo servidor**, que en un PC es la ventana que entra por
+`127.0.0.1`. El ctrlX no tiene pantalla, así que el snap arranca con
+`PLC_REDES_SERVIDOR=auto`: los PCs de la misma LAN que el ctrlX cuentan como
+servidor. Si se quiere acotar a una red concreta, se cambia por una lista
+(`192.168.17.0/24,10.0.0.5`) en `bin/snap-wrapper.sh` o en el `environment`
+de `snap/snapcraft.yaml` y se reconstruye.
+
 ## Puertos
 
 8010 (HTTP + WebSocket). El 8000 lo usa `api-sysid` si está instalado en el

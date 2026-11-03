@@ -133,6 +133,8 @@ apps:
       # 8000 es de api-sysid; si cambias esto, cambia también el enlace de
       # package-assets/package-manifest.json y open.html.
       PLC_API_PORT: "8010"
+      PLC_AUTH_DB_ID: "local"
+      PLC_REDES_SERVIDOR: "auto"
       PYTHONUNBUFFERED: "1"
     plugs:
       - network

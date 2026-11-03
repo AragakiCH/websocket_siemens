@@ -31,6 +31,16 @@ La consecuencia de ignorarlas es que, detrás de un proxy inverso, TODO parecer�
 local. Psi Core se despliega sin proxy —uvicorn escucha directamente—, así que
 hoy no aplica; si algún día se pone uno delante, hay que revisar este módulo, y
 por eso está escrito aquí y no repartido por tres routers.
+
+SERVIDORES SIN PANTALLA (ctrlX CORE)
+------------------------------------
+En un ctrlX no hay navegador: nadie puede entrar por 127.0.0.1, y con la regla
+de arriba a secas sería imposible crear la primera cuenta o configurar la base.
+Para eso está `PLC_REDES_SERVIDOR`: redes cuyas peticiones cuentan como del
+servidor. `auto` toma las subredes de las interfaces de la propia máquina (la
+LAN a la que está enchufado el ctrlX), que es lo que el snap pone por defecto;
+también vale una lista fija (`192.168.17.0/24,10.0.0.5`). Sigue sin mirarse
+ninguna cabecera: es la IP real del socket contra esa lista.
 """
 from __future__ import annotations
 
@@ -72,7 +82,76 @@ def es_local(request: Request) -> bool:
 
     if getattr(dir_ip, "ipv4_mapped", None) is not None:
         dir_ip = dir_ip.ipv4_mapped
-    return dir_ip.is_loopback
+    if dir_ip.is_loopback:
+        return True
+    return any(dir_ip in red for red in _redes_servidor(request))
+
+
+# --------------------------------------------------------------------- #
+# Redes del servidor (PLC_REDES_SERVIDOR)
+# --------------------------------------------------------------------- #
+_Red = ipaddress.IPv4Network | ipaddress.IPv6Network
+_cache_redes: dict[str, list[_Red]] = {}
+
+
+def _redes_servidor(request: Request) -> list[_Red]:
+    """Lista resuelta (y cacheada por valor de la opción) de redes servidor."""
+    settings = getattr(getattr(request, "app", None), "state", None)
+    valor = (getattr(getattr(settings, "settings", None), "redes_servidor", "")
+             or "").strip()
+    if not valor:
+        return []
+    if valor not in _cache_redes:
+        redes = (_redes_propias() if valor.lower() == "auto"
+                 else _parsear_redes(valor))
+        _cache_redes[valor] = redes
+        logger.info("Redes tratadas como equipo servidor (%s): %s", valor,
+                    ", ".join(str(r) for r in redes) or "ninguna")
+    return _cache_redes[valor]
+
+
+def _parsear_redes(valor: str) -> list[_Red]:
+    redes: list[_Red] = []
+    for trozo in valor.split(","):
+        trozo = trozo.strip()
+        if not trozo:
+            continue
+        try:
+            redes.append(ipaddress.ip_network(trozo, strict=False))
+        except ValueError:
+            logger.warning("PLC_REDES_SERVIDOR: '%s' no es una red ni una IP "
+                           "válida; se ignora.", trozo)
+    return redes
+
+
+def _redes_propias() -> list[_Red]:
+    """
+    Subredes IPv4 directamente conectadas a esta máquina, leídas de
+    `/proc/net/route` (rutas sin puerta de enlace). No necesita paquetes
+    extra ni permisos especiales, y funciona dentro de un snap estricto.
+    En Windows no existe ese fichero: devuelve vacío (allí hay pantalla).
+    """
+    redes: list[_Red] = []
+    try:
+        with open("/proc/net/route", encoding="ascii") as f:
+            next(f)  # cabecera
+            for linea in f:
+                campos = linea.split()
+                if len(campos) < 8:
+                    continue
+                destino, gateway, mascara = campos[1], campos[2], campos[7]
+                if gateway != "00000000" or destino == "00000000":
+                    continue
+                ip = ipaddress.IPv4Address(int(destino, 16).to_bytes(4, "little"))
+                bits = bin(int(mascara, 16)).count("1")
+                if ip.is_loopback or bits == 32:
+                    continue
+                red = ipaddress.ip_network(f"{ip}/{bits}", strict=False)
+                if red not in redes:
+                    redes.append(red)
+    except (OSError, ValueError, StopIteration) as exc:
+        logger.warning("No se pudieron leer las redes propias: %s", exc)
+    return redes
 
 
 def exigir_local(request: Request, que: str = "esta operación") -> None:

@@ -227,6 +227,18 @@ class Settings(BaseSettings):
     auth_db_id: Optional[str] = Field(default=None)
     # Prefijo de la tabla, si se creó el esquema con uno.
     auth_tabla_prefijo: str = Field(default="")
+    # Redes desde las que una petición cuenta como «equipo servidor» además
+    # del bucle local. Hace falta cuando el servidor NO tiene pantalla (un
+    # ctrlX CORE, un PC sin monitor): nadie puede abrir 127.0.0.1 allí, y
+    # sin esto no se podría crear la primera cuenta ni configurar la base.
+    #   ""                      -> solo 127.0.0.1 (lo de siempre, PCs Windows)
+    #   "auto"                  -> las subredes de las interfaces de esta máquina
+    #   "192.168.17.0/24,10.0.0.5" -> lista fija (CIDR o IP sueltas)
+    redes_servidor: str = Field(
+        default="",
+        description="Redes (CIDR, separadas por comas) o 'auto' cuyas "
+                    "peticiones se tratan como del equipo servidor.",
+    )
 
     # ------------------------------------------------------------------ #
     # Motor de alarmas
