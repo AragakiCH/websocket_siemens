@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Psi Core</title>
+</head>
+<body style="font-family: Arial, sans-serif; padding: 24px;">
+  <h2>Psi Core</h2>
+  <p>Abriendo la aplicación en una pestaña nueva…</p>
+  <p><a id="openLink" href="#" target="_blank" rel="noopener noreferrer">Abrir manualmente</a></p>
+  <script>
+    // Mismo host que el ctrlX, puerto propio de Psi Core (ver snapcraft.yaml).
+    const target = `http://${window.location.hostname}:8010/`;
+    document.getElementById("openLink").href = target;
+    const w = window.open(target, "_blank", "noopener,noreferrer");
+    if (!w) {
+      document.body.insertAdjacentHTML(
+        "beforeend",
+        "<p>El navegador bloqueó la ventana emergente. Usa el enlace manual.</p>"
+      );
+    }
+  </script>
+</body>
+</html>

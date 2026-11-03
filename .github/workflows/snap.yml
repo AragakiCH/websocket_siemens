@@ -1,0 +1,148 @@
+# Empaquetado de Psi Core como snap para ctrlX CORE, en amd64 y arm64.
+#
+# Calcado del workflow de ctrlx_sysid (mismas razones: nada de
+# `snapcore/action-build`, que descarga desde codeload.github.com y falla con
+# 429/502 en los runners ARM; se instala snapcraft con reintentos y se
+# llama directo), con UNA diferencia: Psi Core tiene un frontend React que
+# hay que compilar ANTES de snapcraft, porque FastAPI sirve frontend/dist y
+# esa carpeta no está en git.
+#
+# Resultado: un artefacto `psicore-<arch>` con el .snap. Para instalarlo en
+# el ctrlX: Settings → Apps → "Install from file" (o por SSH:
+# `sudo snap install --dangerous psicore_<version>_arm64.snap`). Ver
+# docs/CTRLX.md.
+
+name: Build snap ctrlX (amd64 + arm64)
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build snap (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-22.04
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Frontend ────────────────────────────────────────────────
+      # Node 20 por setup-node: el `nodejs` de apt en 22.04 es demasiado
+      # viejo para Vite 5. Se compila en cada arquitectura (es rápido y
+      # evita pasar artefactos entre jobs).
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Compilar frontend (frontend/dist)
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          test -f dist/index.html
+
+      # ── Snap ───────────────────────────────────────────────────────
+      - name: Instalar snapcraft
+        run: |
+          set -euo pipefail
+          sudo snap wait system seed.loaded
+          for intento in 1 2 3 4 5; do
+            if sudo snap install snapcraft --classic; then
+              exit 0
+            fi
+            espera=$((intento * 15))
+            echo "Intento $intento fallido. Reintento en ${espera}s..."
+            sleep "$espera"
+          done
+          echo "No se pudo instalar snapcraft tras 5 intentos."
+          exit 1
+
+      - name: Build snap
+        id: build
+        run: |
+          set -euo pipefail
+          # --destructive-mode: construye en el propio runner (base core22 =
+          # ubuntu-22.04), sin levantar LXD.
+          sudo snapcraft --destructive-mode --verbosity brief
+
+          archivo=$(ls -1 ./*.snap | head -n1)
+          if [ -z "$archivo" ]; then
+            echo "snapcraft terminó sin error pero no dejó ningún .snap"
+            exit 1
+          fi
+          echo "snap=$archivo" >> "$GITHUB_OUTPUT"
+          ls -lh "$archivo"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: psicore-${{ matrix.arch }}
+          path: ${{ steps.build.outputs.snap }}
+          if-no-files-found: error
+          retention-days: 30
+
+  # Publicación en Snap Store (canal edge) solo con tags v*. Necesita el
+  # secreto SNAPCRAFT_STORE_CREDENTIALS y el nombre `psicore` registrado en
+  # la tienda. El ctrlX no instala desde ahí: es solo para repartir el
+  # fichero; si no se quiere, se puede borrar este job sin más.
+  publish:
+    name: Publish ${{ matrix.arch }} to Snap Store
+    needs: build
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+
+    steps:
+      - name: Download snap (${{ matrix.arch }})
+        uses: actions/download-artifact@v4
+        with:
+          name: psicore-${{ matrix.arch }}
+          path: dist
+
+      - name: Resolve snap file
+        id: snap
+        run: |
+          set -euo pipefail
+          archivo=$(ls -1 dist/*.snap | head -n1)
+          echo "path=$archivo" >> "$GITHUB_OUTPUT"
+
+      - name: Instalar snapcraft
+        run: |
+          set -euo pipefail
+          sudo snap wait system seed.loaded
+          for intento in 1 2 3 4 5; do
+            if sudo snap install snapcraft --classic; then
+              exit 0
+            fi
+            espera=$((intento * 15))
+            echo "Intento $intento fallido. Reintento en ${espera}s..."
+            sleep "$espera"
+          done
+          exit 1
+
+      - name: Publish to Snap Store (edge)
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        run: |
+          set -euo pipefail
+          snapcraft upload --release=edge "${{ steps.snap.outputs.path }}"

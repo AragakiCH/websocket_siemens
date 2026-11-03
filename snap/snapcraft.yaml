@@ -1,0 +1,134 @@
+# =========================================================================
+# snapcraft.yaml — Psi Core como app de ctrlX CORE (Bosch Rexroth)
+#
+# El MISMO código que el instalador de Windows (desktop/), empaquetado como
+# snap de confinamiento estricto para Ubuntu Core 22 (ctrlX OS 2.x), en
+# amd64 (ctrlX COREvirtual) y arm64 (ctrlX CORE X3/X5/X7).
+#
+# Lo que cambia respecto a Windows NO está en el código, está aquí y en
+# bin/snap-wrapper.sh:
+#   · los datos viven en $SNAP_COMMON/datos (sobreviven a las actualizaciones);
+#   · la conexión «local» es SQLite (sin servidor, sin driver ODBC);
+#   · el puerto es el 8010 (el 8000 lo usa api-sysid en el mismo ctrlX);
+#   · el frontend va compilado dentro (frontend/dist, que genera el workflow).
+#
+# Se construye con `snapcraft` (ver .github/workflows/snap.yml); en Windows
+# no se puede construir, pero sí instalar el .snap resultante en el ctrlX
+# desde Settings → Apps → «Install from file».
+# =========================================================================
+name: psicore
+base: core22
+adopt-info: app
+summary: Psi Core — HMI y supervisión para ctrlX CORE
+description: |
+  HMI web con lectura en vivo de PLCs (Rexroth ctrlX por Data Layer u OPC UA,
+  Siemens S7 por OPC UA/S7comm, Allen-Bradley por EtherNet/IP), diseñador de
+  pantallas, alarmas, recetas, historización en SQL y exportación a Excel.
+  Se abre desde el menú lateral del ctrlX en el puerto 8010.
+
+grade: stable
+confinement: strict
+
+architectures:
+  - build-on: amd64
+  - build-on: arm64
+
+parts:
+  app:
+    plugin: nil
+    source: .
+
+    build-packages:
+      - python3
+      - python3-venv
+      - python3-pip
+      - python3-dev
+      - build-essential
+      - rsync
+
+    override-build: |
+      set -eu
+
+      # La versión del snap es la del proyecto (fichero VERSION), no otra
+      # escrita a mano aquí que se quedaría atrás.
+      craftctl set version="$(tr -d '[:space:]' < VERSION)"
+
+      # El frontend compilado tiene que existir ANTES de empaquetar: lo
+      # genera `npm run build` (el workflow lo hace). Sin él la app
+      # arrancaría y serviría un 404 en «/», que es peor que fallar aquí.
+      if [ ! -f frontend/dist/index.html ]; then
+        echo "ERROR: falta frontend/dist/index.html. Ejecuta 'npm ci && npm run build' en frontend/ antes de snapcraft." >&2
+        exit 1
+      fi
+
+      D="$CRAFT_PART_INSTALL/psicore"
+      mkdir -p "$D" "$CRAFT_PART_INSTALL/bin" "$CRAFT_PART_INSTALL/semilla"
+
+      # El código y lo que lee en tiempo de ejecución, con la MISMA forma
+      # de carpetas que el repositorio: app/main.py localiza frontend/dist
+      # y sql/ a partir de su propia ruta.
+      rsync -a --exclude '__pycache__' --exclude '*.pyc' app/ "$D/app/"
+      rsync -a frontend/dist/ "$D/frontend/dist/"
+      rsync -a sql/ "$D/sql/"
+      rsync -a docs/ "$D/docs/"
+      cp README.md VERSION "$D/"
+
+      # SEMILLA: lo que un ctrlX recién instalado necesita para tener algo
+      # que pintar (los widgets importados y los temas). NO van pantallas
+      # ni conexiones de ningún cliente: eso se restaura después desde
+      # Configuración → Carpeta de datos, o por SSH a $SNAP_COMMON/datos.
+      rsync -a datos/widgets/ "$CRAFT_PART_INSTALL/semilla/widgets/"
+      cp datos/temas.json datos/categorias_widgets.json "$CRAFT_PART_INSTALL/semilla/"
+
+      cp bin/snap-wrapper.sh "$CRAFT_PART_INSTALL/bin/"
+      chmod +x "$CRAFT_PART_INSTALL/bin/snap-wrapper.sh"
+
+      # Entorno Python dentro del snap. requirements.snap.txt es la lista
+      # de Windows SIN pyodbc/aioodbc (SQL Server exige el driver ODBC del
+      # sistema, que no está en Ubuntu Core) y CON aiomysql/asyncpg (Python
+      # puro) para bases externas.
+      python3 -m venv "$CRAFT_PART_INSTALL/venv"
+      "$CRAFT_PART_INSTALL/venv/bin/pip" install --upgrade pip setuptools wheel
+      "$CRAFT_PART_INSTALL/venv/bin/pip" install -r requirements.snap.txt
+
+      # Lo que no hace falta en el PLC y pesa: pip y sus cachés.
+      rm -rf "$CRAFT_PART_INSTALL/venv/lib/python3"*"/site-packages/pip" \
+             "$CRAFT_PART_INSTALL/venv/lib/python3"*"/site-packages/setuptools" \
+             "$CRAFT_PART_INSTALL/venv/lib/python3"*"/site-packages/wheel"
+      find "$CRAFT_PART_INSTALL/venv" -name '__pycache__' -type d -prune -exec rm -rf {} +
+
+  # Lo que el ctrlX lee para pintar la entrada en su menú lateral.
+  webui-assets:
+    plugin: dump
+    source: package-assets/
+    organize:
+      "*": package-assets/
+
+  gui-meta:
+    plugin: dump
+    source: meta/
+    organize:
+      "gui/*": meta/gui/
+
+apps:
+  psicore:
+    command: bin/snap-wrapper.sh
+    daemon: simple
+    restart-condition: always
+    environment:
+      PLC_API_HOST: 0.0.0.0
+      # 8000 es de api-sysid; si cambias esto, cambia también el enlace de
+      # package-assets/package-manifest.json y open.html.
+      PLC_API_PORT: "8010"
+      PYTHONUNBUFFERED: "1"
+    plugs:
+      - network
+      - network-bind
+
+slots:
+  package-assets:
+    interface: content
+    content: package-assets
+    source:
+      read:
+        - $SNAP/package-assets

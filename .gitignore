@@ -42,3 +42,10 @@ Claude outputs/
 # si entra es el resultado de convertir un catalogo, que es lo que usa el
 # widget de simbolos.
 SymbolFactory/
+
+# --- Snap para ctrlX CORE (ver docs/CTRLX.md) ---
+*.snap
+parts/
+stage/
+prime/
+snap/.snapcraft/

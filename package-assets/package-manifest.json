@@ -1,0 +1,22 @@
+{
+  "version": "1.5.1",
+  "license": "Proprietary",
+  "packageName": "psicore",
+  "description": "Psi Core: HMI y supervisión de planta para ctrlX CORE",
+  "vendor": "PSI",
+  "author": "PSI",
+  "company": "PSI",
+  "keywords": ["ctrlX", "HMI", "SCADA", "OPC UA", "Data Layer", "Siemens"],
+  "homepage": "https://example.com",
+  "icon": "package-assets/psicore/icon.png",
+  "menus": {
+    "sidebar": [
+      {
+        "id": "psicore",
+        "title": "Psi Core",
+        "link": "http://${hostname}:8010/",
+        "target": "_blank"
+      }
+    ]
+  }
+}
