@@ -62,7 +62,9 @@ parts:
       fi
 
       D="$CRAFT_PART_INSTALL/psicore"
-      mkdir -p "$D" "$CRAFT_PART_INSTALL/bin" "$CRAFT_PART_INSTALL/semilla"
+      # rsync solo crea la última carpeta del destino: las intermedias van aquí.
+      mkdir -p "$D/app" "$D/frontend/dist" "$D/sql" "$D/docs" \
+               "$CRAFT_PART_INSTALL/bin" "$CRAFT_PART_INSTALL/semilla/widgets"
 
       # El código y lo que lee en tiempo de ejecución, con la MISMA forma
       # de carpetas que el repositorio: app/main.py localiza frontend/dist
@@ -77,8 +79,19 @@ parts:
       # que pintar (los widgets importados y los temas). NO van pantallas
       # ni conexiones de ningún cliente: eso se restaura después desde
       # Configuración → Carpeta de datos, o por SSH a $SNAP_COMMON/datos.
-      rsync -a datos/widgets/ "$CRAFT_PART_INSTALL/semilla/widgets/"
-      cp datos/temas.json datos/categorias_widgets.json "$CRAFT_PART_INSTALL/semilla/"
+      # datos/ está en .gitignore, así que en GitHub Actions no existe: ahí se
+      # usa snap/semilla (temas y categorías, que sí van en git). Los widgets
+      # solo se incluyen si están a mano (build local, o `git add -f
+      # datos/widgets`); si no, se cargan después desde Carpeta de datos.
+      for origen in datos snap/semilla; do
+        [ -f "$origen/temas.json" ] && [ ! -f "$CRAFT_PART_INSTALL/semilla/temas.json" ] \
+          && cp "$origen/temas.json" "$CRAFT_PART_INSTALL/semilla/"
+        [ -f "$origen/categorias_widgets.json" ] && [ ! -f "$CRAFT_PART_INSTALL/semilla/categorias_widgets.json" ] \
+          && cp "$origen/categorias_widgets.json" "$CRAFT_PART_INSTALL/semilla/"
+        [ -d "$origen/widgets" ] && [ -z "$(ls -A "$CRAFT_PART_INSTALL/semilla/widgets")" ] \
+          && rsync -a "$origen/widgets/" "$CRAFT_PART_INSTALL/semilla/widgets/"
+      done
+      echo "Semilla: $(ls "$CRAFT_PART_INSTALL/semilla/widgets" | wc -l) widgets, $(ls "$CRAFT_PART_INSTALL/semilla")"
 
       cp bin/snap-wrapper.sh "$CRAFT_PART_INSTALL/bin/"
       chmod +x "$CRAFT_PART_INSTALL/bin/snap-wrapper.sh"

@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "actualizado_en": "2026-10-06T22:31:38.345180Z",
+  "proyectos": {
+    "principal": {
+      "categorias": [
+        {
+          "id": "basicos",
+          "nombre": "Básicos",
+          "fija": true
+        },
+        {
+          "id": "indicadores",
+          "nombre": "Indicadores",
+          "fija": true
+        },
+        {
+          "id": "equipos",
+          "nombre": "Equipos",
+          "fija": true
+        },
+        {
+          "id": "datos",
+          "nombre": "Datos",
+          "fija": true
+        },
+        {
+          "id": "faceplates",
+          "nombre": "Faceplates",
+          "fija": false
+        },
+        {
+          "id": "l2-pantallas",
+          "nombre": "L2 PANTALLAS",
+          "fija": false
+        },
+        {
+          "id": "elementos-graficos-varios",
+          "nombre": "ELEMENTOS GRÁFICOS VARIOS",
+          "fija": false
+        },
+        {
+          "id": "menu-desplegable",
+          "nombre": "MENÚ DESPLEGABLE",
+          "fija": false
+        },
+        {
+          "id": "widgets-indicadores",
+          "nombre": "WIDGETS INDICADORES",
+          "fija": false
+        },
+        {
+          "id": "tags-lectura-y-escritura",
+          "nombre": "TAGS LECTURA Y ESCRITURA",
+          "fija": false
+        },
+        {
+          "id": "widgets-clickeables",
+          "nombre": "WIDGETS CLICKEABLES",
+          "fija": false
+        },
+        {
+          "id": "l3-pantallas",
+          "nombre": "L3 PANTALLAS",
+          "fija": false
+        },
+        {
+          "id": "l4-pantallas",
+          "nombre": "L4 PANTALLAS",
+          "fija": false
+        },
+        {
+          "id": "l5-pantallas",
+          "nombre": "L5 PANTALLAS",
+          "fija": false
+        },
+        {
+          "id": "autefa",
+          "nombre": "AUTEFA",
+          "fija": false
+        }
+      ],
+      "asignaciones": {},
+      "actualizado_en": "2026-10-05T18:14:41.401226Z",
+      "actualizado_por": "administrador"
+    },
+    "proyecto_2": {
+      "categorias": [
+        {
+          "id": "basicos",
+          "nombre": "Básicos",
+          "fija": true
+        },
+        {
+          "id": "indicadores",
+          "nombre": "Indicadores",
+          "fija": true
+        },
+        {
+          "id": "equipos",
+          "nombre": "Equipos",
+          "fija": true
+        },
+        {
+          "id": "datos",
+          "nombre": "Datos",
+          "fija": true
+        },
+        {
+          "id": "autefa",
+          "nombre": "AUTEFA",
+          "fija": false
+        }
+      ],
+      "asignaciones": {},
+      "actualizado_en": "2026-10-06T22:31:38.345180Z",
+      "actualizado_por": "administrador"
+    }
+  }
+}
