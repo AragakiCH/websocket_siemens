@@ -37,23 +37,44 @@ sudo snapcraft --destructive-mode
 Aparece «Psi Core» en el menú lateral; abre `http://<ip-del-ctrlx>:8010/`.
 La primera vez pide crear la primera cuenta (la base SQLite ya está creada).
 
-## Dónde están los datos
+## Dónde están los datos (y cómo sobreviven a desinstalar)
 
-`/var/snap/psicore/common/datos/` — el equivalente a `C:\ProgramData\PsiCore\datos`
-en Windows: pantallas, widgets, temas, `conexiones.json`, `.clave`,
-`psicore.db` (SQLite) y los registros. Sobrevive a actualizaciones del snap.
+Psi Core guarda sus datos en el **almacén de Solutions del ctrlX**:
 
-Por SSH (`rexroot` tiene `sudo`):
+    /var/snap/rexroth-solutions/common/solutions/DefaultSolution/configurations/appdata/psicore
+    (dentro del snap se ve como $SNAP_COMMON/solutions/activeConfiguration/psicore)
 
-```bash
-sudo ls /var/snap/psicore/common/datos
-sudo snap logs psicore -n 100        # el log del servicio
-sudo snap restart psicore            # tras copiar ficheros a mano
-```
+Esa carpeta es del ctrlX, no de la app: **desinstalar Psi Core no la borra**,
+y al reinstalar (la versión que sea) la encuentra tal cual: cuentas,
+pantallas, PLC, variables, `.clave` y la base SQLite `psicore.db`.
 
-Para traer un proyecto desde Windows: en Windows, Configuración → Carpeta
-de datos → «Descargar copia»; en el ctrlX, la misma pantalla → «Restaurar»
-(conserva la conexión SQLite local del ctrlX).
+Además forma parte de la *configuración* del ctrlX, así que desde su web,
+**sin SSH**: *Settings → Manage app data* → **Save** crea un archivo con
+todo (y se puede **descargar**); **Load** lo vuelve a poner (o lo carga en
+otro ctrlX). `copyOnLoad` está activado en `package-manifest.json`, así que
+el propio ctrlX copia la carpeta en el guardado y en la carga. Tras un
+**Load**, reinicia la app (*Apps → Psi Core → Restart*, o `sudo snap restart
+psicore`) para que lea la copia nueva.
+
+Para que esto funcione, la interfaz `active-solution` tiene que estar
+conectada. Normalmente lo está al instalar; se comprueba por SSH con
+`snap connections psicore`, y si sale desconectada:
+
+    sudo snap connect psicore:active-solution rexroth-solutions:active-solution
+    sudo snap restart psicore
+
+Mientras no lo esté, el arranque lo avisa en `snap logs psicore` y usa
+`/var/snap/psicore/common/datos` como antes (que sí se pierde al
+desinstalar). En cuanto se conecta, el siguiente arranque **migra** solo lo
+que hubiera allí al almacén y renombra la carpeta vieja a
+`datos_migrado_a_solutions` (se puede borrar).
+
+Lo que no es configuración (`traza_rendimiento.log`, `auditoria.jsonl`…)
+vive en la misma carpeta pero no entra en las copias.
+
+Dentro de la app: *Configuración → Carpeta de datos* dice la ruta en uso,
+baja una copia `.zip` de la configuración y la restaura. Es la vía para
+llevarse la configuración de un PC Windows al ctrlX y viceversa.
 
 ## Bases de datos
 

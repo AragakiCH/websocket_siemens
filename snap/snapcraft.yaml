@@ -139,6 +139,17 @@ apps:
     plugs:
       - network
       - network-bind
+      - active-solution
+
+# Almacén de la app Solutions del ctrlX. Lo que Psi Core guarda en
+# $SNAP_COMMON/solutions/activeConfiguration/psicore sobrevive a desinstalar
+# el snap y entra en la configuración que el ctrlX guarda/carga desde su web
+# (ver bin/snap-wrapper.sh y package-assets/package-manifest.json).
+plugs:
+  active-solution:
+    interface: content
+    content: solutions
+    target: $SNAP_COMMON/solutions
 
 slots:
   package-assets:

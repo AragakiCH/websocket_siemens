@@ -2,21 +2,73 @@
 # =========================================================================
 # Arranque de Psi Core dentro del snap (ctrlX CORE).
 #
-# Hace tres cosas antes de lanzar uvicorn, y las tres son idempotentes:
-#   1. Deja los datos en $SNAP_COMMON/datos, que es la única carpeta que
-#      sobrevive a las actualizaciones del snap y que se puede leer por SSH
-#      (/var/snap/psicore/common/datos). El código no cambia: ya obedece a
-#      PLC_DATOS_DIR.
-#   2. La PRIMERA vez siembra widgets y temas desde $SNAP/semilla.
-#   3. La PRIMERA vez crea la base SQLite «local» con las tablas del HMI y
-#      la da de alta en conexiones.json, para que la app arranque directa en
-#      «crear la primera cuenta» y no en el asistente de bases de datos.
+# Hace cuatro cosas antes de lanzar uvicorn, y las cuatro son idempotentes:
+#   0. Elige DÓNDE viven los datos (ver abajo): en el almacén de Solutions
+#      del ctrlX si la interfaz `active-solution` está conectada, y si no
+#      en $SNAP_COMMON/datos. El código no cambia: obedece a PLC_DATOS_DIR.
+#   1. Siembra widgets y temas desde $SNAP/semilla la PRIMERA vez.
+#   2. Crea la base SQLite «local» con las tablas del HMI la PRIMERA vez y
+#      la da de alta en conexiones.json, para que la app arranque directa
+#      en «crear la primera cuenta» y no en el asistente de bases de datos.
+#   3. Exporta el entorno y arranca.
+#
+# DÓNDE VIVEN LOS DATOS, Y POR QUÉ
+# ---------------------------------
+# $SNAP_COMMON/datos sobrevive a ACTUALIZAR el snap, pero `snap remove` lo
+# borra: desinstalar Psi Core era perder cuentas, pantallas y la base.
+#
+# El ctrlX tiene un sitio pensado para esto: el almacén de la app Solutions,
+# que se monta en $SNAP_COMMON/solutions por la interfaz `active-solution`
+# (ver snapcraft.yaml). Lo que una app guarda en
+# $SNAP_COMMON/solutions/activeConfiguration/<app> es del ctrlX, no de la
+# app: NO se borra al desinstalarla, y forma parte de la «configuración»
+# que el ctrlX guarda, descarga y carga desde su web (Settings → Manage
+# app data), sin SSH. Con `copyOnLoad` en package-manifest.json, el propio
+# ctrlX copia la carpeta al guardar y al cargar.
+#
+# Si la interfaz no está conectada (un snap instalado «a mano» puede
+# arrancar antes de que lo esté, o no estarlo nunca), se espera un rato y,
+# si no llega, se usa $SNAP_COMMON/datos como hasta ahora; en cuanto se
+# conecte, el siguiente arranque MIGRA lo que haya allí al almacén.
 # =========================================================================
 set -eu
 
 RAIZ="$SNAP/psicore"
-DATOS="$SNAP_COMMON/datos"
-mkdir -p "$DATOS"
+NOMBRE_APP="psicore"
+DATOS_LOCAL="$SNAP_COMMON/datos"
+SOLUCION="$SNAP_COMMON/solutions/activeConfiguration"
+
+# ── 0 · Dónde viven los datos ──────────────────────────────────────────
+conectada() {
+  snapctl is-connected active-solution 2>/dev/null
+}
+espera=0
+while ! conectada && [ "$espera" -lt 30 ]; do
+  [ "$espera" -eq 0 ] && echo "[psicore] esperando a la interfaz active-solution (almacén de Solutions del ctrlX)..."
+  sleep 2
+  espera=$((espera + 2))
+done
+
+if conectada && [ -d "$SOLUCION" ]; then
+  DATOS="$SOLUCION/$NOMBRE_APP"
+  if [ ! -d "$DATOS" ] || [ -z "$(ls -A "$DATOS" 2>/dev/null)" ]; then
+    mkdir -p "$DATOS"
+    if [ -d "$DATOS_LOCAL" ] && [ -n "$(ls -A "$DATOS_LOCAL" 2>/dev/null)" ]; then
+      # Primera vez con la interfaz: lo que había en common/datos pasa al
+      # almacén. Se COPIA, no se mueve: si algo fallara a medias, lo de
+      # antes sigue intacto. La copia vieja se renombra para que quede
+      # claro que ya no se usa (y se pueda borrar por SSH cuando se quiera).
+      echo "[psicore] migrando los datos de $DATOS_LOCAL a $DATOS"
+      cp -a "$DATOS_LOCAL/." "$DATOS/"
+      mv "$DATOS_LOCAL" "${DATOS_LOCAL}_migrado_a_solutions" 2>/dev/null || true
+    fi
+  fi
+  echo "[psicore] datos en el almacén de Solutions del ctrlX: $DATOS"
+else
+  DATOS="$DATOS_LOCAL"
+  mkdir -p "$DATOS"
+  echo "[psicore] AVISO: la interfaz active-solution no está conectada; los datos van a $DATOS y se PERDERÁN si se desinstala el snap. Conéctala con: snap connect psicore:active-solution rexroth-solutions:active-solution"
+fi
 
 # ── 2 · Semilla (solo si no hay nada) ──────────────────────────────────
 if [ ! -d "$DATOS/widgets" ] && [ -d "$SNAP/semilla/widgets" ]; then
@@ -61,6 +113,35 @@ if [ ! -f "$DATOS/conexiones.json" ]; then
 ]
 JSON
   echo "[psicore] conexiones.json inicial con la base SQLite local"
+else
+  # Si los datos cambiaron de carpeta (migración al almacén de Solutions, o
+  # una copia traída de otro ctrlX), la base SQLite «local» sigue apuntando
+  # a la ruta vieja. Se reescribe para que apunte al psicore.db de AQUÍ.
+  "$SNAP/venv/bin/python" - "$DATOS/conexiones.json" "$DATOS" <<'PYRUTA'
+import json, os, sys
+ruta, datos = sys.argv[1], sys.argv[2]
+try:
+    lista = json.load(open(ruta, encoding="utf-8"))
+except Exception:
+    sys.exit(0)
+cambiado = False
+for c in lista if isinstance(lista, list) else []:
+    if not isinstance(c, dict) or c.get("motor") != "sqlite":
+        continue
+    bd = str(c.get("base_datos") or "")
+    if not bd or bd.startswith(datos + os.sep):
+        continue
+    nueva = os.path.join(datos, os.path.basename(bd))
+    if os.path.isfile(nueva):
+        c["base_datos"] = nueva
+        cambiado = True
+        print(f"[psicore] conexión '{c.get('db_id')}': {bd} -> {nueva}")
+if cambiado:
+    tmp = ruta + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(lista, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, ruta)
+PYRUTA
 fi
 
 # ── 1 · Entorno ────────────────────────────────────────────────────────
