@@ -45,6 +45,16 @@ def _ahora_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _numero_o_none(v: object) -> Optional[float]:
+    """Un límite que venga de un fichero: número, o nada si no lo es."""
+    if v is None or isinstance(v, bool):
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
 @dataclass
 class TagEscribible:
     """Un tag habilitado para escritura, con sus límites."""
@@ -185,6 +195,10 @@ class EscrituraStore:
         por quien llama. Un tag que YA estaba habilitado conserva sus límites,
         su descripción y quién lo habilitó: «habilitar todas» no puede borrar
         los topes que alguien puso a mano.
+
+        Si una entrada trae `minimo`, `maximo` o `descripcion` (un proyecto
+        importado), se aplican al tag NUEVO; un mínimo mayor que el máximo
+        se descarta —se habilita sin límites— en vez de tumbar el lote.
         """
         if not plc_id:
             raise ValueError("Hace falta el plc_id.")
@@ -197,10 +211,15 @@ class EscrituraStore:
             clave = f"{plc_id}|{tag}"
             if clave in self.tags:
                 continue
+            minimo = _numero_o_none(e.get("minimo"))
+            maximo = _numero_o_none(e.get("maximo"))
+            if minimo is not None and maximo is not None and minimo > maximo:
+                minimo = maximo = None
             self.tags[clave] = TagEscribible(
                 plc_id=plc_id, tag=tag, node_id=e.get("node_id") or "",
-                data_type=e.get("data_type") or "", minimo=None, maximo=None,
-                descripcion="", habilitado_por=usuario, habilitado_en=ahora,
+                data_type=e.get("data_type") or "", minimo=minimo, maximo=maximo,
+                descripcion=str(e.get("descripcion") or ""),
+                habilitado_por=usuario, habilitado_en=ahora,
                 actualizado_en=ahora,
             )
             nuevos += 1

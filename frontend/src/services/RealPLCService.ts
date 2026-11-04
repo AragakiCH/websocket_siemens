@@ -126,6 +126,32 @@ class RealPLCServiceImpl {
     this.emitNow();
   }
 
+  /**
+   * Aplica de golpe la selección que trae un proyecto importado
+   * (`seleccion_variables` del fichero). Se MEZCLA con la de aquí: lo que
+   * el fichero no menciona se queda como estaba. Un solo guardado y una
+   * sola emisión, no una por variable.
+   */
+  aplicarSeleccion(entradas: Record<string, boolean>) {
+    let cambios = 0;
+    for (const [id, sel] of Object.entries(entradas)) {
+      if (typeof sel !== 'boolean') continue;
+      if (this.selection.get(id) !== sel) {
+        this.selection.set(id, sel);
+        cambios += 1;
+      }
+    }
+    if (cambios === 0) return 0;
+    this.saveSelection();
+    this.emitNow();
+    return cambios;
+  }
+
+  /** La selección actual, para llevarla dentro de un proyecto exportado. */
+  seleccionActual(): Record<string, boolean> {
+    return Object.fromEntries(this.selection);
+  }
+
   subscribe(fn: Listener): () => void {
     this.listeners.add(fn);
     fn(this.getVariables()); // snapshot inmediato

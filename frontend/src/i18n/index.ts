@@ -209,6 +209,16 @@ const es: Dict = {
   'variables internas ya existían aquí y se han conservado tal cual.',
   'projects.importedVarsConflict':
   'Ojo: estas variables internas existen aquí con OTRO tipo, así que los widgets enlazados mostrarán algo que no encaja:',
+  'projects.importedGroups': 'carpetas de pantallas recreadas',
+  'projects.importedGrouped': 'pantallas colocadas en ellas.',
+  'projects.importedPlcs': 'PLC dados de alta desde el fichero.',
+  'projects.importedPlcsKept': 'PLC ya estaban aquí y se reutilizan.',
+  'projects.importedCatalogs':
+  'PLC tomaron el catálogo de variables del fichero (hasta que conecten).',
+  'projects.importedWritable': 'tags habilitados para escritura.',
+  'projects.importedSelection': 'variables marcadas en Configuración.',
+  'projects.importedPlcsOmitted':
+  'Estos PLC del fichero no se pudieron dar de alta; sus variables no aparecerán hasta crearlos en Configuración:',
   'projects.delete': 'Eliminar proyecto',
   'projects.cantDeleteMain':
   'El proyecto principal no se puede eliminar: siempre debe existir uno. Puedes vaciarlo.',
@@ -576,6 +586,16 @@ const en: Dict = {
   'internal variables already existed here and were kept as they are.',
   'projects.importedVarsConflict':
   'Careful: these internal variables exist here with a DIFFERENT type, so the widgets bound to them will show something that does not fit:',
+  'projects.importedGroups': 'screen folders recreated',
+  'projects.importedGrouped': 'screens placed in them.',
+  'projects.importedPlcs': 'PLCs added from the file.',
+  'projects.importedPlcsKept': 'PLCs were already here and are reused.',
+  'projects.importedCatalogs':
+  'PLCs took the variable catalog from the file (until they connect).',
+  'projects.importedWritable': 'tags enabled for writing.',
+  'projects.importedSelection': 'variables checked in Configuration.',
+  'projects.importedPlcsOmitted':
+  'These PLCs from the file could not be added; their variables will not appear until you create them in Configuration:',
   'projects.delete': 'Delete project',
   'projects.cantDeleteMain':
   'The main project cannot be deleted: there must always be one. You can empty it instead.',

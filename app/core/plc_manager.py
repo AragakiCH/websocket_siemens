@@ -32,7 +32,7 @@ from app.core.connection_manager import ConnectionManager
 from app.core.plc_discovery import EndpointPlc, descubrir_plcs
 from app.drivers.escritura import convertir
 from app.drivers.opcua_driver import OpcUaDriver
-from app.drivers.plc_driver import PlcDriver
+from app.drivers.plc_driver import PlcDriver, TagInfo
 from app.drivers.rexroth_driver import RexrothDriver
 
 
@@ -604,6 +604,51 @@ class PlcManager:
         pueden escribir (ver `escribir_tags`).
         """
         self._constantes = store
+
+    # ------------------------------------------------------------------ #
+    # Para exportar / importar proyectos (ver app/api/intercambio.py)
+    # ------------------------------------------------------------------ #
+    def endpoints(self) -> Dict[str, EndpointPlc]:
+        """Los PLC gestionados (sin el «PLC» de las internas): id -> endpoint."""
+        return {pid: ep for pid, ep in self._endpoints.items()
+                if not getattr(self._handlers.get(pid), "es_interno", False)}
+
+    def id_por_endpoint(self, endpoint: str) -> Optional[str]:
+        """El id del PLC que ya está gestionado con ese endpoint, o None."""
+        for pid, h in self._handlers.items():
+            if h.endpoint == endpoint:
+                return pid
+        return None
+
+    def catalogo(self, plc_id: str) -> List[TagInfo]:
+        """El catálogo de variables de un PLC (lo último que se le vio)."""
+        h = self._handlers.get(plc_id)
+        return list(h.catalogo()) if h is not None else []
+
+    def adoptar_catalogo(self, plc_id: str, tags: List[dict]) -> bool:
+        """
+        Da a un PLC SIN catálogo el que trae un fichero importado. Si ya
+        tiene uno (conectó alguna vez), no se toca. Devuelve si se adoptó.
+        """
+        h = self._handlers.get(plc_id)
+        if h is None:
+            return False
+        lista: List[TagInfo] = []
+        for d in tags:
+            try:
+                lista.append(TagInfo(
+                    name=str(d["name"]), full_name=str(d["full_name"]),
+                    node_id=str(d.get("node_id") or ""),
+                    data_type=str(d.get("data_type") or ""),
+                    db_name=str(d.get("db_name") or ""),
+                ))
+            except Exception:  # noqa: BLE001
+                continue
+        return h.adoptar_catalogo(lista)
+
+    async def difundir_snapshot(self) -> None:
+        """Manda a todas las vistas el estado actual (tras un cambio grande)."""
+        await self._manager.broadcast(self.build_snapshot_message())
 
     def list_plc_ids(self) -> List[str]:
         """Ids de los PLCs gestionados (para el selector del cliente)."""

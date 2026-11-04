@@ -17,11 +17,15 @@ Lo que viaja dentro de un fichero exportado, y por qué:
 
   * las pantallas y sus widgets     -> es lo que se quiere llevar;
   * los widgets personalizados      -> sin ellos quedan cajas vacías;
-  * las variables INTERNAS enlazadas -> sin ellas los widgets se enlazan
-    a algo que en el otro equipo no existe, y el síntoma es un widget en
-    blanco sin ningún error;
-  * las variables de PLC NO viajan  -> existen porque existe el autómata.
-    Crearlas al importar sería inventarse un dato que nadie puede leer.
+  * las variables INTERNAS           -> en un proyecto, TODAS las definidas
+    (son parte del trabajo de quien lo diseñó: las 19 de su equipo tienen
+    que ser 19 en el otro, no solo las 3 que ya enlazó); en una pantalla
+    suelta, las que enlazan sus widgets;
+  * los PLC y su configuración      -> definición (sin contraseñas), el
+    catálogo de variables que se les vio por última vez y qué tags están
+    habilitados para escritura con sus límites. Los VALORES no viajan:
+    existen porque existe el autómata. El catálogo sí, porque es lo que
+    deja asignar variables y ver los enlaces con el PLC apagado.
 
 Nada de esto sabe de HTTP a propósito. Las rutas deciden códigos y mensajes;
 aquí solo vive la lógica que las dos comparten.
@@ -250,9 +254,11 @@ def internas_usadas(pantallas: List[dict]) -> List[str]:
     return nombres
 
 
-def internas_para_exportar(internas_store, pantallas: List[dict]) -> List[dict]:
+def internas_para_exportar(internas_store, pantallas: List[dict],
+                           todas: bool = False) -> List[dict]:
     """
-    La DEFINICIÓN de las variables internas que usan estas pantallas.
+    La DEFINICIÓN de las variables internas: las que usan estas pantallas
+    o, con `todas=True` (proyecto entero), todas las definidas en el equipo.
 
     Mismo razonamiento que `widgets_para_exportar()`: sin esto, abrir lo
     exportado en otro equipo deja widgets enlazados a `interno|nivel` donde no
@@ -268,6 +274,22 @@ def internas_para_exportar(internas_store, pantallas: List[dict]) -> List[dict]:
     if internas_store is None:
         return []
     salida: List[dict] = []
+    if todas:
+        # Un proyecto se lleva TODAS las internas del equipo, enlazadas o no:
+        # quien las definió las va a necesitar al seguir diseñando allí, y
+        # con solo las enlazadas llegaban 3 de 19 y parecía que se perdían.
+        filas = []
+        try:
+            filas = internas_store.listar()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("No se pudieron listar las internas: %s", exc)
+        for d in filas:
+            d = dict(d)
+            d.pop("valor", None)
+            d.pop("creado_en", None)
+            d.pop("actualizado_en", None)
+            salida.append(d)
+        return salida
     for nombre in internas_usadas(pantallas):
         try:
             v = internas_store.obtener(nombre)
@@ -412,3 +434,260 @@ def soltar_enlaces_rotos(valor: Any, validos: set) -> Tuple[Any, List[str]]:
     # Sin repetir, conservando el orden en que aparecieron.
     unicos = list(dict.fromkeys(sueltos))
     return limpio, unicos
+
+
+# ====================================================================== #
+# PLC: definición, catálogo de variables y escritura
+# ====================================================================== #
+#
+# Lo que un proyecto necesita del PLC para abrirse igual en otro equipo:
+#
+#   * la DEFINICIÓN del PLC (IP, puerto, marca, transporte, rack/slot…), sin
+#     la contraseña: un Rexroth la pide al importar y se mete a mano;
+#   * el CATÁLOGO de variables que se le vio por última vez. No son valores
+#     —esos existen porque existe el autómata— sino la lista de nombres y
+#     tipos, que es lo que permite asignar variables en el inspector y ver
+#     los enlaces con el PLC apagado (ver tags_store.py);
+#   * qué tags están HABILITADOS PARA ESCRITURA y con qué límites. Es
+#     configuración que se hizo a mano, tag a tag, y rehacerla en el otro
+#     equipo es la clase de trabajo que se olvida a medias.
+#
+# Campos de la definición que viajan. `password` NO está a propósito.
+CAMPOS_PLC = ("endpoint", "host", "port", "nombre", "vendor", "usuario",
+              "app", "programa", "slot", "rack", "transporte", "s7_tags")
+#: Campos de un tag del catálogo (los mismos que guarda tags_store).
+CAMPOS_TAG = ("name", "full_name", "node_id", "data_type", "db_name")
+#: Campos de una entrada de escritura que son CONFIGURACIÓN (no quién/cuándo).
+CAMPOS_ESCRITURA = ("tag", "node_id", "data_type", "minimo", "maximo",
+                    "descripcion")
+
+
+def plcs_para_exportar(plc_manager, escritura_store) -> List[dict]:
+    """
+    Los PLC dados de alta, cada uno con su catálogo y su lista de escritura.
+
+    El «PLC» de las variables internas no entra: no es un autómata, y sus
+    variables ya viajan en `variables_internas`.
+    """
+    if plc_manager is None:
+        return []
+    salida: List[dict] = []
+    try:
+        endpoints = plc_manager.endpoints()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudieron listar los PLC: %s", exc)
+        return []
+    for plc_id, ep in endpoints.items():
+        d: Dict[str, Any] = {"plc_id": plc_id}
+        for campo in CAMPOS_PLC:
+            d[campo] = getattr(ep, campo, "")
+        tags: List[dict] = []
+        try:
+            for t in plc_manager.catalogo(plc_id):
+                tags.append({c: getattr(t, c, "") for c in CAMPOS_TAG})
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("No se pudo leer el catálogo de '%s': %s",
+                           plc_id, exc)
+        d["tags"] = tags
+        escritura: List[dict] = []
+        if escritura_store is not None:
+            try:
+                for e in escritura_store.listar(plc_id):
+                    escritura.append({c: e.get(c) for c in CAMPOS_ESCRITURA})
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("No se pudo leer la escritura de '%s': %s",
+                               plc_id, exc)
+        d["escritura"] = escritura
+        salida.append(d)
+    return salida
+
+
+async def importar_plcs(plc_manager, escritura_store, lista: List[dict],
+                        usuario: str = "") -> dict:
+    """
+    Da de alta los PLC del fichero que no existan y les aplica su catálogo y
+    su escritura. **Nunca pisa nada**: un PLC que ya está (mismo endpoint)
+    se reutiliza tal cual; el catálogo solo se adopta si el PLC de aquí no
+    tiene ninguno; la escritura solo añade tags que aquí no estaban
+    habilitados, y respeta los límites que alguien ya puso a mano.
+
+    Devuelve un dict con lo que pasó, para que la vista lo cuente:
+      creados, ya_existentes, omitidos ([{plc_id, motivo}]),
+      renombrados ({id_del_fichero: id_aquí}), catalogos (cuántos PLC
+      adoptaron catálogo), escritura (tags habilitados nuevos).
+    """
+    r: Dict[str, Any] = {"creados": [], "ya_existentes": [], "omitidos": [],
+                         "renombrados": {}, "catalogos": 0, "escritura": 0}
+    if plc_manager is None or not lista:
+        return r
+
+    for d in lista:
+        original = str(d.get("plc_id") or "")
+        endpoint = str(d.get("endpoint") or "")
+        host = str(d.get("host") or "")
+        vendor = str(d.get("vendor") or "siemens")
+        if not host and not endpoint:
+            r["omitidos"].append({"plc_id": original,
+                                  "motivo": "sin dirección"})
+            continue
+
+        # ¿Ya está? Por endpoint, que es lo que identifica a un autómata.
+        plc_id = plc_manager.id_por_endpoint(endpoint) if endpoint else None
+        if plc_id is not None:
+            r["ya_existentes"].append(plc_id)
+        elif vendor == "rexroth" and not d.get("password"):
+            # El fichero no trae contraseñas (a propósito) y un ctrlX no
+            # acepta sesiones anónimas: no se puede dar de alta a ciegas.
+            r["omitidos"].append({
+                "plc_id": original,
+                "motivo": "es un Rexroth y necesita contraseña: dalo de alta "
+                          "a mano en Configuración",
+            })
+            continue
+        else:
+            try:
+                res = await plc_manager.add_plc_manual(
+                    host=host or endpoint,
+                    puerto=int(d.get("port") or 4840),
+                    vendor=vendor,
+                    usuario=str(d.get("usuario") or ""),
+                    password=str(d.get("password") or ""),
+                    app=str(d.get("app") or ""),
+                    programa=str(d.get("programa") or ""),
+                    slot=int(d.get("slot") or 0),
+                    rack=int(d.get("rack") or 0),
+                    transporte=str(d.get("transporte") or ""),
+                    s7_tags=str(d.get("s7_tags") or ""),
+                )
+            except Exception as exc:  # noqa: BLE001
+                res = {"ok": False, "mensaje": str(exc)}
+            if not res.get("ok"):
+                r["omitidos"].append({"plc_id": original,
+                                      "motivo": res.get("mensaje", "")})
+                continue
+            plc_id = res["plc_id"]
+            r["creados"].append(plc_id)
+
+        if original and original != plc_id:
+            r["renombrados"][original] = plc_id
+
+        # Catálogo: solo si aquí no hay ninguno. Si el PLC ya conectó alguna
+        # vez, lo que se vio aquí vale más que lo que se vio allí.
+        tags = d.get("tags") or []
+        if tags:
+            try:
+                if plc_manager.adoptar_catalogo(plc_id, tags):
+                    r["catalogos"] += 1
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("No se pudo adoptar el catálogo de '%s': %s",
+                               plc_id, exc)
+
+        # Escritura: añade lo que falte, con sus límites y descripción.
+        escritura = d.get("escritura") or []
+        if escritura and escritura_store is not None:
+            try:
+                r["escritura"] += escritura_store.habilitar_lote(
+                    plc_id, [e for e in escritura if isinstance(e, dict)],
+                    usuario)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("No se pudo aplicar la escritura de '%s': %s",
+                               plc_id, exc)
+
+    if r["catalogos"]:
+        try:
+            await plc_manager.difundir_snapshot()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("No se pudo difundir el snapshot: %s", exc)
+    return r
+
+
+def remapear_variables(valor: Any, mapa_plc: Dict[str, str]) -> Any:
+    """
+    Reescribe los enlaces `<plc>|<tag>` cuando el id del PLC cambió al
+    importar (aquí ya había otro con ese id). Misma idea que
+    `remapear_pantallas()`: solo las claves de `CLAVES_DE_VARIABLE`, en
+    profundidad, y solo si el prefijo es exactamente un id renombrado.
+    """
+    if not mapa_plc:
+        return valor
+    if isinstance(valor, dict):
+        salida = {}
+        for clave, dentro in valor.items():
+            if (clave in CLAVES_DE_VARIABLE and isinstance(dentro, str)
+                    and "|" in dentro):
+                plc, _, tag = dentro.partition("|")
+                salida[clave] = (f"{mapa_plc[plc]}|{tag}" if plc in mapa_plc
+                                 else dentro)
+            else:
+                salida[clave] = remapear_variables(dentro, mapa_plc)
+        return salida
+    if isinstance(valor, list):
+        return [remapear_variables(x, mapa_plc) for x in valor]
+    return valor
+
+
+# ====================================================================== #
+# Grupos de la barra de pestañas (las «carpetas» de pantallas)
+# ====================================================================== #
+#
+# La organización de la barra —qué grupos hay, en qué orden, y en cuál cae
+# cada pantalla— vive fuera de las pantallas (ver grupos_store.py). Si no
+# viaja, el proyecto importado llega con todas las pestañas sueltas, que es
+# justo lo que uno nota al abrirlo: «estaba todo en carpetas y ahora no».
+
+
+def grupos_para_exportar(grupos_store, proyecto_id: str) -> dict:
+    """`{"grupos": [{id, nombre}...], "asignaciones": {pantalla: grupo}}`."""
+    if grupos_store is None:
+        return {"grupos": [], "asignaciones": {}}
+    try:
+        doc = grupos_store.documento(proyecto_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudieron leer los grupos de '%s': %s",
+                       proyecto_id, exc)
+        return {"grupos": [], "asignaciones": {}}
+    return {
+        "grupos": [{"id": str(g.get("id") or ""), "nombre": str(g.get("nombre") or "")}
+                   for g in doc.get("grupos", []) if isinstance(g, dict)],
+        "asignaciones": {str(k): str(v) for k, v in
+                         (doc.get("asignaciones") or {}).items()},
+    }
+
+
+def importar_grupos(grupos_store, proyecto_id: str, datos: dict,
+                    mapa_pantallas: Dict[str, str], usuario: str = "") -> dict:
+    """
+    Recrea los grupos en el proyecto recién importado y mete cada pantalla
+    en el suyo. Las pantallas que cambiaron de id al importar se buscan por
+    `mapa_pantallas`; una asignación a una pantalla que no vino en el
+    fichero se ignora. Devuelve `{"grupos": n, "asignadas": n}`.
+    """
+    r = {"grupos": 0, "asignadas": 0}
+    if grupos_store is None or not isinstance(datos, dict):
+        return r
+    ids: Dict[str, str] = {}
+    for g in datos.get("grupos") or []:
+        if not isinstance(g, dict):
+            continue
+        original = str(g.get("id") or "")
+        nombre = str(g.get("nombre") or original)
+        try:
+            creado = grupos_store.crear(proyecto_id, nombre, usuario)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Grupo '%s' no se pudo crear en '%s': %s",
+                           nombre, proyecto_id, exc)
+            continue
+        ids[original] = creado["id"]
+        r["grupos"] += 1
+    for pantalla, gid in (datos.get("asignaciones") or {}).items():
+        destino = ids.get(str(gid))
+        if destino is None:
+            continue
+        pid = mapa_pantallas.get(str(pantalla), str(pantalla))
+        try:
+            grupos_store.asignar(proyecto_id, pid, destino, usuario)
+            r["asignadas"] += 1
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("No se pudo asignar '%s' al grupo '%s': %s",
+                           pid, destino, exc)
+    return r

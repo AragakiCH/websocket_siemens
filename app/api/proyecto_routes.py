@@ -46,11 +46,16 @@ from app.api.intercambio import (
     FORMATO_PROYECTO,
     FORMATO_VERSION,
     MAX_PANTALLAS_IMPORTADAS,
+    grupos_para_exportar,
     id_libre,
+    importar_grupos,
     importar_internas,
+    importar_plcs,
     importar_widgets,
     nombre_libre,
+    plcs_para_exportar,
     remapear_pantallas,
+    remapear_variables,
     slug,
     internas_para_exportar,
     widgets_para_exportar,
@@ -371,11 +376,17 @@ async def borrar_proyecto(
 # un widget, sin ningún error que lo explicara: el diseño sabe que ahí va un
 # `custom:manometro`, pero ese equipo no tiene ni idea de qué es eso.
 #
+# También TODAS las variables internas del equipo y los PLC con su catálogo
+# de variables y su lista de escritura (ver `intercambio.py`): es lo que
+# hace que el proyecto se abra en el otro equipo con las mismas variables
+# para asignar y los mismos tags escribibles, sin rehacer esa configuración
+# a mano. Al importar NADA de eso pisa lo que ya haya aquí.
+#
 # NO viajan las alarmas, las recetas, los flujos ni las conexiones a base de
-# datos. No cuelgan del diseño sino de los tags del PLC y de la instalación:
-# llevárselos escondidos dentro de un proyecto sobrescribiría configuración
-# de planta que nadie ha pedido tocar. Para mover una instalación entera
-# está la copia de seguridad de Configuración (`/sistema/datos/backup`).
+# datos. Cuelgan de la instalación: llevárselos escondidos dentro de un
+# proyecto sobrescribiría configuración de planta que nadie ha pedido tocar.
+# Para mover una instalación entera está la copia de seguridad de
+# Configuración (`/sistema/datos/backup`).
 #
 # ES UN JSON Y NO UN .ZIP a propósito: se puede abrir con cualquier editor
 # para ver qué trae antes de meterlo en un equipo de planta, y se versiona en
@@ -407,9 +418,18 @@ class ProyectoExportado(BaseModel):
     # exactamente lo que pasaba antes.
     variables_internas: List[Dict[str, Any]] = Field(
         default_factory=list,
-        description="Definición de las variables internas que enlazan los "
-                    "widgets. Las de PLC no viajan: existen porque existe el "
-                    "autómata.")
+        description="Definición de TODAS las variables internas del equipo "
+                    "que exportó (sin su valor actual).")
+    # Igual que arriba: un fichero anterior no lo trae y se importa igual.
+    plcs: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="PLC dados de alta (sin contraseñas), cada uno con su "
+                    "catálogo de variables (`tags`) y los tags habilitados "
+                    "para escritura con sus límites (`escritura`).")
+    grupos: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Grupos de la barra de pestañas (`grupos`, en orden) y "
+                    "en cuál cae cada pantalla (`asignaciones`).")
 
 
 @router.get(
@@ -462,8 +482,19 @@ async def exportar_proyecto(
     # llega al otro equipo con los enlaces apuntando a variables que allí no
     # existen: widgets en blanco y ni un error que lo explique.
     internas = internas_para_exportar(
-        getattr(request.app.state, "internas_store", None), pantallas
+        getattr(request.app.state, "internas_store", None), pantallas,
+        todas=True,
     )
+
+    # Los PLC con su catálogo y su escritura. Sin contraseñas.
+    plcs = plcs_para_exportar(
+        getattr(request.app.state, "plc_manager", None),
+        getattr(request.app.state, "escritura_store", None),
+    )
+
+    # Las «carpetas» de la barra y qué pantalla va en cada una.
+    grupos = grupos_para_exportar(
+        getattr(request.app.state, "grupos_store", None), proyecto_id)
 
     doc = {
         "formato": FORMATO_PROYECTO,
@@ -477,12 +508,15 @@ async def exportar_proyecto(
         "pantallas": pantallas,
         "widgets_personalizados": personalizados,
         "variables_internas": internas,
+        "plcs": plcs,
+        "grupos": grupos,
     }
 
     _auditar(request, "proyecto.exportado", sesion, proyecto_id,
              {"pantallas": len(pantallas),
               "widgets_personalizados": len(personalizados),
-              "variables_internas": len(internas)})
+              "variables_internas": len(internas),
+              "plcs": len(plcs)})
 
     nombre_fichero = f"proyecto-{slug(proyecto['nombre']) or proyecto_id}.json"
     return JSONResponse(
@@ -598,6 +632,20 @@ async def importar_proyecto(
             mapa[original] = nuevo
         destinos.append((nuevo, etiqueta, pantalla))
 
+    # ── 3b. PLC: dar de alta los que falten, con catálogo y escritura ──
+    #
+    # Va ANTES de crear las pantallas porque, si aquí ya había un PLC con
+    # el mismo id pero otra dirección, el importado nace con otro id y los
+    # enlaces `<plc>|<tag>` de los widgets tienen que reescribirse. Un PLC
+    # que falle no tumba la importación: se cuenta y se sigue (el diseño
+    # vale igual, solo que ese PLC habrá que darlo de alta a mano).
+    r_plcs = await importar_plcs(
+        getattr(request.app.state, "plc_manager", None),
+        getattr(request.app.state, "escritura_store", None),
+        cuerpo.plcs, quien,
+    )
+    mapa_plc: Dict[str, str] = r_plcs.get("renombrados") or {}
+
     # ── 4. Crear. Si algo falla, se deshace ──────────────────────
     creadas: List[str] = []
     try:
@@ -606,6 +654,7 @@ async def importar_proyecto(
             await almacen.crear(nuevo, etiqueta, quien, proyecto_id)
             creadas.append(nuevo)
             widgets = remapear_pantallas(pantalla.get("widgets", []), mapa)
+            widgets = remapear_variables(widgets, mapa_plc)
             await almacen.guardar_todo(
                 nuevo, widgets, pantalla.get("canvas") or {},
                 None,          # version=None: acaba de nacer, no hay conflicto
@@ -632,6 +681,20 @@ async def importar_proyecto(
         cuerpo.widgets_personalizados, quien,
     )
 
+    # Los grupos de la barra: el proyecto acaba de nacer, así que no hay
+    # nada con lo que chocar; se recrean en su orden y cada pantalla va al
+    # suyo (con el id que le haya tocado aquí).
+    r_grupos = importar_grupos(
+        getattr(request.app.state, "grupos_store", None), proyecto_id,
+        cuerpo.grupos, mapa, quien,
+    )
+    if r_grupos["grupos"]:
+        try:
+            await request.app.state.manager.difundir_config(
+                "grupos", quien, "importados")
+        except Exception:  # noqa: BLE001
+            pass
+
     # Y las variables internas, con el mismo criterio: las que ya existan aquí
     # se dejan como están —el widget se enlaza a la que hay, que es lo que su
     # nombre dice— y solo se crean las que faltan.
@@ -643,7 +706,9 @@ async def importar_proyecto(
     _auditar(request, "proyecto.importado", sesion, proyecto_id,
              {"pantallas": len(creadas), "widgets_nuevos": importados,
               "widgets_ya_existentes": omitidos,
-              "variables_nuevas": v_nuevas})
+              "variables_nuevas": v_nuevas,
+              "plcs_creados": r_plcs["creados"],
+              "plcs_omitidos": r_plcs["omitidos"]})
     await _difundir(request, "proyecto.updated", proyecto_id, quien,
                     {"accion": "proyecto_importado",
                      "pantallas": len(creadas)})
@@ -666,6 +731,17 @@ async def importar_proyecto(
         # —la clave es la misma— y el widget enseñará algo sin sentido sin dar
         # error: es el único caso en que callarse haría daño.
         "variables_en_conflicto": v_conflictos,
+        # PLC: qué se dio de alta, qué ya estaba, qué no se pudo (y por qué),
+        # y los ids que cambiaron (los enlaces ya van reescritos).
+        "plcs_creados": r_plcs["creados"],
+        "plcs_ya_existentes": r_plcs["ya_existentes"],
+        "plcs_omitidos": r_plcs["omitidos"],
+        "plcs_renombrados": mapa_plc,
+        "catalogos_importados": r_plcs["catalogos"],
+        "escritura_habilitada": r_plcs["escritura"],
+        # Carpetas de la barra recreadas y pantallas colocadas en ellas.
+        "grupos_importados": r_grupos["grupos"],
+        "pantallas_agrupadas": r_grupos["asignadas"],
     }
 
 

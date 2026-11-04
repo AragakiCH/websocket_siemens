@@ -24,6 +24,7 @@
 // =========================================================================
 import { fetchAuth } from '../services/authApi';
 import { descargarJson, hoy, leerJsonDeFichero } from './descargas';
+import { RealPLCService } from '../services/RealPLCService';
 
 /** Proyecto que el backend garantiza que existe. No se puede borrar. */
 export const PROYECTO_HMI_POR_DEFECTO = 'principal';
@@ -177,10 +178,12 @@ export async function borrarProyectoHmi(proyectoId: string): Promise<string[]> {
 // dejaria cajas vacias donde habia un widget, sin ningun error que lo
 // explicara.
 //
-// SI viajan las variables INTERNAS enlazadas a los widgets: sin ellas el
-// diseno llega al otro equipo apuntando a variables que alli no existen, y
-// el sintoma es un widget en blanco sin ningun error. Las de PLC no viajan:
-// existen porque existe el automata.
+// SI viajan TODAS las variables INTERNAS del equipo (no solo las enlazadas:
+// quien disena alli las va a necesitar), y los PLC con su catalogo de
+// variables y su lista de escritura con limites. Los VALORES del PLC no
+// viajan: existen porque existe el automata. Y viaja la seleccion de
+// variables de Configuracion, que vive en este navegador (localStorage) y
+// por eso la pone y la lee la vista, no el servidor.
 //
 // NO viajan alarmas, recetas, flujos ni conexiones a base de datos: son de la
 // instalacion, no del diseno. Para mover una instalacion entera esta la copia
@@ -201,6 +204,22 @@ export interface ProyectoExportado {
    * trae, y tiene que seguir importandose igual.
    */
   variables_internas?: unknown[];
+  /** PLC dados de alta (sin contrasenas), con `tags` y `escritura`. */
+  plcs?: unknown[];
+  /** Carpetas de la barra de pestanas y en cual cae cada pantalla. */
+  grupos?: { grupos?: unknown[]; asignaciones?: Record<string, string> };
+  /**
+   * Seleccion de variables de Configuracion (`<plc>|<tag>` -> marcada).
+   * La pone la vista al descargar y la aplica al importar: el servidor no la
+   * conoce, vive en el navegador.
+   */
+  seleccion_variables?: Record<string, boolean>;
+}
+
+/** Un PLC del fichero que no se pudo dar de alta, y por que. */
+export interface PlcOmitido {
+  plc_id: string;
+  motivo: string;
 }
 
 /** Una variable del fichero cuyo tipo NO coincide con el de aqui. */
@@ -233,6 +252,22 @@ export interface ResultadoImportacion {
    * callarse hace dano.
    */
   variables_en_conflicto: ConflictoVariable[];
+  /** PLC dados de alta a partir del fichero. */
+  plcs_creados: string[];
+  /** PLC que ya estaban aqui (mismo endpoint) y se reutilizan. */
+  plcs_ya_existentes: string[];
+  /** PLC que no se pudieron crear (un Rexroth sin contrasena, p. ej.). */
+  plcs_omitidos: PlcOmitido[];
+  /** Ids de PLC que cambiaron (ya habia otro con ese id). Enlaces reescritos. */
+  plcs_renombrados: Record<string, string>;
+  /** Cuantos PLC adoptaron el catalogo de variables del fichero. */
+  catalogos_importados: number;
+  /** Tags habilitados para escritura que no lo estaban aqui. */
+  escritura_habilitada: number;
+  /** Carpetas de la barra recreadas en el proyecto importado. */
+  grupos_importados: number;
+  /** Pantallas colocadas en su carpeta. */
+  pantallas_agrupadas: number;
 }
 
 /** Pide el documento del proyecto. Es el contenido del fichero. */
@@ -257,6 +292,9 @@ export async function descargarProyecto(
   nombreProyecto: string
 ): Promise<string> {
   const doc = await exportarProyecto(proyectoId);
+  // La seleccion de Configuracion es de este navegador: el servidor no la
+  // tiene, asi que se anade aqui, justo antes de escribir el fichero.
+  doc.seleccion_variables = RealPLCService.seleccionActual();
   return descargarJson(doc, nombreDeFichero(nombreProyecto || proyectoId));
 }
 
@@ -297,5 +335,36 @@ export async function importarProyecto(
     variables_importadas: d.variables_importadas ?? [],
     variables_ya_existentes: d.variables_ya_existentes ?? [],
     variables_en_conflicto: d.variables_en_conflicto ?? [],
+    plcs_creados: d.plcs_creados ?? [],
+    plcs_ya_existentes: d.plcs_ya_existentes ?? [],
+    plcs_omitidos: d.plcs_omitidos ?? [],
+    plcs_renombrados: d.plcs_renombrados ?? {},
+    catalogos_importados: d.catalogos_importados ?? 0,
+    escritura_habilitada: d.escritura_habilitada ?? 0,
+    grupos_importados: d.grupos_importados ?? 0,
+    pantallas_agrupadas: d.pantallas_agrupadas ?? 0,
   };
+}
+
+/**
+ * Aplica en este navegador la seleccion de variables que traia el fichero,
+ * con los ids de PLC ya traducidos si el servidor los renombro. Devuelve
+ * cuantas marcas cambiaron. Se llama DESPUES de importar, cuando ya se
+ * sabe que ids tienen los PLC aqui.
+ */
+export function aplicarSeleccionImportada(
+  doc: ProyectoExportado,
+  renombrados: Record<string, string>
+): number {
+  const origen = doc.seleccion_variables;
+  if (!origen || typeof origen !== 'object') return 0;
+  const traducida: Record<string, boolean> = {};
+  for (const [clave, sel] of Object.entries(origen)) {
+    const sep = clave.indexOf('|');
+    if (sep < 0) continue;
+    const plc = clave.slice(0, sep);
+    const tag = clave.slice(sep + 1);
+    traducida[`${renombrados[plc] ?? plc}|${tag}`] = sel;
+  }
+  return RealPLCService.aplicarSeleccion(traducida);
 }

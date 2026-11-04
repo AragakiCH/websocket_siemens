@@ -52,6 +52,7 @@ import {
   borrarProyectoHmi,
   descargarProyecto,
   leerFicheroDeProyecto,
+  aplicarSeleccionImportada,
   importarProyecto,
   PROYECTO_HMI_POR_DEFECTO,
   type ProyectoExportado,
@@ -185,6 +186,11 @@ export function ProyectoSelector() {
       if (renombradas > 0) {
         partes.push(`${renombradas} ${t('projects.importedRenamed')}`);
       }
+      if (r.grupos_importados > 0) {
+        partes.push(
+          `${r.grupos_importados} ${t('projects.importedGroups')} (${r.pantallas_agrupadas} ${t('projects.importedGrouped')})`
+        );
+      }
       if (r.widgets_importados.length > 0) {
         partes.push(
           `${r.widgets_importados.length} ${t('projects.importedWidgets')}`
@@ -205,6 +211,34 @@ export function ProyectoSelector() {
         partes.push(
           `${r.variables_ya_existentes.length} ${t('projects.importedVarsKept')}`
         );
+      }
+
+      // PLC: lo que entró y lo que ya estaba. El catálogo y la escritura
+      // se cuentan aparte porque son lo que uno busca al abrir
+      // Configuración después de importar.
+      if (r.plcs_creados.length > 0) {
+        partes.push(`${r.plcs_creados.length} ${t('projects.importedPlcs')}`);
+      }
+      if (r.plcs_ya_existentes.length > 0) {
+        partes.push(
+          `${r.plcs_ya_existentes.length} ${t('projects.importedPlcsKept')}`
+        );
+      }
+      if (r.catalogos_importados > 0) {
+        partes.push(
+          `${r.catalogos_importados} ${t('projects.importedCatalogs')}`
+        );
+      }
+      if (r.escritura_habilitada > 0) {
+        partes.push(
+          `${r.escritura_habilitada} ${t('projects.importedWritable')}`
+        );
+      }
+      // La selección de Configuración vive en este navegador: se aplica
+      // aquí, con los ids de PLC que el servidor haya dado.
+      const marcas = aplicarSeleccionImportada(doc, r.plcs_renombrados);
+      if (marcas > 0) {
+        partes.push(`${marcas} ${t('projects.importedSelection')}`);
       }
 
       // Los dos avisos de problema se juntan en UNO.
@@ -236,6 +270,15 @@ export function ProyectoSelector() {
       const faltan = widgetsQueFaltan(doc);
       if (faltan.length > 0) {
         problemas.push(`${t('projects.importedMissing')} ${faltan.join(', ')}.`);
+      }
+
+      // Un PLC que no se pudo dar de alta se dice con su motivo: el diseño
+      // está importado, pero sus variables no aparecerán hasta crearlo.
+      if (r.plcs_omitidos.length > 0) {
+        const detalle = r.plcs_omitidos
+          .map((p) => `${p.plc_id || '?'} (${p.motivo})`)
+          .join(', ');
+        problemas.push(`${t('projects.importedPlcsOmitted')} ${detalle}.`);
       }
 
       if (problemas.length > 0) setError(problemas.join(' '));

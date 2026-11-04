@@ -80,16 +80,26 @@ MAX_ZIP = 50 * 1024 * 1024
 # mano `conexiones.json` volvían a leerse sus contraseñas.
 #
 # `conexiones.json` y `.clave` describen ESTE servidor, no el proyecto. Por
-# defecto se conservan: las conexiones del equipo se quedan, las del zip que
-# no choquen por `db_id` se añaden (con su contraseña re-cifrada con la clave
-# local), y las que choquen se descartan, porque la del equipo es la que
-# funciona aquí. Quien de verdad quiera pisarlas lo pide explícitamente con
-# `conservar_conexiones=false`.
+# defecto se conservan: las conexiones del equipo se quedan TODAS, y las del
+# zip se AÑADEN (con su contraseña re-cifrada con la clave local y sin
+# autoconectar, para revisarlas antes). Si una del zip choca por `db_id` con
+# una de aquí hay dos casos: es la MISMA base (mismo motor, servidor, base y
+# usuario) y entonces sobra —ya está—; o es OTRA base que casualmente se
+# llama igual (`local` en los dos equipos, por ejemplo), y entonces entra
+# renombrada (`local_importada`), porque descartarla era perder la conexión
+# del compañero que uno quería tener a mano para sus flujos. Lo que en el
+# zip apunte a ese `db_id` (grupos de historización, consultas) se reescribe
+# al nombre nuevo. Quien de verdad quiera pisar sus conexiones lo pide
+# explícitamente con `conservar_conexiones=false`.
 FICHERO_CONEXIONES = "conexiones.json"
 FICHERO_CLAVE = ".clave"
 # Ficheros con contraseñas cifradas por la clave: si se conserva la clave
 # local, lo que venga del zip hay que re-cifrarlo con ella.
 FICHEROS_CON_CIFRADO = (FICHERO_CONEXIONES, "plcs.json")
+# Ficheros del zip cuyas entradas llevan `db_id`: si una conexión entra
+# renombrada, aquí hay que apuntar al nombre nuevo.
+FICHEROS_CON_DB_ID = ("historicos.json", "consultas.json")
+SUFIJO_IMPORTADA = "_importada"
 
 
 def _fernet(clave: Optional[bytes]):
@@ -128,34 +138,87 @@ def _recifrar(valor: Any, origen, destino) -> str:
     return PREFIJO_CIFRADO + destino.encrypt(claro).decode()
 
 
+def _misma_base(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
+    """¿Apuntan las dos conexiones a la misma base del mismo servidor?"""
+    def _n(c: Dict[str, Any]) -> tuple:
+        return (str(c.get("motor", "")).lower(),
+                str(c.get("host", "")).strip().lower(),
+                int(c.get("puerto") or 0),
+                str(c.get("base_datos", "")).strip().lower(),
+                str(c.get("usuario", "")).strip().lower())
+    return _n(a) == _n(b)
+
+
 def _fusionar_conexiones(locales: List[Dict[str, Any]],
                          importadas: List[Dict[str, Any]],
                          f_zip, f_local) -> tuple:
     """
-    Conexiones locales + las del zip que no choquen por `db_id`.
+    Conexiones locales + las del zip. Ninguna local se toca.
 
-    Devuelve `(lista_final, añadidas, descartadas)` con los `db_id` de cada
-    grupo, para que el mensaje al usuario diga exactamente qué pasó con cada
-    una en vez de un "restaurado" que no explica por qué su base sigue ahí.
+    Devuelve `(lista_final, añadidas, descartadas, renombradas)`:
+      * `añadidas`: `db_id` (ya definitivo) de las que entraron;
+      * `descartadas`: las del zip que eran la MISMA base que una local;
+      * `renombradas`: `{db_id_del_zip: db_id_aquí}` de las que chocaban por
+        nombre con otra base distinta y entraron con sufijo. Sirve para
+        reescribir lo que en el zip apuntaba a ese nombre.
     """
-    ids_locales = {str(c.get("db_id", "")) for c in locales}
+    por_id = {str(c.get("db_id", "")): c for c in locales}
     final = list(locales)
     anadidas: List[str] = []
     descartadas: List[str] = []
+    renombradas: Dict[str, str] = {}
     for c in importadas:
         db_id = str(c.get("db_id", ""))
-        if db_id in ids_locales:
-            descartadas.append(db_id)
+        if not db_id:
             continue
+        nuevo_id = db_id
+        if db_id in por_id:
+            if _misma_base(por_id[db_id], c):
+                descartadas.append(db_id)
+                continue
+            base = f"{db_id}{SUFIJO_IMPORTADA}"
+            nuevo_id = base
+            i = 2
+            while nuevo_id in por_id:
+                nuevo_id = f"{base}_{i}"
+                i += 1
+            renombradas[db_id] = nuevo_id
         c = dict(c)
+        c["db_id"] = nuevo_id
+        if nuevo_id != db_id:
+            c["nombre"] = f"{c.get('nombre') or db_id} (importada)"[:80]
         c["password"] = _recifrar(c.get("password", ""), f_zip, f_local)
         # Que no arranque sola apuntando a un servidor que quizá no existe
         # aquí: se deja dada de alta para revisarla, no para que falle cada
         # arranque.
         c["autoconectar"] = False
         final.append(c)
-        anadidas.append(db_id)
-    return final, anadidas, descartadas
+        por_id[nuevo_id] = c
+        anadidas.append(nuevo_id)
+    return final, anadidas, descartadas, renombradas
+
+
+def _reapuntar_db_id(datos: Any, renombradas: Dict[str, str]) -> Any:
+    """
+    Cambia el `db_id` de las entradas (grupos de historización, consultas)
+    que apunten a una conexión que entró renombrada. Solo la clave `db_id`,
+    en el primer nivel de cada entrada: es donde vive en esos ficheros.
+    """
+    if not renombradas:
+        return datos
+    if isinstance(datos, list):
+        salida = []
+        for e in datos:
+            if isinstance(e, dict) and str(e.get("db_id", "")) in renombradas:
+                e = dict(e)
+                e["db_id"] = renombradas[str(e["db_id"])]
+            salida.append(e)
+        return salida
+    if isinstance(datos, dict):
+        return {k: (_reapuntar_db_id(v, renombradas)
+                    if isinstance(v, (list, dict)) else v)
+                for k, v in datos.items()}
+    return datos
 
 
 # ====================================================================== #
@@ -457,16 +520,48 @@ async def restaurar_backup(
     restaurados = 0
     anadidas: List[str] = []
     descartadas: List[str] = []
+    renombradas: Dict[str, str] = {}
+    # Las conexiones se fusionan ANTES de recorrer el zip: el resultado (qué
+    # db_id cambió de nombre) hace falta para reescribir los ficheros que
+    # apuntan a ellas, vengan en el orden que vengan dentro del zip.
+    if conservar and FICHERO_CONEXIONES in nombres:
+        try:
+            datos_cx = json.loads(z.read(FICHERO_CONEXIONES).decode("utf-8"))
+        except Exception:  # noqa: BLE001
+            datos_cx = None
+        if isinstance(datos_cx, list):
+            datos_cx, anadidas, descartadas, renombradas = _fusionar_conexiones(
+                locales, [c for c in datos_cx if isinstance(c, dict)],
+                f_zip, f_local)
+            ruta_conexiones.write_text(
+                json.dumps(datos_cx, ensure_ascii=False, indent=2),
+                encoding="utf-8")
+            restaurados += 1
+
     for nombre in nombres:
         if nombre == "_LEEME.txt":
             continue
         salida = destino / nombre
         salida.parent.mkdir(parents=True, exist_ok=True)
 
-        if conservar and nombre == FICHERO_CLAVE:
+        if conservar and nombre in (FICHERO_CLAVE, FICHERO_CONEXIONES):
             # La clave de este equipo se queda: es la que abre sus
             # contraseñas, y todo lo que entra del zip se re-cifra con ella.
+            # Las conexiones ya se fusionaron arriba.
             continue
+
+        if conservar and renombradas and nombre in FICHEROS_CON_DB_ID:
+            try:
+                datos = json.loads(z.read(nombre).decode("utf-8"))
+            except Exception:  # noqa: BLE001
+                datos = None
+            if datos is not None:
+                salida.write_text(
+                    json.dumps(_reapuntar_db_id(datos, renombradas),
+                               ensure_ascii=False, indent=2),
+                    encoding="utf-8")
+                restaurados += 1
+                continue
 
         if conservar and nombre in FICHEROS_CON_CIFRADO:
             try:
@@ -475,9 +570,7 @@ async def restaurar_backup(
                 datos = None
             if isinstance(datos, list):
                 if nombre == FICHERO_CONEXIONES:
-                    datos, anadidas, descartadas = _fusionar_conexiones(
-                        locales, [c for c in datos if isinstance(c, dict)],
-                        f_zip, f_local)
+                    pass  # ya fusionadas arriba (no se llega aquí)
                 else:
                     for d in datos:
                         if isinstance(d, dict) and d.get("password"):
@@ -503,7 +596,8 @@ async def restaurar_backup(
                                "bytes": len(contenido),
                                "conexiones_conservadas": conservar,
                                "conexiones_anadidas": anadidas,
-                               "conexiones_descartadas": descartadas},
+                               "conexiones_descartadas": descartadas,
+                               "conexiones_renombradas": renombradas},
                       sesion=sesion)
 
     nota_conexiones = ""
@@ -515,10 +609,16 @@ async def restaurar_backup(
             nota_conexiones += (
                 f"; del zip se añadieron {', '.join(anadidas)} (desactivadas, "
                 f"revísalas antes de usarlas)")
+        if renombradas:
+            nota_conexiones += (
+                "; " + ", ".join(f"{a} entró como {b}" for a, b in
+                                 renombradas.items())
+                + " porque aquí ya había otra base con ese id (sus grupos "
+                  "y consultas del zip apuntan al nombre nuevo)")
         if descartadas:
             nota_conexiones += (
-                f"; se descartaron {', '.join(descartadas)} del zip porque "
-                f"aquí ya existen con ese id")
+                f"; {', '.join(descartadas)} del zip ya estaban aquí (misma "
+                f"base) y no se duplicaron")
         nota_conexiones += "."
 
     # `usuario_de` devuelve '' cuando no hay sesión, que pasa de verdad en dos
@@ -536,6 +636,7 @@ async def restaurar_backup(
         "conexiones_conservadas": conservar,
         "conexiones_anadidas": anadidas,
         "conexiones_descartadas": descartadas,
+        "conexiones_renombradas": renombradas,
         "mensaje": f"{restaurados} fichero(s) restaurados.{nota_conexiones} "
                    f"REINICIA el servicio para que se apliquen. La "
                    f"configuración anterior quedó en {respaldo.name}.",

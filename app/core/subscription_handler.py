@@ -392,6 +392,29 @@ class SubscriptionHandler:
                 self._log(logging.WARNING,
                           "No se pudo guardar el catálogo de tags: %s", exc)
 
+    def catalogo(self) -> List[TagInfo]:
+        """Los tags conocidos de este PLC (último browse, o el guardado)."""
+        return list(self._tags)
+
+    def adoptar_catalogo(self, tags: List[TagInfo]) -> bool:
+        """
+        Toma como catálogo una lista que viene de FUERA (un proyecto
+        importado), solo si este PLC todavía no tiene ninguno. En cuanto
+        conecte, el browse real lo reemplaza (ver `_fijar_catalogo`).
+        """
+        if self._tags or not tags:
+            return False
+        self._tags = list(tags)
+        if self._tags_store is not None:
+            try:
+                self._tags_store.guardar(self.plc_id, self._tags)
+            except Exception as exc:  # noqa: BLE001
+                self._log(logging.WARNING,
+                          "No se pudo guardar el catálogo importado: %s", exc)
+        self._log(logging.INFO, "Catálogo adoptado de un proyecto importado: "
+                  "%d variables (hasta que el PLC conecte).", len(self._tags))
+        return True
+
     def is_plc_connected(self) -> bool:
         return self._driver.is_connected()
 
