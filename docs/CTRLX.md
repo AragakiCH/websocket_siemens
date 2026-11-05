@@ -78,14 +78,25 @@ llevarse la configuración de un PC Windows al ctrlX y viceversa.
 
 ## Bases de datos
 
-- `local` = SQLite en `$SNAP_COMMON/datos/psicore.db`: cuentas, recetas,
-  alarmas. Suficiente para la configuración del HMI.
-- Historizador: apunta a una base **externa** (MySQL/PostgreSQL en un PC o
-  servidor de la red). La flash del ctrlX (2,7 GB en una X3) no es sitio
-  para millones de filas.
-- SQL Server no está disponible en el snap (necesita el driver ODBC del
-  sistema). Si hiciera falta, es un `stage-packages` con `msodbcsql18`
-  arm64; no está hecho a propósito.
+La conexión «local» es **SQLite** (`psicore.db` en la carpeta de datos): sin
+servidor ni driver. Es donde viven cuentas, alarmas y recetas por defecto.
+
+Para bases **externas** desde el PLC van dentro del snap:
+
+| Motor | Cómo | Notas |
+|---|---|---|
+| SQL Server | aioodbc/pyodbc + **ODBC Driver 18 for SQL Server** de Microsoft (`msodbcsql18`, stage-package) | El workflow añade el repositorio de Microsoft al runner antes de `snapcraft`. `bin/snap-wrapper.sh` escribe `odbcinst.ini` en `$SNAP_COMMON/odbc` con la ruta real del driver y pone `ODBCSYSINI`. Hay también un segundo driver, «FreeTDS SQL Server», por si el de Microsoft fallara con alguna versión. |
+| MySQL / MariaDB | aiomysql | Python puro. |
+| PostgreSQL | asyncpg | Rueda binaria para aarch64. |
+
+Ojo con las conexiones **importadas** de un PC Windows: `localhost` en el
+ctrlX es el propio ctrlX. Cambia el servidor a la **IP del PC** donde corre
+SQL Server (y que ese SQL Server acepte TCP en el 1433 desde la red, como
+se configuró para los visores). Con el driver 18, `TrustServerCertificate=yes`
+en opciones si el servidor no tiene certificado válido.
+
+En `snap logs psicore` se ve al arrancar qué drivers ODBC quedaron
+registrados («ODBC: Microsoft ODBC Driver 18 for SQL Server (...)»).
 
 ## Primera cuenta y «equipo servidor»
 

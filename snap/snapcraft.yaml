@@ -8,7 +8,10 @@
 # Lo que cambia respecto a Windows NO está en el código, está aquí y en
 # bin/snap-wrapper.sh:
 #   · los datos viven en $SNAP_COMMON/datos (sobreviven a las actualizaciones);
-#   · la conexión «local» es SQLite (sin servidor, sin driver ODBC);
+#   · la conexión «local» es SQLite (sin servidor); para SQL Server externo
+#     va dentro el ODBC Driver 18 de Microsoft (stage-packages msodbcsql18,
+#     del repositorio de Microsoft que añade el workflow) y FreeTDS de
+#     respaldo; MySQL y PostgreSQL van por pip (aiomysql, asyncpg);
 #   · el puerto es el 8010 (el 8000 lo usa api-sysid en el mismo ctrlX);
 #   · el frontend va compilado dentro (frontend/dist, que genera el workflow).
 #
@@ -45,6 +48,25 @@ parts:
       - python3-dev
       - build-essential
       - rsync
+    # Bibliotecas del sistema que viajan DENTRO del snap (Ubuntu Core no deja
+    # instalar nada aparte):
+    #   · unixodbc: el gestor ODBC que usa pyodbc;
+    #   · msodbcsql18: «ODBC Driver 18 for SQL Server» de Microsoft. NO está
+    #     en los repositorios de Ubuntu: hace falta el de Microsoft
+    #     (https://packages.microsoft.com/ubuntu/22.04/prod), que el workflow
+    #     añade al runner antes de snapcraft. Para construir en local:
+    #       curl -sSL -O https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb
+    #       sudo dpkg -i packages-microsoft-prod.deb && sudo apt-get update
+    #   · tdsodbc: FreeTDS, un segundo driver de SQL Server por si el de
+    #     Microsoft no sirve en algún caso (se registra como
+    #     «FreeTDS SQL Server»).
+    # Sus dependencias (libodbc2, libodbcinst2, krb5, libct4…) las resuelve
+    # snapcraft solo. bin/snap-wrapper.sh escribe el odbcinst.ini con las
+    # rutas de dentro del snap y pone LD_LIBRARY_PATH.
+    stage-packages:
+      - unixodbc
+      - msodbcsql18
+      - tdsodbc
 
     override-build: |
       set -eu

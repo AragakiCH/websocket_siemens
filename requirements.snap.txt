@@ -1,12 +1,12 @@
 # Dependencias para el SNAP de ctrlX CORE (Ubuntu Core 22, amd64 y arm64).
 #
-# Es requirements.txt con dos diferencias, y solo dos:
-#   · SIN aioodbc/pyodbc: SQL Server necesita el driver ODBC de Microsoft
-#     instalado en el sistema, y en un snap estricto de Ubuntu Core no está.
-#     La app arranca igual (pyodbc se importa dentro de funciones) y ofrece
-#     SQLite, MySQL y PostgreSQL.
-#   · CON aiomysql y asyncpg: Python puro, para historizar en una base
-#     externa desde el PLC.
+# Es requirements.txt MÁS lo que hace falta para las bases externas desde el
+# PLC, todo en Python puro o con rueda binaria para aarch64:
+#   · aioodbc/pyodbc (SQL Server): el driver ODBC de Microsoft NO viene por
+#     pip; lo mete snapcraft como paquete del sistema (stage-packages
+#     msodbcsql18 + unixodbc, ver snap/snapcraft.yaml) y bin/snap-wrapper.sh
+#     lo registra en un odbcinst.ini propio del snap.
+#   · aiomysql (MySQL/MariaDB) y asyncpg (PostgreSQL).
 # Las versiones fijadas son las mismas que en Windows para que lo probado
 # allí sea lo que corre aquí.
 fastapi==0.115.12
@@ -20,6 +20,8 @@ asyncua==1.1.5
 cryptography>=42.0.0
 SQLAlchemy[asyncio]==2.0.51
 aiosqlite==0.20.0
+aioodbc==0.5.0
+pyodbc>=5.0
 aiomysql>=0.2.0
 asyncpg>=0.29
 openpyxl==3.1.5

@@ -146,6 +146,51 @@ fi
 
 # ── 1 · Entorno ────────────────────────────────────────────────────────
 export PLC_DATOS_DIR="$DATOS"
+
+# ── 1b · ODBC (SQL Server) ─────────────────────────────────────────────
+# El driver de Microsoft y FreeTDS viajan dentro del snap (stage-packages),
+# pero unixODBC los busca en /etc/odbcinst.ini, que aquí es de solo lectura
+# y no los conoce. Se escribe un odbcinst.ini propio con las rutas reales de
+# dentro del snap y se apunta ODBCSYSINI a él. Y como las .so del snap no
+# están en las rutas del sistema, LD_LIBRARY_PATH.
+case "${SNAP_ARCH:-}" in
+  arm64) TRIPLETE="aarch64-linux-gnu" ;;
+  amd64) TRIPLETE="x86_64-linux-gnu" ;;
+  armhf) TRIPLETE="arm-linux-gnueabihf" ;;
+  *)     TRIPLETE="$(uname -m)-linux-gnu" ;;
+esac
+export LD_LIBRARY_PATH="$SNAP/usr/lib/$TRIPLETE:$SNAP/lib/$TRIPLETE:$SNAP/usr/lib:$SNAP/lib:$SNAP/opt/microsoft/msodbcsql18/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+ODBC_DIR="$SNAP_COMMON/odbc"
+mkdir -p "$ODBC_DIR"
+: > "$ODBC_DIR/odbcinst.ini"
+MS_SO="$(ls "$SNAP"/opt/microsoft/msodbcsql18/lib64/libmsodbcsql-18*.so* 2>/dev/null | head -n 1 || true)"
+if [ -n "$MS_SO" ]; then
+  cat >> "$ODBC_DIR/odbcinst.ini" <<INI
+[ODBC Driver 18 for SQL Server]
+Description=Microsoft ODBC Driver 18 for SQL Server
+Driver=$MS_SO
+UsageCount=1
+
+INI
+  echo "[psicore] ODBC: Microsoft ODBC Driver 18 for SQL Server ($MS_SO)"
+else
+  echo "[psicore] AVISO: el snap no trae msodbcsql18; SQL Server solo por FreeTDS si está."
+fi
+TDS_SO="$(ls "$SNAP"/usr/lib/"$TRIPLETE"/odbc/libtdsodbc.so* 2>/dev/null | head -n 1 || true)"
+if [ -n "$TDS_SO" ]; then
+  cat >> "$ODBC_DIR/odbcinst.ini" <<INI
+[FreeTDS SQL Server]
+Description=FreeTDS (alternativa al driver de Microsoft)
+Driver=$TDS_SO
+UsageCount=1
+
+INI
+  echo "[psicore] ODBC: FreeTDS SQL Server ($TDS_SO)"
+fi
+# odbc.ini vacío: no se usan DSN, la app monta la cadena de conexión entera.
+[ -f "$ODBC_DIR/odbc.ini" ] || : > "$ODBC_DIR/odbc.ini"
+export ODBCSYSINI="$ODBC_DIR"
+export ODBCINI="$ODBC_DIR/odbc.ini"
 export PLC_API_HOST="${PLC_API_HOST:-0.0.0.0}"
 export PLC_API_PORT="${PLC_API_PORT:-8010}"
 # Las cuentas viven en la base SQLite local (db_id "local" en conexiones.json);

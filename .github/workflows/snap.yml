@@ -59,6 +59,20 @@ jobs:
           test -f dist/index.html
 
       # ── Snap ───────────────────────────────────────────────────────
+      # El «ODBC Driver 18 for SQL Server» (msodbcsql18) que el snap mete
+      # como stage-package solo está en el repositorio de Microsoft. Con
+      # --destructive-mode snapcraft usa el apt del runner, así que basta
+      # con darlo de alta aquí (el .deb de configuración añade la lista y la
+      # clave, para amd64 y arm64).
+      - name: Repositorio de Microsoft (ODBC Driver 18 for SQL Server)
+        run: |
+          set -euo pipefail
+          curl -sSL -o /tmp/packages-microsoft-prod.deb \
+            https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb
+          sudo dpkg -i /tmp/packages-microsoft-prod.deb
+          sudo apt-get update
+          apt-cache policy msodbcsql18 | head -n 5
+
       - name: Instalar snapcraft
         run: |
           set -euo pipefail
