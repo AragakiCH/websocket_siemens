@@ -18,14 +18,20 @@ otra base del HMI, del motor que sea, **re-numerando las claves**.
 
 LO QUE SE LLEVA Y LO QUE NO
 ---------------------------
-  Se llevan   alarmas_def, alarmas, recetas, receta_elementos,
+  Se llevan   usuarios, alarmas_def, alarmas, recetas, receta_elementos,
               receta_registros, receta_valores, y opcionalmente plc_prg
               (el histórico, que puede pesar mucho).
-  No se lleva `usuarios`. Las cuentas son de cada instalación: el otro
-              equipo tiene su propio Supervisor y sus propias contraseñas.
-              Las columnas `usuario_id` que apuntan a ellas se importan a
-              NULL —se pierde el «quién», nunca el dato—, que es la misma
-              decisión que toma `CrudManager` al borrar una cuenta.
+
+  `usuarios` viaja (con el hash de la contraseña, nunca la contraseña), y
+  al importar manda SIEMPRE el equipo de destino: una cuenta con el mismo
+  nombre de usuario se reutiliza tal cual está aquí —su contraseña, su
+  categoría, su estado— y nunca se pisa. Las que no existen entran según
+  `usuarios=`: «inactivos» (por defecto: entran desactivadas y un
+  Supervisor de aquí decide a quién activa), «tal_cual» (entran como
+  estaban allí), u «omitir» (no entran; las columnas `usuario_id` que
+  apuntaban a ellas quedan a NULL: se pierde el «quién», nunca el dato).
+  Esto cubre lo que pasaba antes: al no viajar las cuentas, todo llegaba
+  sin «quién» aunque la misma persona existiera en los dos equipos.
 
 POR QUÉ LOS IDS NO SE PUEDEN COPIAR TAL CUAL
 --------------------------------------------
@@ -35,8 +41,8 @@ receta 7 del otro. Así que las filas se insertan SIN id, el motor asigna uno
 nuevo, y se guarda el mapa viejo→nuevo para reescribir las claves foráneas de
 las tablas que vienen después. El orden de importación es el de dependencia:
 
-    plc_prg → alarmas_def → recetas → receta_elementos → receta_registros
-            → alarmas → receta_valores
+    usuarios → plc_prg → alarmas_def → recetas → receta_elementos
+             → receta_registros → alarmas → receta_valores
 
 QUÉ PASA CUANDO EL DESTINO YA TIENE DATOS (modo «fusionar»)
 -----------------------------------------------------------
@@ -44,6 +50,7 @@ Antes de insertar se busca la fila por su clave NATURAL —lo que la identifica
 para una persona, no para el motor— y, si ya está, se reutiliza su id en vez
 de duplicarla:
 
+    usuarios          usuario                         (siempre, también en «añadir»)
     alarmas_def       nombre + tag
     recetas           nombre
     receta_elementos  receta + nombre
@@ -122,8 +129,8 @@ class Tabla:
         historico: bool = False,
     ) -> None:
         self.nombre = nombre
-        # columna -> tabla a la que apunta. Las que apuntan a `usuarios` se
-        # ponen a NULL al importar (la tabla no viaja).
+        # columna -> tabla a la que apunta. Si el padre no entró (omitido o
+        # ausente), la FK opcional entra a NULL y la obligatoria se omite.
         self.fks = fks
         self.fechas = fechas
         # Columnas que identifican la fila para una persona. Las de FK se
@@ -136,6 +143,7 @@ class Tabla:
 # EN ORDEN DE DEPENDENCIA. Importar en este orden garantiza que, cuando una
 # fila llega, todas las que referencia ya tienen id nuevo.
 TABLAS: Tuple[Tabla, ...] = (
+    Tabla("usuarios", {}, ("creado_en", "ultimo_acceso"), ("usuario",)),
     Tabla("plc_prg", {}, ("ts", "ts_local"), ("ts", "plc_id", "tag"), historico=True),
     Tabla("alarmas_def", {"usuario_id": "usuarios"},
           ("creado_en", "actualizado_en"), ("nombre", "tag")),
@@ -160,7 +168,10 @@ TABLAS: Tuple[Tabla, ...] = (
 TABLA_POR_NOMBRE: Dict[str, Tabla] = {t.nombre: t for t in TABLAS}
 
 # Lo que NUNCA viaja, dicho por su nombre para que conste en el manifiesto.
-EXCLUIDAS = ("usuarios",)
+# Tablas que no se llevan nunca. `usuarios` ya viaja (ver arriba); lo que
+# se controla es cómo ENTRA, con el parámetro `usuarios` de `importar()`.
+EXCLUIDAS: Tuple[str, ...] = ()
+MODOS_USUARIOS = ("inactivos", "tal_cual", "omitir")
 
 
 # ====================================================================== #
@@ -209,6 +220,7 @@ async def exportar(
     prefijo: str = "",
     incluir_historico: bool = True,
     origen: Optional[Dict[str, Any]] = None,
+    incluir_usuarios: bool = True,
 ) -> Tuple[str, Dict[str, Any]]:
     """
     Escribe el `.zip` en un fichero temporal y devuelve su ruta y el manifiesto.
@@ -245,6 +257,8 @@ async def exportar(
             async with driver._engine.connect() as conn:
                 for t in TABLAS:
                     if t.historico and not incluir_historico:
+                        continue
+                    if t.nombre == "usuarios" and not incluir_usuarios:
                         continue
                     tabla = _nombre_seguro(f"{p}{t.nombre}")
                     columnas = await _columnas_reales(driver, tabla)
@@ -287,9 +301,13 @@ async def exportar(
                 "_LEEME.txt",
                 "Datos del HMI de PsiCore.\n\n"
                 "Impórtalo desde Configuración → Sistema → «Migrar datos de la "
-                "base», en el equipo de destino. No contiene cuentas de "
-                "usuario. Las claves se renumeran al importar, así que sirve "
-                "sobre una base que ya tiene datos.\n")
+                "base», en el equipo de destino. Las claves se renumeran al "
+                "importar, así que sirve sobre una base que ya tiene datos.\n"
+                + ("\nCONTIENE LAS CUENTAS DE USUARIO (usuarios.jsonl) con el "
+                   "hash de sus contraseñas. Guárdalo como un fichero "
+                   "sensible. Al importar, las cuentas que ya existan en el "
+                   "destino no se tocan.\n" if incluir_usuarios else
+                   "\nNo contiene cuentas de usuario.\n"))
     except Exception:
         try:
             os.unlink(ruta)
@@ -361,12 +379,14 @@ def _iterar_jsonl(z: zipfile.ZipFile, nombre: str) -> Iterable[Dict[str, Any]]:
 class _Importador:
     """Estado de UNA importación. Vive lo que dura la transacción."""
 
-    def __init__(self, driver, conn, prefijo: str, modo: str) -> None:
+    def __init__(self, driver, conn, prefijo: str, modo: str,
+                 usuarios: str = "inactivos") -> None:
         self.driver = driver
         self.conn = conn
         self.motor = driver.motor
         self.p = _prefijo_seguro(prefijo)
         self.fusionar = modo != "añadir"
+        self.usuarios = usuarios if usuarios in MODOS_USUARIOS else "inactivos"
         # tabla -> {id_viejo: id_nuevo}
         self.mapas: Dict[str, Dict[int, int]] = {}
         self.informe: Dict[str, InformeTabla] = {}
@@ -427,7 +447,9 @@ class _Importador:
         cargar las claves de un año entero para comparar con una semana no
         tiene sentido.
         """
-        if not self.fusionar:
+        # Las cuentas se buscan SIEMPRE por nombre de usuario, también en
+        # modo «añadir»: `usuario` es UNIQUE y la cuenta de aquí manda.
+        if not self.fusionar and t.nombre != "usuarios":
             return {}
         cols = [c for c in t.clave_natural if c in columnas]
         if len(cols) != len(t.clave_natural):
@@ -463,6 +485,10 @@ class _Importador:
         fichero = f"{t.nombre}.jsonl"
         if fichero not in z.namelist():
             inf.aviso("No viene en el fichero.")
+            return
+        if t.nombre == "usuarios" and self.usuarios == "omitir":
+            inf.aviso("No se importan las cuentas (se pidió así): lo que "
+                      "apuntaba a ellas entra sin «quién».")
             return
 
         tabla = self.tabla(t.nombre)
@@ -542,11 +568,22 @@ class _Importador:
                 continue
 
             # 2 · ¿Ya está? (clave natural, con las FK ya traducidas)
-            k = self.clave(t, fila) if self.fusionar else None
+            k = (self.clave(t, fila)
+                 if self.fusionar or t.nombre == "usuarios" else None)
             if k is not None and all(x is not None for x in k) and k in existentes:
                 mapa[id_viejo] = existentes[k]
                 inf.reutilizadas += 1
                 continue
+
+            # Una cuenta NUEVA: entra con su hash (nadie conoce la
+            # contraseña), sin «último acceso» (aquí no ha entrado nunca)
+            # y, salvo que se pida «tal_cual», desactivada: que un
+            # Supervisor de aquí decida a quién abre la puerta.
+            if t.nombre == "usuarios":
+                if "ultimo_acceso" in reales_lc:
+                    fila[reales_lc["ultimo_acceso"]] = None
+                if self.usuarios == "inactivos" and "estado" in reales_lc:
+                    fila[reales_lc["estado"]] = "Inactivo"
 
             # 3 · Insertar. El histórico va en bloque salvo las filas que
             #     alguien referencia (hace falta su id nuevo).
@@ -606,6 +643,7 @@ async def importar(
     modo: str = "fusionar",
     simular: bool = False,
     incluir_historico: bool = True,
+    usuarios: str = "inactivos",
 ) -> Dict[str, Any]:
     """
     Mete en `driver` lo que trae el zip. Devuelve el informe por tabla.
@@ -623,7 +661,7 @@ async def importar(
 
         async with driver._engine.connect() as conn:
             trans = await conn.begin()
-            imp = _Importador(driver, conn, prefijo, modo)
+            imp = _Importador(driver, conn, prefijo, modo, usuarios)
             try:
                 for t in TABLAS:
                     if t.historico and not incluir_historico:
@@ -653,6 +691,7 @@ async def importar(
         "ok": True,
         "simulado": simular,
         "modo": modo,
+        "usuarios": imp.usuarios,
         "mensaje": mensaje,
         "origen": manifiesto.get("origen", {}),
         "generado_en": manifiesto.get("generado_en", ""),
@@ -660,3 +699,96 @@ async def importar(
         "totales": {"insertadas": total_ins, "reutilizadas": total_reu,
                     "omitidas": total_omi},
     }
+
+
+# ====================================================================== #
+# Lo mismo, pero en JSON dentro de otro fichero (el proyecto exportado)
+# ====================================================================== #
+#
+# «Exportar proyecto» se lleva las reglas de alarma y las recetas dentro de
+# su .json, no en un zip aparte: quien importa un proyecto quiere UN fichero.
+# Aquí no hay formato nuevo: son las mismas filas que irían al .jsonl, y al
+# importar se arma un zip en memoria y se pasa por `importar()`, con todo lo
+# que eso implica (renumerado, fusionar por clave natural, una transacción).
+#
+# Solo las tablas de DISEÑO. Ni `plc_prg` ni `alarmas` (eventos): eso es
+# historial de una instalación, no el proyecto.
+TABLAS_DISENO = ("alarmas_def", "recetas", "receta_elementos",
+                 "receta_registros", "receta_valores")
+
+
+async def exportar_filas(driver, prefijo: str = "",
+                         tablas: Tuple[str, ...] = TABLAS_DISENO
+                         ) -> Dict[str, List[Dict[str, Any]]]:
+    """`{tabla: [fila...]}` con los mismos valores que irían al .jsonl."""
+    if driver is None or driver._engine is None:
+        raise RuntimeError("La conexión no está abierta.")
+    p = _prefijo_seguro(prefijo)
+    motor = driver.motor
+    salida: Dict[str, List[Dict[str, Any]]] = {}
+    async with driver._engine.connect() as conn:
+        for nombre in tablas:
+            t = TABLA_POR_NOMBRE.get(nombre)
+            if t is None:
+                continue
+            tabla = _nombre_seguro(f"{p}{t.nombre}")
+            columnas = await _columnas_reales(driver, tabla)
+            if not columnas:
+                continue
+            columnas = ["id"] + [c for c in columnas if c.lower() != "id"]
+            filas: List[Dict[str, Any]] = []
+            desde = 0
+            sql = text(_sql_pagina(motor, tabla, columnas, PAGINA))
+            while True:
+                r = await conn.execute(sql, {"desde": desde})
+                lote = r.fetchall()
+                if not lote:
+                    break
+                for fila in lote:
+                    filas.append({c: _serializable(v)
+                                  for c, v in zip(columnas, fila)})
+                desde = int(lote[-1][0])
+                if len(lote) < PAGINA:
+                    break
+            salida[t.nombre] = filas
+    return salida
+
+
+async def importar_filas(driver, datos: Dict[str, List[Dict[str, Any]]],
+                         prefijo: str = "", modo: str = "fusionar",
+                         origen: Optional[Dict[str, Any]] = None
+                         ) -> Dict[str, Any]:
+    """
+    Mete `{tabla: [fila...]}` en `driver` con las mismas garantías que
+    `importar()`: es ese mismo camino, con un zip temporal por medio.
+    """
+    if not datos:
+        return {"ok": True, "tablas": [], "mensaje": "Nada que importar.",
+                "totales": {"insertadas": 0, "reutilizadas": 0, "omitidas": 0}}
+    tmp = tempfile.NamedTemporaryFile(prefix="psicore-proyecto-",
+                                      suffix=".zip", delete=False)
+    ruta = tmp.name
+    tmp.close()
+    try:
+        manifiesto = {
+            "formato": "psicore-datos", "version": VERSION_FORMATO,
+            "generado_en": datetime.now(timezone.utc).isoformat(),
+            "origen": origen or {}, "motor": "", "prefijo": "",
+            "excluye": list(EXCLUIDAS),
+            "tablas": {k: {"filas": len(v)} for k, v in datos.items()},
+        }
+        with zipfile.ZipFile(ruta, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr("manifiesto.json", json.dumps(manifiesto))
+            for nombre, filas in datos.items():
+                if nombre not in TABLA_POR_NOMBRE or not isinstance(filas, list):
+                    continue
+                z.writestr(f"{nombre}.jsonl", "".join(
+                    json.dumps(f, ensure_ascii=False) + "\n"
+                    for f in filas if isinstance(f, dict)))
+        return await importar(driver, ruta, prefijo, modo, False,
+                              incluir_historico=False, usuarios="omitir")
+    finally:
+        try:
+            os.unlink(ruta)
+        except OSError:
+            pass

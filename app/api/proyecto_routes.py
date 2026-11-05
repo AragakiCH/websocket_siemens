@@ -46,8 +46,12 @@ from app.api.intercambio import (
     FORMATO_PROYECTO,
     FORMATO_VERSION,
     MAX_PANTALLAS_IMPORTADAS,
+    datos_bd_para_exportar,
+    flujos_para_exportar,
     grupos_para_exportar,
     id_libre,
+    importar_datos_bd,
+    importar_flujos,
     importar_grupos,
     importar_internas,
     importar_plcs,
@@ -430,6 +434,16 @@ class ProyectoExportado(BaseModel):
         default_factory=dict,
         description="Grupos de la barra de pestañas (`grupos`, en orden) y "
                     "en cuál cae cada pantalla (`asignaciones`).")
+    flujos: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Conexiones a BD (sin contraseña), grupos de "
+                    "historización y consultas guardadas. El dibujo del "
+                    "lienzo lo añade la vista en `flujos.lienzo`.")
+    datos_bd: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Reglas de alarma y recetas (tablas alarmas_def y "
+                    "recetas/receta_*) de la base del HMI, con sus ids de "
+                    "origen; al importar se renumeran y se fusionan.")
 
 
 @router.get(
@@ -496,6 +510,16 @@ async def exportar_proyecto(
     grupos = grupos_para_exportar(
         getattr(request.app.state, "grupos_store", None), proyecto_id)
 
+    # Flujos: conexiones (sin contraseña), grupos de historización y
+    # consultas. Y lo que vive en la base SQL: reglas de alarma y recetas.
+    st = request.app.state
+    db_manager = getattr(st, "db_manager", None)
+    flujos = flujos_para_exportar(
+        getattr(db_manager, "_store", None) if db_manager else None,
+        getattr(st, "historizador", None))
+    datos_bd = await datos_bd_para_exportar(
+        getattr(st, "crud_manager", None), db_manager, st.settings)
+
     doc = {
         "formato": FORMATO_PROYECTO,
         "version": FORMATO_VERSION,
@@ -510,13 +534,18 @@ async def exportar_proyecto(
         "variables_internas": internas,
         "plcs": plcs,
         "grupos": grupos,
+        "flujos": flujos,
+        "datos_bd": datos_bd,
     }
 
     _auditar(request, "proyecto.exportado", sesion, proyecto_id,
              {"pantallas": len(pantallas),
               "widgets_personalizados": len(personalizados),
               "variables_internas": len(internas),
-              "plcs": len(plcs)})
+              "plcs": len(plcs),
+              "grupos_historian": len(flujos.get("grupos", [])),
+              "alarmas": len((datos_bd.get("tablas") or {}).get("alarmas_def", [])),
+              "recetas": len((datos_bd.get("tablas") or {}).get("recetas", []))})
 
     nombre_fichero = f"proyecto-{slug(proyecto['nombre']) or proyecto_id}.json"
     return JSONResponse(
@@ -695,6 +724,31 @@ async def importar_proyecto(
         except Exception:  # noqa: BLE001
             pass
 
+    # Flujos (conexiones, grupos de historización, consultas) y datos de BD
+    # (alarmas, recetas). Fuera del deshacer por lo mismo que los widgets:
+    # el proyecto ya está, y lo que falle aquí se cuenta y se sigue.
+    st = request.app.state
+    db_manager = getattr(st, "db_manager", None)
+    r_flujos = await importar_flujos(
+        getattr(db_manager, "_store", None) if db_manager else None,
+        getattr(st, "historizador", None), cuerpo.flujos, mapa_plc, quien)
+    r_datos = await importar_datos_bd(
+        getattr(st, "crud_manager", None), db_manager, st.settings,
+        cuerpo.datos_bd)
+    if r_datos.get("ok") and r_datos.get("totales", {}).get("insertadas"):
+        # El motor de alarmas tiene las reglas en memoria, y las vistas de
+        # alarmas y recetas se leen al abrirlas: que se enteren.
+        motor = getattr(st, "motor_alarmas", None)
+        if motor is not None:
+            try:
+                await motor.recargar()
+            except Exception:  # noqa: BLE001
+                pass
+        try:
+            await st.manager.difundir_config("datos", quien, "importados")
+        except Exception:  # noqa: BLE001
+            pass
+
     # Y las variables internas, con el mismo criterio: las que ya existan aquí
     # se dejan como están —el widget se enlaza a la que hay, que es lo que su
     # nombre dice— y solo se crean las que faltan.
@@ -742,6 +796,23 @@ async def importar_proyecto(
         # Carpetas de la barra recreadas y pantallas colocadas en ellas.
         "grupos_importados": r_grupos["grupos"],
         "pantallas_agrupadas": r_grupos["asignadas"],
+        # Flujos: lo que entró, lo que ya estaba y lo que no pudo.
+        "conexiones_nuevas": r_flujos["conexiones_nuevas"],
+        "conexiones_existentes": r_flujos["conexiones_existentes"],
+        "conexiones_renombradas": r_flujos["conexiones_renombradas"],
+        "grupos_historian_nuevos": r_flujos["grupos_nuevos"],
+        "grupos_historian_existentes": r_flujos["grupos_existentes"],
+        "consultas_nuevas": r_flujos["consultas_nuevas"],
+        "consultas_existentes": r_flujos["consultas_existentes"],
+        "flujos_omitidos": r_flujos["omitidos"],
+        # Alarmas y recetas: el informe de la migración (por tabla).
+        "datos_bd": {
+            "ok": bool(r_datos.get("ok")),
+            "db_id": r_datos.get("db_id", ""),
+            "mensaje": r_datos.get("mensaje", ""),
+            "totales": r_datos.get("totales", {}),
+            "tablas": r_datos.get("tablas", []),
+        },
     }
 
 

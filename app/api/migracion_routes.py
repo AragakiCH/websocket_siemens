@@ -89,6 +89,7 @@ async def exportar_datos(
     db_id: str,
     tareas: BackgroundTasks,
     incluir_historico: bool = True,
+    incluir_usuarios: bool = True,
     sesion: Optional[Sesion] = Depends(exigir_rol("Administradores")),
 ) -> FileResponse:
     driver = await _driver(request, db_id)
@@ -103,7 +104,8 @@ async def exportar_datos(
     }
     try:
         ruta, manifiesto = await migracion_datos.exportar(
-            driver, _prefijo(request), incluir_historico, origen)
+            driver, _prefijo(request), incluir_historico, origen,
+            incluir_usuarios)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Fallo exportando datos de %s", db_id)
         raise HTTPException(500, f"No se pudo exportar: {exc}")
@@ -137,8 +139,11 @@ async def exportar_datos(
         "`modo=añadir`: todo entra como nuevo.\n\n"
         "`simular=true`: hace el recorrido completo y termina en ROLLBACK; "
         "el informe es el que daría la importación real.\n\n"
-        "**Todo o nada**: la importación va en una sola transacción. Las "
-        "columnas `usuario_id` entran a NULL (las cuentas no viajan)."
+        "**Todo o nada**: la importación va en una sola transacción.\n\n"
+        "**Cuentas**: las del fichero que ya existan aquí (mismo nombre de "
+        "usuario) se reutilizan tal cual están aquí, nunca se pisan. Las "
+        "nuevas entran según `usuarios`: `inactivos` (defecto), `tal_cual` "
+        "u `omitir`."
     ),
 )
 async def importar_datos(
@@ -148,6 +153,12 @@ async def importar_datos(
     modo: str = Form("fusionar"),
     simular: bool = Form(False),
     incluir_historico: bool = Form(True),
+    usuarios: str = Form(
+        "inactivos",
+        description="Qué hacer con las cuentas del fichero que aquí no "
+                    "existan: `inactivos` (entran desactivadas), `tal_cual` "
+                    "(como estaban) u `omitir`. Las que ya existen aquí "
+                    "nunca se tocan."),
     sesion: Optional[Sesion] = Depends(exigir_rol("Supervisor")),
 ) -> Dict[str, Any]:
     driver = await _driver(request, db_id)
@@ -172,7 +183,7 @@ async def importar_datos(
         try:
             informe = await migracion_datos.importar(
                 driver, tmp.name, _prefijo(request), modo, simular,
-                incluir_historico)
+                incluir_historico, usuarios)
         except ValueError as exc:
             raise HTTPException(400, str(exc))
         except Exception as exc:  # noqa: BLE001

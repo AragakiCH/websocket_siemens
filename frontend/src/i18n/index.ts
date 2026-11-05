@@ -209,6 +209,19 @@ const es: Dict = {
   'variables internas ya existían aquí y se han conservado tal cual.',
   'projects.importedVarsConflict':
   'Ojo: estas variables internas existen aquí con OTRO tipo, así que los widgets enlazados mostrarán algo que no encaja:',
+  'projects.importedDbs':
+  'conexiones a base de datos añadidas (desactivadas y sin contraseña: ponla y pruébala en Bases de datos).',
+  'projects.importedHistorian': 'grupos de historización creados (detenidos).',
+  'projects.importedQueries': 'consultas guardadas.',
+  'projects.importedFlowNodes': 'nodos añadidos al lienzo de Flujos.',
+  'projects.importedDbData': 'En la base:',
+  'projects.importedAlarms': 'reglas de alarma',
+  'projects.importedRecipes': 'recetas nuevas',
+  'projects.importedDbKept': 'filas ya existían',
+  'projects.importedFlowsOmitted':
+  'Esto de los flujos no se pudo crear:',
+  'projects.importedDbFailed':
+  'Las alarmas y recetas no se pudieron meter en la base:',
   'projects.importedGroups': 'carpetas de pantallas recreadas',
   'projects.importedGrouped': 'pantallas colocadas en ellas.',
   'projects.importedPlcs': 'PLC dados de alta desde el fichero.',
@@ -586,6 +599,19 @@ const en: Dict = {
   'internal variables already existed here and were kept as they are.',
   'projects.importedVarsConflict':
   'Careful: these internal variables exist here with a DIFFERENT type, so the widgets bound to them will show something that does not fit:',
+  'projects.importedDbs':
+  'database connections added (disabled and without password: set it and test it under Databases).',
+  'projects.importedHistorian': 'historian groups created (stopped).',
+  'projects.importedQueries': 'saved queries.',
+  'projects.importedFlowNodes': 'nodes added to the Flows canvas.',
+  'projects.importedDbData': 'In the database:',
+  'projects.importedAlarms': 'alarm rules',
+  'projects.importedRecipes': 'new recipes',
+  'projects.importedDbKept': 'rows already existed',
+  'projects.importedFlowsOmitted':
+  'These flow items could not be created:',
+  'projects.importedDbFailed':
+  'Alarms and recipes could not be written to the database:',
   'projects.importedGroups': 'screen folders recreated',
   'projects.importedGrouped': 'screens placed in them.',
   'projects.importedPlcs': 'PLCs added from the file.',

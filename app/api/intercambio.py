@@ -691,3 +691,238 @@ def importar_grupos(grupos_store, proyecto_id: str, datos: dict,
             logger.warning("No se pudo asignar '%s' al grupo '%s': %s",
                            pid, destino, exc)
     return r
+
+
+# ====================================================================== #
+# Flujos: conexiones a BD, grupos de historización y consultas guardadas
+# ====================================================================== #
+#
+# El lienzo de Flujos es un dibujo en el navegador (localStorage); lo que
+# de verdad hace algo vive en el servidor: las CONEXIONES a base de datos,
+# los GRUPOS de historización (qué tags, a qué base, cada cuánto) y las
+# CONSULTAS guardadas (las que alimentan widgets y el Excel). Eso es lo que
+# viaja aquí; el dibujo lo añade y lo aplica la vista.
+#
+# Las conexiones van SIN contraseña: la de aquí está cifrada con la clave
+# de este equipo y no se puede leer allí. Entran desactivadas
+# (`autoconectar: false`), para teclear la contraseña y probarla antes.
+CAMPOS_CONEXION = ("db_id", "motor", "nombre", "host", "puerto",
+                   "base_datos", "usuario", "opciones")
+SUFIJO_CONEXION_IMPORTADA = "_importada"
+
+
+def _misma_base(a: dict, b: dict) -> bool:
+    def _n(c: dict) -> tuple:
+        return (str(c.get("motor", "")).lower(),
+                str(c.get("host", "")).strip().lower(),
+                int(c.get("puerto") or 0),
+                str(c.get("base_datos", "")).strip().lower(),
+                str(c.get("usuario", "")).strip().lower())
+    return _n(a) == _n(b)
+
+
+def flujos_para_exportar(db_store, historizador) -> dict:
+    """`{"conexiones": [...], "grupos": [...], "consultas": [...]}`."""
+    salida = {"conexiones": [], "grupos": [], "consultas": []}
+    if db_store is not None:
+        try:
+            for c in db_store.conexiones.values():
+                d = c.publico()
+                salida["conexiones"].append({k: d.get(k) for k in CAMPOS_CONEXION})
+            for q in db_store.consultas.values():
+                salida["consultas"].append(q.publico())
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("No se pudieron leer conexiones/consultas: %s", exc)
+    if historizador is not None:
+        try:
+            for g in historizador.grupos.values():
+                salida["grupos"].append(historizador._serializar(g))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("No se pudieron leer los grupos: %s", exc)
+    return salida
+
+
+async def importar_flujos(db_store, historizador, datos: dict,
+                          mapa_plc: Dict[str, str], usuario: str = "") -> dict:
+    """
+    Conexiones, grupos y consultas del fichero, sin pisar nada:
+
+      * conexión con el mismo `db_id` y la MISMA base -> ya está, se omite;
+        mismo `db_id` pero OTRA base -> entra como `<db_id>_importada`;
+        nueva -> entra tal cual. Siempre sin contraseña y desactivada.
+      * grupo con el mismo `grupo_id` -> se deja el de aquí; nuevo -> se
+        crea DETENIDO, apuntando a la conexión (renombrada si lo fue) y con
+        los tags reescritos si algún PLC cambió de id.
+      * consulta con el mismo `query_id` -> se deja; nueva -> entra.
+    """
+    r: Dict[str, Any] = {"conexiones_nuevas": [], "conexiones_existentes": [],
+                         "conexiones_renombradas": {}, "grupos_nuevos": [],
+                         "grupos_existentes": [], "consultas_nuevas": [],
+                         "consultas_existentes": [], "omitidos": []}
+    if not isinstance(datos, dict):
+        return r
+    mapa_db: Dict[str, str] = {}
+
+    # ── Conexiones ───────────────────────────────────────────────
+    if db_store is not None:
+        from app.db.store import ConexionGuardada
+        for c in datos.get("conexiones") or []:
+            if not isinstance(c, dict):
+                continue
+            db_id = str(c.get("db_id") or "").strip()
+            if not db_id:
+                continue
+            nuevo_id = db_id
+            local = db_store.conexiones.get(db_id)
+            if local is not None:
+                if _misma_base(local.publico(), c):
+                    r["conexiones_existentes"].append(db_id)
+                    continue
+                base = f"{db_id}{SUFIJO_CONEXION_IMPORTADA}"
+                nuevo_id, i = base, 2
+                while nuevo_id in db_store.conexiones:
+                    nuevo_id = f"{base}_{i}"
+                    i += 1
+                mapa_db[db_id] = nuevo_id
+                r["conexiones_renombradas"][db_id] = nuevo_id
+            try:
+                puerto = c.get("puerto")
+                puerto = int(puerto) if puerto not in (None, "") else None
+                nombre = str(c.get("nombre") or db_id)
+                if nuevo_id != db_id:
+                    nombre = f"{nombre} (importada)"[:80]
+                db_store.guardar_conexion(ConexionGuardada(
+                    db_id=nuevo_id, motor=str(c.get("motor") or ""),
+                    nombre=nombre, host=str(c.get("host") or ""),
+                    puerto=puerto, base_datos=str(c.get("base_datos") or ""),
+                    usuario=str(c.get("usuario") or ""),
+                    opciones=dict(c.get("opciones") or {}),
+                    autoconectar=False,
+                ), "")
+                r["conexiones_nuevas"].append(nuevo_id)
+            except Exception as exc:  # noqa: BLE001
+                r["omitidos"].append({"tipo": "conexion", "id": db_id,
+                                      "motivo": str(exc)})
+
+    # ── Grupos de historización ──────────────────────────────────
+    if historizador is not None:
+        for g in datos.get("grupos") or []:
+            if not isinstance(g, dict):
+                continue
+            gid = str(g.get("grupo_id") or "").strip()
+            if not gid:
+                continue
+            if gid in historizador.grupos:
+                r["grupos_existentes"].append(gid)
+                continue
+            db_id = str(g.get("db_id") or "")
+            db_id = mapa_db.get(db_id, db_id)
+            tags = []
+            for t in g.get("tags") or []:
+                t = str(t)
+                plc, sep, resto = t.partition("|")
+                tags.append(f"{mapa_plc[plc]}|{resto}" if sep and plc in mapa_plc else t)
+            try:
+                res = historizador.alta_grupo(
+                    grupo_id=gid, db_id=db_id, tags=tags,
+                    tabla=str(g.get("tabla") or "plc_prg"),
+                    nombre=str(g.get("nombre") or ""),
+                    # Detenido: que nadie empiece a escribir en una base que
+                    # aquí todavía no se ha revisado ni conectado.
+                    activo=False,
+                    banda_muerta=float(g.get("banda_muerta") or 0),
+                    intervalo_min_ms=int(g.get("intervalo_min_ms") or 0),
+                    modo=str(g.get("modo") or "muestreo"),
+                    periodo_ms=int(g.get("periodo_ms") or 1000),
+                )
+            except Exception as exc:  # noqa: BLE001
+                res = {"ok": False, "mensaje": str(exc)}
+            if res.get("ok"):
+                r["grupos_nuevos"].append(gid)
+            else:
+                r["omitidos"].append({"tipo": "grupo", "id": gid,
+                                      "motivo": res.get("mensaje", "")})
+
+    # ── Consultas guardadas ──────────────────────────────────────
+    if db_store is not None:
+        from app.db.store import ConsultaGuardada
+        for q in datos.get("consultas") or []:
+            if not isinstance(q, dict):
+                continue
+            qid = str(q.get("query_id") or "").strip()
+            if not qid:
+                continue
+            if qid in db_store.consultas:
+                r["consultas_existentes"].append(qid)
+                continue
+            db_id = str(q.get("db_id") or "")
+            try:
+                db_store.guardar_consulta(ConsultaGuardada(
+                    query_id=qid, db_id=mapa_db.get(db_id, db_id),
+                    nombre=str(q.get("nombre") or ""), sql=str(q.get("sql") or ""),
+                    parametros=dict(q.get("parametros") or {}),
+                    limite=int(q.get("limite") or 1000),
+                    descripcion=str(q.get("descripcion") or ""),
+                ))
+                r["consultas_nuevas"].append(qid)
+            except Exception as exc:  # noqa: BLE001
+                r["omitidos"].append({"tipo": "consulta", "id": qid,
+                                      "motivo": str(exc)})
+    r["mapa_db"] = mapa_db
+    return r
+
+
+# ====================================================================== #
+# Datos de BD: reglas de alarma y recetas
+# ====================================================================== #
+#
+# Viven en la base SQL (tablas alarmas_def y recetas/receta_*), no en la
+# carpeta de datos. Se sacan y se meten con el mismo motor que «Migrar datos
+# de la base» (app/db/migracion_datos.py): claves renumeradas, fusionar por
+# clave natural, una transacción. Lo que no viaja: eventos de alarma e
+# histórico del PLC, que son de la instalación.
+
+
+async def datos_bd_para_exportar(crud, db_manager, settings) -> dict:
+    """`{"db_id": ..., "tablas": {alarmas_def: [...], recetas: [...], ...}}`."""
+    if crud is None or db_manager is None:
+        return {}
+    from app.db import migracion_datos
+    try:
+        db_id = crud._db_id(None)
+        driver = await db_manager._driver_de(db_id)
+        prefijo = (getattr(settings, "esquema_prefijo", "") or
+                   getattr(settings, "auth_tabla_prefijo", "") or "")
+        tablas = await migracion_datos.exportar_filas(driver, prefijo)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudieron exportar alarmas/recetas: %s", exc)
+        return {}
+    return {"db_id": db_id, "tablas": tablas}
+
+
+async def importar_datos_bd(crud, db_manager, settings, datos: dict) -> dict:
+    """
+    Mete las alarmas y recetas del fichero en la base del HMI de AQUÍ (la
+    de `PLC_AUTH_DB_ID`, o la primera). Devuelve el informe de la
+    migración, o `{"ok": False, "mensaje": ...}` sin tumbar la importación.
+    """
+    if (crud is None or db_manager is None or not isinstance(datos, dict)
+            or not datos.get("tablas")):
+        return {"ok": True, "totales": {"insertadas": 0, "reutilizadas": 0,
+                                        "omitidas": 0}, "tablas": []}
+    from app.db import migracion_datos
+    try:
+        db_id = crud._db_id(None)
+        driver = await db_manager._driver_de(db_id)
+        prefijo = (getattr(settings, "esquema_prefijo", "") or
+                   getattr(settings, "auth_tabla_prefijo", "") or "")
+        informe = await migracion_datos.importar_filas(
+            driver, datos["tablas"], prefijo, "fusionar",
+            origen={"db_id": datos.get("db_id", ""), "desde": "proyecto"})
+        informe["db_id"] = db_id
+        return informe
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("No se pudieron importar alarmas/recetas")
+        return {"ok": False, "mensaje": str(exc),
+                "totales": {"insertadas": 0, "reutilizadas": 0, "omitidas": 0},
+                "tablas": []}

@@ -101,6 +101,51 @@ FICHEROS_CON_CIFRADO = (FICHERO_CONEXIONES, "plcs.json")
 FICHEROS_CON_DB_ID = ("historicos.json", "consultas.json")
 SUFIJO_IMPORTADA = "_importada"
 
+# ====================================================================== #
+# Lo que NO vive en la carpeta de datos y aun así es configuración
+# ====================================================================== #
+# Dos cosas se quedaban fuera de la copia:
+#
+#   * `.env`, que vive junto al ejecutable (puertos, modo de acceso, subred
+#     de descubrimiento, zona horaria, IA…). Va en la copia como
+#     `_instalacion/env.txt`, con las claves/contraseñas tapadas, y al
+#     restaurar NO se aplica: queda en `datos/_instalacion/` para leerlo y
+#     copiar a mano lo que convenga. Aplicarlo a ciegas cambiaría el puerto
+#     o la carpeta de datos del equipo que restaura, que es justo lo que
+#     nadie quiere que una restauración haga.
+#   * las preferencias del NAVEGADOR (qué variables están marcadas, el
+#     lienzo de Flujos, el modo de color, la base elegida para alarmas y
+#     recetas…), que viven en localStorage. La vista las manda a
+#     `POST /sistema/datos/navegador` justo antes de pedir la copia, se
+#     guardan en `preferencias_navegador.json` (dentro de la carpeta, así
+#     que viajan en el zip) y tras restaurar la vista las vuelve a leer.
+CARPETA_INSTALACION = "_instalacion"
+FICHERO_PREFERENCIAS = "preferencias_navegador.json"
+PALABRAS_SECRETAS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CONTRASENA",
+                     "CONTRASEÑA", "CLAVE")
+MAX_PREFERENCIAS = 2 * 1024 * 1024
+
+
+def _env_tapado() -> Optional[str]:
+    """El `.env` en uso, con los valores sensibles sustituidos por ***."""
+    ruta = Path(os.getenv("PLC_ENV_FILE") or ".env")
+    if not ruta.is_file():
+        return None
+    try:
+        lineas = ruta.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return None
+    salida = []
+    for linea in lineas:
+        limpia = linea.strip()
+        if "=" in limpia and not limpia.startswith("#"):
+            clave = limpia.split("=", 1)[0].strip().upper()
+            if any(p in clave for p in PALABRAS_SECRETAS):
+                salida.append(f"{limpia.split('=', 1)[0]}=***")
+                continue
+        salida.append(linea)
+    return "\n".join(salida) + "\n"
+
 
 def _fernet(clave: Optional[bytes]):
     """Fernet a partir de una clave leída de disco, o None si no vale."""
@@ -219,6 +264,68 @@ def _reapuntar_db_id(datos: Any, renombradas: Dict[str, str]) -> Any:
                     if isinstance(v, (list, dict)) else v)
                 for k, v in datos.items()}
     return datos
+
+
+# ====================================================================== #
+# Preferencias del navegador (para que viajen en la copia)
+# ====================================================================== #
+@router.post(
+    "/sistema/datos/navegador",
+    tags=["Sistema"],
+    summary="Guardar las preferencias del navegador en la carpeta de datos",
+    description="La vista manda un objeto `{clave: valor}` con lo que guarda "
+                "en localStorage y es configuración (variables marcadas, "
+                "lienzo de Flujos, modo de color, bases elegidas). Se guarda "
+                "en `preferencias_navegador.json`, que viaja en la copia de "
+                "seguridad. Nunca tokens ni cachés: la vista los filtra y "
+                "aquí se rechazan por nombre.",
+    dependencies=[Depends(exigir_rol("Supervisor"))],
+)
+async def guardar_preferencias(request: Request) -> Dict[str, Any]:
+    try:
+        cuerpo = await request.json()
+    except Exception:  # noqa: BLE001
+        raise HTTPException(400, "Se esperaba un JSON {clave: valor}.")
+    if not isinstance(cuerpo, dict):
+        raise HTTPException(400, "Se esperaba un JSON {clave: valor}.")
+    limpio = {k: v for k, v in cuerpo.items()
+              if isinstance(k, str) and isinstance(v, str)
+              and "token" not in k.lower()}
+    texto = json.dumps({"guardado_en": datetime.now().isoformat(timespec="seconds"),
+                        "preferencias": limpio}, ensure_ascii=False, indent=2)
+    if len(texto.encode("utf-8")) > MAX_PREFERENCIAS:
+        raise HTTPException(413, "Las preferencias superan el tamaño máximo.")
+    ruta = resolver_carpeta_datos() / FICHERO_PREFERENCIAS
+    try:
+        tmp = ruta.with_suffix(".json.tmp")
+        tmp.write_text(texto, encoding="utf-8")
+        tmp.replace(ruta)
+    except OSError as exc:
+        raise HTTPException(500, f"No se pudieron guardar las preferencias: {exc}")
+    return {"ok": True, "claves": len(limpio)}
+
+
+@router.get(
+    "/sistema/datos/navegador",
+    tags=["Sistema"],
+    summary="Leer las preferencias del navegador guardadas",
+    description="Lo que guardó `POST /sistema/datos/navegador` (o lo que "
+                "trajo una copia restaurada). La vista lo aplica a su "
+                "localStorage tras restaurar.",
+    dependencies=[Depends(exigir_rol("Supervisor"))],
+)
+async def leer_preferencias() -> Dict[str, Any]:
+    ruta = resolver_carpeta_datos() / FICHERO_PREFERENCIAS
+    if not ruta.is_file():
+        return {"ok": True, "preferencias": {}, "guardado_en": ""}
+    try:
+        d = json.loads(ruta.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(500, f"preferencias_navegador.json ilegible: {exc}")
+    prefs = d.get("preferencias") if isinstance(d, dict) else None
+    return {"ok": True,
+            "preferencias": prefs if isinstance(prefs, dict) else {},
+            "guardado_en": d.get("guardado_en", "") if isinstance(d, dict) else ""}
 
 
 # ====================================================================== #
@@ -365,6 +472,10 @@ async def descargar_backup() -> StreamingResponse:
         for p in sorted(ruta.rglob("*")):
             if not p.is_file() or not es_configuracion(p, ruta):
                 continue
+            # Lo que dejó una restauración anterior como referencia no se
+            # vuelve a empaquetar: la copia lleva el .env de AHORA (abajo).
+            if p.relative_to(ruta).parts[0] == CARPETA_INSTALACION:
+                continue
             try:
                 z.write(p, arcname=str(p.relative_to(ruta)))
             except (PermissionError, OSError) as exc:
@@ -382,6 +493,9 @@ async def descargar_backup() -> StreamingResponse:
                 + "\n\nCierra PsiCore y vuelve a generar la copia si los "
                   "necesitas.\n",
             )
+        env = _env_tapado()
+        if env is not None:
+            z.writestr(f"{CARPETA_INSTALACION}/env.txt", env)
         z.writestr(
             "_LEEME.txt",
             "Copia de seguridad de la configuracion de PsiCore\n"
@@ -391,6 +505,13 @@ async def descargar_backup() -> StreamingResponse:
             "sensible. Sin ella, las contrasenas guardadas no se pueden leer.\n\n"
             "Para restaurarlo: Configuracion -> Carpeta de datos -> Restaurar,\n"
             "y reinicia el servicio despues.\n\n"
+            "Incluye _instalacion/env.txt: el .env del equipo de origen con\n"
+            "las claves tapadas, SOLO como referencia. Al restaurar no se\n"
+            "aplica: queda en datos/_instalacion/ para copiar a mano lo que\n"
+            "convenga (puertos, subred, zona horaria...).\n\n"
+            "Incluye preferencias_navegador.json si la vista las mando antes\n"
+            "de pedir la copia: variables marcadas, lienzo de Flujos, modo de\n"
+            "color, base elegida para alarmas y recetas.\n\n"
             "NO contiene el perfil del navegador incrustado ni los registros:\n"
             "no son configuracion, pesan mucho y el perfil incluye cookies.\n",
         )
@@ -628,16 +749,22 @@ async def restaurar_backup(
     logger.warning("Configuración restaurada por %s (%d ficheros). Respaldo en %s.%s",
                    usuario_de(sesion) or "anónimo", restaurados, respaldo,
                    nota_conexiones)
+    nota_env = ""
+    if any(n.startswith(f"{CARPETA_INSTALACION}/") for n in nombres):
+        nota_env = (f" El .env del equipo de origen quedó en "
+                    f"{CARPETA_INSTALACION}/env.txt SOLO como referencia "
+                    f"(no se aplica).")
     return {
         "ok": True,
         "ficheros": restaurados,
         "ruta": str(destino),
         "respaldo_anterior": str(respaldo),
+        "preferencias_navegador": FICHERO_PREFERENCIAS in nombres,
         "conexiones_conservadas": conservar,
         "conexiones_anadidas": anadidas,
         "conexiones_descartadas": descartadas,
         "conexiones_renombradas": renombradas,
-        "mensaje": f"{restaurados} fichero(s) restaurados.{nota_conexiones} "
-                   f"REINICIA el servicio para que se apliquen. La "
-                   f"configuración anterior quedó en {respaldo.name}.",
+        "mensaje": f"{restaurados} fichero(s) restaurados.{nota_conexiones}"
+                   f"{nota_env} REINICIA el servicio para que se apliquen. "
+                   f"La configuración anterior quedó en {respaldo.name}.",
     }

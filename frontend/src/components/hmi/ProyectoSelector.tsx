@@ -52,6 +52,7 @@ import {
   borrarProyectoHmi,
   descargarProyecto,
   leerFicheroDeProyecto,
+  aplicarLienzoImportado,
   aplicarSeleccionImportada,
   importarProyecto,
   PROYECTO_HMI_POR_DEFECTO,
@@ -241,6 +242,34 @@ export function ProyectoSelector() {
         partes.push(`${marcas} ${t('projects.importedSelection')}`);
       }
 
+      // Flujos: conexiones, grupos de historización, consultas y el dibujo.
+      if (r.conexiones_nuevas.length > 0) {
+        partes.push(`${r.conexiones_nuevas.length} ${t('projects.importedDbs')}`);
+      }
+      if (r.grupos_historian_nuevos.length > 0) {
+        partes.push(
+          `${r.grupos_historian_nuevos.length} ${t('projects.importedHistorian')}`
+        );
+      }
+      if (r.consultas_nuevas.length > 0) {
+        partes.push(`${r.consultas_nuevas.length} ${t('projects.importedQueries')}`);
+      }
+      const nodos = aplicarLienzoImportado(doc, r.conexiones_renombradas);
+      if (nodos > 0) {
+        partes.push(`${nodos} ${t('projects.importedFlowNodes')}`);
+      }
+      // Alarmas y recetas: lo que entró en la base de aquí, por tabla.
+      const bd = r.datos_bd;
+      const ins = bd.totales.insertadas ?? 0;
+      const reu = bd.totales.reutilizadas ?? 0;
+      if (bd.ok && (ins > 0 || reu > 0)) {
+        const alarmas = bd.tablas.find((x) => x.tabla === 'alarmas_def');
+        const recetas = bd.tablas.find((x) => x.tabla === 'recetas');
+        partes.push(
+          `${t('projects.importedDbData')} ${alarmas?.insertadas ?? 0} ${t('projects.importedAlarms')}, ${recetas?.insertadas ?? 0} ${t('projects.importedRecipes')} (${reu} ${t('projects.importedDbKept')})`
+        );
+      }
+
       // Los dos avisos de problema se juntan en UNO.
       //
       // Antes cada uno llamaba a `setError` por su cuenta, así que si una
@@ -279,6 +308,16 @@ export function ProyectoSelector() {
           .map((p) => `${p.plc_id || '?'} (${p.motivo})`)
           .join(', ');
         problemas.push(`${t('projects.importedPlcsOmitted')} ${detalle}.`);
+      }
+
+      if (r.flujos_omitidos.length > 0) {
+        const detalle = r.flujos_omitidos
+          .map((f) => `${f.tipo} ${f.id} (${f.motivo})`)
+          .join(', ');
+        problemas.push(`${t('projects.importedFlowsOmitted')} ${detalle}.`);
+      }
+      if (!r.datos_bd.ok && r.datos_bd.mensaje) {
+        problemas.push(`${t('projects.importedDbFailed')} ${r.datos_bd.mensaje}.`);
       }
 
       if (problemas.length > 0) setError(problemas.join(' '));

@@ -52,6 +52,7 @@ interface Informe {
 }
 
 const NOMBRES: Record<string, string> = {
+  usuarios: 'Cuentas de usuario',
   plc_prg: 'Histórico del PLC',
   alarmas_def: 'Reglas de alarma',
   alarmas: 'Historial de alarmas',
@@ -70,6 +71,11 @@ export function PanelMigracionDatos() {
   const [bases, setBases] = useState<ConexionRemota[]>([]);
   const [dbId, setDbId] = useState('');
   const [historico, setHistorico] = useState(true);
+  // Cuentas: en el fichero van con el hash de la contraseña (nunca la
+  // contraseña). Al importar, las que ya existen aquí NUNCA se tocan; esto
+  // decide solo qué pasa con las que no existen.
+  const [conCuentas, setConCuentas] = useState(true);
+  const [cuentas, setCuentas] = useState<'inactivos' | 'tal_cual' | 'omitir'>('inactivos');
   const [modo, setModo] = useState<'fusionar' | 'añadir'>('fusionar');
   const [trabajando, setTrabajando] = useState('');
   const [mensaje, setMensaje] = useState('');
@@ -111,7 +117,7 @@ export function PanelMigracionDatos() {
     setInforme(null);
     try {
       const r = await fetch(
-        `${API_BASE}/db/${encodeURIComponent(dbId)}/datos/exportar?incluir_historico=${historico}`,
+        `${API_BASE}/db/${encodeURIComponent(dbId)}/datos/exportar?incluir_historico=${historico}&incluir_usuarios=${conCuentas}`,
         { headers: cabeceras() }
       );
       if (!r.ok) {
@@ -151,6 +157,7 @@ export function PanelMigracionDatos() {
       cuerpo.append('modo', modo);
       cuerpo.append('simular', String(simular));
       cuerpo.append('incluir_historico', String(historico));
+      cuerpo.append('usuarios', cuentas);
       const r = await fetch(`${API_BASE}/db/${encodeURIComponent(dbId)}/datos/importar`, {
         method: 'POST',
         headers: cabeceras(),
@@ -235,6 +242,16 @@ export function PanelMigracionDatos() {
         />
         Incluir el histórico del PLC (<code className="text-[10.5px]">plc_prg</code>; puede pesar mucho)
       </label>
+      <label className="mt-1.5 flex items-center gap-2 text-[11.5px] text-slate-600 dark:text-slate-300">
+        <input
+          type="checkbox"
+          checked={conCuentas}
+          onChange={(e) => setConCuentas(e.target.checked)}
+          disabled={ocupado}
+          className={CHECK}
+        />
+        Incluir las cuentas de usuario al exportar (van con el hash de la contraseña, nunca la contraseña: trata el .zip como un fichero sensible)
+      </label>
 
       {/* ── Exportar ─────────────────────────────────────────── */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -316,6 +333,22 @@ export function PanelMigracionDatos() {
             Añadir todo como nuevo
           </label>
         </div>
+        <label className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] text-slate-600 dark:text-slate-300">
+          Cuentas de usuario del fichero que aquí no existan:
+          <select
+            value={cuentas}
+            onChange={(e) => setCuentas(e.target.value as typeof cuentas)}
+            disabled={ocupado}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11.5px] text-navy outline-none focus:border-siemens dark:border-navy-slate dark:bg-navy dark:text-slate-100"
+          >
+            <option value="inactivos">entran desactivadas (recomendado)</option>
+            <option value="tal_cual">entran tal cual estaban</option>
+            <option value="omitir">no entran</option>
+          </select>
+        </label>
+        <p className="mt-1 text-[10.5px] leading-relaxed text-slate-400">
+          Una cuenta con el mismo nombre de usuario que una de aquí se reutiliza tal cual está aquí (su contraseña, su categoría, su estado): nunca se pisa. Así lo que ella creó allí queda a su nombre aquí.
+        </p>
         <p className="mt-1 text-[10.5px] leading-relaxed text-slate-400">
           {modo === 'fusionar'
             ? 'Una receta o una regla de alarma que ya exista con el mismo nombre se reutiliza en vez de duplicarse; los eventos y lecturas repetidos se saltan. Importar dos veces no duplica nada.'

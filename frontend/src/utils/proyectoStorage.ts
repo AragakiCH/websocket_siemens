@@ -209,12 +209,34 @@ export interface ProyectoExportado {
   /** Carpetas de la barra de pestanas y en cual cae cada pantalla. */
   grupos?: { grupos?: unknown[]; asignaciones?: Record<string, string> };
   /**
+   * Flujos: conexiones a BD (sin contrasena), grupos de historizacion y
+   * consultas guardadas (servidor), mas el dibujo del lienzo (`lienzo`),
+   * que vive en este navegador y lo pone/aplica la vista.
+   */
+  flujos?: {
+    conexiones?: unknown[];
+    grupos?: unknown[];
+    consultas?: unknown[];
+    lienzo?: LienzoFlujos;
+  };
+  /** Reglas de alarma y recetas de la base del HMI. */
+  datos_bd?: { db_id?: string; tablas?: Record<string, unknown[]> };
+  /**
    * Seleccion de variables de Configuracion (`<plc>|<tag>` -> marcada).
    * La pone la vista al descargar y la aplica al importar: el servidor no la
    * conoce, vive en el navegador.
    */
   seleccion_variables?: Record<string, boolean>;
 }
+
+/** El dibujo del lienzo de Flujos, tal como lo guarda FlowEditor. */
+export interface LienzoFlujos {
+  nodes: Array<{ id: string; type: string; config?: Record<string, unknown>; [k: string]: unknown }>;
+  connections: Array<{ id: string; from: string; to: string; [k: string]: unknown }>;
+}
+
+/** Misma clave que usa FlowEditor para guardar el lienzo. */
+const CLAVE_LIENZO_FLUJOS = 'srx_flow_editor';
 
 /** Un PLC del fichero que no se pudo dar de alta, y por que. */
 export interface PlcOmitido {
@@ -268,6 +290,24 @@ export interface ResultadoImportacion {
   grupos_importados: number;
   /** Pantallas colocadas en su carpeta. */
   pantallas_agrupadas: number;
+  /** Flujos: conexiones a BD que entraron (desactivadas, sin contrasena). */
+  conexiones_nuevas: string[];
+  conexiones_existentes: string[];
+  /** `db_id` del fichero -> `db_id` aqui, cuando ya habia otra base con ese id. */
+  conexiones_renombradas: Record<string, string>;
+  grupos_historian_nuevos: string[];
+  grupos_historian_existentes: string[];
+  consultas_nuevas: string[];
+  consultas_existentes: string[];
+  flujos_omitidos: Array<{ tipo: string; id: string; motivo: string }>;
+  /** Alarmas y recetas: informe de la migracion a la base de aqui. */
+  datos_bd: {
+    ok: boolean;
+    db_id: string;
+    mensaje: string;
+    totales: { insertadas?: number; reutilizadas?: number; omitidas?: number };
+    tablas: Array<{ tabla: string; insertadas: number; reutilizadas: number; omitidas: number; avisos?: string[] }>;
+  };
 }
 
 /** Pide el documento del proyecto. Es el contenido del fichero. */
@@ -295,6 +335,9 @@ export async function descargarProyecto(
   // La seleccion de Configuracion es de este navegador: el servidor no la
   // tiene, asi que se anade aqui, justo antes de escribir el fichero.
   doc.seleccion_variables = RealPLCService.seleccionActual();
+  // Lo mismo con el dibujo del lienzo de Flujos.
+  const lienzo = leerLienzoFlujos();
+  if (lienzo) doc.flujos = { ...(doc.flujos ?? {}), lienzo };
   return descargarJson(doc, nombreDeFichero(nombreProyecto || proyectoId));
 }
 
@@ -343,7 +386,81 @@ export async function importarProyecto(
     escritura_habilitada: d.escritura_habilitada ?? 0,
     grupos_importados: d.grupos_importados ?? 0,
     pantallas_agrupadas: d.pantallas_agrupadas ?? 0,
+    conexiones_nuevas: d.conexiones_nuevas ?? [],
+    conexiones_existentes: d.conexiones_existentes ?? [],
+    conexiones_renombradas: d.conexiones_renombradas ?? {},
+    grupos_historian_nuevos: d.grupos_historian_nuevos ?? [],
+    grupos_historian_existentes: d.grupos_historian_existentes ?? [],
+    consultas_nuevas: d.consultas_nuevas ?? [],
+    consultas_existentes: d.consultas_existentes ?? [],
+    flujos_omitidos: d.flujos_omitidos ?? [],
+    datos_bd: {
+      ok: Boolean(d.datos_bd?.ok),
+      db_id: d.datos_bd?.db_id ?? '',
+      mensaje: d.datos_bd?.mensaje ?? '',
+      totales: d.datos_bd?.totales ?? {},
+      tablas: d.datos_bd?.tablas ?? [],
+    },
   };
+}
+
+function leerLienzoFlujos(): LienzoFlujos | null {
+  try {
+    const raw = localStorage.getItem(CLAVE_LIENZO_FLUJOS);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (!d || !Array.isArray(d.nodes)) return null;
+    return { nodes: d.nodes, connections: Array.isArray(d.connections) ? d.connections : [] };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Anade al lienzo de Flujos de este navegador los nodos que traia el
+ * fichero. Se MEZCLA con lo que haya: un nodo cuyo id ya exista aqui entra
+ * con otro id (y sus cables con el). Los `db_id` que el servidor renombro
+ * al importar se traducen en la configuracion de los nodos, para que el
+ * dibujo apunte a la conexion que de verdad entro. Devuelve cuantos nodos
+ * se anadieron.
+ */
+export function aplicarLienzoImportado(
+  doc: ProyectoExportado,
+  conexionesRenombradas: Record<string, string>
+): number {
+  const traido = doc.flujos?.lienzo;
+  if (!traido || !Array.isArray(traido.nodes) || traido.nodes.length === 0) return 0;
+  const actual = leerLienzoFlujos() ?? { nodes: [], connections: [] };
+  const ocupados = new Set(actual.nodes.map((n) => n.id));
+  const mapaIds: Record<string, string> = {};
+  const nuevos: LienzoFlujos['nodes'] = [];
+  let n = 0;
+  for (const nodo of traido.nodes) {
+    if (!nodo || typeof nodo.id !== 'string') continue;
+    let id = nodo.id;
+    let i = 2;
+    while (ocupados.has(id)) id = `${nodo.id}_imp${i++}`;
+    ocupados.add(id);
+    mapaIds[nodo.id] = id;
+    const config: Record<string, unknown> = { ...(nodo.config ?? {}) };
+    const dbId = typeof config.db_id === 'string' ? config.db_id : '';
+    if (dbId && conexionesRenombradas[dbId]) config.db_id = conexionesRenombradas[dbId];
+    // Un nodo recien llegado no ha "guardado" nada aqui todavia.
+    nuevos.push({ ...nodo, id, config, status: 'idle', statusMsg: undefined });
+    n += 1;
+  }
+  const cables = (traido.connections ?? [])
+    .filter((c) => c && mapaIds[c.from] && mapaIds[c.to])
+    .map((c) => ({ ...c, id: `${c.id}_${Date.now()}`, from: mapaIds[c.from], to: mapaIds[c.to] }));
+  try {
+    localStorage.setItem(
+      CLAVE_LIENZO_FLUJOS,
+      JSON.stringify({ nodes: [...actual.nodes, ...nuevos], connections: [...actual.connections, ...cables] })
+    );
+  } catch {
+    return 0;
+  }
+  return n;
 }
 
 /**

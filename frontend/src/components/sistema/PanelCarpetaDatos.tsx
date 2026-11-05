@@ -23,6 +23,10 @@ import {
 } from 'lucide-react';
 import { apiGet, apiPost, API_BASE } from '../flows/api';
 import { getToken } from '../../services/authApi';
+import {
+  aplicarPreferenciasNavegador,
+  leerPreferenciasNavegador,
+} from '../../utils/preferenciasNavegador';
 
 interface EstadoDatos {
   ruta: string;
@@ -89,6 +93,15 @@ export function PanelCarpetaDatos() {
     setMensaje('');
     setError('');
     try {
+      // Lo que este navegador guarda en localStorage y es configuración
+      // (variables marcadas, lienzo de Flujos, modo de color, bases
+      // elegidas) se manda ANTES de pedir la copia, para que viaje en ella.
+      // Si falla, la copia sale igual: es un extra, no una condición.
+      try {
+        await apiPost('/sistema/datos/navegador', leerPreferenciasNavegador());
+      } catch {
+        /* sin preferencias en la copia */
+      }
       const token = getToken();
       const r = await fetch(`${API_BASE}/sistema/datos/backup`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -128,7 +141,22 @@ export function PanelCarpetaDatos() {
       if (!r.ok || d?.ok === false) {
         throw new Error(d?.detail ?? d?.mensaje ?? `HTTP ${r.status}`);
       }
-      setMensaje(d.mensaje);
+      let nota = '';
+      if (d.preferencias_navegador) {
+        // La copia traía las preferencias del navegador que la hizo: se
+        // aplican aquí (mezclando con las de este) para que al recargar
+        // estén las mismas variables marcadas y el mismo lienzo de Flujos.
+        try {
+          const p = await apiGet<{ preferencias: Record<string, string> }>(
+            '/sistema/datos/navegador'
+          );
+          const n = aplicarPreferenciasNavegador(p.preferencias ?? {});
+          if (n > 0) nota = ` Se aplicaron ${n} preferencia(s) del navegador; recarga la página para verlas.`;
+        } catch {
+          /* sin preferencias */
+        }
+      }
+      setMensaje(d.mensaje + nota);
       await cargar();
     } catch (e: any) {
       setError(e?.message ?? 'No se pudo restaurar.');
