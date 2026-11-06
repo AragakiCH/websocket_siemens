@@ -219,8 +219,16 @@ export interface ProyectoExportado {
     consultas?: unknown[];
     lienzo?: LienzoFlujos;
   };
-  /** Reglas de alarma y recetas de la base del HMI. */
-  datos_bd?: { db_id?: string; tablas?: Record<string, unknown[]> };
+  /** Cuentas, reglas de alarma y recetas de las bases del HMI. */
+  datos_bd?: {
+    db_id?: string;
+    tablas?: Record<string, unknown[]>;
+    bases?: Record<string, Record<string, unknown[]>>;
+  };
+  /** Constantes de los faceplates de este proyecto. */
+  constantes?: unknown[];
+  /** Categorias de la paleta de widgets y donde va cada widget. */
+  categorias?: { categorias?: unknown[]; asignaciones?: Record<string, string> };
   /**
    * Seleccion de variables de Configuracion (`<plc>|<tag>` -> marcada).
    * La pone la vista al descargar y la aplica al importar: el servidor no la
@@ -286,6 +294,13 @@ export interface ResultadoImportacion {
   catalogos_importados: number;
   /** Tags habilitados para escritura que no lo estaban aqui. */
   escritura_habilitada: number;
+  /** Constantes de faceplate creadas, y las que cambiaron de id (enlaces ya reescritos). */
+  constantes_importadas: string[];
+  constantes_renombradas: Record<string, string>;
+  constantes_en_conflicto: Array<{ id: string; nombre?: string; error?: string }>;
+  /** Categorias propias de la paleta recreadas y widgets colocados. */
+  categorias_importadas: number;
+  widgets_categorizados: number;
   /** Carpetas de la barra recreadas en el proyecto importado. */
   grupos_importados: number;
   /** Pantallas colocadas en su carpeta. */
@@ -384,6 +399,11 @@ export async function importarProyecto(
     plcs_renombrados: d.plcs_renombrados ?? {},
     catalogos_importados: d.catalogos_importados ?? 0,
     escritura_habilitada: d.escritura_habilitada ?? 0,
+    constantes_importadas: d.constantes_importadas ?? [],
+    constantes_renombradas: d.constantes_renombradas ?? {},
+    constantes_en_conflicto: d.constantes_en_conflicto ?? [],
+    categorias_importadas: d.categorias_importadas ?? 0,
+    widgets_categorizados: d.widgets_categorizados ?? 0,
     grupos_importados: d.grupos_importados ?? 0,
     pantallas_agrupadas: d.pantallas_agrupadas ?? 0,
     conexiones_nuevas: d.conexiones_nuevas ?? [],

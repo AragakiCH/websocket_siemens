@@ -81,20 +81,29 @@ for f in temas.json categorias_widgets.json; do
 done
 
 # ── 3 · Base SQLite local con el esquema del HMI ───────────────────────
+# El esquema se pasa en CADA arranque, no solo al crear la base: es todo
+# `CREATE TABLE IF NOT EXISTS`, así que sobre una base completa no hace
+# nada, y sobre una a la que le falte una tabla (una restaurada de otro
+# sitio, una de una versión anterior) la crea. Es lo que evita el «La tabla
+# receta_registros no existe» al abrir Recetas.
 BD="$DATOS/psicore.db"
-if [ ! -f "$BD" ]; then
-  "$SNAP/venv/bin/python" - "$BD" "$RAIZ/sql/esquema_hmi_sqlite.sql" <<'PY'
+NUEVA=0; [ -f "$BD" ] || NUEVA=1
+"$SNAP/venv/bin/python" - "$BD" "$RAIZ/sql/esquema_hmi_sqlite.sql" "$NUEVA" <<'PY'
 import sqlite3, sys
-bd, esquema = sys.argv[1], sys.argv[2]
+bd, esquema, nueva = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
 con = sqlite3.connect(bd)
 try:
+    antes = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     con.executescript(open(esquema, encoding="utf-8").read())
     con.commit()
+    despues = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
 finally:
     con.close()
-print(f"[psicore] Base SQLite creada en {bd}")
+if nueva:
+    print(f"[psicore] Base SQLite creada en {bd} ({len(despues)} tablas)")
+elif despues - antes:
+    print(f"[psicore] Base SQLite: tablas creadas que faltaban: {', '.join(sorted(despues - antes))}")
 PY
-fi
 if [ ! -f "$DATOS/conexiones.json" ]; then
   cat > "$DATOS/conexiones.json" <<JSON
 [

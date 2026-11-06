@@ -63,7 +63,10 @@ MAX_PANTALLAS_IMPORTADAS = 200
 #: Importa porque los ids pueden cambiar al importar, y un enlace que apunte
 #: al id viejo llevaría a la pantalla de otro proyecto —o a ninguna— sin dar
 #: ningún error.
-CLAVES_DE_PANTALLA = ("pantalla", "project_id")
+CLAVES_DE_PANTALLA = ("pantalla", "project_id", "faceplate", "tipo")
+#: Claves cuyo valor es una LISTA de ids de pantalla (el Navegador de
+#: Pantallas guarda `config.pantallas: [...]`).
+CLAVES_LISTA_DE_PANTALLA = ("pantallas",)
 
 #: Claves cuyo valor es la CLAVE DE UNA VARIABLE (`<plc>|<tag>`) enlazada a un
 #: widget. Se busca por nombre de clave y en profundidad, igual que
@@ -143,14 +146,24 @@ def kinds_personalizados(pantallas: List[dict]) -> List[str]:
     el programa".
     """
     kinds: List[str] = []
+
+    def _recorrer(v: Any) -> None:
+        # En profundidad: un widget dentro de un Contenedor o de una
+        # plantilla también necesita su definición en el otro equipo.
+        if isinstance(v, dict):
+            kind = v.get("kind")
+            if isinstance(kind, str) and kind.startswith("custom:"):
+                limpio = kind[len("custom:"):]
+                if limpio and limpio not in kinds:
+                    kinds.append(limpio)
+            for dentro in v.values():
+                _recorrer(dentro)
+        elif isinstance(v, list):
+            for x in v:
+                _recorrer(x)
+
     for pantalla in pantallas:
-        for widget in pantalla.get("widgets", []):
-            kind = str(widget.get("kind") or "")
-            if not kind.startswith("custom:"):
-                continue
-            limpio = kind[len("custom:"):]
-            if limpio and limpio not in kinds:
-                kinds.append(limpio)
+        _recorrer(pantalla.get("widgets", []))
     return kinds
 
 
@@ -177,14 +190,22 @@ def widgets_para_exportar(widget_store, pantallas: List[dict]) -> List[dict]:
 
 
 def importar_widgets(widget_store, lista: List[dict],
-                     usuario: str = "") -> Tuple[List[str], List[str], List[str]]:
+                     usuario: str = "", actualizar: bool = True,
+                     ) -> Tuple[List[str], List[str], List[str]]:
     """
-    Guarda los widgets del fichero que NO existan ya aquí.
+    Guarda los widgets del fichero.
 
-    Devuelve `(importados, ya_existentes, con_error)`.
+    Devuelve `(importados, ya_existentes, con_error)`. En `importados` van
+    también los ACTUALIZADOS (ya estaban, pero con otro contenido); en
+    `ya_existentes`, los idénticos.
 
-    Los que ya están se dejan como están: reemplazarlos cambiaría el aspecto
-    de OTROS proyectos que los usen, y eso nadie lo ha pedido.
+    Un widget que ya está aquí con OTRO contenido se reemplaza por el del
+    fichero (`actualizar=True`). Antes se conservaba el de aquí, y el
+    resultado era que un proyecto llegaba con los widgets guía de hace tres
+    meses y los faceplates salían descuadrados: el fichero trae la versión
+    con la que ese proyecto se diseñó, y esa es la que tiene que verse. Los
+    proyectos de aquí que usen ese widget lo verán también actualizado; si
+    eso no se quiere, `actualizar=False` deja los de aquí intactos.
 
     Un widget que no se deja guardar no tumba la importación. Si el diseño ya
     está creado, quedarse sin un widget es un problema pequeño y visible (una
@@ -201,9 +222,15 @@ def importar_widgets(widget_store, lista: List[dict],
         kind = str(w.get("kind") or "")
         if not kind:
             continue
-        if widget_store.obtener(kind) is not None:
-            omitidos.append(kind)
-            continue
+        actual = widget_store.obtener(kind)
+        if actual is not None:
+            igual = (actual.html == str(w.get("html") or "")
+                     and (actual.css or "") == str(w.get("css") or "")
+                     and (actual.js or "") == str(w.get("js") or "")
+                     and (actual.meta or {}) == (w.get("meta") or {}))
+            if igual or not actualizar:
+                omitidos.append(kind)
+                continue
         try:
             widget_store.guardar(
                 kind, str(w.get("nombre") or ""), str(w.get("html") or ""),
@@ -378,12 +405,17 @@ def remapear_pantallas(valor: Any, mapa: Dict[str, str]) -> Any:
     casualidad diga lo mismo que un id no se toca, porque no está bajo una de
     esas claves.
     """
+    if not mapa:
+        return valor
     if isinstance(valor, dict):
         salida = {}
         for clave, dentro in valor.items():
             if (clave in CLAVES_DE_PANTALLA and isinstance(dentro, str)
                     and dentro in mapa):
                 salida[clave] = mapa[dentro]
+            elif (clave in CLAVES_LISTA_DE_PANTALLA and isinstance(dentro, list)
+                  and all(isinstance(x, str) for x in dentro)):
+                salida[clave] = [mapa.get(x, x) for x in dentro]
             else:
                 salida[clave] = remapear_pantallas(dentro, mapa)
         return salida
@@ -884,20 +916,43 @@ async def importar_flujos(db_store, historizador, datos: dict,
 
 
 async def datos_bd_para_exportar(crud, db_manager, settings) -> dict:
-    """`{"db_id": ..., "tablas": {alarmas_def: [...], recetas: [...], ...}}`."""
+    """
+    `{"db_id": <base principal>, "tablas": {...}, "bases": {db_id: {...}}}`.
+
+    Se exporta de TODAS las bases dadas de alta que respondan y tengan las
+    tablas del HMI, no solo de la principal: las recetas de una planta
+    pueden vivir en `scada_34` mientras las cuentas están en `local`, y un
+    proyecto que solo mirara la principal llegaría con 14 recetas y ningún
+    elemento. `tablas` repite la principal por compatibilidad con ficheros
+    anteriores. Van también las CUENTAS (con el hash de la contraseña): al
+    importar, las que ya existan aquí no se tocan.
+    """
     if crud is None or db_manager is None:
         return {}
     from app.db import migracion_datos
+    prefijo = (getattr(settings, "esquema_prefijo", "") or
+               getattr(settings, "auth_tabla_prefijo", "") or "")
     try:
-        db_id = crud._db_id(None)
-        driver = await db_manager._driver_de(db_id)
-        prefijo = (getattr(settings, "esquema_prefijo", "") or
-                   getattr(settings, "auth_tabla_prefijo", "") or "")
-        tablas = await migracion_datos.exportar_filas(driver, prefijo)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("No se pudieron exportar alarmas/recetas: %s", exc)
+        principal = crud._db_id(None)
+    except Exception:  # noqa: BLE001
+        principal = ""
+    bases: Dict[str, Dict[str, list]] = {}
+    for c in db_manager.listar_conexiones():
+        db_id = str(c.get("db_id") or "")
+        try:
+            driver = await db_manager._driver_de(db_id)
+            tablas = await migracion_datos.exportar_filas(
+                driver, prefijo, ("usuarios",) + migracion_datos.TABLAS_DISENO)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Base '%s': no se pudo exportar (%s); se sigue "
+                           "con las demás.", db_id, exc)
+            continue
+        if any(tablas.get(t) for t in tablas):
+            bases[db_id] = tablas
+    if not bases:
         return {}
-    return {"db_id": db_id, "tablas": tablas}
+    return {"db_id": principal, "tablas": bases.get(principal, {}),
+            "bases": bases}
 
 
 async def importar_datos_bd(crud, db_manager, settings, datos: dict) -> dict:
@@ -906,23 +961,221 @@ async def importar_datos_bd(crud, db_manager, settings, datos: dict) -> dict:
     de `PLC_AUTH_DB_ID`, o la primera). Devuelve el informe de la
     migración, o `{"ok": False, "mensaje": ...}` sin tumbar la importación.
     """
-    if (crud is None or db_manager is None or not isinstance(datos, dict)
-            or not datos.get("tablas")):
-        return {"ok": True, "totales": {"insertadas": 0, "reutilizadas": 0,
-                                        "omitidas": 0}, "tablas": []}
+    vacio = {"ok": True, "totales": {"insertadas": 0, "reutilizadas": 0,
+                                     "omitidas": 0}, "tablas": []}
+    if crud is None or db_manager is None or not isinstance(datos, dict):
+        return vacio
+    # Ficheros nuevos traen `bases` (una entrada por base de origen); los
+    # anteriores solo `tablas`. Todo entra en la base principal de AQUÍ,
+    # fusionando: lo que se repita entre bases de origen no se duplica.
+    origenes: Dict[str, dict] = {}
+    if isinstance(datos.get("bases"), dict) and datos["bases"]:
+        origenes = {str(k): v for k, v in datos["bases"].items()
+                    if isinstance(v, dict) and v}
+    elif datos.get("tablas"):
+        origenes = {str(datos.get("db_id") or "origen"): datos["tablas"]}
+    if not origenes:
+        return vacio
     from app.db import migracion_datos
     try:
         db_id = crud._db_id(None)
         driver = await db_manager._driver_de(db_id)
         prefijo = (getattr(settings, "esquema_prefijo", "") or
                    getattr(settings, "auth_tabla_prefijo", "") or "")
-        informe = await migracion_datos.importar_filas(
-            driver, datos["tablas"], prefijo, "fusionar",
-            origen={"db_id": datos.get("db_id", ""), "desde": "proyecto"})
-        informe["db_id"] = db_id
-        return informe
+        # Si a la base de aquí le falta alguna tabla del HMI (una SQLite
+        # recién creada, una base a medio provisionar), se crea: es lo que
+        # evita el «La tabla receta_registros no existe» al importar.
+        try:
+            await db_manager.asegurar_esquema(db_id, prefijo)
+            if hasattr(crud, "invalidar_columnas"):
+                crud.invalidar_columnas()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("No se pudo asegurar el esquema en '%s': %s",
+                           db_id, exc)
+        total = {"insertadas": 0, "reutilizadas": 0, "omitidas": 0}
+        por_tabla: Dict[str, dict] = {}
+        for origen_id, tablas in origenes.items():
+            informe = await migracion_datos.importar_filas(
+                driver, tablas, prefijo, "fusionar",
+                origen={"db_id": origen_id, "desde": "proyecto"},
+                usuarios="tal_cual")
+            for k in total:
+                total[k] += int(informe.get("totales", {}).get(k, 0))
+            for t in informe.get("tablas", []):
+                acc = por_tabla.setdefault(t["tabla"], {
+                    "tabla": t["tabla"], "insertadas": 0, "reutilizadas": 0,
+                    "omitidas": 0, "avisos": []})
+                for k in ("insertadas", "reutilizadas", "omitidas"):
+                    acc[k] += int(t.get(k, 0))
+                for a in t.get("avisos", []) or []:
+                    if a not in acc["avisos"]:
+                        acc["avisos"].append(a)
+        return {"ok": True, "db_id": db_id, "totales": total,
+                "tablas": list(por_tabla.values()),
+                "mensaje": f"{total['insertadas']} fila(s) nuevas, "
+                           f"{total['reutilizadas']} ya existían."}
     except Exception as exc:  # noqa: BLE001
         logger.exception("No se pudieron importar alarmas/recetas")
         return {"ok": False, "mensaje": str(exc),
                 "totales": {"insertadas": 0, "reutilizadas": 0, "omitidas": 0},
                 "tablas": []}
+
+
+# ====================================================================== #
+# Constantes de faceplate
+# ====================================================================== #
+#
+# Cada tipo de faceplate (una pantalla marcada como tipo) puede tener
+# constantes: valores fijos con nombre que se asignan a sus parámetros. Los
+# widgets las enlazan como `constante|<id>`. Sin ellas, una instancia que
+# tenía «Velocidad nominal = 1450» llega con el hueco vacío.
+PREFIJO_CONSTANTE = "constante|"
+
+
+def constantes_para_exportar(constantes_store, pantallas: List[dict]) -> List[dict]:
+    """Las constantes de los faceplates que son pantallas de este proyecto."""
+    if constantes_store is None:
+        return []
+    ids = {str(p.get("project_id") or "") for p in pantallas}
+    salida: List[dict] = []
+    try:
+        for c in constantes_store.listar():
+            if str(c.get("faceplate") or "") in ids:
+                salida.append({k: c.get(k) for k in
+                               ("id", "faceplate", "nombre", "tipo", "valor")})
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudieron leer las constantes: %s", exc)
+    return salida
+
+
+def importar_constantes(constantes_store, lista: List[dict],
+                        mapa_pantallas: Dict[str, str]) -> Tuple[List[str], Dict[str, str], List[dict]]:
+    """
+    Crea las constantes del fichero. Se intenta conservar el id (así los
+    enlaces `constante|id` de los widgets siguen valiendo sin tocarlos); si
+    el id ya está ocupado aquí por OTRA constante, nace con uno nuevo y se
+    devuelve el cambio en `renombradas` para reescribir los enlaces. Una
+    constante idéntica (mismo id, faceplate y nombre) ya está y se omite.
+
+    Devuelve `(creadas, renombradas, conflictos)`.
+    """
+    creadas: List[str] = []
+    renombradas: Dict[str, str] = {}
+    conflictos: List[dict] = []
+    if constantes_store is None:
+        return creadas, renombradas, conflictos
+    for d in lista or []:
+        if not isinstance(d, dict):
+            continue
+        cid = str(d.get("id") or "")
+        faceplate = str(d.get("faceplate") or "")
+        faceplate = mapa_pantallas.get(faceplate, faceplate)
+        datos = {"faceplate": faceplate, "nombre": d.get("nombre"),
+                 "tipo": d.get("tipo"), "valor": d.get("valor")}
+        try:
+            actual = constantes_store.obtener(cid) if cid else None
+        except Exception:  # noqa: BLE001
+            actual = None
+        if actual is not None:
+            if actual.faceplate == faceplate and actual.nombre == d.get("nombre"):
+                continue          # la misma: ya está
+            datos_id = None       # id ocupado por otra: que nazca con uno nuevo
+        else:
+            datos_id = cid or None
+        try:
+            c = constantes_store.crear({**datos, "id": datos_id} if datos_id else datos)
+        except Exception as exc:  # noqa: BLE001
+            conflictos.append({"id": cid, "nombre": d.get("nombre"),
+                               "error": str(exc)})
+            continue
+        creadas.append(c.id)
+        if cid and c.id != cid:
+            renombradas[cid] = c.id
+    return creadas, renombradas, conflictos
+
+
+def remapear_constantes(valor: Any, renombradas: Dict[str, str]) -> Any:
+    """`constante|viejo` -> `constante|nuevo` en los enlaces de los widgets."""
+    if not renombradas:
+        return valor
+    mapa = {f"{PREFIJO_CONSTANTE}{a}": f"{PREFIJO_CONSTANTE}{b}"
+            for a, b in renombradas.items()}
+    if isinstance(valor, dict):
+        return {k: (mapa[v] if (k in CLAVES_DE_VARIABLE and isinstance(v, str)
+                                and v in mapa)
+                    else remapear_constantes(v, renombradas))
+                for k, v in valor.items()}
+    if isinstance(valor, list):
+        return [remapear_constantes(x, renombradas) for x in valor]
+    return valor
+
+
+# ====================================================================== #
+# Categorías de la paleta de widgets
+# ====================================================================== #
+#
+# Por proyecto, igual que los grupos de la barra: qué secciones tiene la
+# paleta, en qué orden y en cuál cae cada widget personalizado. Sin esto el
+# proyecto llega con la paleta de fábrica y los widgets del cliente
+# repartidos donde su `widget.json` diga, no donde quien diseñó los dejó.
+
+
+def categorias_para_exportar(categorias_store, proyecto_id: str) -> dict:
+    if categorias_store is None:
+        return {"categorias": [], "asignaciones": {}}
+    try:
+        doc = categorias_store.documento(proyecto_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudieron leer las categorías: %s", exc)
+        return {"categorias": [], "asignaciones": {}}
+    return {
+        "categorias": [{"id": str(c.get("id") or ""), "nombre": str(c.get("nombre") or ""),
+                        "fija": bool(c.get("fija"))}
+                       for c in doc.get("categorias", []) if isinstance(c, dict)],
+        "asignaciones": {str(k): str(v) for k, v in
+                         (doc.get("asignaciones") or {}).items()},
+    }
+
+
+def importar_categorias(categorias_store, proyecto_id: str, datos: dict,
+                        usuario: str = "") -> dict:
+    """
+    Recrea la paleta del proyecto importado: las categorías de fábrica se
+    renombran si allí tenían otro nombre, las propias se crean, se dejan en
+    el mismo orden y cada widget va a la suya.
+    """
+    r = {"categorias": 0, "asignadas": 0}
+    if categorias_store is None or not isinstance(datos, dict):
+        return r
+    orden: List[str] = []
+    for c in datos.get("categorias") or []:
+        if not isinstance(c, dict):
+            continue
+        cid = str(c.get("id") or "")
+        nombre = str(c.get("nombre") or cid)
+        try:
+            if categorias_store.existe(proyecto_id, cid):
+                actual = next((x for x in categorias_store.categorias(proyecto_id)
+                               if x["id"] == cid), None)
+                if actual is not None and actual.get("nombre") != nombre:
+                    categorias_store.renombrar(proyecto_id, cid, nombre, usuario)
+                orden.append(cid)
+            else:
+                creada = categorias_store.crear(proyecto_id, nombre, usuario)
+                orden.append(creada["id"])
+                r["categorias"] += 1
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Categoría '%s' no se pudo crear en '%s': %s",
+                           nombre, proyecto_id, exc)
+    if orden:
+        try:
+            categorias_store.reordenar(proyecto_id, orden, usuario)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("No se pudo ordenar la paleta: %s", exc)
+    for kind, cid in (datos.get("asignaciones") or {}).items():
+        try:
+            categorias_store.asignar(proyecto_id, str(kind), str(cid), usuario)
+            r["asignadas"] += 1
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("No se pudo asignar '%s' a '%s': %s", kind, cid, exc)
+    return r

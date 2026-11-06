@@ -776,9 +776,18 @@ function escucharCambiosRemotos(): void {
  * `listo` igualmente para que el lienzo deje de decir «cargando» y diga la
  * verdad: que no hay definición.
  */
-export async function sincronizarWidgets(): Promise<ZipWidget[]> {
+export async function sincronizarWidgets(forzar = false): Promise<ZipWidget[]> {
   escucharCambiosRemotos();
-  if (sincronizacion) return sincronizacion;
+  if (sincronizacion) {
+    // Una sincronización en vuelo pudo haber pedido la lista al servidor
+    // ANTES de que algo cambiara (importar un proyecto mete widgets nuevos
+    // justo mientras la del arranque está en marcha). Devolver esa
+    // promesa dejaba al Diseñador sin los widgets recién importados hasta
+    // recargar — el runtime, abierto después, sí los tenía. Con `forzar`
+    // se espera a que termine y se vuelve a pedir.
+    if (!forzar) return sincronizacion;
+    await sincronizacion.catch(() => undefined);
+  }
 
   sincronizacion = (async () => {
     // Primero lo que hay en disco, para pintar ya. Es rápido (una lectura

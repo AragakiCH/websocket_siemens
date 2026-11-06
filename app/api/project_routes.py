@@ -687,6 +687,9 @@ async def exportar_pantalla(
         "nombre": doc["nombre"],
         "canvas": doc.get("canvas", {}),
         "widgets": doc.get("widgets", []),
+        # Tipo de faceplate y parámetros: una plantilla exportada suelta
+        # tiene que llegar como plantilla, no como pantalla normal.
+        "faceplate": doc.get("faceplate") or {"es_tipo": False, "parametros": []},
     }
 
     # De qué proyecto salió. Es informativo —al importar se elige el destino—
@@ -837,6 +840,7 @@ async def importar_pantalla(
             nuevo_id, widgets, cuerpo.pantalla.get("canvas") or {},
             None,      # version=None: acaba de nacer, no hay nada que pisar
             quien,
+            faceplate=cuerpo.pantalla.get("faceplate"),
         )
     except Exception as exc:  # noqa: BLE001
         await almacen.borrar(nuevo_id, en_cascada=True)

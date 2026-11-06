@@ -46,14 +46,19 @@ from app.api.intercambio import (
     FORMATO_PROYECTO,
     FORMATO_VERSION,
     MAX_PANTALLAS_IMPORTADAS,
+    categorias_para_exportar,
+    constantes_para_exportar,
     datos_bd_para_exportar,
     flujos_para_exportar,
     grupos_para_exportar,
     id_libre,
+    importar_categorias,
+    importar_constantes,
     importar_datos_bd,
     importar_flujos,
     importar_grupos,
     importar_internas,
+    remapear_constantes,
     importar_plcs,
     importar_widgets,
     nombre_libre,
@@ -441,9 +446,18 @@ class ProyectoExportado(BaseModel):
                     "lienzo lo añade la vista en `flujos.lienzo`.")
     datos_bd: Dict[str, Any] = Field(
         default_factory=dict,
-        description="Reglas de alarma y recetas (tablas alarmas_def y "
-                    "recetas/receta_*) de la base del HMI, con sus ids de "
-                    "origen; al importar se renumeran y se fusionan.")
+        description="Cuentas, reglas de alarma y recetas (tablas usuarios, "
+                    "alarmas_def y recetas/receta_*) de las bases del HMI, "
+                    "con sus ids de origen; al importar se renumeran y se "
+                    "fusionan en la base principal de aquí.")
+    constantes: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Constantes de los faceplates de este proyecto "
+                    "(`constante|<id>` en los widgets).")
+    categorias: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Categorías de la paleta de widgets de este proyecto, en "
+                    "orden, y en cuál cae cada widget personalizado.")
 
 
 @router.get(
@@ -486,6 +500,11 @@ async def exportar_proyecto(
             "nombre": doc["nombre"],
             "canvas": doc.get("canvas", {}),
             "widgets": doc.get("widgets", []),
+            # Si es un TIPO de faceplate y sus parámetros. Sin esto, las
+            # pantallas-plantilla llegaban como pantallas normales: los
+            # widgets de dentro perdían su parámetro y el selector «Tipo de
+            # faceplate» de los botones salía en «Sin tipo».
+            "faceplate": doc.get("faceplate") or {"es_tipo": False, "parametros": []},
         })
 
     personalizados = widgets_para_exportar(
@@ -510,9 +529,15 @@ async def exportar_proyecto(
     grupos = grupos_para_exportar(
         getattr(request.app.state, "grupos_store", None), proyecto_id)
 
-    # Flujos: conexiones (sin contraseña), grupos de historización y
-    # consultas. Y lo que vive en la base SQL: reglas de alarma y recetas.
+    # Constantes de los faceplates de este proyecto y la paleta de widgets.
     st = request.app.state
+    constantes = constantes_para_exportar(
+        getattr(st, "constantes_store", None), pantallas)
+    categorias = categorias_para_exportar(
+        getattr(st, "categorias_store", None), proyecto_id)
+
+    # Flujos: conexiones (sin contraseña), grupos de historización y
+    # consultas. Y lo que vive en la base SQL: cuentas, alarmas y recetas.
     db_manager = getattr(st, "db_manager", None)
     flujos = flujos_para_exportar(
         getattr(db_manager, "_store", None) if db_manager else None,
@@ -536,6 +561,8 @@ async def exportar_proyecto(
         "grupos": grupos,
         "flujos": flujos,
         "datos_bd": datos_bd,
+        "constantes": constantes,
+        "categorias": categorias,
     }
 
     _auditar(request, "proyecto.exportado", sesion, proyecto_id,
@@ -675,6 +702,14 @@ async def importar_proyecto(
     )
     mapa_plc: Dict[str, str] = r_plcs.get("renombrados") or {}
 
+    # ── 3c. Constantes de faceplate ─────────────────────────────────
+    # También antes de las pantallas: si un id de constante ya estaba
+    # ocupado aquí, nace con otro y hay que reescribir `constante|<id>`
+    # en los widgets. Apuntan a su faceplate con el id que tenga AQUÍ.
+    c_creadas, mapa_const, c_conflictos = importar_constantes(
+        getattr(request.app.state, "constantes_store", None),
+        cuerpo.constantes, mapa)
+
     # ── 4. Crear. Si algo falla, se deshace ──────────────────────
     creadas: List[str] = []
     try:
@@ -684,10 +719,13 @@ async def importar_proyecto(
             creadas.append(nuevo)
             widgets = remapear_pantallas(pantalla.get("widgets", []), mapa)
             widgets = remapear_variables(widgets, mapa_plc)
+            widgets = remapear_constantes(widgets, mapa_const)
             await almacen.guardar_todo(
                 nuevo, widgets, pantalla.get("canvas") or {},
                 None,          # version=None: acaba de nacer, no hay conflicto
                 quien,
+                # El tipo de faceplate y sus parámetros, tal como estaban.
+                faceplate=pantalla.get("faceplate"),
             )
     except HTTPException:
         await _deshacer_importacion(proyectos, almacen, proyecto_id, creadas)
@@ -709,6 +747,18 @@ async def importar_proyecto(
         getattr(request.app.state, "widget_store", None),
         cuerpo.widgets_personalizados, quien,
     )
+
+    # La paleta de widgets de este proyecto (categorías y dónde va cada
+    # widget), ya con los widgets personalizados en el almacén.
+    r_cats = importar_categorias(
+        getattr(request.app.state, "categorias_store", None), proyecto_id,
+        cuerpo.categorias, quien)
+    if r_cats["categorias"] or r_cats["asignadas"]:
+        try:
+            await request.app.state.manager.difundir_config(
+                "categorias", quien, "importadas")
+        except Exception:  # noqa: BLE001
+            pass
 
     # Los grupos de la barra: el proyecto acaba de nacer, así que no hay
     # nada con lo que chocar; se recrean en su orden y cada pantalla va al
@@ -796,6 +846,12 @@ async def importar_proyecto(
         # Carpetas de la barra recreadas y pantallas colocadas en ellas.
         "grupos_importados": r_grupos["grupos"],
         "pantallas_agrupadas": r_grupos["asignadas"],
+        # Faceplates: constantes creadas (y renombradas) y paleta.
+        "constantes_importadas": c_creadas,
+        "constantes_renombradas": mapa_const,
+        "constantes_en_conflicto": c_conflictos,
+        "categorias_importadas": r_cats["categorias"],
+        "widgets_categorizados": r_cats["asignadas"],
         # Flujos: lo que entró, lo que ya estaba y lo que no pudo.
         "conexiones_nuevas": r_flujos["conexiones_nuevas"],
         "conexiones_existentes": r_flujos["conexiones_existentes"],

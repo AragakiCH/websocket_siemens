@@ -174,7 +174,7 @@ export function ProyectoSelector() {
       //
       // `sincronizarWidgets` avisa al resto de la aplicación al terminar
       // (ver EVENTO_WIDGETS), así que el lienzo se repinta solo.
-      await sincronizarWidgets();
+      await sincronizarWidgets(true);
 
       await refrescarProyectos();
       abrirProyecto(r.proyecto_id);
@@ -200,6 +200,16 @@ export function ProyectoSelector() {
       if (r.widgets_ya_existentes.length > 0) {
         partes.push(
           `${r.widgets_ya_existentes.length} ${t('projects.importedWidgetsKept')}`
+        );
+      }
+      if (r.constantes_importadas.length > 0) {
+        partes.push(
+          `${r.constantes_importadas.length} ${t('projects.importedConstants')}`
+        );
+      }
+      if (r.categorias_importadas > 0 || r.widgets_categorizados > 0) {
+        partes.push(
+          `${r.categorias_importadas} ${t('projects.importedCategories')} (${r.widgets_categorizados} ${t('projects.importedCategorized')})`
         );
       }
 
@@ -265,8 +275,9 @@ export function ProyectoSelector() {
       if (bd.ok && (ins > 0 || reu > 0)) {
         const alarmas = bd.tablas.find((x) => x.tabla === 'alarmas_def');
         const recetas = bd.tablas.find((x) => x.tabla === 'recetas');
+        const cuentas = bd.tablas.find((x) => x.tabla === 'usuarios');
         partes.push(
-          `${t('projects.importedDbData')} ${alarmas?.insertadas ?? 0} ${t('projects.importedAlarms')}, ${recetas?.insertadas ?? 0} ${t('projects.importedRecipes')} (${reu} ${t('projects.importedDbKept')})`
+          `${t('projects.importedDbData')} ${alarmas?.insertadas ?? 0} ${t('projects.importedAlarms')}, ${recetas?.insertadas ?? 0} ${t('projects.importedRecipes')}, ${cuentas?.insertadas ?? 0} ${t('projects.importedAccounts')} (${reu} ${t('projects.importedDbKept')})`
         );
       }
 
@@ -310,6 +321,12 @@ export function ProyectoSelector() {
         problemas.push(`${t('projects.importedPlcsOmitted')} ${detalle}.`);
       }
 
+      if (r.constantes_en_conflicto.length > 0) {
+        const detalle = r.constantes_en_conflicto
+          .map((c) => `${c.nombre ?? c.id} (${c.error ?? ''})`)
+          .join(', ');
+        problemas.push(`${t('projects.importedConstantsConflict')} ${detalle}.`);
+      }
       if (r.flujos_omitidos.length > 0) {
         const detalle = r.flujos_omitidos
           .map((f) => `${f.tipo} ${f.id} (${f.motivo})`)

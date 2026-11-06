@@ -207,6 +207,38 @@ class DbManager:
     # ================================================================== #
     # Esquema estándar del HMI
     # ================================================================== #
+    async def asegurar_esquema(self, db_id: str, prefijo: str = "") -> dict:
+        """
+        Crea las tablas del HMI que falten en `db_id` y pone al día sus
+        columnas. Idempotente: sobre una base completa no hace nada. Es el
+        mismo trabajo que `POST /db/{db_id}/esquema`, para poder hacerlo
+        desde dentro (importar un proyecto, el arranque del snap) sin pasar
+        por HTTP. Devuelve `{"tablas": [...], "fallos": [...]}`.
+        """
+        from app.db.migraciones import asegurar_columnas_hmi
+
+        driver = await self._driver_de(db_id)
+        creadas: list = []
+        fallos: list = []
+        for nombre, sentencia in driver.ddl_esquema_hmi(prefijo or ""):
+            try:
+                await driver._ejecutar_interno(sentencia)
+                creadas.append(nombre)
+            except Exception as exc:  # noqa: BLE001
+                texto = str(exc).lower()
+                if "duplicate key name" in texto or "already exists" in texto:
+                    creadas.append(nombre)
+                    continue
+                fallos.append(f"{nombre}: {exc}")
+        try:
+            await asegurar_columnas_hmi(driver, prefijo or "")
+        except Exception as exc:  # noqa: BLE001
+            fallos.append(f"columnas: {exc}")
+        if fallos:
+            logger.warning("Esquema de '%s': %d sentencia(s) fallaron: %s",
+                           db_id, len(fallos), fallos[0])
+        return {"tablas": creadas, "fallos": fallos}
+
     async def baja_conexion(self, db_id: str) -> dict:
         """Cierra el pool y borra la conexión y sus consultas."""
         async with self._lock:

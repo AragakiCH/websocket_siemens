@@ -270,8 +270,12 @@ class ConstantesStore:
             raise ErrorConstante(
                 f"Tipo '{tipo}' no válido. Opciones: {', '.join(TIPOS)}.")
         nombre = self._nombre_valido(datos.get("nombre"), faceplate)
+        # Un id venido de fuera (un proyecto importado) se respeta si está
+        # libre: así los widgets que enlazan `constante|<id>` siguen
+        # valiendo sin reescribirlos. Ocupado o ausente -> uno nuevo.
+        pedido = str(datos.get("id") or "").strip()
         c = Constante(
-            id=_nuevo_id(),
+            id=pedido if pedido and pedido not in self._items else _nuevo_id(),
             faceplate=faceplate,
             nombre=nombre,
             tipo=tipo,

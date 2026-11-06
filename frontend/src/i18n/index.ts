@@ -199,9 +199,15 @@ const es: Dict = {
   'projects.importedScreens': 'pantallas importadas',
   'projects.importedRenamed':
   'pantallas se renombraron porque ya existía una con su nombre interno.',
-  'projects.importedWidgets': 'widgets personalizados nuevos.',
+  'projects.importedWidgets': 'widgets personalizados nuevos o actualizados.',
   'projects.importedWidgetsKept':
-  'widgets personalizados ya estaban en este equipo y se han conservado.',
+  'widgets personalizados ya estaban aquí idénticos.',
+  'projects.importedConstants': 'constantes de faceplate creadas.',
+  'projects.importedConstantsConflict':
+  'Estas constantes de faceplate no se pudieron crear:',
+  'projects.importedCategories': 'categorías propias de la paleta recreadas',
+  'projects.importedCategorized': 'widgets colocados en su categoría.',
+  'projects.importedAccounts': 'cuentas nuevas',
   'projects.importedMissing':
   'El proyecto usa widgets personalizados que no venían en el fichero ni están en este equipo, y saldrán como cajas vacías:',
   'projects.importedVars': 'variables internas creadas.',
@@ -589,9 +595,15 @@ const en: Dict = {
   'projects.importedScreens': 'screens imported',
   'projects.importedRenamed':
   'screens were renamed because their internal name was taken.',
-  'projects.importedWidgets': 'new custom widgets.',
+  'projects.importedWidgets': 'custom widgets added or updated.',
   'projects.importedWidgetsKept':
-  'custom widgets were already on this machine and were kept.',
+  'custom widgets were already here, identical.',
+  'projects.importedConstants': 'faceplate constants created.',
+  'projects.importedConstantsConflict':
+  'These faceplate constants could not be created:',
+  'projects.importedCategories': 'custom palette categories recreated',
+  'projects.importedCategorized': 'widgets placed in their category.',
+  'projects.importedAccounts': 'new accounts',
   'projects.importedMissing':
   'The project uses custom widgets that were not in the file and are not on this machine; they will show as empty boxes:',
   'projects.importedVars': 'internal variables created.',

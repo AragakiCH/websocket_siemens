@@ -756,7 +756,8 @@ async def exportar_filas(driver, prefijo: str = "",
 
 async def importar_filas(driver, datos: Dict[str, List[Dict[str, Any]]],
                          prefijo: str = "", modo: str = "fusionar",
-                         origen: Optional[Dict[str, Any]] = None
+                         origen: Optional[Dict[str, Any]] = None,
+                         usuarios: str = "omitir",
                          ) -> Dict[str, Any]:
     """
     Mete `{tabla: [fila...]}` en `driver` con las mismas garantías que
@@ -786,7 +787,7 @@ async def importar_filas(driver, datos: Dict[str, List[Dict[str, Any]]],
                     json.dumps(f, ensure_ascii=False) + "\n"
                     for f in filas if isinstance(f, dict)))
         return await importar(driver, ruta, prefijo, modo, False,
-                              incluir_historico=False, usuarios="omitir")
+                              incluir_historico=False, usuarios=usuarios)
     finally:
         try:
             os.unlink(ruta)
