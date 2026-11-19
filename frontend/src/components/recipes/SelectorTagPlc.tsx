@@ -69,8 +69,17 @@ export function SelectorTagPlc({
   sinPlcs,
 }: {
   valor: string;
-  /** `tag` siempre; `tipo` solo cuando se eligió de la lista y se conoce. */
-  onElegir: (tag: string, tipoTia?: string) => void;
+  /**
+   * `tag` siempre; `tipo` solo cuando se eligió de la lista y se conoce.
+   *
+   * `deLaLista` es `true` cuando el tag se ELIGIÓ entre los descubiertos, y
+   * no viene cuando se está tecleando. Quien reacciona al cambio de tag —el
+   * editor de alarmas ajusta la condición al tipo del tag nuevo— tiene que
+   * poder distinguirlo: mientras se teclea, el texto a medias puede coincidir
+   * por un instante con OTRO tag, y actuar ahí sería cambiarle la
+   * configuración a alguien que todavía no ha terminado de escribir.
+   */
+  onElegir: (tag: string, tipoTia?: string, deLaLista?: boolean) => void;
   tags: TagRemoto[];
   cargando: boolean;
   /** No hay ningún PLC dado de alta (distinto de "hay, pero sin conectar"). */
@@ -114,7 +123,11 @@ export function SelectorTagPlc({
   };
 
   const elegir = (t: TagRemoto) => {
-    onElegir(claveTag(t), TIPO_OPC_A_TIA[String(t.type ?? '')] || undefined);
+    onElegir(
+      claveTag(t),
+      TIPO_OPC_A_TIA[String(t.type ?? '')] || undefined,
+      true
+    );
     setAbierto(false);
   };
 

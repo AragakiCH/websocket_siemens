@@ -23,7 +23,7 @@ Diseñador y de los widgets a propósito: es una operación de sistema.
 
 | Tabla | Viaja | Nota |
 |---|---|---|
-| `alarmas_def` | sí | reglas de alarma |
+| `alarmas_def` | sí | reglas de alarma, **incluidas las eliminadas** (la papelera): llegan eliminadas, con su fecha |
 | `alarmas` | sí | historial de eventos |
 | `recetas`, `receta_elementos`, `receta_registros`, `receta_valores` | sí | recetas completas |
 | `plc_prg` | opcional | histórico del PLC; puede pesar mucho |
@@ -42,7 +42,7 @@ clave natural y, si ya está, se reutiliza su id:
 
 | Tabla | Clave natural |
 |---|---|
-| `alarmas_def` | nombre + tag |
+| `alarmas_def` | nombre + tag + si está eliminada |
 | `recetas` | nombre |
 | `receta_elementos` | receta + nombre |
 | `receta_registros` | receta + nombre |
@@ -52,6 +52,13 @@ clave natural y, si ya está, se reutiliza su id:
 
 Importar dos veces el mismo fichero no duplica nada. **Modo añadir** salta
 esa búsqueda y lo mete todo como nuevo.
+
+**La papelera de alarmas no resucita nada.** Una regla eliminada
+(`alarmas_def.eliminado_en` con fecha) y otra en uso con el mismo nombre y
+tag no son «la misma»: entran las dos, cada una como estaba. Y si el destino
+es una base antigua **sin** esa columna, las eliminadas se omiten (con
+aviso) en vez de entrar sin su marca, que sería entrar como reglas en uso.
+«Exportar proyecto» directamente no se las lleva.
 
 **Todo o nada**: la importación va en una sola transacción; si una fila
 falla, la base queda como estaba. «Simular» hace el recorrido completo y

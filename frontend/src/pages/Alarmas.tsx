@@ -8,7 +8,7 @@
 // PENDIENTE NO ES "SIGUE ACTIVA"
 //
 //   Es SIN RECONOCER. Una alarma que saltó de madrugada y se normalizó sola
-//   sigue aquí por la mañana, marcada como «Se fue sola». Si desapareciera al
+//   sigue aquí por la mañana, marcada como «Normalizada». Si desapareciera al
 //   normalizarse, quien entra al turno no sabría que hubo un problema — y esa
 //   es exactamente la información que se necesita.
 //
@@ -22,9 +22,27 @@
 //   serían 150 consultas por minuto contra la base para recibir lo mismo casi
 //   siempre. El botón de refrescar queda para cuando alguien quiere estar
 //   seguro.
+//
+// LAS COLUMNAS, IGUALES EN LAS DOS PESTAÑAS
+//
+//   Clase · ID · Fecha y hora · Mensaje · Tag y valor · Situación · Usuario
+//   y la última, que es lo único que cambia: «Acción» (reconocer) en
+//   Pendientes, «Reconocida» (cuándo) en el Histórico.
+//
+//   ID es el NÚMERO DE LA ALARMA —el de Configuración → Alarmas—, no el del
+//   evento: es por el que la gente se refiere a ella. USUARIO es quién la
+//   reconoció; en Pendientes va vacío por definición, porque pendiente es
+//   justamente que nadie la ha reconocido todavía.
+//
+// LA FLECHA DE VOLVER VUELVE A DONDE SE ESTABA
+//
+//   No al menú. A esta pantalla se llega desde el runtime (la franja de
+//   arriba, el widget de alarmas), y quien está operando una línea y entra a
+//   mirar una alarma quiere volver a ESA línea, no caer en el menú de
+//   configuración y tener que encontrar otra vez el camino.
 // =========================================================================
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeftIcon,
@@ -39,6 +57,7 @@ import {
   Loader2Icon,
   TagIcon,
   InfoIcon,
+  UserIcon,
 } from 'lucide-react';
 import {
   CLASE_DE_SEVERIDAD,
@@ -48,6 +67,7 @@ import {
   fetchHistorico,
   fetchPendientes,
   haceCuanto,
+  nombreUsuario,
   partesTag,
   reconocer,
   reconocerTodas,
@@ -119,6 +139,66 @@ function Tag({ tag }: { tag: string | null }) {
   );
 }
 
+/** Columnas de la tabla. Lo usan las filas que ocupan el ancho entero. */
+const COLUMNAS = 8;
+
+/**
+ * El número de la alarma: el ID con el que se configuró.
+ *
+ * NO es el id del evento. «Ha saltado la 12» se refiere a la alarma 12 de
+ * Configuración → Alarmas, y esa es la que se enseña: la misma alarma lleva
+ * el mismo número cada vez que salta.
+ */
+function IdAlarma({ a }: { a: EventoAlarma }) {
+  if (a.alarma_def_id === null || a.alarma_def_id === undefined) {
+    return (
+      <span
+        className="cursor-help text-slate-400"
+        title="Este evento no está ligado a ninguna alarma configurada: lo generó el sistema, o su alarma se borró para siempre."
+      >
+        —
+      </span>
+    );
+  }
+  return (
+    <span className="font-mono text-[12px] font-semibold tabular-nums text-navy dark:text-slate-100">
+      {a.alarma_def_id}
+    </span>
+  );
+}
+
+/** Quién reconoció la alarma. Vacío mientras nadie lo haya hecho. */
+function Usuario({ a }: { a: EventoAlarma }) {
+  const nombre = nombreUsuario(a);
+  if (!nombre) {
+    return (
+      <span
+        className="cursor-help text-slate-400"
+        title={
+          a.ts_reconocimiento
+            ? 'Se reconoció sin una sesión iniciada: no quedó apuntado quién.'
+            : 'Todavía no la ha reconocido nadie.'
+        }
+      >
+        —
+      </span>
+    );
+  }
+  return (
+    <span
+      className="flex min-w-0 items-center gap-1.5 text-slate-600 dark:text-slate-300"
+      title={
+        a.ts_reconocimiento
+          ? `${nombre} la reconoció el ${fechaHora(a.ts_reconocimiento)}`
+          : nombre
+      }
+    >
+      <UserIcon className="h-3 w-3 shrink-0 text-slate-400" />
+      <span className="truncate">{nombre}</span>
+    </span>
+  );
+}
+
 /** Un dato del panel de diagnóstico. */
 function Dato({
   etiqueta, valor, ayuda, alerta = false,
@@ -149,7 +229,24 @@ function Dato({
 // ===================================================================== //
 export function Alarmas() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [pestana, setPestana] = useState<Pestana>('pendientes');
+
+  // ── Volver ────────────────────────────────────────────────────
+  //
+  // Un paso atrás en el historial: la pantalla desde la que se entró. Si se
+  // vino del runtime, el runtime — y en la misma sección, porque la
+  // navegación del HMI se conserva mientras la aplicación siga abierta (ver
+  // `navegacion/store.ts`).
+  //
+  // `key === 'default'` es la única entrada que NO tiene nada detrás: se
+  // abrió esta dirección directamente (un marcador, la URL escrita a mano).
+  // Ahí «atrás» sacaría de la aplicación, así que se va al menú, que a su
+  // vez manda al runtime a quien no puede usar el menú.
+  const volver = useCallback(() => {
+    if (location.key !== 'default') navigate(-1);
+    else navigate('/menu');
+  }, [location.key, navigate]);
 
   const [pendientes, setPendientes] = useState<EventoAlarma[]>([]);
   const [historico, setHistorico] = useState<EventoAlarma[]>([]);
@@ -169,9 +266,8 @@ export function Alarmas() {
     try {
       const [p, e] = await Promise.all([
         fetchPendientes(200),
-        // El estado del motor se pide junto: es donde se ve si hay reglas
-        // sin tag, que es el motivo número uno de "configuré la alarma y no
-        // salta". Un fallo aquí no debe tumbar la lista.
+        // El estado del motor se pide junto, para el panel de arriba. Un
+        // fallo aquí no debe tumbar la lista.
         fetchEstadoMotor().catch(() => null),
       ]);
       setPendientes(p.alarmas);
@@ -266,8 +362,9 @@ export function Alarmas() {
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-3 dark:border-navy-slate dark:bg-navy-soft">
         <div className="flex min-w-0 items-center gap-3">
           <button
-            onClick={() => navigate('/menu')}
-            aria-label="Volver al menú"
+            onClick={volver}
+            aria-label="Volver a la pantalla anterior"
+            title="Volver a la pantalla anterior"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 outline-none transition hover:bg-slate-100 hover:text-navy focus-visible:ring-2 focus-visible:ring-siemens/40 dark:hover:bg-navy-slate/40 dark:hover:text-slate-100"
           >
             <ArrowLeftIcon className="h-5 w-5" />
@@ -352,9 +449,12 @@ export function Alarmas() {
           </div>
         )}
 
-        {/* Diagnóstico del motor. `reglas_sin_tag` es el número que explica
-            el 90 % de los "configuré la alarma y no salta": la regla existe,
-            tiene nombre y texto, y no vigila nada. */}
+        {/* Diagnóstico del motor: lo que le sirve a quien opera. Cuántas
+            reglas vigila, sobre cuántos tags, cuántas se cumplen ahora y
+            cuánto lleva escrito. («Sin tag» y «Valores evaluados» se
+            quitaron de aquí: son datos de quien configura, y el primero ya
+            lo avisa el editor de alarmas en su pie. Siguen en
+            `GET /alarmas/estado` para cuando haga falta diagnosticar.) */}
         {motor && (
           <div className="mb-4 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-navy-slate dark:bg-navy-soft">
             <div className="mb-2.5 flex items-center gap-2">
@@ -363,18 +463,13 @@ export function Alarmas() {
                 Motor de alarmas
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
               <Dato etiqueta="Reglas activas" valor={motor.reglas_activas}
                 ayuda="Cuántas definiciones está vigilando ahora mismo." />
-              <Dato etiqueta="Sin tag" valor={motor.reglas_sin_tag}
-                alerta={motor.reglas_sin_tag > 0}
-                ayuda="Configuradas pero sin Trigger tag: no se evalúan nunca. Desde el editor se ven igual que las que sí funcionan." />
               <Dato etiqueta="Tags vigilados" valor={motor.tags_vigilados}
                 ayuda="Variables distintas del PLC que el motor está mirando." />
               <Dato etiqueta="Disparadas" valor={motor.disparadas_ahora}
                 ayuda="Reglas cuya condición se cumple en este instante." />
-              <Dato etiqueta="Valores evaluados" valor={motor.valores_evaluados}
-                ayuda="Cuántos valores del PLC ha comparado desde que arrancó. Si es 0, no está llegando nada: mira la conexión del PLC." />
               <Dato etiqueta="Eventos escritos" valor={motor.eventos_abiertos}
                 ayuda="Alarmas registradas en la tabla desde el arranque." />
             </div>
@@ -424,15 +519,27 @@ export function Alarmas() {
           className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-navy-slate dark:bg-navy-soft"
         >
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] text-xs">
+            <table className="w-full min-w-[1100px] text-xs">
               <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400 dark:border-navy-slate dark:bg-navy/40">
                 <tr>
-                  <th className="w-[140px] px-3 py-2 text-left font-semibold">Clase</th>
+                  <th className="w-[128px] px-3 py-2 text-left font-semibold">Clase</th>
+                  <th
+                    className="w-[64px] cursor-help px-3 py-2 text-left font-semibold"
+                    title="El número de la alarma: el ID que tiene en Configuración → Alarmas."
+                  >
+                    ID
+                  </th>
+                  <th className="w-[160px] px-3 py-2 text-left font-semibold">Fecha y hora</th>
                   <th className="px-3 py-2 text-left font-semibold">Mensaje</th>
                   <th className="w-[190px] px-3 py-2 text-left font-semibold">Tag y valor</th>
-                  <th className="w-[130px] px-3 py-2 text-left font-semibold">Situación</th>
-                  <th className="w-[150px] px-3 py-2 text-left font-semibold">Cuándo</th>
-                  <th className="w-[120px] px-3 py-2 text-right font-semibold">
+                  <th className="w-[124px] px-3 py-2 text-left font-semibold">Situación</th>
+                  <th
+                    className="w-[130px] cursor-help px-3 py-2 text-left font-semibold"
+                    title="Quién reconoció la alarma. Vacío mientras nadie la haya reconocido."
+                  >
+                    Usuario
+                  </th>
+                  <th className="w-[124px] px-3 py-2 text-right font-semibold">
                     {pestana === 'pendientes' ? 'Acción' : 'Reconocida'}
                   </th>
                 </tr>
@@ -440,7 +547,7 @@ export function Alarmas() {
               <tbody className="divide-y divide-slate-100 dark:divide-navy-slate/60">
                 {cargando && filas.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-10 text-center text-slate-400">
+                    <td colSpan={COLUMNAS} className="px-3 py-10 text-center text-slate-400">
                       <Loader2Icon className="mx-auto mb-2 h-5 w-5 animate-spin" />
                       Leyendo las alarmas…
                     </td>
@@ -449,7 +556,7 @@ export function Alarmas() {
 
                 {!cargando && filas.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-14 text-center">
+                    <td colSpan={COLUMNAS} className="px-3 py-14 text-center">
                       <BellOffIcon className="mx-auto mb-3 h-9 w-9 text-slate-300 dark:text-slate-600" />
                       <p className="text-sm font-semibold text-slate-500 dark:text-slate-300">
                         {pestana === 'pendientes'
@@ -474,6 +581,17 @@ export function Alarmas() {
                       <Severidad n={a.severidad} />
                     </td>
                     <td className="px-3 py-2.5">
+                      <IdAlarma a={a} />
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <p className="text-slate-600 dark:text-slate-300">
+                        {haceCuanto(a.ts_activacion)}
+                      </p>
+                      <p className="text-[10.5px] text-slate-400">
+                        {fechaHora(a.ts_activacion)}
+                      </p>
+                    </td>
+                    <td className="px-3 py-2.5">
                       <p className="font-medium text-navy dark:text-slate-100">
                         {a.mensaje}
                       </p>
@@ -493,12 +611,7 @@ export function Alarmas() {
                       <Situacion a={a} />
                     </td>
                     <td className="px-3 py-2.5">
-                      <p className="text-slate-600 dark:text-slate-300">
-                        {haceCuanto(a.ts_activacion)}
-                      </p>
-                      <p className="text-[10.5px] text-slate-400">
-                        {fechaHora(a.ts_activacion)}
-                      </p>
+                      <Usuario a={a} />
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       {a.ts_reconocimiento ? (
@@ -534,15 +647,16 @@ export function Alarmas() {
 
         {/* La explicación de por qué una alarma que ya pasó sigue en la
             lista. Va escrita porque es lo primero que se pregunta quien ve
-            «Se fue sola» y no es evidente sin conocer el modelo. */}
+            «Normalizada» entre las pendientes, y no es evidente sin conocer
+            el modelo. */}
         {pestana === 'pendientes' && pendientes.some((a) => a.ts_normalizacion) && (
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-[11px] leading-relaxed text-slate-500 dark:border-navy-slate dark:bg-navy-soft dark:text-slate-400">
             <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0 text-slate-400" />
             <p>
-              Las marcadas <strong>«Se fue sola»</strong> ya se normalizaron
-              solas, pero siguen aquí porque nadie las ha reconocido. Es a
-              propósito: si desaparecieran, el turno siguiente no sabría que
-              hubo un problema.
+              Las marcadas <strong>«Normalizada»</strong> ya volvieron a la
+              normalidad por sí solas, pero siguen aquí porque nadie las ha
+              reconocido. Es a propósito: si desaparecieran, el turno
+              siguiente no sabría que hubo un problema.
             </p>
           </div>
         )}

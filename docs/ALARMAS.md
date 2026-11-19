@@ -21,17 +21,19 @@ Meterlo todo en una tabla obligaría a repetir el texto y la clase en cada event
 
 ## 2. Configurar una alarma
 
-**Configuración → Alarmas.** Ocho columnas:
+**Diseñador → Alarmas.** Las columnas:
 
 | Columna | Para qué |
 |---|---|
+| **ID** | El número de la alarma. Lo da la base de datos y no cambia: es el que luego se ve en el runtime cuando salta |
 | **Name** | Nombre corto. Solo para reconocerla en la lista |
 | **Alarm text** | Lo que ve el operador cuando salta. Es lo que importa |
 | **Alarm class** | `Critical` · `Error` · `Warning` · `Maintenance` · `Information` |
 | **Trigger tag** | **La variable del PLC.** Se elige de la lista |
-| **Condición** | Cómo se evalúa: bit, o una comparación contra un límite |
+| **Condición** | Cómo se evalúa: un bit (activo o inactivo), o una comparación contra un límite |
 | **Banda** | Histéresis. Solo en analógicas |
-| **On** | Silenciarla sin borrarla |
+| **On** | Silenciarla sin eliminarla |
+| *(acciones)* | Duplicar y **eliminar** (el tachito). Siempre a la vista, pegadas al borde derecho |
 
 ### El Trigger tag
 
@@ -41,18 +43,43 @@ Se guarda en formato `plc_id|tag`, el mismo que usan el WebSocket y el historiza
 
 **También se puede teclear a mano.** La lista solo existe tras un browse correcto, y configurar alarmas desde la oficina con la máquina apagada tiene que ser posible. Si el tag que escribes no está entre los descubiertos, el campo te lo dice sin tratarlo como un error.
 
-> **El fallo silencioso de esta pantalla.** Una alarma sin Trigger tag se ve **exactamente igual** que una que funciona: tiene nombre, texto y clase. El motor la ignora por completo. El pie de la tabla cuenta cuántas hay en ese estado, y la pantalla de alarmas también (`reglas_sin_tag`).
+> **El fallo silencioso de esta pantalla.** Una alarma sin Trigger tag se ve **exactamente igual** que una que funciona: tiene nombre, texto y clase. El motor la ignora por completo. El pie de la tabla cuenta cuántas hay en ese estado (el dato también está en `GET /alarmas/estado`, `reglas_sin_tag`). Lo mismo con una comparación a la que aún no se le ha puesto límite: su celda se marca en ámbar y el pie la cuenta.
 
 ### La condición
 
-**Alarma discreta** (`Bit activo`) — la de TIA. Mira un bit del tag.
+Ocho opciones, en este orden. La primera es la de arranque: una alarma nueva nace en `Bit activo`.
 
-- Un `Bool` del PLC es el **bit 0**, que es el valor por defecto: vigilar un Bool no obliga a configurar nada más.
-- Para una palabra de estado, el número de bit indica cuál.
+| Condición | Salta cuando… |
+|---|---|
+| `Bit activo (TRUE / 1)` | el bit está a 1. La discreta de TIA |
+| `Bit inactivo (FALSE / 0)` | el bit está a 0. La alarma de *«falta la señal»*: el permisivo que se cae, la marcha que no llega |
+| `Mayor que` · `Mayor o igual` · `Menor que` · `Menor o igual` · `Igual a` · `Distinto de` | el valor cumple la comparación contra el **límite** |
 
-**Alarma analógica** (`Mayor que`, `Menor o igual`, …) — compara contra el **límite**.
+**Lo que se ofrece depende del tipo del Trigger tag:**
 
-Funciona con Bool, Int y Real indistintamente: un booleano cuenta como 0/1, así que `Igual a 1` sobre un Bool hace lo esperado.
+| El tag es… | Condiciones | ¿Se elige el bit? |
+|---|---|---|
+| **Bool** | Solo `Bit activo` y `Bit inactivo` | No: un Bool es un solo bit. La casilla sale deshabilitada |
+| **Entero** (Int, DInt, Word…) | Las ocho | Sí, pero solo con `Bit activo` / `Bit inactivo`. Con una comparación, en su lugar va el límite |
+| **Decimal** (Real, LReal) | Solo las seis comparaciones | No: un decimal no tiene bits |
+| *No se sabe* (tag escrito a mano, PLC apagado) | Las ocho | Sí |
+
+Al **elegir el tag de la lista**, si la condición que había no existe para su tipo, pasa sola a la primera que sí se ofrece (`Mayor que` al poner un decimal, `Bit activo` al poner un Bool). Mientras se **teclea** el tag no se toca nada: si al terminar la condición no encaja con el tipo, la celda se marca en ámbar para que se corrija a mano.
+
+Cambiar la condición es **un** cambio: el límite de una comparación se escribe después, en su celda. Mientras falte, la alarma no se evalúa.
+
+### Eliminar y restaurar
+
+El tachito **no borra** la alarma: la manda a la tabla **«Alarmas eliminadas»**, debajo de la principal.
+
+- El motor deja de vigilarla al momento. Si tenía una alarma **activa**, ese evento se cierra (normalizado), porque ya nadie iba a normalizarlo; sigue pendiente de reconocer si nadie lo había visto.
+- **Restaurar** la devuelve a la tabla tal como estaba: mismo ID, mismo tag, misma condición.
+- Los eventos que ya provocó conservan su número de alarma.
+- **Borrar para siempre** se hace desde esa tabla y pide confirmación. Ahí sí se va la fila: sus eventos siguen en el histórico, pero sin número de alarma.
+
+En la base es una fecha, `alarmas_def.eliminado_en` (`NULL` = en uso). Una base creada antes de que existiera la columna la recibe sola la primera vez que se elimina una alarma. «Exportar proyecto» no se lleva las eliminadas; «Migrar datos de la base» sí, y llegan eliminadas.
+
+Hace falta categoría `Administradores`, igual que para borrar.
 
 ### La banda muerta
 
@@ -111,6 +138,14 @@ No se monta cuando no hay nada pendiente: un hueco reservado «por si acaso» mo
 
 Solo parpadean `Critical` y `Error`. Si todo parpadeara, el parpadeo dejaría de significar *mira esto ahora*.
 
+### El widget de alarmas
+
+En la paleta del Diseñador, **Datos → Alarmas**. Es la lista de pendientes *dentro* de la pantalla del HMI, filtrable por gravedad, por área y por texto del tag.
+
+Cada fila enseña, en este orden: **símbolo e ID** de la alarma · **fecha** · **hora** · **mensaje** · **usuario** (quién la reconoció) · y el **✓** para reconocerla. Con menos de 440 px de ancho las columnas no caben y cada alarma pasa a dos líneas, con los mismos datos. Qué columnas salen se elige en el panel del widget.
+
+En la cabecera, el botón **«Ver todas»** abre la pantalla `/alarmas`. Reconocer y «Ver todas» solo actúan en la vista previa, no en el lienzo del Diseñador.
+
 ### La pantalla `/alarmas`
 
 Dos pestañas:
@@ -118,7 +153,18 @@ Dos pestañas:
 - **Pendientes** — la lista de trabajo, la más grave primero.
 - **Histórico** — todo, con filtros por clase y estado.
 
-Arriba, el **diagnóstico del motor**. El dato que más se mira es `Sin tag`; el segundo es `Valores evaluados`: si está en cero, no está llegando nada del PLC y el problema es de conexión, no de configuración.
+Las dos con las mismas columnas:
+
+| Clase | ID | Fecha y hora | Mensaje | Tag y valor | Situación | Usuario | Acción / Reconocida |
+|---|---|---|---|---|---|---|---|
+
+- **ID** es el número de la **alarma** (el de la tabla de configuración), no el del evento: la misma alarma lleva el mismo número cada vez que salta.
+- **Usuario** es quién la reconoció. En *Pendientes* va vacío por definición —pendiente es que nadie la ha reconocido—; en el *Histórico* aparece el nombre.
+- La última columna es lo único que cambia: el botón **Reconocer** en Pendientes, y **cuándo** se reconoció en el Histórico.
+
+Arriba, el **diagnóstico del motor**: reglas activas, tags vigilados, disparadas ahora y eventos escritos.
+
+La **flecha de volver** devuelve a la pantalla desde la que se entró —al HMI, en la misma sección, si se vino del runtime—, no al menú.
 
 ### Reconocer
 
@@ -134,7 +180,7 @@ Es la parte que más se equivoca la gente, y la que más importa.
 
 > **Una alarma que se normaliza sola NO desaparece.**
 
-Si la temperatura sube, dispara y baja mientras nadie mira, el evento se normaliza **pero sigue pendiente** hasta que alguien lo reconozca. En la lista aparece como **«Se fue sola»**.
+Si la temperatura sube, dispara y baja mientras nadie mira, el evento se normaliza **pero sigue pendiente** hasta que alguien lo reconozca. En la lista aparece como **«Normalizada»**.
 
 El motivo se ve pensando en el turno siguiente: si las alarmas transitorias se borraran solas, la información de que hubo un problema se perdería **justo en el caso en que nadie lo vio** — que es precisamente cuando hace falta.
 
@@ -157,25 +203,27 @@ Por eso el filtro es `ts_reconocimiento IS NULL` y no `estado != 'normalizada'`.
 python tools/probar_alarmas.py
 ```
 
-30 comprobaciones contra una SQLite real: flancos, banda muerta, pendientes, reinicio sin duplicar y recarga sin cerrar en falso. No toca tu configuración.
+Más de 60 comprobaciones contra una SQLite real: flancos, banda muerta, pendientes, reinicio sin duplicar y recarga sin cerrar en falso; y además cambiar la condición campo a campo, `Bit inactivo`, la papelera (eliminar, restaurar, una base antigua sin la columna), silenciar con la alarma activa y el nombre de quien reconoce. No toca tu configuración.
 
 ### Con PLC
 
-1. **Configuración → Alarmas → Nueva.**
+1. **Diseñador → Alarmas → Agregar alarma.**
 2. Elige un `Bool` cualquiera en **Trigger tag** (el desplegable muestra su valor actual).
-3. Deja la condición en `Bit activo`, bit 0.
+3. Deja la condición en `Bit activo (TRUE / 1)`.
 4. Fuerza ese bit a `true` desde el PLC.
 
 Debe aparecer el banner **en menos de un segundo**, en todas las pantallas abiertas a la vez.
 
 ### Si no salta
 
-Mira el diagnóstico en `/alarmas`, en este orden:
+Mira primero el pie del editor de alarmas: avisa de las que no tienen Trigger tag y de las comparaciones sin límite, que no se evalúan nunca.
+
+Después, el diagnóstico del motor. En `/alarmas` están los cuatro datos de operación; el resto se pide con `GET /alarmas/estado`:
 
 | Dato | Qué significa si está mal |
 |---|---|
-| `Valores evaluados` **= 0** | No llega nada del PLC. El problema es la conexión, no la alarma |
-| `Sin tag` **> 0** | Alguna regla no tiene Trigger tag. No se evalúa nunca |
+| `valores_evaluados` **= 0** | No llega nada del PLC. El problema es la conexión, no la alarma |
+| `reglas_sin_tag` **> 0** | Alguna regla no tiene Trigger tag. No se evalúa nunca |
 | `Tags vigilados` **= 0** | Ninguna regla activa tiene tag |
 | `Último error` | Falla la escritura en la base de datos |
 
@@ -204,6 +252,10 @@ Al guardar en el editor se llama a `POST /alarmas/recargar`, así que un cambio 
 | `POST /alarmas/{id}/reconocer` | Darse por enterado — `Usuarios` |
 | `POST /alarmas/reconocer-todas` | En bloque, tras una parada — `Usuarios` |
 | `POST /alarmas/recargar` | Releer las reglas — `Administradores` |
+| `POST /alarmas/definiciones/{id}/eliminar` | Mandar una regla a la papelera — `Administradores` |
+| `POST /alarmas/definiciones/{id}/restaurar` | Sacarla de la papelera — `Administradores` |
+
+`/pendientes` y `/historico` devuelven en cada evento `alarma_def_id` (el número de la alarma) y `usuario` (el **nombre** de quien la reconoció, además de su `usuario_id`).
 
 Por WebSocket llegan `alarma.activada`, `alarma.normalizada` y `alarma.reconocida`, con el evento **completo** — no un «algo cambió, vuelve a preguntar». Con veinte alarmas saltando a la vez y veinte clientes, eso serían cuatrocientas consultas contra la base en un segundo.
 
@@ -226,6 +278,7 @@ Por WebSocket llegan `alarma.activada`, `alarma.normalizada` y `alarma.reconocid
 | `app/api/alarm_routes.py` | Los endpoints |
 | `frontend/src/components/alarms/AlarmsEditor.tsx` | Configurar las reglas |
 | `frontend/src/components/alarms/BannerAlarmas.tsx` | La franja |
+| `frontend/src/components/hmi/custom/alarmas/Alarmas.tsx` | El widget de alarmas del lienzo |
 | `frontend/src/pages/Alarmas.tsx` | Pendientes e histórico |
 | `frontend/src/services/alarmasApi.ts` | Las reglas |
 | `frontend/src/services/alarmasRuntimeApi.ts` | Los eventos |

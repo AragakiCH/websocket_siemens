@@ -21,6 +21,19 @@ sino las cinco cosas que de verdad rompen un motor de alarmas:
                      en vez de crear un segundo.
   5. RECARGA.        Editar una regla no cierra en falso las alarmas activas.
 
+Y lo que se añadió con las observaciones de planta sobre las alarmas:
+
+  6. CONDICIÓN.      Cambiar la condición es un PATCH con ese único campo, y
+                     tiene que aceptarse aunque el límite aún esté vacío. (El
+                     editor se quedaba siempre en «Bit activo» por esto.)
+  7. BIT INACTIVO.   La alarma que salta cuando el bit está a 0.
+  8. PAPELERA.       Eliminar no borra: marca la fila, el motor deja de
+                     vigilarla, su alarma activa se cierra y se puede
+                     restaurar. Y una base de antes, sin esa columna, la
+                     estrena sola al eliminar la primera.
+  9. SILENCIAR.      Con la alarma activa, el evento no se queda colgado.
+ 10. QUIÉN.          El id de quien reconoció se traduce a su nombre.
+
 POR QUÉ NO LEVANTA UVICORN
 --------------------------
 Los otros scripts de `tools/` arrancan el servidor y hablan por HTTP, porque
@@ -301,6 +314,296 @@ async def main() -> int:
     d = await crud.listar("alarmas", db_id="test", limite=200)
     ck("la silenciada no escribe nada", d["total"] == antes,
        f"id={id_off}")
+
+    async def total_eventos() -> int:
+        return (await crud.listar("alarmas", db_id="test", limite=1))["total"]
+
+    async def evento(id_evento: int) -> dict:
+        return (await crud.obtener("alarmas", id_evento, db_id="test"))["fila"]
+
+    # ── 6 · LA CONDICIÓN SE PUEDE CAMBIAR ─────────────────────────
+    #
+    # El editor manda cada celda por separado: primero llega el comparador,
+    # solo, y el límite se escribe después. Antes ese primer PATCH se
+    # rechazaba siempre («hace falta valor_limite»), la celda volvía a «Bit
+    # activo» y no había forma de configurar una alarma analógica.
+    print("\n--- La condición se puede cambiar, un campo cada vez ---")
+    id_cond = await nueva_regla(nombre="Nivel", texto="Nivel alto",
+                                tag="PLC_1|DB1.nivel")
+    motivo = ""
+    try:
+        await crud.actualizar("alarmas_def", id_cond, {"comparador": ">"},
+                              db_id="test")
+    except Exception as exc:  # noqa: BLE001
+        motivo = str(exc)
+    ck("pasar de «Bit activo» a «Mayor que» sin mandar el límite se acepta",
+       not motivo, motivo[:70])
+    guardada = (await crud.obtener("alarmas_def", id_cond, db_id="test"))["fila"]
+    ck("y queda guardado así", guardada["comparador"] == ">",
+       str(guardada["comparador"]))
+
+    await motor2.recargar()
+    motor2.on_mensaje(valor("PLC_1", "DB1.nivel", 999))
+    await esperar_volcado(motor2)
+    ck("sin límite todavía, la analógica ni salta ni rompe nada",
+       motor2.reglas[id_cond].evento_id is None)
+
+    await crud.actualizar("alarmas_def", id_cond, {"valor_limite": 50},
+                          db_id="test")
+    await motor2.recargar()
+    motor2.on_mensaje(valor("PLC_1", "DB1.nivel", 51))
+    await esperar_volcado(motor2)
+    ck("en cuanto tiene límite, salta",
+       motor2.reglas[id_cond].evento_id is not None)
+
+    rechazado = False
+    try:
+        await crud.actualizar("alarmas_def", id_cond, {"comparador": "casi"},
+                              db_id="test")
+    except Exception:  # noqa: BLE001
+        rechazado = True
+    ck("un comparador que no existe se sigue rechazando", rechazado)
+
+    # ── 7 · BIT INACTIVO ──────────────────────────────────────────
+    print("\n--- «Bit inactivo»: la alarma de la señal que falta ---")
+    id_marcha = await nueva_regla(nombre="Sin marcha",
+                                  texto="Falta la señal de marcha",
+                                  tag="PLC_1|DB1.marcha", comparador="!bit")
+    id_palabra = await nueva_regla(nombre="Permisivo 3",
+                                   texto="Se cayó el permisivo 3",
+                                   tag="PLC_1|DB1.estado", comparador="!bit",
+                                   bit_disparo=3)
+    id_bool5 = await nueva_regla(nombre="Bool con bit 5",
+                                 texto="Un Bool no tiene bit 5",
+                                 tag="PLC_1|DB1.bool5", comparador="bit",
+                                 bit_disparo=5)
+    await motor2.recargar()
+
+    antes = await total_eventos()
+    motor2.on_mensaje(valor("PLC_1", "DB1.marcha", True))
+    await esperar_volcado(motor2)
+    ck("con el bit a 1 no salta", await total_eventos() == antes)
+
+    motor2.on_mensaje(valor("PLC_1", "DB1.marcha", False))
+    await esperar_volcado(motor2)
+    ck("con el bit a 0, salta", motor2.reglas[id_marcha].evento_id is not None)
+
+    ev_marcha = motor2.reglas[id_marcha].evento_id
+    motor2.on_mensaje(valor("PLC_1", "DB1.marcha", True))
+    await esperar_volcado(motor2)
+    ck("y al volver a 1 se normaliza",
+       ev_marcha is not None and bool((await evento(ev_marcha))["ts_normalizacion"]))
+
+    # En una palabra de estado se mira el bit que se configuró, no el 0.
+    motor2.on_mensaje(valor("PLC_1", "DB1.estado", 0b1000))
+    await esperar_volcado(motor2)
+    ck("palabra con el bit 3 a 1: no salta",
+       motor2.reglas[id_palabra].evento_id is None)
+    motor2.on_mensaje(valor("PLC_1", "DB1.estado", 0b0111))
+    await esperar_volcado(motor2)
+    ck("palabra con el bit 3 a 0 (y los demás a 1): salta",
+       motor2.reglas[id_palabra].evento_id is not None)
+
+    # Un Bool es UN bit. Antes, con `bit_disparo` distinto de 0 no saltaba
+    # nunca; y con «Bit inactivo» habría estado encendida para siempre.
+    motor2.on_mensaje(valor("PLC_1", "DB1.bool5", True))
+    await esperar_volcado(motor2)
+    ck("un Bool salta aunque la regla tenga apuntado otro bit",
+       motor2.reglas[id_bool5].evento_id is not None)
+
+    # ── 8 · PAPELERA ──────────────────────────────────────────────
+    print("\n--- Papelera: eliminar no borra, y se puede restaurar ---")
+    id_pap = await nueva_regla(nombre="Va a la papelera",
+                               texto="Se elimina estando activa",
+                               clase="Warning", tag="PLC_1|DB1.pap")
+    await motor2.recargar()
+    motor2.on_mensaje(valor("PLC_1", "DB1.pap", True))
+    await esperar_volcado(motor2)
+    ev_pap = motor2.reglas[id_pap].evento_id
+    ck("la regla tiene su alarma activa antes de eliminarla", ev_pap is not None)
+    reglas_antes = motor2.estado()["reglas_total"]
+
+    r = await crud.cambiar_papelera("alarmas_def", id_pap, True, db_id="test")
+    ck("eliminar marca la fecha y NO borra la fila",
+       bool(r["fila"].get("eliminado_en")), str(r["fila"].get("eliminado_en")))
+    fecha_1 = r["fila"].get("eliminado_en")
+
+    await motor2.recargar()
+    await esperar_volcado(motor2)
+    ck("el motor deja de tenerla cargada", id_pap not in motor2.reglas)
+    ck("y deja de contarla entre sus reglas",
+       motor2.estado()["reglas_total"] == reglas_antes - 1,
+       f"antes {reglas_antes}, ahora {motor2.estado()['reglas_total']}")
+
+    f_pap = await evento(int(ev_pap))
+    ck("su alarma activa se cierra, no se queda en «Activa» para siempre",
+       bool(f_pap["ts_normalizacion"]) and f_pap["estado"] == "normalizada",
+       str(f_pap["estado"]))
+    ck("el evento conserva el número de su alarma",
+       f_pap["alarma_def_id"] == id_pap, str(f_pap["alarma_def_id"]))
+    ck("y sigue PENDIENTE: nadie la había reconocido",
+       ev_pap in [f["id"] for f in await motor2.pendientes()])
+
+    antes = await total_eventos()
+    for v in (False, True):
+        motor2.on_mensaje(valor("PLC_1", "DB1.pap", v))
+    await esperar_volcado(motor2)
+    ck("eliminada, ya no genera eventos", await total_eventos() == antes)
+
+    r2 = await crud.cambiar_papelera("alarmas_def", id_pap, True, db_id="test")
+    ck("eliminarla otra vez conserva la fecha de la primera",
+       r2["fila"].get("eliminado_en") == fecha_1)
+
+    # La papelera NO se escribe con un PATCH: ese camino pide solo `Usuarios`
+    # y sería un atajo para quitar alarmas sin el rol que exige borrarlas.
+    try:
+        await crud.actualizar(
+            "alarmas_def", id_cond,
+            {"eliminado_en": "2026-01-01T00:00:00+00:00"}, db_id="test")
+    except Exception:  # noqa: BLE001
+        pass
+    intacta = (await crud.obtener("alarmas_def", id_cond, db_id="test"))["fila"]
+    ck("un PATCH genérico no puede mandar una regla a la papelera",
+       not intacta.get("eliminado_en"))
+
+    r = await crud.cambiar_papelera("alarmas_def", id_pap, False, db_id="test")
+    ck("restaurar le quita la fecha", not r["fila"].get("eliminado_en"))
+    await motor2.recargar()
+    ck("y el motor vuelve a vigilarla", id_pap in motor2.reglas)
+
+    motor2.on_mensaje(valor("PLC_1", "DB1.pap", True))
+    await esperar_volcado(motor2)
+    ck("restaurada con la condición cumpliéndose, abre un evento NUEVO",
+       motor2.reglas[id_pap].evento_id not in (None, ev_pap),
+       f"antes {ev_pap}, ahora {motor2.reglas[id_pap].evento_id}")
+
+    no_existe = False
+    try:
+        await crud.cambiar_papelera("alarmas_def", 987654, True, db_id="test")
+    except Exception as exc:  # noqa: BLE001
+        no_existe = getattr(exc, "codigo", 0) == 404
+    ck("eliminar una regla que no existe es un 404, no un acierto", no_existe)
+
+    # Una base creada ANTES de que existiera la papelera no tiene la columna.
+    # Tiene que seguir leyéndose igual, y estrenarla sola al eliminar.
+    ruta_vieja = str(TMP / "antigua.db")
+    await provisionar(motor="sqlite", base_datos=ruta_vieja, crear_esquema=True)
+    await db.alta_conexion(db_id="antigua", motor="sqlite", base_datos=ruta_vieja)
+    antigua = await db._driver_de("antigua")
+    # Se le quita la columna para dejarla como estaba una base de entonces.
+    # (`DROP COLUMN` existe en SQLite desde la 3.35, de 2021.)
+    await antigua._ejecutar_interno(
+        "ALTER TABLE alarmas_def DROP COLUMN eliminado_en")
+    crud_ant = CrudManager(db, settings)
+    id_ant = int((await crud_ant.crear(
+        "alarmas_def", {"nombre": "De antes", "texto": "Regla de una base antigua",
+                        "clase": "Error", "comparador": "bit", "activo": 1},
+        db_id="antigua"))["id"])
+    lista = await crud_ant.listar("alarmas_def", db_id="antigua")
+    ck("una base sin la columna de la papelera se sigue leyendo",
+       lista["total"] == 1 and "eliminado_en" not in lista["filas"][0])
+    r = await crud_ant.cambiar_papelera("alarmas_def", id_ant, True,
+                                        db_id="antigua")
+    ck("y al eliminar la primera, la columna se añade sola",
+       bool(r["fila"].get("eliminado_en")))
+
+    # Y la que NO puede estrenarla: el HMI conectado con un usuario de solo
+    # datos (lo normal en SQL Server) no tiene permiso de ALTER. Tiene que
+    # decirlo con la sentencia exacta, no con un error genérico.
+    await antigua._ejecutar_interno(
+        "ALTER TABLE alarmas_def DROP COLUMN eliminado_en")
+    crud_sin = CrudManager(db, settings)
+    ejecutar_de_verdad = antigua._ejecutar_interno
+
+    async def sin_permiso(sql, parametros=None):
+        if sql.lstrip().upper().startswith("ALTER"):
+            raise RuntimeError("ALTER TABLE permission denied")
+        return await ejecutar_de_verdad(sql, parametros)
+
+    antigua._ejecutar_interno = sin_permiso
+    aviso = None
+    try:
+        await crud_sin.cambiar_papelera("alarmas_def", id_ant, True,
+                                        db_id="antigua")
+    except Exception as exc:  # noqa: BLE001
+        aviso = exc
+    antigua._ejecutar_interno = ejecutar_de_verdad
+    ck("sin permiso para añadirla, no se pierde nada: avisa (409)",
+       getattr(aviso, "codigo", 0) == 409, type(aviso).__name__)
+    ck("y el aviso trae la sentencia exacta que la crea",
+       "ALTER TABLE alarmas_def ADD" in getattr(aviso, "sql", "")
+       and "eliminado_en" in getattr(aviso, "sql", ""),
+       getattr(aviso, "sql", ""))
+    sigue = await crud_sin.listar("alarmas_def", db_id="antigua")
+    ck("la regla sigue donde estaba, sin tocar", sigue["total"] == 1)
+
+    # ── 9 · SILENCIAR CON LA ALARMA ACTIVA ────────────────────────
+    print("\n--- Silenciar una regla con su alarma activa ---")
+    id_sil = await nueva_regla(nombre="Se silencia activa",
+                               texto="Se silencia estando activa",
+                               tag="PLC_1|DB1.sil")
+    await motor2.recargar()
+    motor2.on_mensaje(valor("PLC_1", "DB1.sil", True))
+    await esperar_volcado(motor2)
+    ev_sil = motor2.reglas[id_sil].evento_id
+
+    await crud.actualizar("alarmas_def", id_sil, {"activo": 0}, db_id="test")
+    await motor2.recargar()
+    await esperar_volcado(motor2)
+    ck("el evento se cierra en vez de quedarse colgado",
+       ev_sil is not None and bool((await evento(int(ev_sil)))["ts_normalizacion"]))
+
+    await crud.actualizar("alarmas_def", id_sil, {"activo": 1}, db_id="test")
+    await motor2.recargar()
+    motor2.on_mensaje(valor("PLC_1", "DB1.sil", True))
+    await esperar_volcado(motor2)
+    ck("al reactivarla con la condición cumpliéndose abre uno nuevo",
+       motor2.reglas[id_sil].evento_id not in (None, ev_sil))
+
+    # Una recarga justo mientras se escribe el evento (el editor guarda en
+    # ese instante) cambia los objetos de las reglas por otros nuevos. El
+    # evento recién abierto no puede quedarse apuntado en el objeto viejo.
+    id_car = await nueva_regla(nombre="Recarga a destiempo",
+                               texto="Se recarga mientras se escribe",
+                               tag="PLC_1|DB1.car")
+    await motor2.recargar()
+    crear_de_verdad = crud.crear
+
+    async def crear_y_recargar(recurso, datos, **kw):
+        res = await crear_de_verdad(recurso, datos, **kw)
+        if recurso == "alarmas":
+            await motor2.recargar()
+        return res
+
+    crud.crear = crear_y_recargar
+    motor2.on_mensaje(valor("PLC_1", "DB1.car", True))
+    await esperar_volcado(motor2)
+    crud.crear = crear_de_verdad
+    ev_car = motor2.reglas[id_car].evento_id
+    ck("recargar mientras se escribe no pierde el evento recién abierto",
+       ev_car is not None)
+    motor2.on_mensaje(valor("PLC_1", "DB1.car", False))
+    await esperar_volcado(motor2)
+    ck("...así que después sí se puede normalizar",
+       ev_car is not None and bool((await evento(int(ev_car)))["ts_normalizacion"]))
+
+    # ── 10 · QUIÉN LA RECONOCIÓ, CON NOMBRE ───────────────────────
+    print("\n--- La columna «Usuario»: un nombre, no un número ---")
+    from app.api.alarm_routes import nombres_de_usuarios  # noqa: E402
+
+    principal = await db._driver_de("test")
+    id_ana = int(await principal.insertar("usuarios", {
+        "usuario": "ana", "password_hash": "no-es-un-hash",
+        "categoria": "Usuarios", "estado": "Activo"}))
+    await motor2.reconocer(int(ev_pap), usuario_id=id_ana)
+    f_pap = await evento(int(ev_pap))
+    ck("reconocer deja apuntado quién fue", f_pap["usuario_id"] == id_ana,
+       str(f_pap["usuario_id"]))
+    nombres = await nombres_de_usuarios(crud, "usuarios", "test",
+                                        [id_ana, 987654])
+    ck("ese id se traduce a su nombre", nombres == {id_ana: "ana"}, str(nombres))
+    sin_tabla = await nombres_de_usuarios(crud, "no_existe", "test", [id_ana])
+    ck("si los nombres no se pueden leer, no se rompe la lista", sin_tabla == {})
 
     # ── Cierre ────────────────────────────────────────────────────
     await motor2.stop()

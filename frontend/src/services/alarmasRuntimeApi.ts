@@ -36,10 +36,24 @@ import { fetchAuth } from './authApi';
 
 /** Un evento de la tabla `alarmas`, tal como lo devuelve la API. */
 export interface EventoAlarma {
+  /** Id del EVENTO (esta vez que saltó). No es el número de la alarma. */
   id: number;
+  /**
+   * El número de la ALARMA: el ID que se ve en Configuración → Alarmas. Es
+   * lo que las tablas enseñan en la columna «ID», porque es lo que una
+   * persona reconoce («ha saltado la 12»). `null` si el evento no vino de
+   * una regla, o si la regla se borró para siempre.
+   */
   alarma_def_id: number | null;
   plc_prg_id: number | null;
+  /** Quién la reconoció. `null` mientras nadie lo haya hecho. */
   usuario_id: number | null;
+  /**
+   * El NOMBRE de quien la reconoció. Lo añade el backend en `/pendientes` y
+   * `/historico`; puede faltar (un backend anterior, o un nombre que no se
+   * pudo leer), y entonces queda el id. Ver `nombreUsuario()`.
+   */
+  usuario?: string | null;
   tipo: string;                 // proceso | equipo | comunicacion | sistema
   area: string | null;
   /** 1 = Critical … 5 = Information. Ordenar por texto no daría gravedad. */
@@ -177,7 +191,9 @@ export function situacion(a: EventoAlarma): {
   if (!a.ts_reconocimiento) {
     return {
       clave: 'sin_ver',
-      etiqueta: 'Se fue sola',
+      // «Normalizada» es como se llama esto en planta (y en TIA): la
+      // condición ya no se cumple. Antes decía «Se fue sola».
+      etiqueta: 'Normalizada',
       ayuda:
         'El valor volvió a la normalidad sin que nadie la reconociera. Sigue ' +
         'pendiente a propósito: es la prueba de que hubo un problema.',
@@ -211,6 +227,70 @@ export function fechaHora(iso: string | null): string {
     day: '2-digit', month: '2-digit', year: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit',
   });
+}
+
+/**
+ * Solo la fecha, en el formato del equipo. Para las tablas que la enseñan en
+ * su propia columna, separada de la hora (el widget de alarmas).
+ */
+export function soloFecha(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(undefined, {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+  });
+}
+
+/** Solo la hora, con segundos: dos alarmas del mismo minuto no son la misma. */
+export function soloHora(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString(undefined, {
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+}
+
+/**
+ * Quién reconoció la alarma, para la columna «Usuario». `''` si nadie.
+ *
+ * El nombre si se conoce; si solo se tiene el id (la cuenta se borró, o el
+ * backend no manda nombres), el id con almohadilla: «#3» sigue diciendo que
+ * alguien la reconoció y permite buscar quién, que un hueco no.
+ */
+export function nombreUsuario(a: EventoAlarma): string {
+  const nombre = (a.usuario ?? '').trim();
+  if (nombre) return nombre;
+  return a.usuario_id === null || a.usuario_id === undefined
+    ? ''
+    : `#${a.usuario_id}`;
+}
+
+/**
+ * Color del SÍMBOLO de la clase (el icono), como texto.
+ *
+ * `tonoSeveridad().texto` no sirve para esto: en una Critical es blanco,
+ * porque está pensado para ir sobre su propio fondo rojo. Un icono suelto
+ * sobre el fondo de una tabla necesita el color de la clase tal cual.
+ */
+export function colorSimbolo(s: number): string {
+  if (s <= 2) return 'text-state-error';
+  if (s === 3) return 'text-state-warn';
+  if (s === 4) return 'text-siemens';
+  return 'text-slate-400';
+}
+
+/**
+ * Color de la BARRA lateral de una fila, como fondo. Mismo criterio que
+ * `colorSimbolo`, y por el mismo motivo: `tonoSeveridad().punto` es blanco en
+ * una Critical (va sobre rojo), y una barra blanca no avisa de nada.
+ */
+export function colorBarra(s: number): string {
+  if (s <= 2) return 'bg-state-error';
+  if (s === 3) return 'bg-state-warn';
+  if (s === 4) return 'bg-siemens';
+  return 'bg-slate-400';
 }
 
 /** El tag sin el prefijo del PLC, para cuando ya se muestra el PLC aparte. */

@@ -127,6 +127,7 @@ class Tabla:
         fechas: Tuple[str, ...],
         clave_natural: Tuple[str, ...],
         historico: bool = False,
+        marca_borrado: str = "",
     ) -> None:
         self.nombre = nombre
         # columna -> tabla a la que apunta. Si el padre no entró (omitido o
@@ -138,6 +139,15 @@ class Tabla:
         self.clave_natural = clave_natural
         # Se puede dejar fuera del fichero (pesa).
         self.historico = historico
+        # Columna de PAPELERA de la tabla, si tiene: con fecha = la fila está
+        # eliminada (y es restaurable). Cambia tres cosas, las tres para que
+        # algo eliminado no vuelva a la vida por viajar en un fichero:
+        #   · una fila eliminada y otra en uso NO son «la misma» aunque
+        #     compartan clave natural (ver `_Importador.clave`);
+        #   · si el destino no tiene la columna, la eliminada se OMITE en vez
+        #     de entrar sin su marca, que sería entrar como fila en uso;
+        #   · el proyecto exportado no se la lleva (ver `exportar_filas`).
+        self.marca_borrado = marca_borrado
 
 
 # EN ORDEN DE DEPENDENCIA. Importar en este orden garantiza que, cuando una
@@ -146,7 +156,8 @@ TABLAS: Tuple[Tabla, ...] = (
     Tabla("usuarios", {}, ("creado_en", "ultimo_acceso"), ("usuario",)),
     Tabla("plc_prg", {}, ("ts", "ts_local"), ("ts", "plc_id", "tag"), historico=True),
     Tabla("alarmas_def", {"usuario_id": "usuarios"},
-          ("creado_en", "actualizado_en"), ("nombre", "tag")),
+          ("creado_en", "actualizado_en", "eliminado_en"), ("nombre", "tag"),
+          marca_borrado="eliminado_en"),
     Tabla("recetas", {"usuario_id": "usuarios"},
           ("creado_en", "actualizado_en"), ("nombre",)),
     Tabla("receta_elementos",
@@ -454,6 +465,11 @@ class _Importador:
         cols = [c for c in t.clave_natural if c in columnas]
         if len(cols) != len(t.clave_natural):
             return {}       # al destino le falta una columna de la clave
+        # La marca de papelera forma parte de la clave (ver `clave`). Si el
+        # destino no tiene esa columna, nada de lo que hay allí está
+        # eliminado, que es justo lo que da no leerla.
+        if t.marca_borrado and t.marca_borrado in columnas:
+            cols = cols + [t.marca_borrado]
         sql = f"SELECT id, {', '.join(cols)} FROM {tabla}"
         params: Dict[str, Any] = {}
         if rango_ts and t.historico:
@@ -467,11 +483,23 @@ class _Importador:
         return salida
 
     def clave(self, t: Tabla, fila: Dict[str, Any]) -> Tuple[Any, ...]:
-        """La clave natural de una fila, con fechas normalizadas."""
+        """
+        La clave natural de una fila, con fechas normalizadas.
+
+        En una tabla con papelera lleva además SI LA FILA ESTÁ ELIMINADA. Sin
+        eso, una regla de alarma eliminada y la que se creó después con el
+        mismo nombre y el mismo tag serían «la misma» para el importador: la
+        primera que llegara ocuparía el sitio y la otra se daría por
+        repetida. Según el orden, el destino se quedaría con la eliminada y
+        SIN la que está en uso — una alarma que deja de vigilarse por
+        importar un fichero.
+        """
         partes: List[Any] = []
         for c in t.clave_natural:
             v = fila.get(c)
             partes.append(_clave_fecha(v) if c in t.fechas else _norm(v))
+        if t.marca_borrado:
+            partes.append(bool(fila.get(t.marca_borrado)))
         return tuple(partes)
 
     # ---- Una tabla ---------------------------------------------------------
@@ -524,6 +552,22 @@ class _Importador:
             except (TypeError, ValueError):
                 inf.omitidas += 1
                 inf.aviso("Fila sin id; se omite.")
+                continue
+
+            # 0 · Una fila que viene de la PAPELERA a un destino que no tiene
+            #     papelera. Dejarla pasar sería quitarle la marca (la columna
+            #     se descarta más abajo) y meterla como fila en uso: una regla
+            #     de alarma que alguien eliminó volvería a vigilar aquí sin
+            #     que nadie la haya restaurado. No entra; lo que apuntara a
+            #     ella entra sin esa referencia, como con cualquier padre que
+            #     no llega.
+            if (t.marca_borrado and doc.get(t.marca_borrado)
+                    and t.marca_borrado not in reales_lc):
+                inf.omitidas += 1
+                inf.aviso(
+                    f"Fila {id_viejo}: estaba eliminada (en la papelera) y "
+                    f"el destino no tiene la columna '{t.marca_borrado}'; "
+                    f"se omite para que no vuelva como si estuviera en uso.")
                 continue
 
             # 1 · Traducir claves foráneas y quitar lo que no viaja.
@@ -745,8 +789,16 @@ async def exportar_filas(driver, prefijo: str = "",
                 if not lote:
                     break
                 for fila in lote:
-                    filas.append({c: _serializable(v)
-                                  for c, v in zip(columnas, fila)})
+                    doc = {c: _serializable(v)
+                           for c, v in zip(columnas, fila)}
+                    # Lo que está en la papelera no es parte del proyecto:
+                    # quien lo importa en otro equipo no tiene por qué
+                    # encontrarse en su tabla de eliminadas las alarmas que
+                    # otro borró. («Migrar datos de la base» sí se lo lleva
+                    # todo: eso es una copia, y los eventos apuntan a ellas.)
+                    if t.marca_borrado and doc.get(t.marca_borrado):
+                        continue
+                    filas.append(doc)
                 desde = int(lote[-1][0])
                 if len(lote) < PAGINA:
                     break

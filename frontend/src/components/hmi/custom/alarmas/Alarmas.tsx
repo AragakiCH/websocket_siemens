@@ -33,28 +33,56 @@
 // endpoint no los tiene, la lista pendiente es corta por definición, y así
 // un filtro nuevo no obliga a tocar el backend.
 //
-// RECONOCER SOLO EN LA VISTA PREVIA
-// En el Diseñador el botón se ve pero no hace nada (`interactivo` = false):
-// allí el clic sirve para seleccionar y mover el widget, y reconocer una
-// alarma de planta desde el editor por accidente sería un fallo serio. El
-// backend además exige rol para firmar el reconocimiento; si falta, se dice
-// en el propio widget en vez de fallar en silencio.
+// QUÉ ENSEÑA CADA FILA
+// Lo mismo que una tabla de alarmas de planta, en este orden:
+//
+//     SÍMBOLO – ID   FECHA   HORA   MENSAJE   USUARIO   ✓
+//
+// El símbolo es el de la clase y el ID el NÚMERO DE LA ALARMA —el que tiene
+// en Configuración → Alarmas—, no el del evento. USUARIO es quién la
+// reconoció: mientras siga en esta lista va vacío, porque lo que aquí se
+// enseña es justamente lo que nadie ha reconocido todavía.
+//
+// Con sitio se pinta como tabla, con sus títulos. En un widget estrecho las
+// columnas no caben, y los mismos datos pasan a dos líneas: el mensaje
+// arriba y el resto debajo. No se pierde nada por hacerlo pequeño.
+//
+// EL BOTÓN «VER TODAS»
+// Lleva a la pantalla de Alarmas (pendientes e histórico), como el de la
+// franja de arriba. Desde allí, la flecha de volver devuelve a esta misma
+// pantalla del HMI.
+//
+// RECONOCER Y NAVEGAR, SOLO EN LA VISTA PREVIA
+// En el Diseñador los botones se ven pero no hacen nada (`interactivo` =
+// false): allí el clic sirve para seleccionar y mover el widget, y reconocer
+// una alarma de planta desde el editor por accidente sería un fallo serio.
+// El backend además exige rol para firmar el reconocimiento; si falta, se
+// dice en el propio widget en vez de fallar en silencio.
 // =========================================================================
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
+import { useInRouterContext, useNavigate } from 'react-router-dom';
 import {
   BellRingIcon,
   CheckIcon,
   CheckCircle2Icon,
+  ChevronRightIcon,
   Loader2Icon,
 } from 'lucide-react';
 import type { CustomWidgetDef, RenderCtx, InspectorCtx } from '../types';
 import { estiloDeParte } from '../../partes';
+import { SimboloClase } from '../../../alarms/SimboloClase';
 import {
   alRecibirAlarma,
+  colorBarra,
+  colorSimbolo,
   fetchPendientes,
   haceCuanto,
+  nombreUsuario,
   partesTag,
   reconocer as apiReconocer,
+  soloFecha,
+  soloHora,
   tonoSeveridad,
   CLASE_DE_SEVERIDAD,
   type EventoAlarma,
@@ -82,8 +110,21 @@ export interface ConfigAlarmas {
   tag: string;
   /** Botón para reconocer cada alarma (solo funciona en la vista previa). */
   reconocer: boolean;
-  /** Enseñar "hace 3 min" en cada fila. */
+  /**
+   * En la lista, la columna HORA. En el resumen, el «hace 3 min» de la peor.
+   * (Es el mismo ajuste que antes enseñaba «hace X» en cada fila.)
+   */
   hora: boolean;
+  /** Botón de la cabecera que abre la pantalla de Alarmas. */
+  verTodas: boolean;
+  /** Columna SÍMBOLO – ID: el icono de la clase y el número de la alarma. */
+  colId: boolean;
+  /** Columna FECHA. */
+  colFecha: boolean;
+  /** Columna USUARIO: quién la reconoció. */
+  colUsuario: boolean;
+  /** Fila de títulos encima de la lista (ID, Fecha, Hora…). */
+  cabeceras: boolean;
 }
 
 export const CONFIG_ALARMAS: ConfigAlarmas = {
@@ -95,7 +136,19 @@ export const CONFIG_ALARMAS: ConfigAlarmas = {
   tag: '',
   reconocer: true,
   hora: true,
+  verTodas: true,
+  colId: true,
+  colFecha: true,
+  colUsuario: true,
+  cabeceras: true,
 };
+
+/**
+ * Por debajo de este ancho (en píxeles de diseño) las columnas no caben y la
+ * lista pasa a dos líneas por alarma. Con las cinco columnas, 440 es donde
+ * el mensaje se queda con sitio para unas veinte letras.
+ */
+const ANCHO_TABLA = 440;
 
 export function leerConfigAlarmas(config: any): ConfigAlarmas {
   const c = config ?? {};
@@ -112,6 +165,16 @@ export function leerConfigAlarmas(config: any): ConfigAlarmas {
     tag: typeof c.tag === 'string' ? c.tag : '',
     reconocer: c.reconocer !== false,
     hora: c.hora !== false,
+    // Lo nuevo va ENCENDIDO por defecto: un widget guardado antes de que
+    // existieran estos ajustes no los trae, y tiene que enseñar los datos
+    // nuevos sin que nadie tenga que abrirlo y marcarlos uno a uno.
+    verTodas: c.verTodas !== false,
+    colId: c.colId !== false,
+    // Salvo la fecha en un widget al que ya se le había quitado el «hace X»:
+    // quien decidió no enseñar cuándo saltó no espera que ahora aparezca.
+    colFecha: c.colFecha !== undefined ? c.colFecha !== false : c.hora !== false,
+    colUsuario: c.colUsuario !== false,
+    cabeceras: c.cabeceras !== false,
   };
 }
 
@@ -231,6 +294,12 @@ function WidgetAlarmas({ widget, interactivo }: RenderCtx) {
   const visibles = filtradas.slice(0, cfg.maximo);
   const ocultas = filtradas.length - visibles.length;
 
+  // Tabla o dos líneas, según quepa. Se decide con el ancho de DISEÑO del
+  // widget, que es el que manda en el lienzo: la pantalla entera se escala
+  // después, y con ella esto.
+  const comoTabla = (widget.width ?? 0) >= ANCHO_TABLA;
+  const conTitulo = !!cfg.titulo.trim();
+
   return (
     <div
       style={{
@@ -249,8 +318,10 @@ function WidgetAlarmas({ widget, interactivo }: RenderCtx) {
         lineHeight: 1.25,
       }}
     >
-      {/* ── Cabecera ────────────────────────────────────── */}
-      {!!cfg.titulo.trim() && (
+      {/* ── Cabecera ──────────────────────────────────────
+          Sale con título, con el botón «Ver todas», o con los dos. Sin
+          ninguno de los dos no hay cabecera: solo la lista. */}
+      {(conTitulo || cfg.verTodas) && (
         <div
           style={{
             display: 'flex',
@@ -261,10 +332,15 @@ function WidgetAlarmas({ widget, interactivo }: RenderCtx) {
             flexShrink: 0,
           }}
         >
-          <BellRingIcon
-            style={{ width: tamTitulo, height: tamTitulo, flexShrink: 0 }}
-            className={peor ? tonoSeveridad(peor.severidad).texto : ''}
-          />
+          {conTitulo && (
+            <BellRingIcon
+              style={{ width: tamTitulo, height: tamTitulo, flexShrink: 0 }}
+              // `colorSimbolo` y no `tonoSeveridad().texto`: ese es BLANCO
+              // en una Critical (va sobre su fondo rojo), y aquí no hay
+              // fondo — la campana desaparecía justo con la alarma más grave.
+              className={peor ? colorSimbolo(peor.severidad) : ''}
+            />
+          )}
           <span
             style={{
               fontSize: tamTitulo,
@@ -278,10 +354,18 @@ function WidgetAlarmas({ widget, interactivo }: RenderCtx) {
               textAlign: pTitulo.align ?? 'left',
             }}
           >
-            {cfg.titulo}
+            {conTitulo ? cfg.titulo : ''}
           </span>
           {estado === 'ok' && (
             <Contador n={filtradas.length} severidad={peor?.severidad ?? 5} />
+          )}
+          {cfg.verTodas && (
+            <BotonVerTodas
+              interactivo={!!interactivo}
+              // En un widget muy estrecho se queda en la flecha: el texto
+              // se comería el sitio del título.
+              soloIcono={(widget.width ?? 0) < 260}
+            />
           )}
         </div>
       )}
@@ -310,17 +394,58 @@ function WidgetAlarmas({ widget, interactivo }: RenderCtx) {
         />
       ) : (
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} className="mp-scroll mp-scroll-dark">
-          {visibles.map((a) => (
-            <Fila
-              key={a.id}
-              alarma={a}
-              hora={cfg.hora}
-              conBoton={cfg.reconocer}
-              interactivo={!!interactivo}
-              ocupada={ocupada === a.id}
-              onReconocer={() => void reconocerUna(a)}
-            />
-          ))}
+          {comoTabla ? (
+            // Una TABLA de verdad, y no una rejilla por fila: así el
+            // navegador alinea las columnas entre filas él solo, sea cual
+            // sea el tamaño de letra y el formato de fecha del equipo. El
+            // mensaje se queda con todo lo que sobra.
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                tableLayout: 'auto',
+              }}
+            >
+              {cfg.cabeceras && (
+                <thead>
+                  <tr>
+                    <th style={{ ...TH, padding: 0 }}>
+                      <div style={ANCHO_BARRA} />
+                    </th>
+                    {cfg.colId && <th style={TH}>ID</th>}
+                    {cfg.colFecha && <th style={TH}>Fecha</th>}
+                    {cfg.hora && <th style={TH}>Hora</th>}
+                    <th style={{ ...TH, width: '100%' }}>Mensaje</th>
+                    {cfg.colUsuario && <th style={TH}>Usuario</th>}
+                    {cfg.reconocer && <th style={TH} />}
+                  </tr>
+                </thead>
+              )}
+              <tbody>
+                {visibles.map((a) => (
+                  <FilaTabla
+                    key={a.id}
+                    alarma={a}
+                    cfg={cfg}
+                    interactivo={!!interactivo}
+                    ocupada={ocupada === a.id}
+                    onReconocer={() => void reconocerUna(a)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            visibles.map((a) => (
+              <FilaCompacta
+                key={a.id}
+                alarma={a}
+                cfg={cfg}
+                interactivo={!!interactivo}
+                ocupada={ocupada === a.id}
+                onReconocer={() => void reconocerUna(a)}
+              />
+            ))
+          )}
           {ocultas > 0 && (
             <div style={{ padding: '4px 10px', opacity: 0.6, fontSize: Math.max(10, tamTexto - 1) }}>
               +{ocultas} más
@@ -386,33 +511,160 @@ function Contador({ n, severidad }: { n: number; severidad: number }) {
   );
 }
 
-/** Una alarma. La barra de la izquierda es la severidad: se lee sin leer. */
-function Fila({
-  alarma: a,
-  hora,
-  conBoton,
-  interactivo,
-  ocupada,
-  onReconocer,
-}: {
+// ─── Las filas ───────────────────────────────────────────────────
+
+/** Celda de título de la tabla: discreta, para que mande el contenido. */
+const TH: CSSProperties = {
+  padding: '4px 8px',
+  textAlign: 'left',
+  fontSize: '0.78em',
+  fontWeight: 600,
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
+  whiteSpace: 'nowrap',
+  opacity: 0.6,
+  borderBottom: '1px solid rgba(148,163,184,0.25)',
+};
+
+/** Celda de dato. `nowrap`: una fila, una línea. */
+const TD: CSSProperties = {
+  padding: '5px 8px',
+  whiteSpace: 'nowrap',
+  verticalAlign: 'middle',
+  borderBottom: '1px solid rgba(148,163,184,0.15)',
+};
+
+const CIFRAS: CSSProperties = { fontVariantNumeric: 'tabular-nums' };
+
+/** Ancho de la barra de severidad de la tabla. */
+const ANCHO_BARRA: CSSProperties = { width: 3 };
+
+interface PropsFila {
   alarma: EventoAlarma;
-  hora: boolean;
-  conBoton: boolean;
+  cfg: ConfigAlarmas;
   interactivo: boolean;
   ocupada: boolean;
   onReconocer: () => void;
-}) {
-  const tono = tonoSeveridad(a.severidad);
-  const { tag } = partesTag(a.tag);
-  const detalles = [
+}
+
+/** Lo que se lee al dejar el puntero sobre una alarma: lo que no cabe en la fila. */
+function detalleDe(a: EventoAlarma): string {
+  const { plc, tag } = partesTag(a.tag);
+  return [
+    CLASE_DE_SEVERIDAD[a.severidad] ?? '',
+    a.mensaje,
     a.area?.trim() || '',
-    tag,
-    hora ? haceCuanto(a.ts_activacion) : '',
+    tag ? (plc ? `${plc} · ${tag}` : tag) : '',
+    a.valor_disparo !== null && a.valor_disparo !== undefined
+      ? `disparó con ${a.valor_disparo}`
+      : '',
+    a.ts_normalizacion ? 'ya normalizada' : 'sigue activa',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/** El número de la alarma (el de Configuración → Alarmas), o una raya. */
+function idDe(a: EventoAlarma): string {
+  return a.alarma_def_id === null || a.alarma_def_id === undefined
+    ? '—'
+    : String(a.alarma_def_id);
+}
+
+/**
+ * Una alarma como fila de la tabla:
+ * SÍMBOLO – ID · FECHA · HORA · MENSAJE · USUARIO · ✓
+ *
+ * La barra de la izquierda repite la severidad en color: se lee sin leer,
+ * desde el otro lado de la sala.
+ */
+function FilaTabla({ alarma: a, cfg, interactivo, ocupada, onReconocer }: PropsFila) {
+  const usuario = nombreUsuario(a);
+  return (
+    <tr title={detalleDe(a)}>
+      {/* La barra lleva dentro un bloque con el ancho: una celda VACÍA con
+          `width: 3` se queda en cero en cuanto otra columna pide el 100 %
+          (la del mensaje), y la barra desaparecía. */}
+      <td className={colorBarra(a.severidad)} style={{ padding: 0 }}>
+        <div style={ANCHO_BARRA} />
+      </td>
+      {cfg.colId && (
+        <td style={TD}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <SimboloClase severidad={a.severidad} tam={14} />
+            <span style={{ ...CIFRAS, fontWeight: 700 }}>{idDe(a)}</span>
+          </span>
+        </td>
+      )}
+      {cfg.colFecha && (
+        <td style={{ ...TD, ...CIFRAS }}>{soloFecha(a.ts_activacion)}</td>
+      )}
+      {cfg.hora && (
+        <td style={{ ...TD, ...CIFRAS }} title={haceCuanto(a.ts_activacion)}>
+          {soloHora(a.ts_activacion)}
+        </td>
+      )}
+      {/* `maxWidth: 0` + `width: 100%` es lo que hace que ESTA columna se
+          quede con el sitio que sobra y recorte con puntos suspensivos, en
+          vez de ensanchar la tabla hasta sacarla del widget. */}
+      <td
+        style={{
+          ...TD,
+          width: '100%',
+          maxWidth: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          fontWeight: 600,
+        }}
+      >
+        {a.mensaje}
+      </td>
+      {cfg.colUsuario && (
+        <td
+          style={{
+            ...TD,
+            maxWidth: '10em',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            opacity: usuario ? 1 : 0.5,
+          }}
+          title={
+            usuario
+              ? `La reconoció ${usuario}`
+              : 'Todavía no la ha reconocido nadie'
+          }
+        >
+          {usuario || '—'}
+        </td>
+      )}
+      {cfg.reconocer && (
+        <td style={{ ...TD, padding: '3px 8px 3px 4px' }}>
+          <BotonReconocer
+            interactivo={interactivo}
+            ocupada={ocupada}
+            onReconocer={onReconocer}
+          />
+        </td>
+      )}
+    </tr>
+  );
+}
+
+/**
+ * La misma alarma cuando el widget es estrecho: el mensaje arriba, a todo lo
+ * ancho, y debajo el resto en una línea. Los mismos datos que la tabla.
+ */
+function FilaCompacta({ alarma: a, cfg, interactivo, ocupada, onReconocer }: PropsFila) {
+  const usuario = nombreUsuario(a);
+  const detalles = [
+    cfg.colFecha ? soloFecha(a.ts_activacion) : '',
+    cfg.hora ? soloHora(a.ts_activacion) : '',
+    cfg.colUsuario ? usuario || '' : '',
   ].filter(Boolean);
 
   return (
     <div
-      title={`${CLASE_DE_SEVERIDAD[a.severidad] ?? ''} · ${a.mensaje}`}
+      title={detalleDe(a)}
       style={{
         display: 'flex',
         alignItems: 'stretch',
@@ -421,21 +673,36 @@ function Fila({
         borderBottom: '1px solid rgba(148,163,184,0.15)',
       }}
     >
-      <span className={tono.punto} style={{ width: 3, flexShrink: 0, borderRadius: 2 }} />
+      <span
+        className={colorBarra(a.severidad)}
+        style={{ width: 3, flexShrink: 0, borderRadius: 2 }}
+      />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontWeight: 600,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {a.mensaje}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          {cfg.colId && (
+            <>
+              <SimboloClase severidad={a.severidad} tam={13} />
+              <span style={{ ...CIFRAS, fontWeight: 700, flexShrink: 0 }}>
+                {idDe(a)}
+              </span>
+            </>
+          )}
+          <span
+            style={{
+              fontWeight: 600,
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {a.mensaje}
+          </span>
         </div>
         {detalles.length > 0 && (
           <div
             style={{
+              ...CIFRAS,
               opacity: 0.65,
               fontSize: '0.9em',
               overflow: 'hidden',
@@ -447,42 +714,135 @@ function Fila({
           </div>
         )}
       </div>
-      {conBoton && (
-        <button
-          type="button"
-          onClick={onReconocer}
-          disabled={!interactivo || ocupada}
-          title={
-            interactivo
-              ? 'Reconocer esta alarma'
-              : 'Se reconoce desde la vista previa, no desde el Diseñador'
-          }
-          aria-label="Reconocer"
-          className="hover:bg-state-ok/15"
-          style={{
-            alignSelf: 'center',
-            width: 24,
-            height: 24,
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 6,
-            border: '1px solid rgba(148,163,184,0.35)',
-            background: 'transparent',
-            color: 'inherit',
-            cursor: interactivo ? 'pointer' : 'default',
-            opacity: interactivo ? 1 : 0.45,
-          }}
-        >
-          {ocupada ? (
-            <Loader2Icon className="animate-spin" style={{ width: 13, height: 13 }} />
-          ) : (
-            <CheckIcon style={{ width: 13, height: 13 }} />
-          )}
-        </button>
+      {cfg.reconocer && (
+        <span style={{ alignSelf: 'center', flexShrink: 0 }}>
+          <BotonReconocer
+            interactivo={interactivo}
+            ocupada={ocupada}
+            onReconocer={onReconocer}
+          />
+        </span>
       )}
     </div>
+  );
+}
+
+/** El ✓ de cada fila: darse por enterado. Firma con el usuario de la sesión. */
+function BotonReconocer({
+  interactivo,
+  ocupada,
+  onReconocer,
+}: {
+  interactivo: boolean;
+  ocupada: boolean;
+  onReconocer: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onReconocer}
+      disabled={!interactivo || ocupada}
+      title={
+        interactivo
+          ? 'Reconocer esta alarma'
+          : 'Se reconoce desde la vista previa, no desde el Diseñador'
+      }
+      aria-label="Reconocer"
+      className="hover:bg-state-ok/15"
+      style={{
+        width: 24,
+        height: 24,
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 6,
+        border: '1px solid rgba(148,163,184,0.35)',
+        background: 'transparent',
+        color: 'inherit',
+        cursor: interactivo ? 'pointer' : 'default',
+        opacity: interactivo ? 1 : 0.45,
+      }}
+    >
+      {ocupada ? (
+        <Loader2Icon className="animate-spin" style={{ width: 13, height: 13 }} />
+      ) : (
+        <CheckIcon style={{ width: 13, height: 13 }} />
+      )}
+    </button>
+  );
+}
+
+// ─── El botón «Ver todas» ────────────────────────────────────────
+
+/**
+ * Abre la pantalla de Alarmas.
+ *
+ * Navega DENTRO de la aplicación (sin recargar): así la flecha de volver de
+ * esa pantalla devuelve aquí, a la misma sección del HMI, y el WebSocket y
+ * los valores del PLC no se pierden por el camino.
+ *
+ * `useNavigate` revienta si no hay enrutador por encima. Hoy lo hay siempre
+ * —el Diseñador y la vista previa cuelgan del mismo—, pero un botón no puede
+ * tumbar una pantalla de planta el día que el widget se pinte en otro sitio:
+ * sin enrutador, el botón es un enlace normal y corriente.
+ */
+function BotonVerTodas(props: { interactivo: boolean; soloIcono: boolean }) {
+  return useInRouterContext() ? (
+    <BotonVerTodasSpa {...props} />
+  ) : (
+    <CuerpoVerTodas {...props} alPulsar={() => window.location.assign('/alarmas')} />
+  );
+}
+
+function BotonVerTodasSpa(props: { interactivo: boolean; soloIcono: boolean }) {
+  const navigate = useNavigate();
+  return <CuerpoVerTodas {...props} alPulsar={() => navigate('/alarmas')} />;
+}
+
+function CuerpoVerTodas({
+  interactivo,
+  soloIcono,
+  alPulsar,
+}: {
+  interactivo: boolean;
+  soloIcono: boolean;
+  alPulsar: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={alPulsar}
+      disabled={!interactivo}
+      title={
+        interactivo
+          ? 'Abrir la pantalla de Alarmas: pendientes e histórico'
+          : 'Abre la pantalla de Alarmas. Funciona en la vista previa, no en el Diseñador'
+      }
+      aria-label="Ver todas las alarmas"
+      className="hover:bg-siemens/15"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2,
+        flexShrink: 0,
+        height: 24,
+        padding: soloIcono ? '0 4px' : '0 6px 0 9px',
+        borderRadius: 6,
+        border: '1px solid rgba(148,163,184,0.35)',
+        background: 'transparent',
+        color: 'inherit',
+        fontFamily: 'inherit',
+        fontSize: 11,
+        fontWeight: 600,
+        whiteSpace: 'nowrap',
+        cursor: interactivo ? 'pointer' : 'default',
+        opacity: interactivo ? 1 : 0.55,
+      }}
+    >
+      {!soloIcono && 'Ver todas'}
+      <ChevronRightIcon style={{ width: 14, height: 14 }} />
+    </button>
   );
 }
 
@@ -506,7 +866,6 @@ function Resumen({
   hora: boolean;
   color?: string;
 }) {
-  const tono = tonoSeveridad(peor.severidad);
   const tamNumero = Math.max(20, Math.min(72, Math.round(alto * 0.36)));
   return (
     <div
@@ -523,7 +882,9 @@ function Resumen({
       }}
     >
       <span
-        className={tono.texto}
+        // Mismo motivo que la campana de la cabecera: con `tonoSeveridad`
+        // el número salía BLANCO cuando la peor era una Critical.
+        className={colorSimbolo(peor.severidad)}
         style={{
           fontSize: tamNumero,
           fontWeight: 700,
@@ -663,32 +1024,92 @@ function InspectorAlarmas({ config, setConfig }: InspectorCtx) {
         </span>
       </label>
 
-      <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-        <input
-          type="checkbox"
-          checked={cfg.reconocer}
-          onChange={(e) => poner({ reconocer: e.target.checked })}
-          className="h-3.5 w-3.5 accent-siemens"
-        />
-        Botón para reconocer cada alarma
-      </label>
+      <Casilla
+        marcada={cfg.verTodas}
+        alCambiar={(v) => poner({ verTodas: v })}
+        texto="Botón «Ver todas» (abre la pantalla de Alarmas)"
+      />
 
-      <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-        <input
-          type="checkbox"
-          checked={cfg.hora}
-          onChange={(e) => poner({ hora: e.target.checked })}
-          className="h-3.5 w-3.5 accent-siemens"
+      <Casilla
+        marcada={cfg.reconocer}
+        alCambiar={(v) => poner({ reconocer: v })}
+        texto="Botón para reconocer cada alarma"
+      />
+
+      {cfg.modo === 'lista' ? (
+        <div>
+          <span className={CLASE_ETIQUETA}>Datos de cada alarma</span>
+          <div className="space-y-1.5">
+            <Casilla
+              marcada={cfg.colId}
+              alCambiar={(v) => poner({ colId: v })}
+              texto="Símbolo e ID de la alarma"
+            />
+            <Casilla
+              marcada={cfg.colFecha}
+              alCambiar={(v) => poner({ colFecha: v })}
+              texto="Fecha"
+            />
+            <Casilla
+              marcada={cfg.hora}
+              alCambiar={(v) => poner({ hora: v })}
+              texto="Hora"
+            />
+            <Casilla
+              marcada={cfg.colUsuario}
+              alCambiar={(v) => poner({ colUsuario: v })}
+              texto="Usuario (quién la reconoció)"
+            />
+            <Casilla
+              marcada={cfg.cabeceras}
+              alCambiar={(v) => poner({ cabeceras: v })}
+              texto="Títulos de columna"
+            />
+          </div>
+          <span className={CLASE_AYUDA}>
+            El mensaje va siempre. Con menos de {ANCHO_TABLA} px de ancho las
+            columnas no caben y cada alarma pasa a dos líneas, con los mismos
+            datos.
+          </span>
+        </div>
+      ) : (
+        <Casilla
+          marcada={cfg.hora}
+          alCambiar={(v) => poner({ hora: v })}
+          texto="Enseñar hace cuánto saltó la más grave"
         />
-        Enseñar hace cuánto saltó
-      </label>
+      )}
 
       <div className="rounded-lg bg-slate-100 px-2.5 py-2 text-[11px] leading-relaxed text-slate-500 dark:bg-navy-slate/40 dark:text-slate-400">
-        Reconocer solo funciona en la <b>vista previa</b>; en el Diseñador el
-        botón se ve pero no actúa. El título se estiliza en{' '}
-        <b>Apariencia → Título</b> y las filas en <b>Apariencia → Texto</b>.
+        Reconocer y «Ver todas» solo funcionan en la <b>vista previa</b>; en
+        el Diseñador los botones se ven pero no actúan. El título se estiliza
+        en <b>Apariencia → Título</b> y las filas en{' '}
+        <b>Apariencia → Texto</b>.
       </div>
     </>
+  );
+}
+
+/** Una casilla del panel, con su texto al lado. */
+function Casilla({
+  marcada,
+  alCambiar,
+  texto,
+}: {
+  marcada: boolean;
+  alCambiar: (v: boolean) => void;
+  texto: string;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+      <input
+        type="checkbox"
+        checked={marcada}
+        onChange={(e) => alCambiar(e.target.checked)}
+        className="h-3.5 w-3.5 accent-siemens"
+      />
+      {texto}
+    </label>
   );
 }
 
@@ -699,8 +1120,11 @@ export const alarmasWidget: CustomWidgetDef = {
   label: 'Alarmas',
   category: 'Datos',
   icon: BellRingIcon,
-  defaultWidth: 320,
-  defaultHeight: 220,
+  // Ancho de sobra para la tabla con sus cinco columnas. (Los que ya estén
+  // colocados conservan su tamaño; por debajo de `ANCHO_TABLA` se pintan en
+  // dos líneas por alarma.)
+  defaultWidth: 560,
+  defaultHeight: 240,
   render: (ctx) => <WidgetAlarmas {...ctx} />,
   inspector: (ctx) => <InspectorAlarmas {...ctx} />,
   defaultConfig: CONFIG_ALARMAS,

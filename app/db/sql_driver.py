@@ -1068,10 +1068,11 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
             f"tag VARCHAR(400), "
             # Alarma discreta: qué bit del tag se vigila.
             f"bit_disparo {entero} DEFAULT 0, "
-            # Cómo se evalúa. 'bit' = discreta (la de TIA); el resto son
+            # Cómo se evalúa. 'bit' = discreta (la de TIA: salta con el bit a
+            # 1) y '!bit' su contraria (salta con el bit a 0); el resto son
             # alarmas ANALÓGICAS, que TIA trata aparte y aquí caben en la
             # misma tabla porque solo cambia la comparación.
-            #   bit | > | >= | < | <= | == | !=
+            #   bit | !bit | > | >= | < | <= | == | !=
             f"comparador VARCHAR(10) NOT NULL DEFAULT 'bit', "
             f"valor_limite {real}, "
             # Histéresis: cuánto tiene que volver el valor para considerarla
@@ -1085,6 +1086,12 @@ Borrar un usuario NO borra su historial de alarmas: `CrudManager.borrar()`
             f"activo {entero} NOT NULL DEFAULT 1, "
             f"creado_en {ts}, "
             f"actualizado_en {ts}, "
+            # LA PAPELERA. NULL = la regla está en uso; con fecha = alguien la
+            # eliminó desde el editor ese día. No se borra la fila: así se
+            # puede restaurar, y los eventos que ya provocó siguen apuntando
+            # a su número de alarma. El motor ignora las que tienen fecha.
+            # (En una base que ya existía la añade `app/db/migraciones.py`.)
+            f"eliminado_en {ts}, "
             f"{fk_def_usr})"
         )
 

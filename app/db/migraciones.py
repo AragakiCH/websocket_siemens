@@ -35,7 +35,7 @@ después con SQL a mano. Por eso un fallo ahí se informa y no aborta.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from app.db.sql_driver import _nombre_seguro, _prefijo_seguro, tipos_motor
 
@@ -62,8 +62,13 @@ COLUMNAS_AÑADIDAS: Dict[str, Tuple[Tuple[str, str, str, str], ...]] = {
     # Quién configuró la regla de alarma. Ver la nota larga en
     # `CrudManager._sellar_autor()`: la identidad no se pide, se deduce del
     # token.
+    #
+    # `eliminado_en` es la papelera del editor de alarmas: NULL = en uso, con
+    # fecha = eliminada (y restaurable). Una base creada antes de que
+    # existiera no la tiene, y sin ella «eliminar» no tendría dónde apuntarlo.
     "alarmas_def": (("usuario_id", "fk", "usuarios",
-                     "fk_{p}alarmas_def_usuario"),),
+                     "fk_{p}alarmas_def_usuario"),
+                    ("eliminado_en", "ts", "", "")),
     # Quién movió los límites de un ingrediente. `valor_minimo` y
     # `valor_maximo` son la última barrera antes de escribir en una máquina.
     "receta_elementos": (("usuario_id", "fk", "usuarios",
@@ -94,7 +99,9 @@ def _sql_fk(motor: str, tabla: str, columna: str, destino: str,
     )
 
 
-async def asegurar_columnas_hmi(driver, prefijo: str = "") -> List[Dict[str, Any]]:
+async def asegurar_columnas_hmi(
+    driver, prefijo: str = "", solo: Optional[Iterable[str]] = None,
+) -> List[Dict[str, Any]]:
     """
     Añade a las tablas del HMI las columnas que les falten.
 
@@ -102,12 +109,21 @@ async def asegurar_columnas_hmi(driver, prefijo: str = "") -> List[Dict[str, Any
     añadió, qué ya estaba y qué no se pudo hacer. El informe es el producto
     principal — quien ejecuta una migración sobre una base de producción
     necesita leer qué pasó, no un `{"ok": true}`.
+
+    `solo` limita el trabajo a esas tablas (por su nombre sin prefijo). Lo
+    usa quien necesita UNA columna para seguir —la papelera de alarmas pide
+    `alarmas_def.eliminado_en`— y no tiene por qué tocar el resto del esquema
+    de paso. Sin él se revisan todas, que es lo que hace
+    `POST /db/{db_id}/esquema`.
     """
     p = _prefijo_seguro(prefijo)
     tipos = tipos_motor(driver.motor)
     informe: List[Dict[str, Any]] = []
+    elegidas = None if solo is None else {str(t) for t in solo}
 
     for tabla_base, columnas in COLUMNAS_AÑADIDAS.items():
+        if elegidas is not None and tabla_base not in elegidas:
+            continue
         tabla = _nombre_seguro(f"{p}{tabla_base}")
         entrada: Dict[str, Any] = {
             "tabla": tabla, "añadidas": [], "ya_estaban": [], "avisos": [],

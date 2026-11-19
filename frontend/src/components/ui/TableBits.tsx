@@ -209,10 +209,30 @@ export function IconoBoton({
   );
 }
 
-/** Contenedor de las acciones: aparecen al pasar por encima de la fila. */
-export function AccionesFila({ children }: { children: React.ReactNode }) {
+/**
+ * Contenedor de las acciones de una fila.
+ *
+ * Por defecto aparecen al pasar por encima, que deja la tabla limpia. Con
+ * `siempreVisibles` se quedan a la vista: es lo que usa la tabla de alarmas,
+ * donde el tachito escondido hasta el hover —y en la última columna, que en
+ * una ventana estrecha quedaba además fuera de la pantalla— hacía que nadie
+ * supiera que una alarma se podía eliminar.
+ */
+export function AccionesFila({
+  children,
+  siempreVisibles = false,
+}: {
+  children: React.ReactNode;
+  siempreVisibles?: boolean;
+}) {
   return (
-    <div className="flex items-center justify-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+    <div
+      className={`flex items-center justify-center gap-0.5 ${
+        siempreVisibles
+          ? ''
+          : 'opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100'
+      }`}
+    >
       {children}
     </div>
   );

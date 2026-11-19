@@ -118,6 +118,7 @@ class Recurso:
         marca_creado: str = "",
         marca_actualizado: str = "",
         opcionales: Optional[List[str]] = None,
+        solo_servidor: Optional[List[str]] = None,
     ) -> None:
         self.tabla = tabla
         # nombre -> tipo lógico: texto | numero | entero | fecha
@@ -140,10 +141,18 @@ class Recurso:
         # de verdad y se adapta — la trazabilidad aparece cuando la columna
         # existe, y mientras tanto todo lo demás sigue funcionando.
         self.opcionales = list(opcionales or [])
+        # Columnas que se LEEN por el CRUD pero que solo escribe el servidor,
+        # por un camino propio. Hoy es una: `eliminado_en`, la papelera de
+        # las reglas de alarma. Si se pudiera escribir con un PATCH genérico
+        # (que pide rol `Usuarios`), cualquiera podría «eliminar» una alarma
+        # saltándose el rol `Administradores` que exige borrarla — y sin que
+        # el motor se enterase ni quedara apuntado en la auditoría.
+        self.solo_servidor = list(solo_servidor or [])
 
     def editables(self) -> List[str]:
         """Columnas que el cliente puede escribir (nunca `id` ni las marcas)."""
-        prohibidas = {"id", self.marca_creado, self.marca_actualizado}
+        prohibidas = {"id", self.marca_creado, self.marca_actualizado,
+                      *self.solo_servidor}
         return [c for c in self.columnas if c not in prohibidas]
 
 
@@ -156,8 +165,13 @@ class Recurso:
 CLASES_ALARMA = ("Critical", "Error", "Warning", "Maintenance", "Information")
 
 # Cómo se evalúa una alarma. 'bit' es la discreta de TIA (mira un bit del
-# tag); las demás son analógicas y comparan contra `valor_limite`.
-COMPARADORES = ("bit", ">", ">=", "<", "<=", "==", "!=")
+# tag y salta cuando está a 1) y '!bit' es la misma al revés (salta cuando el
+# bit está a 0: «falta la señal de marcha», «se cayó el permisivo»). Las
+# demás son analógicas y comparan contra `valor_limite`.
+COMPARADORES = ("bit", "!bit", ">", ">=", "<", "<=", "==", "!=")
+
+# Los que miran un bit en vez de comparar contra un límite.
+COMPARADORES_DE_BIT = ("bit", "!bit")
 
 
 RECURSOS: Dict[str, Recurso] = {
@@ -187,13 +201,18 @@ RECURSOS: Dict[str, Recurso] = {
             "activo": "entero",
             "creado_en": "fecha",
             "actualizado_en": "fecha",
+            # La papelera: NULL = en uso; con fecha = eliminada desde el
+            # editor (y restaurable). Se lee por aquí; se escribe SOLO con
+            # `CrudManager.cambiar_papelera()`, nunca con un PATCH.
+            "eliminado_en": "fecha",
         },
         obligatorias=["nombre", "texto"],
         filtros=["clase", "tag", "area", "activo", "comparador", "usuario_id"],
         orden_defecto="id",
         marca_creado="creado_en",
         marca_actualizado="actualizado_en",
-        opcionales=["usuario_id"],
+        opcionales=["usuario_id", "eliminado_en"],
+        solo_servidor=["eliminado_en"],
     ),
     # ------------------------------------------------------------------ #
     # alarmas · los EVENTOS: qué pasó y cuándo
@@ -350,6 +369,25 @@ class ErrorCrud(Exception):
         super().__init__(mensaje)
         self.mensaje = mensaje
         self.codigo = codigo
+
+
+class ErrorPapelera(ErrorCrud):
+    """
+    La tabla no tiene la columna de la papelera, y no se pudo añadir.
+
+    Es un caso con nombre propio —y no un `ErrorCrud` más— porque tiene
+    arreglo y quien lo recibe puede ofrecerlo: lleva en `sql` la sentencia
+    EXACTA, para este motor, que crea la columna. Pasa en las instalaciones
+    donde el HMI se conecta con un usuario de solo datos (`db_datareader` +
+    `db_datawriter` en SQL Server, que es lo que crea el asistente): ese
+    usuario no puede hacer `ALTER TABLE`, a propósito, y tiene que ejecutarla
+    quien administre la base.
+    """
+
+    def __init__(self, mensaje: str, sql: str, detalle: str = "") -> None:
+        super().__init__(mensaje, 409)
+        self.sql = sql
+        self.detalle = detalle
 
 
 class CrudManager:
@@ -807,6 +845,122 @@ class CrudManager:
         return {"ok": True, "recurso": recurso_nombre, "id": id_,
                 "mensaje": f"Eliminado {recurso_nombre} {id_}."}
 
+    # ================================================================== #
+    # Papelera: eliminar sin borrar, y restaurar
+    # ================================================================== #
+    # `borrar()` de arriba es para siempre. Para una regla de alarma eso es
+    # demasiado: se elimina por error con un clic, y con ella se va el número
+    # con el que el histórico la identifica (`alarmas.alarma_def_id` se pone
+    # a NULL). La papelera es una fecha en la propia fila: la regla deja de
+    # contar —el editor la baja a su tabla de eliminadas y el motor deja de
+    # evaluarla— pero sigue ahí, con su id, para poder restaurarla.
+    COLUMNA_PAPELERA = "eliminado_en"
+
+    async def _asegurar_papelera(self, driver, recurso: Recurso, tabla: str,
+                                 db_id: str) -> None:
+        """
+        Garantiza que la tabla tiene la columna de la papelera.
+
+        Una base creada antes de que existiera no la tiene. Se añade aquí, en
+        el momento en que hace falta, en vez de exigir que alguien pase antes
+        por `POST /db/{db_id}/esquema`: quien pulsa el tachito de una alarma
+        no tiene por qué saber qué es una migración. Solo se toca ESA tabla.
+
+        Si no se puede (un usuario de base sin permiso de ALTER), se lanza
+        `ErrorPapelera`, con la sentencia exacta que hay que pedirle a quien
+        administre la base.
+        """
+        if self.COLUMNA_PAPELERA in await self._columnas(
+                driver, recurso, tabla, db_id):
+            return
+
+        # Import perezoso: `migraciones` solo hace falta en este camino, y
+        # así el CRUD no carga con él en cada arranque.
+        from app.db.migraciones import _sql_add, asegurar_columnas_hmi
+        from app.db.sql_driver import tipos_motor
+
+        prefijo = getattr(self._s, "esquema_prefijo", "") or ""
+        avisos: List[str] = []
+        try:
+            informe = await asegurar_columnas_hmi(
+                driver, prefijo, solo=[recurso.tabla])
+            for entrada in informe:
+                avisos.extend(entrada.get("avisos", []))
+        except Exception as exc:  # noqa: BLE001
+            avisos.append(str(exc))
+
+        # Lo que se sabía de la tabla ya no vale: acaba de cambiar.
+        self._columnas_reales.pop((db_id, tabla), None)
+        if self.COLUMNA_PAPELERA in await self._columnas(
+                driver, recurso, tabla, db_id):
+            logger.info("Papelera lista: columna %s añadida a %s.",
+                        self.COLUMNA_PAPELERA, tabla)
+            return
+
+        # La MISMA sentencia que se acaba de intentar, tal cual, para que
+        # quien sí tiene permiso la pegue en su consola sin traducir nada.
+        sql = _sql_add(driver.motor, tabla, self.COLUMNA_PAPELERA,
+                       tipos_motor(driver.motor)["ts"])
+        raise ErrorPapelera(
+            f"Esta base de datos todavía no tiene la papelera de alarmas: a "
+            f"la tabla '{tabla}' le falta la columna "
+            f"`{self.COLUMNA_PAPELERA}`, y el usuario con el que el HMI se "
+            f"conecta a la base no tiene permiso para añadirla. Quien "
+            f"administre la base tiene que ejecutar una sola vez: {sql}",
+            sql=sql, detalle="; ".join(avisos))
+
+    async def cambiar_papelera(self, recurso_nombre: str, id_: int,
+                               eliminar: bool,
+                               db_id: Optional[str] = None) -> dict:
+        """
+        Manda una fila a la papelera (`eliminar=True`) o la saca de ella.
+
+        Devuelve la fila tal como queda. Es idempotente: eliminar lo ya
+        eliminado conserva la fecha original (es cuándo se eliminó de verdad,
+        no cuándo se repitió el clic), y restaurar lo que no estaba en la
+        papelera no hace nada.
+
+        No sella `usuario_id`: esa columna dice quién CONFIGURÓ la regla, y
+        pisarla con quien la eliminó perdería justo eso. Quién eliminó o
+        restauró queda en la auditoría, que lo apunta quien llama.
+        """
+        recurso = self._recurso(recurso_nombre)
+        if self.COLUMNA_PAPELERA not in recurso.columnas:
+            raise ErrorCrud(
+                f"'{recurso_nombre}' no tiene papelera: sus filas se borran "
+                f"con DELETE /crud/{recurso_nombre}/{{id}}.", 405)
+
+        driver = await self._driver(db_id)
+        tabla = self._tabla(recurso)
+        real = self._db_id(db_id)
+        await self._asegurar_papelera(driver, recurso, tabla, real)
+
+        # Se lee antes de escribir, y no se mira el número de filas del
+        # UPDATE: MySQL cuenta las que CAMBIAN, no las que encuentra, así que
+        # restaurar algo ya restaurado devolvería 0 y parecería un 404.
+        fila = (await self.obtener(recurso_nombre, id_, db_id))["fila"]
+        ya_eliminada = bool(fila.get(self.COLUMNA_PAPELERA))
+
+        if ya_eliminada != bool(eliminar):
+            valor = self._ahora(driver.motor) if eliminar else None
+            try:
+                await driver._ejecutar_interno(
+                    f"UPDATE {tabla} SET {self.COLUMNA_PAPELERA} = :valor "
+                    f"WHERE id = :id", {"valor": valor, "id": id_})
+            except Exception as exc:  # noqa: BLE001
+                raise self._traducir(exc, tabla)
+            fila = (await self.obtener(recurso_nombre, id_, db_id))["fila"]
+            logger.info("CRUD: %s id=%s %s", recurso_nombre, id_,
+                        "a la papelera" if eliminar else "restaurado")
+
+        return {
+            "ok": True, "recurso": recurso_nombre, "id": id_, "fila": fila,
+            "eliminado": bool(eliminar),
+            "mensaje": (f"{recurso_nombre} {id_} enviado a la papelera."
+                        if eliminar else
+                        f"{recurso_nombre} {id_} restaurado."),
+        }
+
     @staticmethod
     def _necesita_fila_completa(recurso: str, valores: Dict[str, Any]) -> bool:
         """
@@ -861,14 +1015,30 @@ class CrudManager:
             if comp and comp not in COMPARADORES:
                 raise ErrorCrud(
                     f"comparador debe ser uno de: {', '.join(COMPARADORES)}. "
-                    f"'bit' es una alarma discreta (mira un bit del tag); el "
-                    f"resto son analógicas y necesitan `valor_limite`.")
-            # Una alarma analógica sin límite no puede dispararse nunca: es
-            # una regla que parece configurada y no vigila nada.
-            if comp and comp != "bit" and valores.get("valor_limite") is None:
+                    f"'bit' y '!bit' son alarmas discretas (miran un bit del "
+                    f"tag: activo o inactivo); el resto son analógicas y "
+                    f"comparan contra `valor_limite`.")
+            # AQUÍ HABÍA UNA REGLA QUE YA NO ESTÁ, Y SE QUITÓ A PROPÓSITO.
+            #
+            # Decía: «con un comparador analógico hace falta `valor_limite`».
+            # Suena razonable y era lo que impedía cambiar la condición desde
+            # el editor: allí la condición y el límite son dos celdas, cada
+            # una manda su PATCH con SOLO su campo, y la del comparador llega
+            # la primera. Se validaba sin el límite a la vista —que aún no se
+            # había podido escribir— y se rechazaba SIEMPRE: la celda volvía
+            # sola a «Bit activo» y no había forma de configurar una alarma
+            # analógica. Leer la fila guardada tampoco lo arreglaba (el
+            # límite sigue vacío en ese instante).
+            #
+            # Una analógica sin límite no es un dato inválido, es una alarma
+            # A MEDIO CONFIGURAR: el motor no la evalúa (`evaluar()` devuelve
+            # None y no toca nada) y el editor la marca en ámbar y la cuenta
+            # en el pie, igual que las que no tienen tag.
+            bit = valores.get("bit_disparo")
+            if bit is not None and not (0 <= int(bit) <= 63):
                 raise ErrorCrud(
-                    f"Con comparador '{comp}' hace falta `valor_limite`: sin "
-                    f"él la alarma no puede evaluarse y nunca saltaría.")
+                    f"bit_disparo debe estar entre 0 y 63 (llegó {bit}): es "
+                    f"la posición del bit que se vigila dentro del tag.")
 
         if recurso == "alarmas":
             sev = valores.get("severidad")

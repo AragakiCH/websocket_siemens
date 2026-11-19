@@ -11,6 +11,13 @@ Las alarmas EN EJECUCIÓN. Configurarlas es otra cosa y va por otro sitio.
   POST /alarmas/reconocer-todas   -> lo mismo, en bloque         [Usuarios]
   POST /alarmas/recargar          -> releer las reglas          [Administradores]
 
+Y la PAPELERA de las reglas, que sí es configuración pero vive aquí porque
+eliminar una regla no es solo apuntarlo en su fila: el motor tiene que dejar
+de vigilarla en ese mismo momento y cerrar la alarma que tuviera activa.
+
+  POST /alarmas/definiciones/{id}/eliminar   -> a la papelera   [Administradores]
+  POST /alarmas/definiciones/{id}/restaurar  -> de vuelta       [Administradores]
+
 POR QUÉ ESTO NO ES `/crud/alarmas`
 ----------------------------------
 El CRUD genérico ya expone la tabla `alarmas` y seguirá haciéndolo: sirve para
@@ -49,7 +56,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.api.auth_routes import exigir_rol, usuario_de
 from app.core.auth_manager import Sesion
-from app.core.crud_manager import ErrorCrud
+from app.core.crud_manager import ErrorCrud, ErrorPapelera
+from app.db.sql_driver import _nombre_seguro
 
 logger = logging.getLogger("alarm_routes")
 
@@ -108,6 +116,79 @@ def _auditar(request: Request, accion: str, sesion: Optional[Sesion],
 
 
 # ====================================================================== #
+# Quién la reconoció, con nombre
+# ====================================================================== #
+async def nombres_de_usuarios(crud, tabla_usuarios: str,
+                              db_id: Optional[str],
+                              ids: List[int]) -> Dict[int, str]:
+    """
+    `{usuario_id: nombre}` para los ids que se pidan.
+
+    `alarmas.usuario_id` es quién reconoció el evento. A la vista le llegaba
+    solo ese número, y un 3 en una columna «Usuario» no le dice nada a quien
+    revisa el turno: lo que hace falta leer es «ana».
+
+    Se busca en la tabla `usuarios` DE LA MISMA BASE que las alarmas, que es
+    a la que apunta la clave foránea de esa columna.
+
+    NUNCA tumba la lista. Si la tabla no existe, no hay permiso o la base no
+    responde, devuelve lo que tenga (nada) y la vista enseña el número: una
+    lista de alarmas sin nombres es una molestia; sin lista, un problema.
+    """
+    ids = sorted({n for n in (_entero(i) for i in ids) if n is not None})
+    if not ids:
+        return {}
+    try:
+        tabla = _nombre_seguro(tabla_usuarios)
+        driver = await crud._driver(db_id)
+        # Un marcador por id: el número de ids cambia, pero cada valor va
+        # bindeado. Del cliente no llega nada a este SQL — los ids salen de
+        # las filas que se acaban de leer.
+        marcas = ", ".join(f":u{n}" for n in range(len(ids)))
+        resultado = await driver.query(
+            f"SELECT id, usuario FROM {tabla} WHERE id IN ({marcas})",
+            {f"u{n}": valor for n, valor in enumerate(ids)},
+            limite=len(ids),
+        )
+        return {int(f["id"]): str(f.get("usuario") or "")
+                for f in resultado.filas if _entero(f.get("id")) is not None}
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("No se pudieron leer los nombres de usuario: %s", exc)
+        return {}
+
+
+def _entero(valor: Any) -> Optional[int]:
+    """`int(valor)`, o None si no lo es. Para ids que vienen de la base."""
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        return None
+
+
+async def _con_usuario(request: Request, db_id: Optional[str],
+                       filas: List[dict]) -> List[dict]:
+    """
+    Añade a cada evento el campo `usuario`: el nombre de quien lo reconoció,
+    o `None` si todavía nadie (o si el nombre no se pudo leer).
+
+    Una sola consulta para toda la página, y ninguna si nadie ha reconocido
+    nada — que en `/pendientes` es siempre: pendiente es, justamente, sin
+    reconocer.
+    """
+    ids = [f.get("usuario_id") for f in filas if f.get("usuario_id") is not None]
+    nombres: Dict[int, str] = {}
+    if ids:
+        auth = getattr(request.app.state, "auth_manager", None)
+        tabla = getattr(auth, "tabla", "") or "usuarios"
+        nombres = await nombres_de_usuarios(
+            request.app.state.crud_manager, tabla, db_id, ids)
+    for f in filas:
+        uid = _entero(f.get("usuario_id"))
+        f["usuario"] = (nombres.get(uid) or None) if uid is not None else None
+    return filas
+
+
+# ====================================================================== #
 # Consulta
 # ====================================================================== #
 @router.get(
@@ -131,6 +212,7 @@ async def pendientes(
         filas = await motor.pendientes(limite=limite)
     except ErrorCrud as exc:
         raise _error(exc)
+    filas = await _con_usuario(request, motor.db_id, filas)
     return {
         "ok": True,
         "alarmas": filas,
@@ -179,7 +261,7 @@ async def historico(
         filtros["tag"] = tag
 
     try:
-        return await request.app.state.crud_manager.listar(
+        datos = await request.app.state.crud_manager.listar(
             "alarmas", db_id=motor.db_id, filtros=filtros,
             desde=desde, hasta=hasta,
             orden="ts_activacion", descendente=True,
@@ -187,6 +269,9 @@ async def historico(
         )
     except ErrorCrud as exc:
         raise _error(exc)
+    # El nombre de quien reconoció cada una, para la columna «Usuario».
+    await _con_usuario(request, motor.db_id, datos.get("filas") or [])
+    return datos
 
 
 @router.get(
@@ -278,3 +363,124 @@ async def recargar(request: Request) -> Dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             503, f"No se pudieron leer las reglas de `alarmas_def`: {exc}")
+
+
+# ====================================================================== #
+# La papelera de las reglas
+# ====================================================================== #
+# POR QUÉ NO ES UN `DELETE /crud/alarmas_def/{id}`
+#
+# Ese sigue existiendo y borra la fila para siempre: es lo que hace «Borrar
+# definitivamente» desde la papelera. Pero como ÚNICA forma de quitar una
+# alarma era demasiado: un clic en el tachito y la regla desaparecía sin
+# vuelta atrás, llevándose además el número con el que el histórico la
+# identifica.
+#
+# Aquí la regla se marca con la fecha (`alarmas_def.eliminado_en`) y nada más.
+# El editor la baja a su tabla de eliminadas, desde donde se restaura; el
+# motor deja de vigilarla al momento, y si tenía una alarma activa la cierra,
+# porque ya nadie iba a normalizarla.
+#
+# POR QUÉ NO ES UN `PATCH` CON `eliminado_en`
+#
+# Porque el PATCH genérico pide `Usuarios` y borrar pide `Administradores`:
+# dejar escribir esa columna por ahí sería un atajo para quitar alarmas sin
+# el rol que hace falta. Por eso el CRUD la enseña y no la deja escribir.
+async def _papelera(request: Request, sesion: Optional[Sesion], def_id: int,
+                    eliminar: bool, db_id: Optional[str]) -> Dict[str, Any]:
+    crud = request.app.state.crud_manager
+    try:
+        r = await crud.cambiar_papelera("alarmas_def", def_id, eliminar, db_id)
+    except ErrorPapelera as exc:
+        # La base no tiene la columna y el usuario de la conexión no puede
+        # crearla. Va con ESTRUCTURA, no como un texto más: así el editor
+        # puede enseñar la sentencia con su botón de copiar y ofrecer, de
+        # mientras, el borrado definitivo — en vez de dejar a quien pulsó el
+        # tachito delante de un error que no sabe cómo resolver.
+        raise HTTPException(409, detail={
+            "codigo": "papelera_no_disponible",
+            "mensaje": exc.mensaje,
+            "sql": exc.sql,
+            "detalle": exc.detalle,
+        })
+    except ErrorCrud as exc:
+        raise _error(exc)
+
+    # El motor tiene las reglas en memoria: sin esto seguiría evaluando la
+    # eliminada (o ignorando la restaurada) hasta su barrido de un minuto.
+    # No se usa `_motor()`: con el motor apagado la papelera tiene que
+    # funcionar igual — las reglas se editan aunque no se evalúen.
+    motor = getattr(request.app.state, "motor_alarmas", None)
+    if motor is not None:
+        try:
+            await motor.recargar()
+        except Exception as exc:  # noqa: BLE001
+            # La fila ya quedó marcada, que es lo que se pidió. El barrido
+            # periódico del motor la recogerá.
+            logger.warning("Regla %s %s, pero el motor no pudo recargar: %s",
+                           def_id, "eliminada" if eliminar else "restaurada",
+                           exc)
+
+    fila = r.get("fila") or {}
+    _auditar(request,
+             "alarma_def.eliminada" if eliminar else "alarma_def.restaurada",
+             sesion, recurso=str(def_id),
+             detalle={"nombre": fila.get("nombre"), "tag": fila.get("tag")})
+    # Y a las demás pantallas abiertas, igual que cualquier otro cambio de
+    # configuración hecho por el CRUD.
+    try:
+        await request.app.state.manager.difundir_config(
+            "alarmas_def", usuario_de(sesion),
+            "eliminado" if eliminar else "restaurado")
+    except Exception:  # noqa: BLE001
+        pass
+    return r
+
+
+@router.post(
+    "/definiciones/{def_id}/eliminar",
+    summary="Mandar una regla de alarma a la papelera",
+    description="La regla **no se borra**: se marca con la fecha y deja de "
+                "contar. El editor la muestra en su tabla de eliminadas y se "
+                "puede restaurar.\n\n"
+                "El motor deja de vigilarla al momento. Si tenía una alarma "
+                "**activa**, ese evento se cierra (normalizado, con la hora "
+                "de ahora): ya nadie iba a normalizarlo. Sigue pendiente de "
+                "reconocer si nadie lo había visto.\n\n"
+                "Los eventos que ya provocó conservan su número de alarma. "
+                "Para borrarla del todo: `DELETE /crud/alarmas_def/{id}`.",
+    responses={404: {"description": "No existe esa regla."},
+               409: {"description": "A la tabla le falta la columna de la "
+                                    "papelera y el usuario de la conexión no "
+                                    "puede añadirla. `detail` es un objeto: "
+                                    "`codigo` = `papelera_no_disponible`, "
+                                    "`mensaje`, y `sql` con la sentencia que "
+                                    "la crea."}},
+)
+async def eliminar_definicion(
+    def_id: int,
+    request: Request,
+    sesion: Optional[Sesion] = Depends(exigir_rol("Administradores")),
+    db_id: Optional[str] = Query(
+        default=None,
+        description="Base donde está la regla. Vacío = la de por defecto."),
+) -> Dict[str, Any]:
+    return await _papelera(request, sesion, def_id, True, db_id)
+
+
+@router.post(
+    "/definiciones/{def_id}/restaurar",
+    summary="Sacar una regla de alarma de la papelera",
+    description="Vuelve tal como estaba —mismo número, mismo tag, misma "
+                "condición— y el motor la vigila otra vez desde ese momento. "
+                "Si estaba silenciada (`activo = 0`) al eliminarla, vuelve "
+                "silenciada.",
+    responses={404: {"description": "No existe esa regla."}},
+)
+async def restaurar_definicion(
+    def_id: int,
+    request: Request,
+    sesion: Optional[Sesion] = Depends(exigir_rol("Administradores")),
+    db_id: Optional[str] = Query(default=None),
+) -> Dict[str, Any]:
+    return await _papelera(request, sesion, def_id, False, db_id)

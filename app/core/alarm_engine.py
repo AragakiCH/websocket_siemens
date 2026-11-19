@@ -122,6 +122,11 @@ MAX_COLA = 2000
 #: la regla se cambió desde otro sitio: SSMS, otra instancia, un script.
 INTERVALO_RECARGA_S = 60.0
 
+#: Filas de `alarmas_def` por lectura (el tope por página del CRUD) y tope
+#: total de cordura. Ver `MotorAlarmas._leer_reglas()`.
+PAGINA_REGLAS = 500
+MAX_REGLAS = 20000
+
 
 def _ahora() -> str:
     """Instante actual en ISO 8601 con offset UTC explícito."""
@@ -147,7 +152,7 @@ class Regla:
     texto: str
     clase: str
     tag: str                      # "<plc>|<tag>", tal cual está en la columna
-    comparador: str               # bit | > | >= | < | <= | == | !=
+    comparador: str               # bit | !bit | > | >= | < | <= | == | !=
     bit_disparo: int
     valor_limite: Optional[float]
     banda_muerta: float
@@ -195,12 +200,20 @@ def _bit(valor: Any, indice: int) -> Optional[bool]:
     """
     El bit `indice` del valor, para las alarmas discretas de TIA.
 
-    Un Bool se trata como una palabra de un solo bit: `bit_disparo = 0` es lo
-    natural y es el valor por defecto de la columna, así que vigilar un Bool
-    no obliga a configurar nada más.
+    UN BOOL ES UN BIT, Y NO TIENE POSICIONES QUE ELEGIR. Por eso `indice` no
+    cuenta para él: vigilar un Bool no obliga a configurar nada más, y el
+    editor ni siquiera deja tocar el bit cuando el tag es un Bool.
+
+    Antes sí contaba, y un Bool con `bit_disparo` distinto de 0 daba siempre
+    False: la alarma parecía configurada y no saltaba nunca. Con «Bit
+    inactivo» habría sido peor —siempre True, una alarma encendida para
+    siempre—, así que las reglas guardadas de antes con un bit que no era el
+    0 quedan cubiertas aquí, sin tener que corregirlas una a una.
     """
     if isinstance(valor, bool):
-        return valor if indice == 0 else False
+        return valor
+    if indice < 0:
+        return None                 # un bit negativo no existe: no se decide
     if isinstance(valor, int):
         return bool((valor >> indice) & 1)
     if isinstance(valor, float) and valor.is_integer():
@@ -230,9 +243,14 @@ def evaluar(regla: Regla, valor: Any) -> Optional[bool]:
     oscilando entre 79.9 y 80.1 genera cientos de eventos por minuto y llena
     el histórico de ruido hasta hacerlo inútil.
     """
-    if regla.comparador == "bit":
+    if regla.comparador in ("bit", "!bit"):
         b = _bit(valor, regla.bit_disparo)
-        return b  # None si el valor no es entero ni booleano
+        if b is None:
+            return None  # el valor no es entero ni booleano
+        # «Bit inactivo» es la misma lectura, al revés: salta cuando el bit
+        # está a 0 y se normaliza cuando vuelve a 1. Es la alarma de «falta
+        # la señal»: el permisivo que se cae, la marcha que no llega.
+        return b if regla.comparador == "bit" else (not b)
 
     n = _a_numero(valor)
     if n is None or regla.valor_limite is None:
@@ -274,7 +292,11 @@ def evaluar(regla: Regla, valor: Any) -> Optional[bool]:
 @dataclass
 class _Pendiente:
     """Un cambio de estado esperando a escribirse en la base."""
-    accion: str                    # "abrir" | "normalizar"
+    #: "abrir" | "normalizar" · los dos flancos que detecta `on_mensaje()`.
+    #: "cerrar" · la regla se dejó de vigilar con un evento abierto; ver
+    #: `_cerrar_lo_que_ya_no_se_vigila()`. Lleva en `datos` el evento y la
+    #: regla tal como era, porque para entonces puede no existir ya.
+    accion: str
     regla_id: int
     ts: str
     datos: Dict[str, Any] = field(default_factory=dict)
@@ -365,18 +387,25 @@ class MotorAlarmas:
         alguien edita su texto, el evento abierto sigue siéndolo. Recargar sin
         conservar `disparada`/`evento_id` cerraría en falso todas las alarmas
         activas cada vez que alguien toca el editor.
+
+        Lo contrario también importa: una regla que se ELIMINA o se SILENCIA
+        con su alarma activa deja de vigilarse, así que nadie normalizaría
+        nunca ese evento. Se cierra aquí; ver
+        `_cerrar_lo_que_ya_no_se_vigila()`.
         """
-        datos = await self._crud.listar(
-            "alarmas_def", db_id=self.db_id, orden="id",
-            descendente=False, limite=1000,
-        )
+        filas = await self._leer_reglas()
         antes = {r.id: r for r in self.reglas.values()}
 
         nuevas: Dict[int, Regla] = {}
-        for fila in datos.get("filas", []):
+        for fila in filas:
             try:
                 rid = int(fila["id"])
             except (KeyError, TypeError, ValueError):
+                continue
+            # En la papelera. Para el motor es como si no existiera: no se
+            # carga, no se evalúa y no cuenta en el diagnóstico. La fila sigue
+            # en la tabla para poder restaurarla desde el editor.
+            if fila.get("eliminado_en"):
                 continue
             tag = (fila.get("tag") or "").strip()
             regla = Regla(
@@ -399,6 +428,8 @@ class MotorAlarmas:
                 regla.evento_id = viejo.evento_id
             nuevas[rid] = regla
 
+        self._cerrar_lo_que_ya_no_se_vigila(antes, nuevas)
+
         self.reglas = nuevas
         self._reindexar()
         self.ultima_recarga = _ahora()
@@ -414,6 +445,74 @@ class MotorAlarmas:
                     len(nuevas), activas,
                     sum(1 for r in nuevas.values() if r.tag))
         return {"reglas": len(nuevas), "activas": activas}
+
+    async def _leer_reglas(self) -> List[dict]:
+        """
+        Todas las filas de `alarmas_def`, página a página.
+
+        El CRUD corta cada lectura en 500 filas. Antes se pedía una sola
+        página, así que la regla 501 no se cargaba, sin avisar. Ahora además
+        la tabla guarda las eliminadas (la papelera), que ocupan sitio en esa
+        cuenta sin ser reglas: con una sola página, una papelera llena
+        acabaría dejando fuera reglas que sí están en uso.
+        """
+        filas: List[dict] = []
+        offset = 0
+        while True:
+            datos = await self._crud.listar(
+                "alarmas_def", db_id=self.db_id, orden="id",
+                descendente=False, limite=PAGINA_REGLAS, offset=offset,
+            )
+            lote = datos.get("filas", [])
+            filas.extend(lote)
+            if len(lote) < PAGINA_REGLAS or len(filas) >= MAX_REGLAS:
+                break
+            offset += len(lote)
+        return filas
+
+    def _cerrar_lo_que_ya_no_se_vigila(
+        self, antes: Dict[int, Regla], nuevas: Dict[int, Regla]
+    ) -> None:
+        """
+        Encola el cierre de los eventos cuyas reglas dejan de vigilarse.
+
+        Una regla deja de vigilarse cuando se ELIMINA (ya no viene en la
+        lectura), cuando se SILENCIA (`activo = 0`) o cuando se queda sin
+        tag. Si en ese momento tenía una alarma activa, el evento se quedaría
+        en «Activa» PARA SIEMPRE: quien lo normaliza es el valor del tag al
+        volver a la normalidad, y ese valor ya no lo mira nadie. En la
+        pantalla de alarmas sería una fila roja que no se va nunca, de una
+        regla que ya ni existe.
+
+        Se cierra como normalizado y con la hora de ahora. No es que la
+        condición haya dejado de cumplirse: es que se ha dejado de mirar, y
+        cuándo pasó eso es el único dato cierto que hay. El evento NO se da
+        por reconocido — si nadie lo había visto sigue pendiente, como
+        cualquier otra alarma que nadie vio.
+
+        Solo ENCOLA. Escribir lo hace `_volcar()`, que ya sabe reintentar si
+        la base no responde; hacerlo aquí dejaría el evento abierto para
+        siempre al primer fallo, porque la regla ya no estaría en memoria
+        para volver a intentarlo.
+        """
+        ts = _ahora()
+        for rid, vieja in antes.items():
+            nueva = nuevas.get(rid)
+            if nueva is not None and nueva.activo and nueva.tag:
+                continue                    # se sigue vigilando: nada que cerrar
+            if nueva is not None:
+                # Silenciada o sin tag: la regla sigue existiendo, pero el día
+                # que vuelva a vigilarse empieza de cero. Si conservara
+                # `disparada`, al reactivarla con la condición cumpliéndose
+                # no abriría evento: no habría flanco que detectar.
+                nueva.disparada = False
+                nueva.evento_id = None
+            if vieja.evento_id is None:
+                continue
+            self._encolar(_Pendiente(
+                "cerrar", rid, ts,
+                {"evento_id": vieja.evento_id, "regla": vieja},
+            ))
 
     def _reindexar(self) -> None:
         idx: Dict[str, List[Regla]] = {}
@@ -544,13 +643,25 @@ class MotorAlarmas:
             return
         lote, self._cola = self._cola, []
 
-        for p in lote:
-            regla = self.reglas.get(p.regla_id)
+        for i, p in enumerate(lote):
+            if p.accion == "cerrar":
+                # El cierre trae la regla consigo: se cierra justamente
+                # porque ya no se vigila, y puede no estar ya en memoria.
+                regla = p.datos.get("regla")
+            else:
+                regla = self.reglas.get(p.regla_id)
             if regla is None:
                 continue                # la regla se borró mientras tanto
             try:
-                if p.accion == "abrir":
-                    await self._abrir(regla, p)
+                if p.accion == "cerrar":
+                    await self._cerrar(regla, p)
+                elif p.accion == "abrir":
+                    # Se silenció (o se quedó sin tag) entre el flanco y este
+                    # volcado: abrir ahora un evento que nadie va a poder
+                    # normalizar sería crear justo la fila colgada que
+                    # `_cerrar_lo_que_ya_no_se_vigila()` existe para evitar.
+                    if regla.activo and regla.tag:
+                        await self._abrir(regla, p)
                 else:
                     await self._normalizar(regla, p)
                 self.ultimo_error = ""
@@ -558,9 +669,13 @@ class MotorAlarmas:
                 self.ultimo_error = str(exc)
                 logger.warning("No se pudo registrar el evento de la alarma "
                                "'%s': %s", regla.nombre, exc)
-                self._cola.insert(0, p)
                 # Se corta el lote: si la base no responde, los siguientes
-                # van a fallar igual y cada intento cuesta un timeout.
+                # van a fallar igual y cada intento cuesta un timeout. Vuelven
+                # a la cola EL QUE FALLÓ Y LOS QUE VENÍAN DETRÁS, en su orden
+                # y por delante de lo que haya llegado mientras tanto. (Antes
+                # solo volvía el que falló: el resto del lote se perdía, y
+                # con él las alarmas que saltaron en ese mismo medio segundo.)
+                self._cola = lote[i:] + self._cola
                 break
 
     async def _abrir(self, regla: Regla, p: _Pendiente) -> None:
@@ -592,6 +707,47 @@ class MotorAlarmas:
                     p.datos.get("valor"))
         await self._difundir("alarma.activada", regla, p.ts,
                              valor=p.datos.get("valor"))
+        self._tras_escribir(regla, abierto=regla.evento_id)
+
+    def _tras_escribir(self, regla: Regla, abierto: Optional[int] = None,
+                       cerrado: Optional[int] = None) -> None:
+        """
+        Pone de acuerdo la memoria con lo que se acaba de escribir, por si
+        hubo una recarga MIENTRAS se escribía.
+
+        `recargar()` sustituye los objetos `Regla` por otros nuevos y les
+        copia el estado. Si eso ocurre durante el `await` de la escritura, el
+        `evento_id` recién obtenido queda apuntado en el objeto VIEJO, que ya
+        nadie mira:
+
+          · al abrir, la regla nueva no sabría que tiene un evento, y al
+            normalizarse no lo cerraría: una fila «Activa» para siempre;
+          · al normalizar, la regla nueva seguiría creyendo que lo tiene
+            abierto, y el siguiente disparo no crearía evento.
+
+        No es un caso raro: el editor pide una recarga en cada guardado, y
+        basta con editar una alarma mientras otra está saltando.
+
+        Y si entretanto la regla se eliminó o se silenció, el evento que se
+        acaba de abrir ya no lo va a normalizar nadie: se encola su cierre.
+        """
+        actual = self.reglas.get(regla.id)
+        if actual is regla:
+            return                      # no hubo recarga: nada que ajustar
+        if cerrado is not None:
+            if actual is not None and actual.evento_id == cerrado:
+                actual.evento_id = None
+            return
+        if abierto is None:
+            return
+        if actual is not None and actual.activo and actual.tag:
+            if actual.evento_id is None:
+                actual.evento_id = abierto
+            return
+        self._encolar(_Pendiente(
+            "cerrar", regla.id, _ahora(),
+            {"evento_id": abierto, "regla": regla},
+        ))
 
     async def _normalizar(self, regla: Regla, p: _Pendiente) -> None:
         """
@@ -610,11 +766,48 @@ class MotorAlarmas:
         evento_id = regla.evento_id
         regla.evento_id = None
         self.eventos_cerrados += 1
+        self._tras_escribir(regla, cerrado=evento_id)
 
         logger.info("NORMALIZADA %s · %s = %s",
                     regla.nombre, regla.tag, p.datos.get("valor"))
         await self._difundir("alarma.normalizada", regla, p.ts,
                              valor=p.datos.get("valor"), evento_id=evento_id)
+
+    async def _cerrar(self, regla: Regla, p: _Pendiente) -> None:
+        """
+        Cierra el evento de una regla que se ha dejado de vigilar.
+
+        Es la misma escritura que `_normalizar()`, con dos diferencias: la
+        regla llega dentro del pendiente (puede no existir ya), y un evento
+        que no está NO es un fallo —alguien borró esa fila del histórico—:
+        no hay nada que cerrar, y reintentarlo dejaría la cola atascada
+        detrás de él para siempre.
+        """
+        evento_id = p.datos.get("evento_id")
+        if evento_id is None:
+            return
+        try:
+            fila = (await self._crud.obtener(
+                "alarmas", evento_id, db_id=self.db_id)).get("fila") or {}
+            # Ya estaba normalizado (lo cerró el propio valor del tag justo
+            # antes): no se le pisa la hora ni se le cambia el estado.
+            if fila.get("ts_normalizacion"):
+                return
+            await self._crud.actualizar(
+                "alarmas", evento_id,
+                {"estado": "normalizada", "ts_normalizacion": p.ts},
+                db_id=self.db_id,
+            )
+        except Exception as exc:  # noqa: BLE001
+            if getattr(exc, "codigo", None) == 404:
+                return
+            raise
+        self.eventos_cerrados += 1
+
+        logger.info("CERRADA %s · la regla se eliminó o se silenció con la "
+                    "alarma activa.", regla.nombre)
+        await self._difundir("alarma.normalizada", regla, p.ts,
+                             evento_id=evento_id)
 
     async def _difundir(self, tipo: str, regla: Regla, ts: str,
                         valor: Any = None,

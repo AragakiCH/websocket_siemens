@@ -65,6 +65,9 @@ export function soloRuntime(
   return esVisor === true && !alcanza(categoria, 'Administradores');
 }
 
+/** Lo que SÍ puede abrir quien solo debe ver el runtime. */
+const RUTAS_DE_OPERACION = ['/preview', '/alarmas'];
+
 export function RutaProtegida({ children, rolMinimo }: Props) {
   const { sesion, authRequerida, comprobandoSesion, esVisor } = useAppStore();
   const donde = useLocation();
@@ -103,7 +106,22 @@ export function RutaProtegida({ children, rolMinimo }: Props) {
   // Un visor de operación no ve nada más que el runtime. El permiso real lo
   // aplica el backend igual; esto evita enseñar un menú al que no se puede
   // entrar.
-  if (soloRuntime(esVisor, sesion.categoria)) {
+  //
+  // «El runtime» son DOS rutas, y las dos tienen que quedar fuera de este
+  // desvío:
+  //
+  //   /preview   el HMI. Sin la excepción, esta misma regla se aplicaba
+  //              también AQUÍ: se devolvía un <Navigate> a /preview estando
+  //              ya en /preview, que no pinta nada, y el operador de un
+  //              puesto visor se quedaba delante de una pantalla en blanco.
+  //   /alarmas   la pantalla de alarmas. Es de operación —lo dice su ruta en
+  //              App.tsx: «la ve todo el mundo»— y a ella llevan el botón
+  //              «Ver todas» de la franja y el del widget de alarmas. Con el
+  //              desvío, pulsarlos devolvía al HMI sin enseñar nada.
+  if (
+    soloRuntime(esVisor, sesion.categoria) &&
+    !RUTAS_DE_OPERACION.includes(donde.pathname)
+  ) {
     return <Navigate to="/preview" replace />;
   }
 

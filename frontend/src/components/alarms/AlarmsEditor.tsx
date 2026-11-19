@@ -18,29 +18,42 @@
 //   cada alarma —una fila ya está guardada en algún sitio, no puede
 //   "apuntar" a otra base— sino de la pantalla entera.
 //
-// ⚠️ LO QUE SIGUE FALTANDO: EL MOTOR
+// ESTO ES LA CONFIGURACIÓN, NO LOS EVENTOS
 //
-//   Esto es la CONFIGURACIÓN, no los eventos. Nada evalúa todavía los
-//   `Trigger tag`: no hay quien lea el valor del PLC, lo compare y escriba
-//   una fila en `alarmas`. Lo que sí hay ya es dónde guardar las reglas, con
-//   qué identificarlas y contra qué compararlas el día que ese motor exista.
+//   Aquí se dice QUÉ vigilar. Quien vigila es el motor del servidor
+//   (`alarm_engine.py`), que lee estas reglas, las compara con los valores
+//   del PLC y escribe en `alarmas` lo que pasa. Lo que pasó se ve en la
+//   pantalla de Alarmas, no aquí.
 //
-// LAS CINCO COLUMNAS
+// LAS COLUMNAS
 //
-//   Son las de la tabla "Discrete alarms" de TIA y se dejan con su nombre en
-//   inglés a propósito: es el vocabulario con el que se trabaja en el
-//   proyecto y así se reconocen al lado del editor de Siemens.
+//   Las cinco primeras son las de la tabla "Discrete alarms" de TIA y se
+//   dejan con su nombre en inglés a propósito: es el vocabulario con el que
+//   se trabaja en el proyecto y así se reconocen al lado del editor de
+//   Siemens.
 //
 //     ID           el de la base de datos, no editable
 //     Name         nombre corto de la alarma          -> nombre
 //     Alarm text   el mensaje que ve el operador      -> texto
 //     Alarm class  categoría (desplegable)            -> clase
 //     Trigger tag  variable que la dispara            -> tag
+//     Condición    cómo se evalúa                     -> comparador + bit/límite
+//     Banda        histéresis de las analógicas       -> banda_muerta
+//     On           silenciarla sin eliminarla         -> activo
 //
-//   La tabla tiene ocho columnas más (`comparador`, `valor_limite`,
-//   `banda_muerta`, `tag_reconocimiento`…) que esta vista no edita: se crean
-//   en NULL. El porqué, y las tres excepciones NOT NULL, están en
-//   `services/alarmasApi.ts`.
+// LA CONDICIÓN DEPENDE DEL TIPO DEL TAG
+//
+//   Un Bool solo admite «Bit activo» / «Bit inactivo», y sin elegir bit (no
+//   tiene más que uno). Un entero lo admite todo, y el bit se elige solo en
+//   las dos condiciones de bit. Un decimal no tiene bits: solo comparaciones.
+//   Las reglas viven en `alarmasApi.ts` (`comparadoresPara`,
+//   `admiteElegirBit`); aquí solo se pintan.
+//
+// ELIMINAR NO BORRA
+//
+//   El tachito manda la alarma a la PAPELERA: la tabla de abajo, desde donde
+//   se restaura tal como estaba. Borrarla para siempre se hace desde ahí, y
+//   pide confirmación.
 // =========================================================================
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
@@ -58,6 +71,7 @@ import {
   BellOffIcon,
   ChevronDownIcon,
   RefreshCwIcon,
+  RotateCcwIcon,
   UploadCloudIcon,
   UserIcon,
   UserXIcon,
@@ -82,28 +96,35 @@ import { actualizarCrud, borrarCrud } from '../../services/crudApi';
 import {
   ALARM_CLASS_IDS,
   CLASE_DEFECTO,
-  COMPARADORES,
   ETIQUETA_COMPARADOR,
+  PapeleraNoDisponible,
+  admiteElegirBit,
   cargarAlarmas,
+  comparadoresPara,
   crearAlarma,
+  eliminarAlarma,
   esAnalogico,
+  esDeBit,
   getBaseAlarmas,
   leerAlarmasLocales,
   nuevaAlarmaDb,
   olvidarAlarmasLocales,
   patchAlarmaADb,
   recargarMotor,
+  restaurarAlarma,
   setBaseAlarmas,
   siguienteNombre,
+  tipoDeTag,
   type Alarm,
   type AlarmClassId,
   type Comparador,
+  type TipoTag,
 } from '../../services/alarmasApi';
 // El MISMO selector que usa el editor de recetas. No se duplica: el formato
 // `plc|tag`, el filtrado por PLC y el "último valor recibido" ya están
 // resueltos ahí, y dos copias se separarían a la primera corrección.
 import { SelectorTagPlc } from '../recipes/SelectorTagPlc';
-import { apiGet, cargarTags, type TagRemoto } from '../flows/api';
+import { apiGet, cargarTags, claveTag, type TagRemoto } from '../flows/api';
 
 export type { Alarm, AlarmClassId };
 
@@ -183,6 +204,53 @@ export const ALARM_CLASSES: AlarmClassDef[] = [
 
 const claseDe = (id: AlarmClassId): AlarmClassDef =>
   ALARM_CLASSES.find((c) => c.id === id) ?? ALARM_CLASSES[1];
+
+// ─── La condición, explicada ─────────────────────────────────────
+//
+// Lo que dice el desplegable de la condición al pasar por encima, según el
+// tipo del tag. Va escrito porque la lista de opciones CAMBIA de una fila a
+// otra, y sin esto parecería un fallo: «¿por qué en esta alarma no me deja
+// elegir Mayor que?».
+
+const AYUDA_CONDICION: Record<TipoTag, string> = {
+  bool:
+    'El tag es un Bool: salta con el bit activo (TRUE / 1) o con el bit ' +
+    'inactivo (FALSE / 0). No hay más opciones porque un Bool no es un número.',
+  entero:
+    'El tag es un entero: se puede mirar uno de sus bits (activo o ' +
+    'inactivo) o compararlo contra un límite.',
+  decimal:
+    'El tag es un número decimal: se compara contra un límite. No tiene ' +
+    'bits que mirar.',
+  otro:
+    'Cómo se evalúa la alarma. Elige el Trigger tag de la lista para ver ' +
+    'solo las condiciones que su tipo admite.',
+};
+
+/** Aviso cuando la condición guardada no es de las que el tipo del tag admite. */
+const AVISO_FUERA_DE_TIPO: Record<TipoTag, string> = {
+  bool:
+    'Esta condición no se ofrece para un tag Bool. Elige «Bit activo» o ' +
+    '«Bit inactivo».',
+  entero: 'Esta condición no se ofrece para este tag.',
+  decimal:
+    'Un número decimal no tiene bits que mirar, así que esta alarma no ' +
+    'puede saltar. Elige una comparación (Mayor que, Menor que…).',
+  otro: 'Esta condición no se ofrece para este tag.',
+};
+
+// ─── La columna de acciones, pegada al borde derecho ─────────────
+//
+// `sticky`: aunque la tabla no quepa y haya que desplazarla, el tachito sigue
+// a la vista. Una celda pegada necesita fondo PROPIO y opaco —si no, lo que
+// pasa por debajo se transparenta—, así que repite el de la fila, también al
+// pasar por encima (los dos hex son el fondo de la fila resaltada, ya
+// mezclado: en claro `slate-50` al 80 % sobre blanco, en oscuro `navy` al
+// 40 % sobre `navy-soft`).
+const PEGADA_CABECERA = 'sticky right-0 z-10 bg-slate-100 dark:bg-navy';
+const PEGADA_CELDA =
+  'sticky right-0 z-[5] bg-white shadow-[inset_1px_0_0_rgba(148,163,184,0.22)] ' +
+  'group-hover:bg-[#f9fbfd] dark:bg-navy-soft dark:group-hover:bg-[#182234]';
 
 // ═════════════════════════════════════════════════════════════════
 
@@ -284,6 +352,18 @@ export function AlarmsEditor() {
       // que solo existe en esta pantalla.
       recargarRef.current();
     }
+    // El motor tiene las reglas en memoria: sin este aviso, el cambio no se
+    // aplicaría hasta su barrido de seguridad (un minuto).
+    //
+    // Va AQUÍ, después de escribir, y no en `editar()` como antes. Allí se
+    // lanzaba en el momento del clic, 600 ms ANTES de que el cambio llegara
+    // a la base: el motor releía lo de siempre, y lo que se acababa de
+    // cambiar —la condición, el interruptor de «On»— no se aplicaba hasta el
+    // minuto siguiente. Parecía que la alarma no hacía caso.
+    //
+    // Sin `await` y tragándose sus errores: guardar ya funcionó (o ya se
+    // avisó de que no), y esto solo adelanta cuándo empieza a vigilarse.
+    void recargarMotor();
   }, []);
 
   const programar = useCallback(
@@ -305,11 +385,13 @@ export function AlarmsEditor() {
       if (temporizador.current) window.clearTimeout(temporizador.current);
       const items = [...cola.current.entries()];
       cola.current.clear();
-      for (const [id, patch] of items) {
-        void actualizarCrud('alarmas_def', id, patch, dbRef.current).catch(
-          () => {}
-        );
-      }
+      if (items.length === 0) return;
+      const escrituras = items.map(([id, patch]) =>
+        actualizarCrud('alarmas_def', id, patch, dbRef.current).catch(() => {})
+      );
+      // Y cuando hayan llegado, que el motor las lea: quien edita y se va a
+      // la vista previa a probar la alarma espera que ya esté aplicada.
+      void Promise.all(escrituras).then(() => recargarMotor());
     };
   }, []);
 
@@ -401,6 +483,8 @@ export function AlarmsEditor() {
       dbRef.current = nueva;
       setAlarmas([]);
       setFiltro('');
+      setPorBorrar(null);
+      setSinPapelera(null);
       setError('');
       setGuardado('limpio');
       setDbAlarmas(nueva);
@@ -408,12 +492,58 @@ export function AlarmsEditor() {
     [vaciarCola]
   );
 
+  // ── Las dos tablas: en uso y papelera ─────────────────────────
+  //
+  // `alarmas` lo trae TODO. Lo que tiene fecha de eliminación va a la tabla
+  // de abajo; el resto es la tabla de trabajo, y es de lo único que hablan
+  // los contadores, el buscador y los avisos del pie.
+  const enUso = useMemo(() => alarmas.filter((a) => !a.eliminadoEn), [alarmas]);
+  const eliminadas = useMemo(
+    () =>
+      alarmas
+        .filter((a) => a.eliminadoEn)
+        // La última eliminada, arriba: es la que se acaba de mandar aquí y
+        // la que con más probabilidad se quiere recuperar.
+        .sort((a, b) => fechaMs(b.eliminadoEn) - fechaMs(a.eliminadoEn)),
+    [alarmas]
+  );
+  const [papeleraAbierta, setPapeleraAbierta] = useState(true);
+  // Borrar para siempre pide un segundo clic sobre la misma fila.
+  const [porBorrar, setPorBorrar] = useState<number | null>(null);
+  // La base no tiene papelera y el servidor no pudo creársela (ver
+  // `PapeleraNoDisponible`). Guarda QUÉ alarma se quiso eliminar y la
+  // sentencia que arregla la base, para explicarlo y ofrecer una salida.
+  const [sinPapelera, setSinPapelera] = useState<{
+    id: number;
+    sql: string;
+  } | null>(null);
+  const [sqlCopiado, setSqlCopiado] = useState(false);
+
+  // ── El tipo de cada tag, para saber qué condición admite ──────
+  //
+  // Sale de la misma lista que alimenta el selector de Trigger tag. Un tag
+  // que no está en ella (escrito a mano, PLC apagado) es de tipo «otro» y no
+  // restringe nada.
+  const tipoPorTag = useMemo(() => {
+    const m = new Map<string, TipoTag>();
+    for (const t of tagsPlc) m.set(claveTag(t), tipoDeTag(t.type, t.value));
+    return m;
+  }, [tagsPlc]);
+  const tipoDe = useCallback(
+    (tag: string): TipoTag => tipoPorTag.get(tag.trim()) ?? 'otro',
+    [tipoPorTag]
+  );
+
   // ── Alta ──────────────────────────────────────────────────────
   const agregar = useCallback(() => {
     void conServidor(async () => {
       const clase = claseDe(CLASE_DEFECTO);
       const nueva = await crearAlarma(
-        nuevaAlarmaDb(siguienteNombre(alarmas), clase.ejemplo, clase.id),
+        nuevaAlarmaDb(
+          siguienteNombre(enUso, eliminadas),
+          clase.ejemplo,
+          clase.id
+        ),
         dbRef.current
       );
       setAlarmas((prev) => [...prev, nueva]);
@@ -427,32 +557,167 @@ export function AlarmsEditor() {
         });
       });
     });
-  }, [alarmas, conServidor, sinMovimiento]);
+  }, [enUso, eliminadas, conServidor, sinMovimiento]);
 
   // ── Edición ───────────────────────────────────────────────────
+  //
+  // El aviso al motor NO va aquí: lo da `vaciarCola()` cuando el cambio ya
+  // está escrito. Ver la nota de allí.
   const editar = useCallback(
     (id: number, patch: Partial<Alarm>) => {
       setAlarmas((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
       programar(id, patchAlarmaADb(patch));
-      // El motor tiene las reglas en memoria: sin este aviso, el cambio no se
-      // aplicaría hasta su barrido de seguridad (un minuto). Va sin `await`
-      // y traga sus propios errores — guardar la alarma ya funcionó, y esto
-      // solo adelanta cuándo empieza a vigilarse.
-      void recargarMotor();
     },
     [programar]
   );
 
-  // ── Baja ──────────────────────────────────────────────────────
+  /**
+   * Cambiar la condición.
+   *
+   * Es un cambio de UN campo, y así viaja: el límite de una analógica se
+   * escribe después, en su celda. (El servidor rechazaba antes este PATCH
+   * por no traer límite, y la celda volvía sola a «Bit activo».)
+   *
+   * Lo único que se arrastra es el bit en un tag Bool: ahí no se elige, así
+   * que se deja en el 0 por si la regla traía otro apuntado de antes.
+   */
+  const elegirComparador = useCallback(
+    (a: Alarm, comparador: Comparador) => {
+      const patch: Partial<Alarm> = { comparador };
+      if (
+        esDeBit(comparador) &&
+        !admiteElegirBit(tipoDe(a.triggerTag), comparador) &&
+        a.bitDisparo !== 0
+      ) {
+        patch.bitDisparo = 0;
+      }
+      editar(a.id, patch);
+    },
+    [editar, tipoDe]
+  );
+
+  /**
+   * Cambiar el Trigger tag.
+   *
+   * Si el tag se ELIGIÓ DE LA LISTA se sabe de qué tipo es, y la condición
+   * se ajusta a él: si la que había no existe para ese tipo («Mayor que»
+   * sobre un Bool, «Bit activo» sobre un decimal) pasa a la primera que sí
+   * se ofrece, que es la de arranque. Dejarla como estaba sería dejar
+   * configurada una alarma que no puede saltar.
+   *
+   * Mientras se TECLEA no se toca nada más que el tag: el texto a medias
+   * puede coincidir un instante con otro tag, y cambiarle la condición a
+   * quien todavía está escribiendo es peor que avisarle al terminar (la
+   * celda de la condición se marca en ámbar si no encaja con el tipo).
+   */
+  const elegirTag = useCallback(
+    (a: Alarm, tag: string, deLaLista: boolean) => {
+      const patch: Partial<Alarm> = { triggerTag: tag };
+      if (deLaLista) {
+        const tipo = tipoDe(tag);
+        const ofrecidos = comparadoresPara(tipo);
+        if (!ofrecidos.includes(a.comparador)) patch.comparador = ofrecidos[0];
+        const comparador = patch.comparador ?? a.comparador;
+        if (
+          esDeBit(comparador) &&
+          !admiteElegirBit(tipo, comparador) &&
+          a.bitDisparo !== 0
+        ) {
+          patch.bitDisparo = 0;
+        }
+      }
+      editar(a.id, patch);
+    },
+    [editar, tipoDe]
+  );
+
+  // ── Eliminar: a la papelera ───────────────────────────────────
   //
-  // Borra la REGLA, no los eventos que ya provocó: el backend pone a NULL
-  // `alarmas.alarma_def_id` antes de borrarla, así que el historial de lo
-  // que pasó sigue estando. Requiere rol Administradores.
-  const borrar = useCallback(
+  // NO borra la fila. La marca con la fecha, el motor deja de vigilarla (y
+  // cierra la alarma que tuviera activa) y baja a la tabla de eliminadas, de
+  // donde se puede restaurar. Los eventos que ya provocó conservan su número
+  // de alarma. Requiere rol Administradores.
+  const eliminar = useCallback(
+    (id: number) => {
+      void conServidor(async () => {
+        // Lo que esta fila tuviera pendiente de guardar se manda ANTES: si
+        // no, el temporizador lo escribiría después sobre una alarma ya
+        // eliminada, o —peor— se perdería y al restaurarla faltaría lo
+        // último que se le escribió.
+        const pendiente = cola.current.get(id);
+        if (pendiente) {
+          cola.current.delete(id);
+          await actualizarCrud('alarmas_def', id, pendiente, dbRef.current);
+        }
+        let cuando: string;
+        try {
+          cuando = await eliminarAlarma(id, dbRef.current);
+        } catch (e) {
+          if (e instanceof PapeleraNoDisponible) {
+            // No es un fallo de guardado, es una base a la que le falta un
+            // paso: se explica en su propio aviso, con la sentencia que lo
+            // arregla y la opción de borrar para siempre mientras tanto.
+            setSqlCopiado(false);
+            setSinPapelera({ id, sql: e.sql });
+            return;
+          }
+          throw e;
+        }
+        setSinPapelera(null);
+        setAlarmas((prev) =>
+          prev.map((a) => (a.id === id ? { ...a, eliminadoEn: cuando } : a))
+        );
+        // Que se vea adónde fue a parar.
+        setPapeleraAbierta(true);
+      });
+    },
+    [conServidor]
+  );
+
+  /** Copia al portapapeles la sentencia que le crea la papelera a la base. */
+  const copiarSql = useCallback(async (sql: string) => {
+    try {
+      await navigator.clipboard.writeText(sql);
+      setSqlCopiado(true);
+    } catch {
+      // Sin permiso de portapapeles (un visor incrustado, http sin TLS): la
+      // sentencia está a la vista y se puede seleccionar a mano.
+      setSqlCopiado(false);
+    }
+  }, []);
+
+  // ── Restaurar: de vuelta a la tabla ───────────────────────────
+  const restaurar = useCallback(
+    (id: number) => {
+      void conServidor(async () => {
+        await restaurarAlarma(id, dbRef.current);
+        setAlarmas((prev) =>
+          prev.map((a) => (a.id === id ? { ...a, eliminadoEn: null } : a))
+        );
+        setPorBorrar(null);
+        // El foco va a su nombre: la fila vuelve a su sitio por orden de
+        // ID, que puede caer fuera de lo que se está viendo, y así la tabla
+        // se desplaza sola hasta ella.
+        setFiltro('');
+        setRecienCreada(id);
+      });
+    },
+    [conServidor]
+  );
+
+  // ── Borrar para siempre (solo desde la papelera) ──────────────
+  //
+  // Aquí sí se va la fila. El backend pone a NULL `alarmas.alarma_def_id`
+  // antes de borrarla: el historial de lo que pasó sigue estando, pero esos
+  // eventos se quedan sin número de alarma. Por eso pide confirmación.
+  const borrarParaSiempre = useCallback(
     (id: number) => {
       void conServidor(async () => {
         await borrarCrud('alarmas_def', id, dbRef.current);
         setAlarmas((prev) => prev.filter((a) => a.id !== id));
+        setPorBorrar(null);
+        setSinPapelera(null);
+        void recargarMotor();
       });
     },
     [conServidor]
@@ -535,13 +800,13 @@ export function AlarmsEditor() {
   // ── Filtro ────────────────────────────────────────────────────
   const visibles = useMemo(() => {
     const q = filtro.trim().toLowerCase();
-    if (!q) return alarmas;
-    return alarmas.filter((a) =>
+    if (!q) return enUso;
+    return enUso.filter((a) =>
       `${a.id} ${a.name} ${a.text} ${a.alarmClass} ${a.triggerTag}`
         .toLowerCase()
         .includes(q)
     );
-  }, [alarmas, filtro]);
+  }, [enUso, filtro]);
 
   // Cuántas están configuradas pero NO se evalúan.
   //
@@ -550,16 +815,32 @@ export function AlarmsEditor() {
   // ignora por completo. Sin este contador, la forma de enterarse es que un
   // día no salte.
   const sinTag = useMemo(
-    () => alarmas.filter((a) => a.activo && !a.triggerTag.trim()).length,
-    [alarmas]
+    () => enUso.filter((a) => a.activo && !a.triggerTag.trim()).length,
+    [enUso]
+  );
+
+  // Lo mismo con las analógicas a las que aún no se les ha puesto límite:
+  // «Mayor que» sin un número contra el que comparar no salta nunca. Es el
+  // estado normal durante un momento —se elige la condición y luego se
+  // escribe el límite—, y por eso se avisa en vez de impedirlo.
+  const sinLimite = useMemo(
+    () =>
+      enUso.filter(
+        (a) =>
+          a.activo &&
+          a.triggerTag.trim() &&
+          esAnalogico(a.comparador) &&
+          a.limite === null
+      ).length,
+    [enUso]
   );
 
   // Cuántas hay de cada clase, para la leyenda de arriba.
   const conteos = useMemo(() => {
     const m = new Map<AlarmClassId, number>();
-    for (const a of alarmas) m.set(a.alarmClass, (m.get(a.alarmClass) ?? 0) + 1);
+    for (const a of enUso) m.set(a.alarmClass, (m.get(a.alarmClass) ?? 0) + 1);
     return m;
-  }, [alarmas]);
+  }, [enUso]);
 
   const filaAnim = sinMovimiento
     ? {}
@@ -584,9 +865,9 @@ export function AlarmsEditor() {
             <p className="text-[11px] text-slate-400">
               {cargando
                 ? 'Cargando…'
-                : alarmas.length === 0
+                : enUso.length === 0
                   ? 'Ninguna configurada'
-                  : `${alarmas.length} configurada${alarmas.length === 1 ? '' : 's'}`}
+                  : `${enUso.length} configurada${enUso.length === 1 ? '' : 's'}`}
             </p>
           </div>
         </div>
@@ -608,7 +889,7 @@ export function AlarmsEditor() {
         />
 
         {/* Leyenda con el conteo por clase */}
-        {alarmas.length > 0 && (
+        {enUso.length > 0 && (
           <div className="hidden flex-wrap items-center gap-1.5 md:flex">
             {ALARM_CLASSES.filter((c) => conteos.get(c.id)).map((c) => (
               <span
@@ -628,7 +909,7 @@ export function AlarmsEditor() {
         <EstadoAutoguardado estado={guardado} ocupado={ocupado} />
 
         <div className="ml-auto flex items-center gap-2">
-          {alarmas.length > 0 && (
+          {enUso.length > 0 && (
             <div className="relative">
               <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
               <input
@@ -685,6 +966,68 @@ export function AlarmsEditor() {
         </div>
       )}
 
+      {/* La base no tiene papelera y no se le pudo crear. No se deja a quien
+          pulsó el tachito delante de un «no se pudo»: se dice qué falta, con
+          la sentencia exacta para quien administre la base, y se ofrece
+          mientras tanto lo único que sí se puede hacer — borrarla del todo,
+          sabiendo que eso no tiene vuelta atrás. */}
+      {sinPapelera && (
+        <div
+          role="alertdialog"
+          aria-label="La papelera no está disponible en esta base de datos"
+          className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100"
+        >
+          <p className="flex items-center gap-2 font-semibold">
+            <AlertTriangleIcon className="h-3.5 w-3.5 shrink-0" />
+            Esta base de datos todavía no tiene la papelera de alarmas
+          </p>
+          <p className="mt-1">
+            La alarma{' '}
+            <strong>
+              {alarmas.find((a) => a.id === sinPapelera.id)?.name ||
+                `#${sinPapelera.id}`}
+            </strong>{' '}
+            no se ha tocado. Para poder eliminarla y restaurarla después, a la
+            tabla <span className="font-mono">alarmas_def</span> le falta una
+            columna, y el usuario con el que el HMI se conecta a la base no
+            tiene permiso para añadirla. Quien administre la base solo tiene
+            que ejecutar esto una vez:
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="min-w-0 flex-1 select-all overflow-x-auto whitespace-nowrap rounded-md bg-white/80 px-2.5 py-1.5 font-mono text-[11px] text-navy dark:bg-navy/70 dark:text-slate-100">
+              {sinPapelera.sql}
+            </code>
+            <button
+              type="button"
+              onClick={() => void copiarSql(sinPapelera.sql)}
+              className="shrink-0 rounded-lg border border-amber-300 bg-white/70 px-2.5 py-1 font-semibold text-amber-900 transition hover:bg-white dark:border-amber-500/40 dark:bg-transparent dark:text-amber-100 dark:hover:bg-amber-500/15"
+            >
+              {sqlCopiado ? 'Copiado' : 'Copiar'}
+            </button>
+          </div>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <span>Mientras tanto se puede</span>
+            <button
+              type="button"
+              onClick={() => borrarParaSiempre(sinPapelera.id)}
+              disabled={ocupado}
+              title="Borra la fila de la base de datos. No se podrá restaurar, y sus eventos del histórico se quedan sin número de alarma."
+              className="rounded-lg bg-state-error px-2.5 py-1 font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+            >
+              Borrarla para siempre
+            </button>
+            <span>(no se podrá restaurar), o</span>
+            <button
+              type="button"
+              onClick={() => setSinPapelera(null)}
+              className="rounded-lg border border-amber-300 px-2.5 py-1 font-semibold transition hover:bg-white/60 dark:border-amber-500/40 dark:hover:bg-amber-500/15"
+            >
+              Dejarla como está
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Las alarmas de la versión anterior, que siguen en este navegador.
           Se ofrecen; no se suben solas, porque subirlas sin preguntar
           duplicaría las que ya estén en la base. */}
@@ -717,38 +1060,49 @@ export function AlarmsEditor() {
 
       {/* ══ Tabla ═══════════════════════════════════════════════ */}
       <div className="flex-1 overflow-hidden p-4">
-        <div className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card dark:border-navy-slate dark:bg-navy-soft">
+        {/* Ancha a propósito. Con el tope de antes (`max-w-6xl`, 1152 px) la
+            tabla —que pide más— no cabía ni en un monitor grande: la última
+            columna, la de las acciones, quedaba SIEMPRE fuera, detrás de un
+            scroll horizontal que nadie sabía que existía. Es por lo que no
+            se encontraba el botón de eliminar. */}
+        <div className="mx-auto flex h-full max-w-[1600px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card dark:border-navy-slate dark:bg-navy-soft">
 
           {/* El contenedor scrollea en los dos ejes: en pantallas angostas la
               tabla no se comprime, se desplaza. Así ninguna columna se
-              vuelve ilegible. */}
+              vuelve ilegible. La de acciones va PEGADA al borde derecho
+              (`sticky`), de modo que el tachito está a la vista aunque haya
+              que desplazarse para ver el resto. */}
           <div ref={cuerpoRef} className="mp-scroll mp-scroll-dark flex-1 overflow-auto">
             {cargando ? (
               <Cargando texto="Leyendo las alarmas de la base de datos…" />
             ) : (
               <>
-                <table className="w-full min-w-[1240px] border-collapse text-left">
-                  <thead className="sticky top-0 z-10">
+                <table className="w-full min-w-[1330px] border-collapse text-left">
+                  <thead className="sticky top-0 z-20">
                     <tr className="bg-slate-100 dark:bg-navy">
                       <Th className="w-[72px] text-center">ID</Th>
-                      <Th className="w-[180px]">Name</Th>
+                      <Th className="w-[170px]">Name</Th>
                       <Th>Alarm text</Th>
-                      <Th className="w-[170px]">Alarm class</Th>
-                      <Th className="w-[250px]">Trigger tag</Th>
+                      <Th className="w-[160px]">Alarm class</Th>
+                      <Th className="w-[240px]">Trigger tag</Th>
                       {/* Las tres columnas de la CONDICIÓN. Estaban en la
                           tabla desde el principio pero sin dónde editarlas:
                           mientras no hubo motor daba igual, ahora deciden si
                           la alarma salta o no. */}
-                      <Th className="w-[210px]">Condición</Th>
-                      <Th className="w-[96px]">
+                      <Th className="w-[270px]">
+                        <span title="Cómo se evalúa. Las opciones dependen del tipo del Trigger tag: un Bool solo admite bit activo o inactivo; un entero, todo; un decimal, solo comparaciones.">
+                          Condición
+                        </span>
+                      </Th>
+                      <Th className="w-[84px]">
                         <span title="Histéresis: cuánto tiene que volver el valor para darla por normalizada. Solo en analógicas.">
                           Banda
                         </span>
                       </Th>
-                      <Th className="w-[64px] text-center">
-                        <span title="Desactivar silencia la regla sin borrarla.">On</span>
+                      <Th className="w-[56px] text-center">
+                        <span title="Desactivar silencia la regla sin eliminarla.">On</span>
                       </Th>
-                      <Th className="w-[76px] text-center">
+                      <Th className={`w-[84px] text-center ${PEGADA_CABECERA}`}>
                         <span className="sr-only">Acciones</span>
                       </Th>
                     </tr>
@@ -759,6 +1113,18 @@ export function AlarmsEditor() {
                       {visibles.map((a) => {
                         const clase = claseDe(a.alarmClass);
                         const Icono = clase.icon;
+                        // Qué condición admite ESTA fila, según su tag.
+                        const tipo = tipoDe(a.triggerTag);
+                        const ofrecidos = comparadoresPara(tipo);
+                        // Guardada con una condición que para este tipo de
+                        // tag no se ofrece (de antes de esta regla, o el tag
+                        // se tecleó después). Se enseña tal cual, marcada:
+                        // cambiarla sola sería tocarle la configuración a
+                        // alguien sin que lo haya pedido.
+                        const fueraDeTipo = !ofrecidos.includes(a.comparador);
+                        const eligeBit = admiteElegirBit(tipo, a.comparador);
+                        const faltaLimite =
+                          esAnalogico(a.comparador) && a.limite === null;
                         return (
                           <motion.tr
                             key={a.id}
@@ -850,7 +1216,9 @@ export function AlarmsEditor() {
                                 tags={tagsPlc}
                                 cargando={cargandoTags}
                                 sinPlcs={!hayPlcs}
-                                onElegir={(tag) => editar(a.id, { triggerTag: tag })}
+                                onElegir={(tag, _tipoTia, deLaLista) =>
+                                  elegirTag(a, tag, deLaLista === true)
+                                }
                               />
                             </td>
 
@@ -858,20 +1226,38 @@ export function AlarmsEditor() {
                                 Los dos controles van juntos porque son UNA
                                 decisión: "bit 3" y "mayor que 80" se leen de
                                 corrido, y separarlos en dos columnas obligaba
-                                a mirar a dos sitios para saber qué vigila. */}
+                                a mirar a dos sitios para saber qué vigila.
+
+                                El desplegable ofrece SOLO lo que el tipo del
+                                tag admite (ver `comparadoresPara`): con un
+                                Bool, las dos de bit; con un decimal, las seis
+                                comparaciones; con un entero, o si el tipo no
+                                se conoce, todas. */}
                             <td className="px-1 py-1">
                               <div className="flex items-center gap-1">
                                 <select
                                   value={a.comparador}
                                   onChange={(e) =>
-                                    editar(a.id, {
-                                      comparador: e.target.value as Comparador,
-                                    })
+                                    elegirComparador(a, e.target.value as Comparador)
                                   }
                                   aria-label={`Cómo se evalúa la alarma ${a.id}`}
-                                  className="w-[122px] shrink-0 cursor-pointer rounded-md border border-transparent bg-transparent py-1.5 pl-2 pr-1 text-xs text-navy outline-none transition hover:border-slate-200 hover:bg-white focus:border-siemens focus:bg-white focus:ring-2 focus:ring-siemens/20 dark:text-slate-100 dark:hover:border-navy-slate dark:hover:bg-navy dark:focus:bg-navy"
+                                  title={
+                                    fueraDeTipo
+                                      ? AVISO_FUERA_DE_TIPO[tipo]
+                                      : AYUDA_CONDICION[tipo]
+                                  }
+                                  className={`w-[176px] shrink-0 cursor-pointer rounded-md border bg-transparent py-1.5 pl-2 pr-1 text-xs outline-none transition hover:bg-white focus:border-siemens focus:bg-white focus:ring-2 focus:ring-siemens/20 dark:hover:bg-navy dark:focus:bg-navy ${
+                                    fueraDeTipo
+                                      ? 'border-state-warn/60 text-state-warn'
+                                      : 'border-transparent text-navy hover:border-slate-200 dark:text-slate-100 dark:hover:border-navy-slate'
+                                  }`}
                                 >
-                                  {COMPARADORES.map((c) => (
+                                  {fueraDeTipo && (
+                                    <option value={a.comparador}>
+                                      {ETIQUETA_COMPARADOR[a.comparador]} · no aplica
+                                    </option>
+                                  )}
+                                  {ofrecidos.map((c) => (
                                     <option key={c} value={c}>
                                       {ETIQUETA_COMPARADOR[c]}
                                     </option>
@@ -896,16 +1282,41 @@ export function AlarmsEditor() {
                                     }
                                     placeholder="límite"
                                     aria-label={`Valor límite de la alarma ${a.id}`}
-                                    className="w-full min-w-0 rounded-md border border-transparent bg-transparent py-1.5 px-2 text-right font-mono text-xs tabular-nums text-navy outline-none transition placeholder:text-slate-300 hover:border-slate-200 hover:bg-white focus:border-siemens focus:bg-white focus:ring-2 focus:ring-siemens/20 dark:text-slate-100 dark:placeholder:text-slate-600 dark:hover:border-navy-slate dark:hover:bg-navy dark:focus:bg-navy"
+                                    // Sin límite, una analógica no se evalúa.
+                                    // Es el estado de paso entre elegir la
+                                    // condición y escribir el número, así
+                                    // que se marca en vez de impedirse.
+                                    title={
+                                      faltaLimite
+                                        ? 'Falta el límite: sin un valor contra el que comparar, esta alarma no salta nunca.'
+                                        : 'Valor contra el que se compara el tag.'
+                                    }
+                                    className={`w-full min-w-0 rounded-md border bg-transparent py-1.5 px-2 text-right font-mono text-xs tabular-nums text-navy outline-none transition hover:bg-white focus:border-siemens focus:bg-white focus:ring-2 focus:ring-siemens/20 dark:text-slate-100 dark:hover:bg-navy dark:focus:bg-navy ${
+                                      faltaLimite
+                                        ? 'border-state-warn/60 placeholder:text-state-warn'
+                                        : 'border-transparent placeholder:text-slate-300 hover:border-slate-200 dark:placeholder:text-slate-600 dark:hover:border-navy-slate'
+                                    }`}
                                   />
                                 ) : (
                                   <div className="flex w-full min-w-0 items-center gap-1">
-                                    <span className="shrink-0 text-[10px] text-slate-400">bit</span>
+                                    <span
+                                      className={`shrink-0 text-[10px] text-slate-400 ${
+                                        eligeBit ? '' : 'opacity-40'
+                                      }`}
+                                    >
+                                      bit
+                                    </span>
                                     <input
                                       type="number"
                                       min={0}
                                       max={63}
-                                      value={a.bitDisparo}
+                                      // Deshabilitado, enseña el 0: es el
+                                      // bit que de verdad se mira en un Bool
+                                      // (el motor no atiende a otro), aunque
+                                      // la regla traiga apuntado uno distinto
+                                      // de antes.
+                                      value={eligeBit ? a.bitDisparo : 0}
+                                      disabled={!eligeBit}
                                       onChange={(e) =>
                                         editar(a.id, {
                                           bitDisparo: Math.max(
@@ -915,11 +1326,14 @@ export function AlarmsEditor() {
                                         })
                                       }
                                       aria-label={`Bit que dispara la alarma ${a.id}`}
-                                      // Un Bool del PLC es el bit 0, que es el
-                                      // valor de arranque: vigilar un Bool no
-                                      // obliga a tocar esto.
-                                      title="Qué bit del tag se vigila. Un Bool es el bit 0."
-                                      className="w-full min-w-0 rounded-md border border-transparent bg-transparent py-1.5 px-2 text-right font-mono text-xs tabular-nums text-navy outline-none transition hover:border-slate-200 hover:bg-white focus:border-siemens focus:bg-white focus:ring-2 focus:ring-siemens/20 dark:text-slate-100 dark:hover:border-navy-slate dark:hover:bg-navy dark:focus:bg-navy"
+                                      title={
+                                        eligeBit
+                                          ? 'Qué bit del tag se vigila (0 = el menos significativo).'
+                                          : tipo === 'bool'
+                                            ? 'Este tag es un Bool: es un solo bit, no hay cuál elegir.'
+                                            : 'Este tag es un número decimal: no tiene bits que elegir.'
+                                      }
+                                      className="w-full min-w-0 rounded-md border border-transparent bg-transparent py-1.5 px-2 text-right font-mono text-xs tabular-nums text-navy outline-none transition hover:border-slate-200 hover:bg-white focus:border-siemens focus:bg-white focus:ring-2 focus:ring-siemens/20 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-transparent disabled:hover:bg-transparent dark:text-slate-100 dark:hover:border-navy-slate dark:hover:bg-navy dark:focus:bg-navy"
                                     />
                                   </div>
                                 )}
@@ -984,20 +1398,24 @@ export function AlarmsEditor() {
                               </div>
                             </td>
 
-                            {/* Acciones — aparecen al pasar por encima */}
-                            <td className="px-1 py-1">
-                              <AccionesFila>
+                            {/* Acciones — SIEMPRE a la vista y pegadas al
+                                borde derecho. Antes solo aparecían al pasar
+                                por encima, en una columna que además quedaba
+                                fuera de la pantalla: el tachito existía y
+                                nadie lo encontraba. */}
+                            <td className={`px-1 py-1 ${PEGADA_CELDA}`}>
+                              <AccionesFila siempreVisibles>
                                 <IconoBoton
                                   onClick={() => duplicar(a.id)}
                                   titulo="Duplicar"
-                                  className="hover:bg-slate-100 hover:text-siemens dark:hover:bg-navy-slate/60"
+                                  className="text-slate-500 hover:bg-slate-100 hover:text-siemens dark:text-slate-300 dark:hover:bg-navy-slate/60"
                                 >
                                   <CopyIcon className="h-3.5 w-3.5" />
                                 </IconoBoton>
                                 <IconoBoton
-                                  onClick={() => borrar(a.id)}
-                                  titulo="Eliminar"
-                                  className="hover:bg-red-50 hover:text-state-error dark:hover:bg-state-error/10"
+                                  onClick={() => eliminar(a.id)}
+                                  titulo="Eliminar (va a la tabla de eliminadas, de donde se puede restaurar)"
+                                  className="text-slate-500 hover:bg-red-50 hover:text-state-error dark:text-slate-300 dark:hover:bg-state-error/10"
                                 >
                                   <Trash2Icon className="h-3.5 w-3.5" />
                                 </IconoBoton>
@@ -1011,15 +1429,19 @@ export function AlarmsEditor() {
                 </table>
 
                 {/* Sin alarmas todavía */}
-                {alarmas.length === 0 && (
+                {enUso.length === 0 && (
                   <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
                     <BellOffIcon className="mb-3 h-10 w-10 text-slate-300 dark:text-slate-600" />
                     <p className="text-sm font-semibold text-slate-500 dark:text-slate-300">
-                      Todavía no hay alarmas
+                      {eliminadas.length > 0
+                        ? 'No hay ninguna alarma en uso'
+                        : 'Todavía no hay alarmas'}
                     </p>
                     <p className="mt-1 max-w-sm text-xs leading-relaxed text-slate-400">
                       Cada alarma necesita un nombre, el texto que verá el operador,
                       su clase y el tag que la dispara.
+                      {eliminadas.length > 0 &&
+                        ' Las que eliminaste están abajo, y se pueden restaurar.'}
                     </p>
                     <button
                       onClick={agregar}
@@ -1033,7 +1455,7 @@ export function AlarmsEditor() {
                 )}
 
                 {/* Hay alarmas pero ninguna pasa el filtro */}
-                {alarmas.length > 0 && visibles.length === 0 && (
+                {enUso.length > 0 && visibles.length === 0 && (
                   <div className="px-6 py-12 text-center">
                     <p className="text-sm text-slate-400">
                       Ninguna alarma coincide con «{filtro}».
@@ -1050,10 +1472,161 @@ export function AlarmsEditor() {
             )}
           </div>
 
+          {/* ══ Papelera: las alarmas eliminadas ═════════════════
+              Va DEBAJO de la tabla y con su propio scroll, no al final del
+              scroll de arriba: con cien alarmas configuradas habría que
+              bajar hasta el fondo para descubrir que existe. Solo aparece
+              cuando hay algo dentro — una tabla vacía permanente serían
+              cuarenta píxeles menos de alarmas a la vista, todos los días,
+              para una cosa que se usa una vez al mes. */}
+          {!cargando && eliminadas.length > 0 && (
+            <section
+              aria-label="Alarmas eliminadas"
+              className="shrink-0 border-t border-slate-200 dark:border-navy-slate"
+            >
+              <button
+                type="button"
+                onClick={() => setPapeleraAbierta((v) => !v)}
+                aria-expanded={papeleraAbierta}
+                className="flex w-full items-center gap-2 bg-slate-50 px-4 py-2 text-left outline-none transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-siemens/40 dark:bg-navy/60 dark:hover:bg-navy"
+              >
+                <Trash2Icon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                <span className="text-xs font-bold text-navy dark:text-slate-100">
+                  Alarmas eliminadas
+                </span>
+                <span className="rounded bg-slate-200 px-1.5 py-px text-[10px] font-semibold tabular-nums text-slate-600 dark:bg-navy-slate dark:text-slate-300">
+                  {eliminadas.length}
+                </span>
+                <span className="hidden min-w-0 truncate text-[11px] text-slate-400 md:inline">
+                  El motor no las vigila. Se restauran tal como estaban, con
+                  su mismo ID.
+                </span>
+                <ChevronDownIcon
+                  aria-hidden="true"
+                  className={`ml-auto h-4 w-4 shrink-0 text-slate-400 transition-transform ${
+                    papeleraAbierta ? '' : '-rotate-90'
+                  }`}
+                />
+              </button>
+
+              {papeleraAbierta && (
+                <div className="mp-scroll mp-scroll-dark max-h-[228px] overflow-auto">
+                  <table className="w-full min-w-[1300px] table-fixed border-collapse text-left">
+                    <thead className="sticky top-0 z-20">
+                      <tr className="bg-slate-100 dark:bg-navy">
+                        <Th className="w-[72px] text-center">ID</Th>
+                        <Th className="w-[150px]">Name</Th>
+                        <Th>Alarm text</Th>
+                        <Th className="w-[120px]">Alarm class</Th>
+                        <Th className="w-[190px]">Trigger tag</Th>
+                        <Th className="w-[180px]">Condición</Th>
+                        <Th className="w-[176px]">Eliminada</Th>
+                        <Th className={`w-[250px] ${PEGADA_CABECERA}`}>
+                          <span className="sr-only">Acciones</span>
+                        </Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {eliminadas.map((a) => {
+                        const clase = claseDe(a.alarmClass);
+                        const Icono = clase.icon;
+                        return (
+                          <tr
+                            key={a.id}
+                            className="group border-t border-slate-100 text-xs text-slate-500 transition-colors hover:bg-slate-50/80 dark:border-navy-slate/70 dark:text-slate-400 dark:hover:bg-navy/40"
+                          >
+                            <td className="px-2 py-2">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <Icono className={`h-3.5 w-3.5 opacity-60 ${textoDe(clase)}`} />
+                                <span className="font-mono tabular-nums">{a.id}</span>
+                              </div>
+                            </td>
+                            <td className="truncate px-3 py-2 font-medium text-navy/80 dark:text-slate-200" title={a.name}>
+                              {a.name}
+                            </td>
+                            <td className="truncate px-3 py-2" title={a.text}>
+                              {a.text}
+                            </td>
+                            <td className="truncate px-3 py-2">
+                              <span className="inline-flex items-center gap-1.5">
+                                <span
+                                  aria-hidden="true"
+                                  className={`h-2 w-2 shrink-0 rounded-full opacity-70 ${clase.punto}`}
+                                />
+                                {a.alarmClass}
+                              </span>
+                            </td>
+                            <td className="truncate px-3 py-2 font-mono text-[11px]" title={a.triggerTag}>
+                              {a.triggerTag || <span className="font-sans italic">sin tag</span>}
+                            </td>
+                            <td className="truncate px-3 py-2" title={resumenCondicion(a)}>
+                              {resumenCondicion(a)}
+                            </td>
+                            <td className="truncate px-3 py-2 tabular-nums">
+                              {cuandoSeElimino(a.eliminadoEn)}
+                            </td>
+                            <td className={`px-2 py-1 ${PEGADA_CELDA}`}>
+                              <div className="flex items-center justify-end gap-1.5">
+                                {porBorrar === a.id ? (
+                                  <>
+                                    <span className="truncate text-[11px] font-semibold text-state-error">
+                                      ¿Para siempre?
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => borrarParaSiempre(a.id)}
+                                      disabled={ocupado}
+                                      title="Borra la fila de la base de datos. Sus eventos siguen en el histórico, pero pierden el número de alarma. No se puede deshacer."
+                                      className="shrink-0 rounded-lg bg-state-error px-2.5 py-1 text-[11px] font-semibold text-white outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-state-error/50 disabled:opacity-60"
+                                    >
+                                      Borrar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setPorBorrar(null)}
+                                      className="shrink-0 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600 outline-none transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-siemens/40 dark:border-navy-slate dark:text-slate-300 dark:hover:bg-navy-slate/40"
+                                    >
+                                      No
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => restaurar(a.id)}
+                                      disabled={ocupado}
+                                      title="Devolverla a la tabla de arriba, tal como estaba. El motor vuelve a vigilarla."
+                                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-siemens/50 px-2.5 py-1 text-[11px] font-semibold text-siemens outline-none transition hover:bg-siemens hover:text-white focus-visible:ring-2 focus-visible:ring-siemens/50 disabled:opacity-60"
+                                    >
+                                      <RotateCcwIcon className="h-3 w-3" />
+                                      Restaurar
+                                    </button>
+                                    <IconoBoton
+                                      onClick={() => setPorBorrar(a.id)}
+                                      titulo="Borrar para siempre"
+                                      className="hover:bg-red-50 hover:text-state-error dark:hover:bg-state-error/10"
+                                    >
+                                      <Trash2Icon className="h-3.5 w-3.5" />
+                                    </IconoBoton>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          )}
+
           {/* Pie: qué pasa con esto una vez guardado.
               Antes decía que no había motor. Ahora lo hay, y lo que hace
-              falta advertir es lo contrario: que una regla sin tag se ve
-              exactamente igual que una que funciona, y no salta nunca. */}
+              falta advertir es lo contrario: que una regla sin tag —o una
+              analógica sin límite— se ve casi igual que una que funciona, y
+              no salta nunca. */}
           <div className="flex items-start gap-2 border-t border-slate-100 bg-slate-50/70 px-4 py-2.5 dark:border-navy-slate dark:bg-navy/40">
             <InfoIcon className="mt-px h-3.5 w-3.5 shrink-0 text-slate-400" />
             <p className="min-w-0 text-[11px] leading-relaxed text-slate-400">
@@ -1062,13 +1635,21 @@ export function AlarmsEditor() {
               momento: cuando la condición se cumple escribe el evento en{' '}
               <span className="font-mono">alarmas</span> y avisa a todas las
               pantallas abiertas.{' '}
-              {sinTag > 0 ? (
+              {sinTag > 0 && (
                 <span className="font-semibold text-state-warn">
                   {sinTag === 1
-                    ? 'Hay 1 alarma sin Trigger tag: no se evalúa nunca.'
-                    : `Hay ${sinTag} alarmas sin Trigger tag: no se evalúan nunca.`}
+                    ? 'Hay 1 alarma sin Trigger tag: no se evalúa nunca. '
+                    : `Hay ${sinTag} alarmas sin Trigger tag: no se evalúan nunca. `}
                 </span>
-              ) : (
+              )}
+              {sinLimite > 0 && (
+                <span className="font-semibold text-state-warn">
+                  {sinLimite === 1
+                    ? 'Hay 1 alarma con una comparación sin límite: no salta hasta que lo tenga.'
+                    : `Hay ${sinLimite} alarmas con una comparación sin límite: no saltan hasta que lo tengan.`}
+                </span>
+              )}
+              {sinTag === 0 && sinLimite === 0 && (
                 <>Vigila aunque no haya nadie con el navegador abierto.</>
               )}
             </p>
@@ -1139,4 +1720,40 @@ function Firma({
 function textoDe(c: AlarmClassDef): string {
   const m = c.insignia.match(/text-[a-z]+-\d+/);
   return m ? m[0] : 'text-slate-400';
+}
+
+// ─── Para la tabla de eliminadas ─────────────────────────────────
+
+/** Una fecha de la base en milisegundos, o 0 si no se entiende. Para ordenar. */
+function fechaMs(iso: string | null): number {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
+/** Cuándo se eliminó, en la hora de quien mira. Si no se entiende, tal cual. */
+function cuandoSeElimino(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/**
+ * La condición de una alarma en una línea: «Bit activo (TRUE / 1) · bit 3»,
+ * «Mayor que 80». En la tabla de eliminadas no se edita nada, pero hay que
+ * poder reconocer cuál es cuál antes de restaurarla.
+ */
+function resumenCondicion(a: Alarm): string {
+  const etiqueta = ETIQUETA_COMPARADOR[a.comparador];
+  if (esDeBit(a.comparador)) {
+    return a.bitDisparo ? `${etiqueta} · bit ${a.bitDisparo}` : etiqueta;
+  }
+  return a.limite === null ? `${etiqueta} (sin límite)` : `${etiqueta} ${a.limite}`;
 }

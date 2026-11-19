@@ -9,41 +9,44 @@
 //                 una vez y no cambia en meses. Es lo que edita esta vista.
 //
 //   alarmas       los EVENTOS: qué pasó y cuándo. Una fila por disparo, y
-//                 crecen sin parar. Las escribirá el motor de alarmas, NO
+//                 crecen sin parar. Las escribe el motor de alarmas, NO
 //                 una persona — por eso esta vista no las toca.
 //
-// LA VISTA USA CINCO COLUMNAS, LA TABLA TIENE TRECE
+// QUÉ EDITA LA VISTA Y QUÉ NO
 //
-//   Las cinco son las de "Discrete alarms" de TIA Portal, que es el
-//   vocabulario con el que se trabaja en el proyecto:
+//   Las cinco primeras columnas son las de "Discrete alarms" de TIA Portal,
+//   que es el vocabulario con el que se trabaja en el proyecto:
 //
 //     ID → id · Name → nombre · Alarm text → texto
 //     Alarm class → clase · Trigger tag → tag
 //
-//   Las otras ocho existen en la tabla porque el motor de alarmas las va a
-//   necesitar (`comparador`, `valor_limite`, `banda_muerta`,
-//   `tag_reconocimiento`…), pero no hay dónde escribirlas todavía. Se crean
-//   en NULL a propósito: una columna vacía se ve vacía, mientras que un
-//   valor inventado —un límite de 0, un área "General"— parece configurado y
-//   el día que el motor exista se comportaría como si alguien lo hubiera
-//   decidido.
+//   Y la CONDICIÓN, que es lo que el motor necesita para evaluar:
 //
-//   Las TRES excepciones son las columnas `NOT NULL` de la tabla, que un
-//   NULL rechazaría en el INSERT: `clase` (la elige la vista), `comparador`
-//   (queda en 'bit', la alarma discreta de TIA, que es justo lo que
-//   describen estas cinco columnas) y `activo` (1: una alarma recién creada
-//   vigila; silenciarla es poner 0, y eso todavía no tiene control en la
-//   vista).
+//     Condición → comparador (+ bit_disparo o valor_limite)
+//     Banda → banda_muerta · On → activo
+//
+//   Qué condiciones se ofrecen depende del TIPO del tag (`comparadoresPara`):
+//   un Bool solo admite bit activo / inactivo, un decimal solo comparaciones.
+//
+//   Lo que sigue sin tener dónde editarse (`tag_reconocimiento`,
+//   `bit_reconocimiento`, `area`) se crea en NULL a propósito: una columna
+//   vacía se ve vacía, mientras que un valor inventado —un área "General"—
+//   parece configurado y se comportaría como si alguien lo hubiera decidido.
+//
+//   `eliminado_en` es la PAPELERA: no la escribe la vista con un PATCH, sino
+//   el servidor por su propio camino (`eliminarAlarma` / `restaurarAlarma`).
 //
 // POR QUÉ EXISTE ESTE ARCHIVO Y NO SE LLAMA AL CRUD DIRECTAMENTE
 //
 //   Las columnas de la base están en español y la vista usa el inglés de
 //   TIA. Traducir en un solo sitio evita que cada celda de la tabla tenga
 //   que saber cómo se llama su columna, y deja UN lugar donde mirar el día
-//   que se añada una de las ocho que faltan.
+//   que se añada una de las que faltan.
 // =========================================================================
 import { crearCrud, listarCrud, type FilaCrud } from './crudApi';
-import { fetchAuth } from './authApi';
+import { fetchAuth, getBasePreferida } from './authApi';
+import { mapOpcType } from './plcAdapter';
+import { API_BASE, apiPost } from '../components/flows/api';
 
 /**
  * Las cinco clases de TIA, de más a menos grave.
@@ -69,15 +72,24 @@ export const CLASE_DEFECTO: AlarmClassId = 'Error';
  * Cómo se evalúa la condición. Mismos valores que `COMPARADORES` en
  * `crud_manager.py` y que lee el motor en `alarm_engine.py`.
  *
- * `bit` es la alarma DISCRETA de TIA: mira un bit concreto del tag. El resto
- * son analógicas y comparan contra `valor_limite`.
+ * `bit` es la alarma DISCRETA de TIA: mira un bit concreto del tag y salta
+ * cuando está a 1. `!bit` es la misma al revés —salta cuando el bit está a
+ * 0—, que es la alarma de «falta la señal»: el permisivo que se cae, la
+ * marcha que no llega. El resto son analógicas y comparan contra
+ * `valor_limite`.
+ *
+ * EL ORDEN ES EL DEL DESPLEGABLE, y la primera es la de arranque: una alarma
+ * nueva nace en «Bit activo».
  */
-export const COMPARADORES = ['bit', '>', '>=', '<', '<=', '==', '!='] as const;
+export const COMPARADORES = [
+  'bit', '!bit', '>', '>=', '<', '<=', '==', '!=',
+] as const;
 export type Comparador = (typeof COMPARADORES)[number];
 
 /** Etiqueta legible de cada comparador, para el desplegable del editor. */
 export const ETIQUETA_COMPARADOR: Record<Comparador, string> = {
-  bit: 'Bit activo',
+  bit: 'Bit activo (TRUE / 1)',
+  '!bit': 'Bit inactivo (FALSE / 0)',
   '>': 'Mayor que',
   '>=': 'Mayor o igual',
   '<': 'Menor que',
@@ -86,8 +98,76 @@ export const ETIQUETA_COMPARADOR: Record<Comparador, string> = {
   '!=': 'Distinto de',
 };
 
+/** Los dos que miran un bit. */
+const DE_BIT: readonly Comparador[] = ['bit', '!bit'];
+/** Los seis que comparan contra el límite. */
+const ANALOGICOS: readonly Comparador[] = ['>', '>=', '<', '<=', '==', '!='];
+
+/** ¿Este comparador mira un bit del tag (activo o inactivo)? */
+export const esDeBit = (c: Comparador | string): boolean =>
+  c === 'bit' || c === '!bit';
+
 /** ¿Este comparador necesita `valor_limite`, o mira un bit? */
-export const esAnalogico = (c: Comparador | string): boolean => c !== 'bit';
+export const esAnalogico = (c: Comparador | string): boolean => !esDeBit(c);
+
+// ─── Qué condición admite cada tipo de tag ───────────────────────
+//
+// No todas las condiciones tienen sentido para todos los tags, y ofrecerlas
+// todas siempre era invitar a configurar alarmas que no pueden saltar:
+//
+//   Bool      Es UN bit. Solo «Bit activo» / «Bit inactivo», y sin elegir
+//             cuál: no hay más que uno.
+//   Entero    Todo vale. Como palabra de estado se mira un bit —y ahí sí se
+//             elige cuál—; como contador o consigna, se compara.
+//   Decimal   No tiene bits que mirar: solo las comparaciones.
+//
+// Cuando el tipo NO se sabe (el tag se escribió a mano, el PLC está apagado y
+// todavía no se ha hecho el browse) no se restringe nada: configurar alarmas
+// desde la oficina con la máquina parada tiene que seguir siendo posible.
+
+/** El tipo del Trigger tag, a efectos de qué condición se le puede poner. */
+export type TipoTag = 'bool' | 'entero' | 'decimal' | 'otro';
+
+/**
+ * Del tipo que anuncia el PLC (OPC UA, S7, CIP…) al que importa aquí.
+ *
+ * Reutiliza `mapOpcType`, el mismo traductor con el que el resto de la
+ * aplicación decide si una variable es booleana, entera o decimal: así una
+ * variable no puede ser «entera» en el Diseñador y «decimal» en esta tabla.
+ * Si el tag no trae tipo, el último valor recibido al menos delata a un
+ * booleano.
+ */
+export function tipoDeTag(
+  tipoPlc: string | null | undefined,
+  ultimoValor?: unknown
+): TipoTag {
+  const t = String(tipoPlc ?? '').trim();
+  if (t) {
+    const d = mapOpcType(t);
+    if (d === 'bool') return 'bool';
+    if (d === 'int') return 'entero';
+    if (d === 'double') return 'decimal';
+    return 'otro';
+  }
+  return typeof ultimoValor === 'boolean' ? 'bool' : 'otro';
+}
+
+/** Las condiciones que se ofrecen para ese tipo, en el orden del desplegable. */
+export function comparadoresPara(tipo: TipoTag): readonly Comparador[] {
+  if (tipo === 'bool') return DE_BIT;
+  if (tipo === 'decimal') return ANALOGICOS;
+  return COMPARADORES;
+}
+
+/**
+ * ¿Hay que elegir QUÉ bit se mira?
+ *
+ * Solo con una condición de bit, y solo si el tag puede tener más de uno: en
+ * un Bool no hay nada que elegir, y un decimal no tiene bits.
+ */
+export function admiteElegirBit(tipo: TipoTag, c: Comparador | string): boolean {
+  return esDeBit(c) && tipo !== 'bool' && tipo !== 'decimal';
+}
 
 /**
  * Una alarma tal como la pinta la vista.
@@ -113,9 +193,9 @@ export interface Alarm {
   // daba igual; ahora no, porque una alarma sin condición no salta nunca y
   // desde la vista era indistinguible de una que sí funciona.
 
-  /** `bit` (discreta) o un comparador analógico contra `limite`. */
+  /** `bit` / `!bit` (discreta) o un comparador analógico contra `limite`. */
   comparador: Comparador;
-  /** Qué bit del tag se mira cuando `comparador === 'bit'`. Un Bool es el 0. */
+  /** Qué bit del tag se mira en una condición de bit. Un Bool es el 0. */
   bitDisparo: number;
   /** Contra qué se compara en las analógicas. `null` = sin configurar. */
   limite: number | null;
@@ -129,10 +209,19 @@ export interface Alarm {
   bandaMuerta: number;
   /** `false` silencia la regla sin borrarla: se conserva y se puede reactivar. */
   activo: boolean;
+  /**
+   * LA PAPELERA. `null` = la alarma está en uso. Con fecha = alguien la
+   * eliminó ese día: baja a la tabla de eliminadas, el motor deja de
+   * vigilarla y se puede restaurar. La fila sigue en la base con su mismo
+   * `id`, que es lo que mantiene el histórico apuntando a ella.
+   */
+  eliminadoEn: string | null;
 }
 
 /** Tope de filas por lectura. El backend corta en 500 de todos modos. */
 const TOPE = 500;
+/** Tope de cordura al leer página a página. */
+const MAX_FILAS = 20000;
 
 const txt = (v: any): string => (v === null || v === undefined ? '' : String(v));
 
@@ -179,6 +268,9 @@ export function aAlarma(f: FilaCrud): Alarm {
     // La columna es NOT NULL DEFAULT 1, pero una base vieja sin migrar podría
     // no traerla: se asume que vigila, que es lo que espera quien la creó.
     activo: f.activo === undefined || f.activo === null ? true : Boolean(Number(f.activo)),
+    // Una base de antes de la papelera no trae la columna: ninguna alarma
+    // suya está eliminada, que es justo lo que da `null`.
+    eliminadoEn: txt(f.eliminado_en) || null,
   };
 }
 
@@ -276,21 +368,100 @@ export async function recargarMotor(): Promise<void> {
 // ─── Lectura ─────────────────────────────────────────────────────
 
 /**
- * Todas las definiciones, en orden de id.
+ * Todas las definiciones, en orden de id. TODAS: las que están en uso y las
+ * de la papelera (`eliminadoEn`), que el editor reparte en sus dos tablas.
  *
  * SIN filtrar por `activo`: una alarma silenciada (`activo = 0`) sigue
- * existiendo y hay que poder verla y editarla. Esta vista no tiene columna
- * para ese campo todavía, y esconder filas que sí están en la base sería la
- * peor forma de no tenerla — el usuario buscaría una alarma que existe y
- * concluiría que se borró sola.
+ * existiendo y hay que poder verla y editarla. Esconder filas que sí están en
+ * la base sería la peor forma de no enseñarlas — el usuario buscaría una
+ * alarma que existe y concluiría que se borró sola.
+ *
+ * Se lee PÁGINA A PÁGINA. El backend corta cada lectura en 500 filas, y con
+ * una sola petición la alarma 501 no aparecería nunca, sin ningún aviso.
+ * Importa más desde que hay papelera: lo eliminado también ocupa sitio en
+ * esa cuenta.
  */
 export async function cargarAlarmas(dbId?: string): Promise<Alarm[]> {
-  const { filas } = await listarCrud(
-    'alarmas_def',
-    { orden: 'id', descendente: false, limite: TOPE },
-    dbId
-  );
-  return filas.map(aAlarma);
+  const todas: Alarm[] = [];
+  for (let offset = 0; offset < MAX_FILAS; offset += TOPE) {
+    const { filas } = await listarCrud(
+      'alarmas_def',
+      { orden: 'id', descendente: false, limite: TOPE, offset },
+      dbId
+    );
+    todas.push(...filas.map(aAlarma));
+    if (filas.length < TOPE) break;
+  }
+  return todas;
+}
+
+// ─── La papelera ─────────────────────────────────────────────────
+//
+// Eliminar una alarma NO la borra: la manda a la papelera, de donde se puede
+// restaurar. Va por un endpoint propio y no por el CRUD porque no es solo
+// apuntar la fecha: el motor tiene que dejar de vigilarla en ese momento y
+// cerrar la alarma que tuviera activa (ver `alarm_routes.py`). Los dos piden
+// rol Administradores, igual que el borrado de siempre.
+//
+// El borrado DEFINITIVO sigue siendo `borrarCrud('alarmas_def', id)`.
+
+function conBase(ruta: string, dbId?: string): string {
+  const db = (dbId ?? '').trim() || getBasePreferida();
+  return db ? `${ruta}?db_id=${encodeURIComponent(db)}` : ruta;
+}
+
+/**
+ * La base de datos no tiene papelera, y el servidor no pudo creársela.
+ *
+ * Pasa donde el HMI se conecta con un usuario de solo datos (lo que crea el
+ * asistente en SQL Server): la papelera es una columna de `alarmas_def`, y
+ * ese usuario no puede añadir columnas. Tiene arreglo, y por eso es un error
+ * con nombre: trae en `sql` la sentencia exacta que hay que ejecutar una vez,
+ * para que el editor la enseñe con su botón de copiar y ofrezca mientras
+ * tanto el borrado definitivo, en vez de un «no se pudo» sin salida.
+ */
+export class PapeleraNoDisponible extends Error {
+  readonly sql: string;
+
+  constructor(mensaje: string, sql: string) {
+    super(mensaje);
+    this.name = 'PapeleraNoDisponible';
+    this.sql = sql;
+    // Sin esto, `instanceof` falla si el código se compila a ES5.
+    Object.setPrototypeOf(this, PapeleraNoDisponible.prototype);
+  }
+}
+
+/** Manda la alarma a la papelera. Devuelve cuándo quedó eliminada. */
+export async function eliminarAlarma(id: number, dbId?: string): Promise<string> {
+  let r: { fila?: FilaCrud } | null;
+  try {
+    // `fetchAuth` y no `apiPost`: conserva el cuerpo del error, que aquí
+    // viene con estructura (ver el `catch`). Con `API_BASE` delante, que es
+    // lo que `apiPost` pone por su cuenta.
+    r = await fetchAuth(
+      API_BASE + conBase(`/alarmas/definiciones/${id}/eliminar`, dbId),
+      { method: 'POST' }
+    );
+  } catch (e: any) {
+    const detalle = e?.data?.detail;
+    if (
+      detalle &&
+      typeof detalle === 'object' &&
+      detalle.codigo === 'papelera_no_disponible'
+    ) {
+      throw new PapeleraNoDisponible(txt(detalle.mensaje), txt(detalle.sql));
+    }
+    throw e;
+  }
+  // La fecha la pone el servidor. Si por lo que sea no viniera, la de ahora
+  // es la mejor aproximación: lo que importa en la vista es que NO sea null.
+  return txt(r?.fila?.eliminado_en) || new Date().toISOString();
+}
+
+/** Saca la alarma de la papelera: vuelve tal como estaba. */
+export async function restaurarAlarma(id: number, dbId?: string): Promise<void> {
+  await apiPost(conBase(`/alarmas/definiciones/${id}/restaurar`, dbId));
 }
 
 /** Crea una alarma y devuelve la fila completa ya traducida. */
@@ -314,9 +485,18 @@ export async function crearAlarma(
  * pueden venir de otra pantalla o de otro PC, así que `Alarma_47` con solo
  * tres alarmas en la tabla sería desconcertante. Lo que importa es que no se
  * repita el nombre en la lista que se está viendo.
+ *
+ * `tambienOcupados` son las de la papelera: no cuentan para el número de
+ * arranque, pero su nombre tampoco se reutiliza — si luego se restaura una,
+ * no puede encontrarse con otra que se llama igual.
  */
-export function siguienteNombre(alarmas: Alarm[]): string {
-  const usados = new Set(alarmas.map((a) => a.name.trim()));
+export function siguienteNombre(
+  alarmas: Alarm[],
+  tambienOcupados: Alarm[] = []
+): string {
+  const usados = new Set(
+    [...alarmas, ...tambienOcupados].map((a) => a.name.trim())
+  );
   let n = alarmas.length + 1;
   while (usados.has(`Alarma_${n}`)) n += 1;
   return `Alarma_${n}`;
@@ -379,6 +559,7 @@ export function leerAlarmasLocales(): Alarm[] {
         limite: null,
         bandaMuerta: 0,
         activo: true,
+        eliminadoEn: null,
       }));
   } catch {
     return [];

@@ -1,7 +1,7 @@
 -- ==========================================================================
 --  Esquema del HMI · SQLite
 -- ==========================================================================
---  GENERADO AUTOMÁTICAMENTE por tools/generar_sql.py el 2026-09-07.
+--  GENERADO AUTOMÁTICAMENTE por tools/generar_sql.py el 2026-11-16.
 --  No lo edites a mano: cambia `ddl_esquema_hmi()` en app/db/sql_driver.py
 --  y vuelve a generarlo. Así el script y el backend nunca se desincronizan.
 --
@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS alarmas_def (
     activo INTEGER NOT NULL DEFAULT 1,
     creado_en TEXT,
     actualizado_en TEXT,
+    eliminado_en TEXT,
     CONSTRAINT fk_alarmas_def_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
 )
 ;

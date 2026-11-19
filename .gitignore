@@ -35,6 +35,10 @@ datos_antes_de_restaurar_*/
 
 # --- Archivos que deja la app de escritorio de Claude (pantallazos, etc.) ---
 Claude outputs/
+# Lo que Claude aparta en vez de borrar (desde su sesión no tiene permiso
+# para borrar en esta carpeta): compilaciones intermedias del frontend,
+# candados de git caducados… Se puede borrar entera cuando se quiera.
+_to_delete/
 
 # La biblioteca ORIGINAL de Symbol Factory (.CAT, SYMFAC1.EXE, su licencia).
 # Es software de terceros —y con licencia a nombre de otra empresa: mirar su
