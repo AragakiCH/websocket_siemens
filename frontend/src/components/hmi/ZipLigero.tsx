@@ -73,6 +73,12 @@ interface Props {
   onModal?: (abierto: boolean) => void;
   onClic?: () => void;
   clicable?: boolean;
+  /**
+   * No quedarse con el puntero: es solo dibujo y está pisando a un widget
+   * que tiene que poder pulsarse. Lo decide quien dibuja la pantalla; ver
+   * `puntero.ts`.
+   */
+  sinPuntero?: boolean;
 }
 
 // ─── ¿Este ZIP puede ir sin iframe? ───────────────────────────────
@@ -230,7 +236,7 @@ function crearAmbito(host: HTMLElement, root: ShadowRoot, puente: Puente) {
 export function ZipLigero(props: Props) {
   const {
     zipWidget, widget, variable, enlaces, style,
-    interactivo = false, onClic, clicable = false,
+    interactivo = false, onClic, clicable = false, sinPuntero = false,
   } = props;
 
   // Si el script del ZIP falla al arrancar, ESTE widget vuelve al iframe.
@@ -428,7 +434,10 @@ export function ZipLigero(props: Props) {
         overflow: 'hidden',
         background: 'transparent',
         colorScheme: 'light',
-        pointerEvents: interactivo ? 'auto' : 'none',
+        // `auto` A MANO, y no heredado: por eso `sinPuntero` tiene que
+        // llegar hasta aquí. Con solo apagarlo en la caja de fuera, esta
+        // seguiría quedándose con el clic.
+        pointerEvents: interactivo && !sinPuntero ? 'auto' : 'none',
         cursor: clicable && interactivo ? 'pointer' : undefined,
       }}
     />

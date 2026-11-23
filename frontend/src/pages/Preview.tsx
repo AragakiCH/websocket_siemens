@@ -67,6 +67,7 @@ import { WidgetRenderer } from '../components/hmi/WidgetRenderer';
 import { Logo } from '../components/ui/Logo';
 import { RealPLCService } from '../services/RealPLCService';
 import CapaPopups from '../components/hmi/custom/faceplate/CapaPopups';
+import { dejanPasarElPuntero } from '../components/hmi/puntero';
 import {
   precargarPantallas,
   precargarModulos,
@@ -1090,30 +1091,39 @@ export function Preview() {
                 // Botón de Pantalla también: es con lo que se vuelve.
                 return !panel.abierta || sigueConPanelAbierto(w.kind);
               })
-              .map((w) => (
-                <div
-                  key={w.id}
-                  style={{
-                    position: 'absolute',
-                    left: w.x,
-                    top: w.y,
-                    width: w.width,
-                    height: w.height,
-                  }}
-                >
-                  <WidgetRenderer
-                    widget={w}
-                    variable={
-                      w.variableId ? variablePorId.get(idRealDeEnlace(w.variableId)) : undefined
-                    }
-                    // Aquí el widget se OPERA: el trend escucha el arrastre
-                    // para moverse en el tiempo. En el Diseñador no, porque
-                    // allí el arrastre sirve para colocarlo.
-                    interactivo
-                    resolver={resolverVariable}
-                  />
-                </div>
-              ))}
+              .map((w, _i, dibujados) => {
+                // Un widget que es SOLO DIBUJO y pisa al de Alarmas no se
+                // queda con el clic. La caja de un adorno llega más lejos de
+                // lo que pinta, y «Ver todas» dejaba de responder justo en
+                // las pantallas donde esa caja le caía encima. Ver puntero.ts.
+                const dejaPasar = dejanPasarElPuntero(dibujados).has(w.id);
+                return (
+                  <div
+                    key={w.id}
+                    style={{
+                      position: 'absolute',
+                      left: w.x,
+                      top: w.y,
+                      width: w.width,
+                      height: w.height,
+                      pointerEvents: dejaPasar ? 'none' : undefined,
+                    }}
+                  >
+                    <WidgetRenderer
+                      widget={w}
+                      variable={
+                        w.variableId ? variablePorId.get(idRealDeEnlace(w.variableId)) : undefined
+                      }
+                      // Aquí el widget se OPERA: el trend escucha el arrastre
+                      // para moverse en el tiempo. En el Diseñador no, porque
+                      // allí el arrastre sirve para colocarlo.
+                      interactivo
+                      resolver={resolverVariable}
+                      dejaPasar={dejaPasar}
+                    />
+                  </div>
+                );
+              })}
           </div>
           </div>
         )}

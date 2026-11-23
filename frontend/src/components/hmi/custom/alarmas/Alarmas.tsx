@@ -36,21 +36,36 @@
 // QUÉ ENSEÑA CADA FILA
 // Lo mismo que una tabla de alarmas de planta, en este orden:
 //
-//     SÍMBOLO – ID   FECHA   HORA   MENSAJE   USUARIO   ✓
+//     SÍMBOLO – ID   FECHA   HORA   MENSAJE   USUARIO   ACCIÓN (✓)
 //
 // El símbolo es el de la clase y el ID el NÚMERO DE LA ALARMA —el que tiene
 // en Configuración → Alarmas—, no el del evento. USUARIO es quién la
 // reconoció: mientras siga en esta lista va vacío, porque lo que aquí se
-// enseña es justamente lo que nadie ha reconocido todavía.
+// enseña es justamente lo que nadie ha reconocido todavía. ACCIÓN es el ✓
+// de reconocer, con su título como las demás columnas.
 //
 // Con sitio se pinta como tabla, con sus títulos. En un widget estrecho las
 // columnas no caben, y los mismos datos pasan a dos líneas: el mensaje
 // arriba y el resto debajo. No se pierde nada por hacerlo pequeño.
 //
+// EL AIRE ENTRE COLUMNAS
+// La tabla le da al mensaje todo lo que sobra, así que en un widget ancho
+// las demás columnas quedaban amontonadas a la izquierda, pegadas unas a
+// otras. La separación crece con el ancho del widget (ver `separacionDe`) y
+// se elige en el Inspector: compacta, normal o amplia. Una tabla estrecha no
+// cambia: ahí no sobra nada, y el aire saldría del mensaje.
+//
 // EL BOTÓN «VER TODAS»
 // Lleva a la pantalla de Alarmas (pendientes e histórico), como el de la
 // franja de arriba. Desde allí, la flecha de volver devuelve a esta misma
 // pantalla del HMI.
+//
+// Y tiene que poder pulsarse SIEMPRE. Un widget de adorno colocado encima se
+// queda con el puntero en toda su caja, también donde no pinta nada, y el
+// botón dejaba de responder justo en las pantallas donde esa caja lo pisaba.
+// Por eso la definición lleva `siempreAlcanzable`: quien dibuja la pantalla
+// hace que los widgets que son solo dibujo le dejen pasar el clic. Ver
+// `puntero.ts`.
 //
 // RECONOCER Y NAVEGAR, SOLO EN LA VISTA PREVIA
 // En el Diseñador los botones se ven pero no hacen nada (`interactivo` =
@@ -125,7 +140,21 @@ export interface ConfigAlarmas {
   colUsuario: boolean;
   /** Fila de títulos encima de la lista (ID, Fecha, Hora…). */
   cabeceras: boolean;
+  /** Cuánto aire hay entre las columnas de la tabla. Ver `Separacion`. */
+  separacion: Separacion;
 }
+
+/**
+ * El aire entre una columna y la siguiente.
+ *
+ *   compacta  El de siempre: lo justo para que no se toquen. Para widgets
+ *             pequeños, donde cada píxel es del mensaje.
+ *   normal    Se abre con el ancho: en un widget estrecho es la compacta, y
+ *             en uno ancho —donde las columnas se amontonaban a la izquierda
+ *             de un mensaje enorme— las separa.
+ *   amplia    Lo mismo, con más aire todavía.
+ */
+export type Separacion = 'compacta' | 'normal' | 'amplia';
 
 export const CONFIG_ALARMAS: ConfigAlarmas = {
   titulo: 'Alarmas',
@@ -141,6 +170,7 @@ export const CONFIG_ALARMAS: ConfigAlarmas = {
   colFecha: true,
   colUsuario: true,
   cabeceras: true,
+  separacion: 'normal',
 };
 
 /**
@@ -149,6 +179,33 @@ export const CONFIG_ALARMAS: ConfigAlarmas = {
  * el mensaje se queda con sitio para unas veinte letras.
  */
 const ANCHO_TABLA = 440;
+
+/**
+ * A partir de este ancho la tabla tiene sitio de sobra. Por debajo va justa
+ * —la fecha y la hora se llevan casi la mitad— y todo lo que se le dé a otra
+ * cosa se le quita al mensaje: ni se abre la separación ni se le pone título
+ * a la columna de los ✓ («Acción» es más ancho que el botón que encabeza).
+ * Entre `ANCHO_TABLA` y este ancho la tabla se ve como se ha visto siempre.
+ */
+const ANCHO_HOLGADO = 500;
+
+/** El aire a cada lado de una celda con la separación compacta, en píxeles. */
+const SEPARACION_MINIMA = 8;
+
+/**
+ * Píxeles de aire a CADA lado de las celdas de la tabla.
+ *
+ * Crece con el ancho de diseño del widget: hasta `ANCHO_HOLGADO` se queda en
+ * el mínimo, y de ahí sube un píxel cada 50 de ancho hasta el tope de la
+ * separación elegida. Un widget pequeño se ve como siempre; uno ancho deja
+ * de amontonar las columnas.
+ */
+function separacionDe(cfg: ConfigAlarmas, ancho: number): number {
+  const tope =
+    cfg.separacion === 'compacta' ? SEPARACION_MINIMA : cfg.separacion === 'amplia' ? 28 : 18;
+  const porAncho = SEPARACION_MINIMA + Math.floor((ancho - ANCHO_HOLGADO) / 50);
+  return Math.max(SEPARACION_MINIMA, Math.min(tope, porAncho));
+}
 
 export function leerConfigAlarmas(config: any): ConfigAlarmas {
   const c = config ?? {};
@@ -175,6 +232,10 @@ export function leerConfigAlarmas(config: any): ConfigAlarmas {
     colFecha: c.colFecha !== undefined ? c.colFecha !== false : c.hora !== false,
     colUsuario: c.colUsuario !== false,
     cabeceras: c.cabeceras !== false,
+    // «normal» para los widgets que ya estaban colocados: son justo los que
+    // tenían las columnas pegadas, y se arreglan sin abrirlos uno a uno.
+    separacion:
+      c.separacion === 'compacta' || c.separacion === 'amplia' ? c.separacion : 'normal',
   };
 }
 
@@ -299,6 +360,11 @@ function WidgetAlarmas({ widget, interactivo }: RenderCtx) {
   // después, y con ella esto.
   const comoTabla = (widget.width ?? 0) >= ANCHO_TABLA;
   const conTitulo = !!cfg.titulo.trim();
+  // El aire entre columnas, y con él el estilo de los títulos. Las filas
+  // reciben el mismo número: título y dato tienen que empezar en el mismo
+  // píxel.
+  const sep = separacionDe(cfg, widget.width ?? 0);
+  const th: CSSProperties = { ...TH, padding: `4px ${sep}px` };
 
   return (
     <div
@@ -412,12 +478,23 @@ function WidgetAlarmas({ widget, interactivo }: RenderCtx) {
                     <th style={{ ...TH, padding: 0 }}>
                       <div style={ANCHO_BARRA} />
                     </th>
-                    {cfg.colId && <th style={TH}>ID</th>}
-                    {cfg.colFecha && <th style={TH}>Fecha</th>}
-                    {cfg.hora && <th style={TH}>Hora</th>}
-                    <th style={{ ...TH, width: '100%' }}>Mensaje</th>
-                    {cfg.colUsuario && <th style={TH}>Usuario</th>}
-                    {cfg.reconocer && <th style={TH} />}
+                    {cfg.colId && <th style={th}>ID</th>}
+                    {cfg.colFecha && <th style={th}>Fecha</th>}
+                    {cfg.hora && <th style={th}>Hora</th>}
+                    <th style={{ ...th, width: '100%' }}>Mensaje</th>
+                    {cfg.colUsuario && <th style={th}>Usuario</th>}
+                    {/* La columna de los ✓ lleva título como las demás: era
+                        la única de la tabla sin nombre. Salvo en una tabla
+                        estrecha, donde se lo quitaría al mensaje (ver
+                        `ANCHO_HOLGADO`): ahí se queda como estaba. */}
+                    {cfg.reconocer &&
+                      ((widget.width ?? 0) >= ANCHO_HOLGADO ? (
+                        <th style={{ ...TH, padding: rellenoAccion(4, sep), textAlign: 'center' }}>
+                          Acción
+                        </th>
+                      ) : (
+                        <th style={TH} />
+                      ))}
                   </tr>
                 </thead>
               )}
@@ -430,6 +507,7 @@ function WidgetAlarmas({ widget, interactivo }: RenderCtx) {
                     interactivo={!!interactivo}
                     ocupada={ocupada === a.id}
                     onReconocer={() => void reconocerUna(a)}
+                    sep={sep}
                   />
                 ))}
               </tbody>
@@ -539,12 +617,28 @@ const CIFRAS: CSSProperties = { fontVariantNumeric: 'tabular-nums' };
 /** Ancho de la barra de severidad de la tabla. */
 const ANCHO_BARRA: CSSProperties = { width: 3 };
 
+/**
+ * El relleno de la columna de acción: arriba, derecha, abajo, izquierda.
+ *
+ * No lleva el aire entero de las demás. A su derecha está el borde del
+ * widget, y un ✓ flotando lejos de él se lee como una columna descolocada;
+ * a su izquierda basta la mitad, porque el título «Acción» ya separa. Con la
+ * separación compacta queda exactamente donde estaba.
+ */
+function rellenoAccion(vertical: number, sep: number): string {
+  const derecha = Math.min(sep, 12);
+  const izquierda = Math.max(4, Math.round(sep / 2));
+  return `${vertical}px ${derecha}px ${vertical}px ${izquierda}px`;
+}
+
 interface PropsFila {
   alarma: EventoAlarma;
   cfg: ConfigAlarmas;
   interactivo: boolean;
   ocupada: boolean;
   onReconocer: () => void;
+  /** Aire a cada lado de las celdas, en píxeles. Solo lo usa la tabla. */
+  sep?: number;
 }
 
 /** Lo que se lee al dejar el puntero sobre una alarma: lo que no cabe en la fila. */
@@ -573,13 +667,23 @@ function idDe(a: EventoAlarma): string {
 
 /**
  * Una alarma como fila de la tabla:
- * SÍMBOLO – ID · FECHA · HORA · MENSAJE · USUARIO · ✓
+ * SÍMBOLO – ID · FECHA · HORA · MENSAJE · USUARIO · ACCIÓN (✓)
  *
  * La barra de la izquierda repite la severidad en color: se lee sin leer,
  * desde el otro lado de la sala.
  */
-function FilaTabla({ alarma: a, cfg, interactivo, ocupada, onReconocer }: PropsFila) {
+function FilaTabla({
+  alarma: a,
+  cfg,
+  interactivo,
+  ocupada,
+  onReconocer,
+  sep = SEPARACION_MINIMA,
+}: PropsFila) {
   const usuario = nombreUsuario(a);
+  // La misma separación que los títulos: es lo que deja cada dato alineado
+  // con el nombre de su columna.
+  const td: CSSProperties = { ...TD, padding: `5px ${sep}px` };
   return (
     <tr title={detalleDe(a)}>
       {/* La barra lleva dentro un bloque con el ancho: una celda VACÍA con
@@ -589,7 +693,7 @@ function FilaTabla({ alarma: a, cfg, interactivo, ocupada, onReconocer }: PropsF
         <div style={ANCHO_BARRA} />
       </td>
       {cfg.colId && (
-        <td style={TD}>
+        <td style={td}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <SimboloClase severidad={a.severidad} tam={14} />
             <span style={{ ...CIFRAS, fontWeight: 700 }}>{idDe(a)}</span>
@@ -597,10 +701,10 @@ function FilaTabla({ alarma: a, cfg, interactivo, ocupada, onReconocer }: PropsF
         </td>
       )}
       {cfg.colFecha && (
-        <td style={{ ...TD, ...CIFRAS }}>{soloFecha(a.ts_activacion)}</td>
+        <td style={{ ...td, ...CIFRAS }}>{soloFecha(a.ts_activacion)}</td>
       )}
       {cfg.hora && (
-        <td style={{ ...TD, ...CIFRAS }} title={haceCuanto(a.ts_activacion)}>
+        <td style={{ ...td, ...CIFRAS }} title={haceCuanto(a.ts_activacion)}>
           {soloHora(a.ts_activacion)}
         </td>
       )}
@@ -609,7 +713,7 @@ function FilaTabla({ alarma: a, cfg, interactivo, ocupada, onReconocer }: PropsF
           vez de ensanchar la tabla hasta sacarla del widget. */}
       <td
         style={{
-          ...TD,
+          ...td,
           width: '100%',
           maxWidth: 0,
           overflow: 'hidden',
@@ -622,7 +726,7 @@ function FilaTabla({ alarma: a, cfg, interactivo, ocupada, onReconocer }: PropsF
       {cfg.colUsuario && (
         <td
           style={{
-            ...TD,
+            ...td,
             maxWidth: '10em',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -638,12 +742,15 @@ function FilaTabla({ alarma: a, cfg, interactivo, ocupada, onReconocer }: PropsF
         </td>
       )}
       {cfg.reconocer && (
-        <td style={{ ...TD, padding: '3px 8px 3px 4px' }}>
-          <BotonReconocer
-            interactivo={interactivo}
-            ocupada={ocupada}
-            onReconocer={onReconocer}
-          />
+        <td style={{ ...TD, padding: rellenoAccion(3, sep) }}>
+          {/* Centrado bajo su título: «Acción» es más ancho que el ✓. */}
+          <span style={{ display: 'flex', justifyContent: 'center' }}>
+            <BotonReconocer
+              interactivo={interactivo}
+              ocupada={ocupada}
+              onReconocer={onReconocer}
+            />
+          </span>
         </td>
       )}
     </tr>
@@ -1071,6 +1178,25 @@ function InspectorAlarmas({ config, setConfig }: InspectorCtx) {
             columnas no caben y cada alarma pasa a dos líneas, con los mismos
             datos.
           </span>
+
+          <label className="mt-2.5 block">
+            <span className={CLASE_ETIQUETA}>Separación entre columnas</span>
+            <select
+              value={cfg.separacion}
+              onChange={(e) => poner({ separacion: e.target.value as Separacion })}
+              className={CLASE_INPUT}
+            >
+              <option value="compacta">Compacta</option>
+              <option value="normal">Normal</option>
+              <option value="amplia">Amplia</option>
+            </select>
+            <span className={CLASE_AYUDA}>
+              El aire entre una columna y la siguiente. Crece con el ancho del
+              widget: por debajo de {ANCHO_HOLGADO} px las tres se ven igual
+              (y la columna de reconocer va sin título), para no quitarle
+              sitio al mensaje.
+            </span>
+          </label>
         </div>
       ) : (
         <Casilla
@@ -1120,12 +1246,15 @@ export const alarmasWidget: CustomWidgetDef = {
   label: 'Alarmas',
   category: 'Datos',
   icon: BellRingIcon,
-  // Ancho de sobra para la tabla con sus cinco columnas. (Los que ya estén
-  // colocados conservan su tamaño; por debajo de `ANCHO_TABLA` se pintan en
-  // dos líneas por alarma.)
-  defaultWidth: 560,
+  // Ancho de sobra para la tabla con sus seis columnas y sus títulos. (Los
+  // que ya estén colocados conservan su tamaño; por debajo de `ANCHO_TABLA`
+  // se pintan en dos líneas por alarma.)
+  defaultWidth: 600,
   defaultHeight: 240,
   render: (ctx) => <WidgetAlarmas {...ctx} />,
   inspector: (ctx) => <InspectorAlarmas {...ctx} />,
   defaultConfig: CONFIG_ALARMAS,
+  // «Ver todas» y los ✓ no pueden quedarse sin clic porque la caja de un
+  // widget de adorno les caiga encima. Ver `puntero.ts`.
+  siempreAlcanzable: true,
 };

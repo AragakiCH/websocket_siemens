@@ -60,6 +60,7 @@ import {
   type MensajeProjectUpdated,
 } from '../../../../utils/aplicarCambio';
 import { WidgetRenderer } from '../../WidgetRenderer';
+import { dejanPasarElPuntero } from '../../puntero';
 import { ContextoEmbebido, esWidgetDeNavegacion } from './store';
 import { indiceDe, useEsVisible } from '../../rendimiento';
 import { ahora, traza, trazaTrasPintar } from '../../../../utils/traza';
@@ -595,28 +596,36 @@ export default function PantallaEmbebida({
             background: fondo,
           }}
         >
-          {aDibujar.map((w) => (
-            <div
-              key={w.id}
-              style={{
-                position: 'absolute',
-                left: w.x,
-                top: w.y,
-                width: w.width,
-                height: w.height,
-              }}
-            >
-              <WidgetRenderer
-                widget={w}
-                variable={resolver(w.variableId)}
-                interactivo={interactivo}
-                // El MISMO resolutor que traduce la variable principal, así
-                // que las variables con nombre de un faceplate leen los tags
-                // de ESTA instancia sin ningún camino aparte.
-                resolver={resolver}
-              />
-            </div>
-          ))}
+          {aDibujar.map((w) => {
+            // Solo donde se opera, y solo el adorno que pisa a un widget que
+            // tiene que poder pulsarse (el de Alarmas): ver puntero.ts. La
+            // misma regla que aplica la vista previa a su propio lienzo.
+            const dejaPasar = interactivo && dejanPasarElPuntero(aDibujar).has(w.id);
+            return (
+              <div
+                key={w.id}
+                style={{
+                  position: 'absolute',
+                  left: w.x,
+                  top: w.y,
+                  width: w.width,
+                  height: w.height,
+                  pointerEvents: dejaPasar ? 'none' : undefined,
+                }}
+              >
+                <WidgetRenderer
+                  widget={w}
+                  variable={resolver(w.variableId)}
+                  interactivo={interactivo}
+                  // El MISMO resolutor que traduce la variable principal, así
+                  // que las variables con nombre de un faceplate leen los tags
+                  // de ESTA instancia sin ningún camino aparte.
+                  resolver={resolver}
+                  dejaPasar={dejaPasar}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

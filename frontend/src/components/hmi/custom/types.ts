@@ -48,6 +48,20 @@ export interface CustomWidgetDef {
   defaultConfig?: Record<string, any>;
 
   /**
+   * Sus mandos tienen que poder pulsarse SIEMPRE, lo pise quien lo pise.
+   *
+   * Un widget de adorno colocado encima se queda con el puntero en toda su
+   * caja, también donde no pinta nada, y deja sin clic lo que tiene debajo.
+   * Para la mayoría eso se arregla recolocando; para un widget marcado así
+   * no puede pasar: quien lo dibuja para operarlo hace que los widgets que
+   * son SOLO DIBUJO le dejen pasar el puntero. Ver `puntero.ts`.
+   *
+   * Hoy lo lleva el de Alarmas: llegar a las alarmas no puede depender de
+   * cómo quedó encajado el panel de al lado.
+   */
+  siempreAlcanzable?: boolean;
+
+  /**
    * Variables ADEMÁS de la principal que este tipo de widget sabe usar.
    *
    * Declararlas hace que el Inspector las pida con su nombre de verdad

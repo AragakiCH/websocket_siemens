@@ -85,11 +85,17 @@ interface Props {
   onClic?: () => void;
   /** Hay acción configurada: el puntero dentro del iframe pasa a ser mano. */
   clicable?: boolean;
+  /**
+   * No quedarse con el puntero: es solo dibujo y está pisando a un widget
+   * que tiene que poder pulsarse. Lo decide quien dibuja la pantalla; ver
+   * `puntero.ts`.
+   */
+  sinPuntero?: boolean;
 }
 
 export function HtmlWidgetRenderer({
   zipWidget, widget, variable, enlaces, style, interactivo = false, onModal,
-  onClic, clicable = false,
+  onClic, clicable = false, sinPuntero = false,
 }: Props) {
   // Sólo lectura / Lectura y escritura. Es del widget, no de la acción; se
   // edita en el panel de Acción y lo comparten todos (ver `acciones.ts`).
@@ -737,7 +743,11 @@ ${inicialScript}
         // real, pero solo vale para el Diseñador: allí el arrastre sirve para
         // colocar el widget, y un iframe que se quede con el puntero lo deja
         // imposible de mover. En la Vista previa es justo al revés.
-        pointerEvents: interactivo ? 'auto' : 'none',
+        //
+        // Y tampoco cuando es solo dibujo y pisa a un widget que tiene que
+        // poder pulsarse (`sinPuntero`, ver puntero.ts): un iframe se queda
+        // con el clic en TODA su caja, pinte algo ahí o no.
+        pointerEvents: interactivo && !sinPuntero ? 'auto' : 'none',
         display: 'block',
         background: 'transparent',
 

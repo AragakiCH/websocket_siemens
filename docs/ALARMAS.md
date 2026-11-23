@@ -142,9 +142,13 @@ Solo parpadean `Critical` y `Error`. Si todo parpadeara, el parpadeo dejaría de
 
 En la paleta del Diseñador, **Datos → Alarmas**. Es la lista de pendientes *dentro* de la pantalla del HMI, filtrable por gravedad, por área y por texto del tag.
 
-Cada fila enseña, en este orden: **símbolo e ID** de la alarma · **fecha** · **hora** · **mensaje** · **usuario** (quién la reconoció) · y el **✓** para reconocerla. Con menos de 440 px de ancho las columnas no caben y cada alarma pasa a dos líneas, con los mismos datos. Qué columnas salen se elige en el panel del widget.
+Cada fila enseña, en este orden: **símbolo e ID** de la alarma · **fecha** · **hora** · **mensaje** · **usuario** (quién la reconoció) · y la columna **Acción**, con el **✓** para reconocerla. Con menos de 440 px de ancho las columnas no caben y cada alarma pasa a dos líneas, con los mismos datos. Qué columnas salen se elige en el panel del widget.
+
+**Separación entre columnas** (en el panel del widget): *Compacta*, *Normal* o *Amplia*. La tabla le da al mensaje todo lo que sobra, así que en un widget ancho las demás columnas quedaban pegadas a la izquierda; con *Normal* —el valor por defecto, también para los widgets que ya estaban colocados— se abren solas según el ancho. Por debajo de 500 px no cambia nada, y la columna de reconocer va sin título: ahí el sitio es del mensaje.
 
 En la cabecera, el botón **«Ver todas»** abre la pantalla `/alarmas`. Reconocer y «Ver todas» solo actúan en la vista previa, no en el lienzo del Diseñador.
+
+**«Ver todas» no se puede tapar con un adorno.** En el lienzo cada widget ocupa su caja entera, también donde no pinta nada, y el que está encima se queda con el clic: un panel decorativo cuya caja pisaba la esquina del widget dejaba el botón sin respuesta en esas pantallas, aunque se viera perfectamente. Ahora un widget importado que es **solo dibujo** deja pasar el puntero mientras pise al widget de Alarmas. Es solo dibujo si su CSS apaga `pointer-events` y no lo enciende en ningún sitio, no trae botones, campos ni un script que escuche al operador, y no tiene acción configurada. Un widget con mandos (un botón, un campo) colocado encima conserva su clic, como siempre: si es ese el que estorba, se recoloca o se trae el de Alarmas al frente. La regla vive en `frontend/src/components/hmi/puntero.ts`.
 
 ### La pantalla `/alarmas`
 
@@ -279,6 +283,7 @@ Por WebSocket llegan `alarma.activada`, `alarma.normalizada` y `alarma.reconocid
 | `frontend/src/components/alarms/AlarmsEditor.tsx` | Configurar las reglas |
 | `frontend/src/components/alarms/BannerAlarmas.tsx` | La franja |
 | `frontend/src/components/hmi/custom/alarmas/Alarmas.tsx` | El widget de alarmas del lienzo |
+| `frontend/src/components/hmi/puntero.ts` | Quién se queda con el clic cuando un adorno pisa al widget |
 | `frontend/src/pages/Alarmas.tsx` | Pendientes e histórico |
 | `frontend/src/services/alarmasApi.ts` | Las reglas |
 | `frontend/src/services/alarmasRuntimeApi.ts` | Los eventos |

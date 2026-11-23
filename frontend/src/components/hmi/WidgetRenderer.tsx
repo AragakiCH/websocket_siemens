@@ -42,6 +42,15 @@ interface Props {
    * leería el tag de otro equipo, que es peor que no leer nada.
    */
   resolver?: (variableId: string | null | undefined) => PlcVariable | undefined;
+  /**
+   * Este widget NO se queda con el puntero.
+   *
+   * Lo decide quien dibuja la pantalla para operarla, cuando un widget que es
+   * solo dibujo está pisando a otro cuyos mandos tienen que poder pulsarse
+   * (ver `puntero.ts`). Se pinta exactamente igual, en su sitio y en su
+   * orden; lo único que cambia es que el clic lo atraviesa.
+   */
+  dejaPasar?: boolean;
 }
 
 // Pure visual renderer for a single HMI widget. Reused by canvas + preview.
@@ -55,6 +64,7 @@ function WidgetRendererBase({
   variable: variableLeida,
   interactivo = false,
   resolver,
+  dejaPasar = false,
 }: Props) {
   // Dentro de una Tarjeta de Acceso: los widgets caros (tendencia, alarmas,
   // recetas) se cambian por un marcador. Ver `rendimiento.ts`.
@@ -275,6 +285,7 @@ function WidgetRendererBase({
           onModal={setModalZip}
           onClic={pulsar}
           clicable={mandaAlgo}
+          sinPuntero={dejaPasar}
         />
       );
     }
@@ -294,6 +305,7 @@ function WidgetRendererBase({
              misma confirmación, y el mismo aviso rojo de abajo si falla. */
           onClic={pulsar}
           clicable={mandaAlgo}
+          sinPuntero={dejaPasar}
         />
       );
     }
@@ -732,6 +744,11 @@ function WidgetRendererBase({
       rootStyle.border = `${style.borderWidth}px solid ${style.borderColor}`;
     }
   }
+  // Solo dibujo pisando a un widget que tiene que poder pulsarse: esta caja
+  // tampoco se queda con el puntero. (El contenido del ZIP recibe lo mismo
+  // por su propiedad `sinPuntero`: él fija su `pointer-events` a mano y no
+  // lo heredaría de aquí.)
+  if (dejaPasar) rootStyle.pointerEvents = "none";
   if (oculto && interactivo) return null;
 
   return (
@@ -985,6 +1002,7 @@ function iguales(a: Props, b: Props): boolean {
   if (a.widget !== b.widget) return false;
   if (a.variable !== b.variable) return false;
   if (a.interactivo !== b.interactivo || a.live !== b.live) return false;
+  if (!!a.dejaPasar !== !!b.dejaPasar) return false;
   if (a.resolver === b.resolver) return true;
   if (!a.resolver || !b.resolver) return false;
   for (const id of idsQueUsa(b.widget)) {
